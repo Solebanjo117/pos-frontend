@@ -1,0 +1,101 @@
+# ERP: Auditoría y Hoja de Ruta Unificada
+
+> Estado al: Semana 1 desde inicio del proyecto (~70% ERP operativo implementado)
+
+---
+
+## ✅ Completado (esta semana)
+
+| Módulo | Estado |
+|---|---|
+| POS — sesiones, carrito, búsqueda asíncrona, numeración de carrito | ✅ |
+| POS — crédito, pagos parciales, cuentas por cobrar (AR) | ✅ |
+| Reporte Z (cierre de caja) | ✅ |
+| Órdenes de Compra + Recepción parcial | ✅ |
+| Cuentas por Pagar (AP) — pagos parciales a proveedores | ✅ |
+| Inventario multi-almacén + movimientos + mermas | ✅ |
+| Smart Reorder (sugerencias de reabasto) | ✅ |
+| Gestión de Marcas, Categorías, Proveedores | ✅ |
+| Catálogo de vehículos + compatibilidad + VIN Linking | ✅ |
+| Reportes: movimientos de inventario, stock levels | ✅ |
+| Dashboard con métricas multi-almacén | ✅ |
+
+---
+
+## 🗺️ Fases Pendientes y Estimaciones
+
+### Fase A — Estabilidad y Seguridad *(2-3 días)*
+> *Prioridad cero — sin esto no se puede pensar en producción*
+
+- [ ] **Roles y permisos (RBAC):** Cajero, Vendedor, Comprador, Gerente, Admin
+- [ ] **Backups de base de datos:** Automático + manual, protección de datos
+- [ ] **Estabilidad POS:** Manejo de errores, reconexión automática, validaciones defensivas
+
+---
+
+### Fase B — Datos y Operación Interna *(3-4 días)*
+> *Reduce fricción en el día a día*
+
+- [ ] **Importador masivo (Excel/CSV):** Para catálogo de productos, precios e inventario inicial
+- [ ] **Cotizaciones de venta:** Flujo cotización → aprobación → OV → factura
+- [ ] **Gastos en entregas:** Registro de costos de envío asociados a órdenes
+
+---
+
+### Fase C — Back-Office Financiero *(4-6 días)*
+> *Cierra el ciclo contable básico*
+
+- [ ] **Facturación fiscal (DGI/CFDI):** Formato oficial de factura para cliente, simplificado
+- [ ] **Devoluciones:** POS + OV, reversión de inventario y AR/AP
+- [ ] **Reserva de stock en OV:** Prevenir sobreventa al crear una orden
+- [ ] **Límite de crédito por cliente:** Alerta en POS si supera el cupo
+
+---
+
+### Fase D — Reportes e Inteligencia *(3-4 días)*
+> *Visibilidad para toma de decisiones gerenciales*
+
+- [ ] **Dashboard de ventas avanzado:** Gráficas diarias, top productos, rendimiento real
+- [ ] **Reportes financieros:** Rentabilidad por marca, ventas perdidas (backorders sin éxito)
+- [ ] **Estado de Resultados (P&L):** Ingresos vs. egresos del período
+
+---
+
+### Fase E — CRM B2B y Precios Inteligentes *(5-7 días)*
+> *Diferenciación para clientes tipo taller/distribuidor*
+
+- [ ] **Listas de precios dinámicas:** VIP, Taller, Mayorista, Cliente Casual
+- [ ] **Historial de flota/trabajos:** Venta vinculada al VIN que el mecánico repara (historial de garantías)
+- [ ] **Líneas de crédito preferenciales:** Bonos por volumen para talleres B2B
+
+---
+
+### Fase F — Configuración para Producción *(2-3 días)*
+> *Infraestructura final*
+
+- [ ] **Servidor y HTTPS:** VPS + dominio + SSL
+- [ ] **CI/CD:** Deploy automatizado
+- [ ] **Variables de entorno:** .env de producción (DB, mail, etc.)
+- [ ] **Monitoreo:** Error tracking, uptime alerts
+
+---
+
+### Fase G — Expansión *(largo plazo, opcional)*
+- [ ] Portal B2B: Talleres haciendo sus propias órdenes desde celular (auto-servicio)
+- [ ] Multi-empresa / SaaS (multi-tenant)
+
+---
+
+## ⏱️ Estimación Total
+
+| Fase | Estimado |
+|---|---|
+| A — Estabilidad y Seguridad | 2-3 días |
+| B — Datos y Operación | 3-4 días |
+| C — Back-Office Financiero | 4-6 días |
+| D — Reportes e Inteligencia | 3-4 días |
+| E — CRM B2B | 5-7 días |
+| F — Producción | 2-3 días |
+| **Total adicional** | **~3-5 semanas** |
+
+> Al ritmo actual (~70% en 1 semana): **producción básica en ~2 semanas más**, sistema completo en ~4-5 semanas.

@@ -1,0 +1,54 @@
+export interface Supplier {
+    id: number
+    name: string
+    contact_name?: string
+    email?: string
+    phone?: string
+    address?: string
+    city?: string
+    country?: string
+    payment_terms?: string
+    lead_time_days?: number
+    notes?: string
+    status: 'active' | 'inactive'
+    products_count?: number
+    created_at: string
+    updated_at: string
+    deleted_at?: string
+}
+
+export interface SupplierFilters {
+    search?: string
+    status?: 'active' | 'inactive'
+    sort_by?: string
+    sort_direction?: 'asc' | 'desc'
+    per_page?: number
+}
+
+export interface CreateSupplierData {
+    name: string
+    contact_name?: string
+    email?: string
+    phone?: string
+    address?: string
+    city?: string
+    country?: string
+    payment_terms?: string
+    lead_time_days?: number
+    notes?: string
+    status?: 'active' | 'inactive'
+}
+
+export interface UpdateSupplierData extends Partial<CreateSupplierData> { }
+
+export interface SupplierProduct {
+    id: number
+    product_id: number
+    product_name: string
+    product_sku: string
+    brand_name: string
+    supplier_cost: number
+    lead_time_days: number
+    minimum_order_quantity: number
+    is_preferred: boolean
+}

@@ -41,10 +41,15 @@ apiClient.interceptors.response.use(
 
             switch (status) {
                 case 401:
-                    // Session expired — redirect to login
-                    console.warn('[API] 401 Unauthorized — redirecting to login')
-                    router.visit('/login')
-                    break
+                    // Session expired or unauthenticated
+                    // Only redirect if we are not already on the login or welcome pages
+                    if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+                        console.warn('[API] 401 Unauthorized — redirecting to login')
+                        router.visit('/login')
+                    } else {
+                        console.warn('[API] 401 Unauthorized — suppressed redirect on public page')
+                    }
+                    break;
 
                 case 403:
                     // Forbidden — show toast via custom event

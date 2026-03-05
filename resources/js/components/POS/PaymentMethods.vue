@@ -42,15 +42,15 @@ defineExpose({ total })
 </script>
 
 <template>
-    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 h-full flex flex-col">
-        <h3 class="text-sm font-semibold text-gray-700 mb-4 border-b border-gray-100 pb-2">
+    <div class="bg-white dark:bg-card p-4 rounded-lg shadow-sm border border-gray-100 dark:border-border h-full flex flex-col">
+        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4 border-b border-gray-100 dark:border-border/50 pb-2">
             Otros Métodos de Pago
         </h3>
 
         <div class="overflow-auto flex-1">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div v-for="type in PAYMENT_TYPES" :key="type.id" class="flex flex-col">
-                    <label :for="`payment-${type.id}`" class="text-xs font-medium text-gray-500 mb-1">
+                    <label :for="`payment-${type.id}`" class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                         {{ type.label }}
                     </label>
                     <div class="relative">
@@ -64,7 +64,7 @@ defineExpose({ total })
                             step="0.01"
                             :value="(payments[type.id] || 0) === 0 ? '' : payments[type.id]"
                             @input="handleChange(type.id, ($event.target as HTMLInputElement).value)"
-                            class="w-full border border-gray-200 rounded px-3 py-2 pl-7 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-gray-900 transition-shadow text-sm"
+                            class="w-full border border-gray-200 dark:border-border dark:bg-card rounded px-3 py-2 pl-7 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-white transition-shadow text-sm"
                             placeholder="0.00"
                         />
                     </div>
@@ -72,9 +72,9 @@ defineExpose({ total })
             </div>
         </div>
 
-        <div class="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center bg-gray-50 p-3 rounded-md">
-            <span class="text-sm font-semibold text-gray-600">Total Electrónicos</span>
-            <span class="text-lg font-bold text-gray-900">{{ formatCurrency(total) }}</span>
+        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-border flex justify-between items-center bg-gray-50 dark:bg-muted p-3 rounded-md">
+            <span class="text-sm font-semibold text-gray-600 dark:text-gray-300">Total Electrónicos</span>
+            <span class="text-lg font-bold text-gray-900 dark:text-white">{{ formatCurrency(total) }}</span>
         </div>
     </div>
 </template>

@@ -57,7 +57,7 @@ onMounted(loadAccountsPayable)
                         Balance de deuda con proveedores basado en órdenes de compra pendientes de pago
                     </p>
                 </div>
-                <Link href="/purchase-orders" class="inline-flex items-center gap-2 px-4 py-2 border border-indigo-600 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition">
+                <Link href="/purchase-orders" class="inline-flex items-center gap-2 px-4 py-2 border border-indigo-600 dark:border-primary text-indigo-600 dark:text-primary dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition">
                     <ExternalLink :size="16" />
                     Ver Órdenes de Compra
                 </Link>
@@ -69,11 +69,11 @@ onMounted(loadAccountsPayable)
                     <p class="text-sm font-medium text-red-700 dark:text-red-300">Total Adeudado</p>
                     <p class="mt-2 text-3xl font-bold text-red-900 dark:text-red-200">{{ formatCurrency(totalDebt) }}</p>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-card rounded-lg p-6 border border-gray-200 dark:border-border">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Proveedores con Deuda</p>
                     <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ suppliersWithDebt.length }}</p>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-card rounded-lg p-6 border border-gray-200 dark:border-border">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Órdenes Pendientes</p>
                     <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                         {{ suppliers.reduce((sum: number, s: any) => sum + (s.pending_orders_count || 0), 0) }}
@@ -88,19 +88,19 @@ onMounted(loadAccountsPayable)
 
             <!-- Loading -->
             <div v-if="loading" class="flex justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-primary"></div>
             </div>
 
             <!-- Table -->
-            <div v-else class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div v-else class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-border">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <Building2 :size="20" class="text-indigo-500" />
                         Proveedores con Saldo Pendiente
                     </h2>
                 </div>
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-900">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <thead class="bg-gray-50 dark:bg-background">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Proveedor</th>
                             <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Órdenes Pendientes</th>
@@ -110,7 +110,7 @@ onMounted(loadAccountsPayable)
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody class="divide-y divide-gray-200 dark:divide-border">
                         <tr v-if="suppliers.length === 0">
                             <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                 <DollarSign class="mx-auto mb-3 text-gray-300" :size="48" />
@@ -118,9 +118,9 @@ onMounted(loadAccountsPayable)
                                 <p class="text-sm">Todas las órdenes de compra están liquidadas.</p>
                             </td>
                         </tr>
-                        <tr v-for="s in suppliers" :key="s.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                        <tr v-for="s in suppliers" :key="s.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/50 transition">
                             <td class="px-6 py-4">
-                                <Link :href="`/suppliers/${s.id}`" class="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">{{ s.name }}</Link>
+                                <Link :href="`/suppliers/${s.id}`" class="font-medium text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">{{ s.name }}</Link>
                                 <p class="text-xs text-gray-500 mt-0.5">{{ s.email }}</p>
                             </td>
                             <td class="px-6 py-4 text-center text-sm text-gray-600 dark:text-gray-400">
@@ -138,7 +138,7 @@ onMounted(loadAccountsPayable)
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <Link :href="`/purchase-orders?supplier_id=${s.id}`" class="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                                <Link :href="`/purchase-orders?supplier_id=${s.id}`" class="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">
                                     <ExternalLink :size="12" /> Ver OCs
                                 </Link>
                             </td>

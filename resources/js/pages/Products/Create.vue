@@ -309,14 +309,14 @@ const cancel = () => { window.location.href = '/products' }
         <form @submit.prevent="handleSubmit" class="space-y-6">
 
             <!-- ══════════ SECTION 1: Producto Base ══════════ -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Producto Base</h2>
                 <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Información compartida por todas las variantes. El nombre se genera con: <strong>Categoría + Vehículos</strong></p>
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Nombre del Producto</label>
                         <input v-model="form.name" type="text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                             placeholder="Déjalo en blanco para autogenerar"
                         />
                         <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">Se autogenera si lo dejas vacío</p>
@@ -330,7 +330,7 @@ const cancel = () => { window.location.href = '/products' }
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">SKU Base</label>
                         <input v-model="form.sku_base" type="text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                             :placeholder="skuPreview || 'Autogenerar al guardar'"
                         />
                         <div class="mt-1">
@@ -345,7 +345,7 @@ const cancel = () => { window.location.href = '/products' }
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Categoría</label>
                         <select v-model="form.category_id"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white">
                             <option :value="undefined">-- Selecciona una categoría --</option>
                             <optgroup v-for="category in categories.filter(c => !c.parent_id)" :key="category.id" :label="category.name">
                                 <option :value="category.id">{{ category.name }}</option>
@@ -359,7 +359,7 @@ const cancel = () => { window.location.href = '/products' }
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Estado</label>
                         <select v-model="form.status"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white">
                             <option value="active">Activo</option>
                             <option value="discontinued">Discontinuado</option>
                             <option value="pending">Pendiente</option>
@@ -369,21 +369,21 @@ const cancel = () => { window.location.href = '/products' }
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Notas</label>
                         <textarea v-model="form.description" rows="2"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                             placeholder="Notas internas del producto..."></textarea>
                     </div>
                 </div>
             </div>
 
             <!-- ══════════ SECTION 2: Compatibilidad Vehicular + VIN ══════════ -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800 border-l-4 border-teal-500">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card border-l-4 border-teal-500">
                 <h2 class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Compatibilidad Vehicular</h2>
                 <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Vehículos y VINs afectan el nombre del producto base.</p>
 
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-4 mb-4">
                     <div>
                         <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Marca del Vehículo</label>
-                        <select v-model="selectedMakeId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                        <select v-model="selectedMakeId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white">
                             <option :value="null">-- Marca --</option>
                             <option v-for="m in vehicleMakes" :key="m.id" :value="m.id">{{ m.name }}</option>
                         </select>
@@ -391,7 +391,7 @@ const cancel = () => { window.location.href = '/products' }
                     <div>
                         <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Modelo</label>
                         <select v-model="selectedModelId" :disabled="!selectedMakeId || loadingModels"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50">
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50">
                             <option :value="null">{{ loadingModels ? 'Cargando...' : '-- Modelo --' }}</option>
                             <option v-for="m in vehicleModels" :key="m.id" :value="m.id">
                                 {{ m.name }} {{ m.year_from ? `(${m.year_from}-${m.year_to || '...'})` : '' }}
@@ -401,7 +401,7 @@ const cancel = () => { window.location.href = '/products' }
                     <div>
                         <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Motor</label>
                         <select v-model="selectedEngineId" :disabled="!selectedModelId || loadingEngines"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50">
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50">
                             <option :value="null">{{ loadingEngines ? 'Cargando...' : '-- Motor --' }}</option>
                             <option v-for="e in vehicleEngines" :key="e.id" :value="e.id">
                                 {{ e.engine_code }} {{ e.displacement ? `(${e.displacement})` : '' }}
@@ -416,9 +416,9 @@ const cancel = () => { window.location.href = '/products' }
                     </div>
                 </div>
 
-                <div v-if="addedEngines.length > 0" class="mb-6 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                <div v-if="addedEngines.length > 0" class="mb-6 overflow-hidden rounded-lg border border-gray-200 dark:border-border">
                     <table class="w-full text-left text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-900/50">
+                        <thead class="bg-gray-50 dark:bg-background/50">
                             <tr>
                                 <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Marca</th>
                                 <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Modelo</th>
@@ -426,8 +426,8 @@ const cancel = () => { window.location.href = '/products' }
                                 <th class="w-10 px-2 py-2"></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700/50">
-                            <tr v-for="(eng, idx) in addedEngines" :key="eng.engine_id" class="bg-white dark:bg-gray-800">
+                        <tbody class="divide-y divide-gray-100 dark:divide-border/50">
+                            <tr v-for="(eng, idx) in addedEngines" :key="eng.engine_id" class="bg-white dark:bg-card">
                                 <td class="px-4 py-2 text-gray-900 dark:text-white">{{ eng.make }}</td>
                                 <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ eng.model }}</td>
                                 <td class="px-4 py-2 font-mono text-gray-600 dark:text-gray-400">{{ eng.engine }}</td>
@@ -443,7 +443,7 @@ const cancel = () => { window.location.href = '/products' }
                     <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-2">VINs del producto</label>
                     <div class="flex gap-2 mb-3">
                         <input v-model="vinInput" type="text" @keydown.enter.prevent="addVin"
-                            class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white font-mono uppercase"
+                            class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white font-mono uppercase"
                             placeholder="Ingresa un VIN y presiona Enter..." />
                         <button type="button" @click="addVin" :disabled="!vinInput.trim()"
                             class="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
@@ -461,7 +461,7 @@ const cancel = () => { window.location.href = '/products' }
             </div>
 
             <!-- ══════════ SECTION 3: Variante Inicial ══════════ -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800 border-l-4 border-indigo-500">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card border-l-4 border-indigo-500">
                 <h2 class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Variante Inicial (Default)</h2>
                 <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Marca, atributos técnicos, SKU y precio de la primera variante. Podrás agregar más marcas después.</p>
 
@@ -469,7 +469,7 @@ const cancel = () => { window.location.href = '/products' }
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Marca <span class="text-red-500">*</span></label>
                         <select v-model="form.brand_id" required :disabled="loadingBrands"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white">
                             <option v-if="loadingBrands" :value="undefined">Cargando marcas...</option>
                             <option v-for="brand in brands" :key="brand.id" :value="brand.id">{{ brand.name }}</option>
                         </select>
@@ -478,9 +478,9 @@ const cancel = () => { window.location.href = '/products' }
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">SKU de la Variante</label>
                         <input v-model="form.sku" type="text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                             :placeholder="autoVariantSku || 'Ej: ALT-0012-BOS'" />
-                        <p v-if="autoVariantSku" class="mt-1 text-xs text-indigo-600 dark:text-indigo-400">
+                        <p v-if="autoVariantSku" class="mt-1 text-xs text-indigo-600 dark:text-primary dark:text-indigo-400">
                             Auto: <span class="font-mono font-bold">{{ autoVariantSku }}</span>
                         </p>
                     </div>
@@ -488,13 +488,13 @@ const cancel = () => { window.location.href = '/products' }
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Custom SKU / UPC</label>
                         <input v-model="form.upc" type="text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                             placeholder="123456789012" />
                     </div>
                 </div>
 
                 <!-- Variant Attributes (from category) -->
-                <div v-if="variantAttributes.length > 0" class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div v-if="variantAttributes.length > 0" class="mt-6 pt-6 border-t border-gray-200 dark:border-border">
                     <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         🔧 Especificaciones Técnicas de esta Variante
                     </h3>
@@ -506,7 +506,7 @@ const cancel = () => { window.location.href = '/products' }
                                 <span v-if="attr.required" class="text-red-500">*</span>
                             </label>
                             <input v-model="attr.value" type="text" :required="attr.required"
-                                class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                                 :placeholder="`Ingresa ${attr.name.toLowerCase()}...`" />
                         </div>
                     </div>
@@ -514,70 +514,70 @@ const cancel = () => { window.location.href = '/products' }
             </div>
 
             <!-- ══════════ SECTION 4: Precios ══════════ -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Precios e Impuestos</h2>
 
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Tipo de Impuesto (ITBM)</label>
                     <div class="flex gap-4">
                         <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                            :class="form.pricing.tax_type === 'standard' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-gray-300 dark:border-gray-600'">
+                            :class="form.pricing.tax_type === 'standard' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-gray-300 dark:border-border'">
                             <input type="radio" name="tax_type" value="standard" :checked="form.pricing.tax_type === 'standard'" @change="onTaxTypeChange('standard')" class="sr-only" />
                             <span class="text-sm font-medium">Con ITBM (7%)</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                            :class="form.pricing.tax_type === 'exempt' ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'border-gray-300 dark:border-gray-600'">
+                            :class="form.pricing.tax_type === 'exempt' ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'border-gray-300 dark:border-border'">
                             <input type="radio" name="tax_type" value="exempt" :checked="form.pricing.tax_type === 'exempt'" @change="onTaxTypeChange('exempt')" class="sr-only" />
                             <span class="text-sm font-medium">Sin ITBM (0%)</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                            :class="form.pricing.tax_type === 'custom' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' : 'border-gray-300 dark:border-gray-600'">
+                            :class="form.pricing.tax_type === 'custom' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' : 'border-gray-300 dark:border-border'">
                             <input type="radio" name="tax_type" value="custom" :checked="form.pricing.tax_type === 'custom'" @change="onTaxTypeChange('custom')" class="sr-only" />
                             <span class="text-sm font-medium">Tasa personalizada</span>
                         </label>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-dashed border-gray-300 dark:border-gray-600">
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-3 p-4 rounded-lg bg-gray-50 dark:bg-muted/50 border border-dashed border-gray-300 dark:border-border">
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Precio Base (USD) <span class="text-red-500">*</span></label>
                         <input v-model.number="form.pricing.base_price" type="number" step="0.01" min="0" required
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="100.00" />
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" placeholder="100.00" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">ITBM (%) <span class="text-red-500">*</span></label>
                         <input v-model.number="form.pricing.tax_rate" type="number" step="0.01" min="0" max="15" required
                             :disabled="form.pricing.tax_type !== 'custom'"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50" />
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white disabled:opacity-50" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Precio Total (con ITBM)</label>
                         <input :value="computed_total" @input="onTotalChange(Number(($event.target as HTMLInputElement).value))"
                             type="number" step="0.01" min="0"
-                            class="mt-1 w-full rounded-md border border-blue-400 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20 px-3 py-2 dark:text-white font-semibold" />
-                        <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">Se recalcula automáticamente</p>
+                            class="mt-1 w-full rounded-md border border-blue-400 bg-blue-50 dark:border-blue-600 dark:border-primary dark:bg-blue-900/20 px-3 py-2 dark:text-white font-semibold" />
+                        <p class="mt-1 text-xs text-blue-600 dark:text-primary dark:text-blue-400">Se recalcula automáticamente</p>
                     </div>
                 </div>
             </div>
 
             <!-- ══════════ SECTION 5: Inventario ══════════ -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Inventario Inicial (Opcional)</h2>
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Stock Disponible</label>
                         <input v-model.number="form.initial_inventory![0].stock_available" type="number" min="0"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="100" />
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" placeholder="100" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Punto de Reorden</label>
                         <input v-model.number="form.initial_inventory![0].reorder_point" type="number" min="0"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="5" />
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" placeholder="5" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Cantidad de Reorden</label>
                         <input v-model.number="form.initial_inventory![0].reorder_quantity" type="number" min="0"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="20" />
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" placeholder="20" />
                     </div>
                 </div>
             </div>
@@ -589,7 +589,7 @@ const cancel = () => { window.location.href = '/products' }
                     Cancelar
                 </button>
                 <button type="submit" :disabled="loading"
-                    class="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
+                    class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-6 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-50">
                     {{ loading ? 'Creando...' : 'Crear Producto' }}
                 </button>
             </div>

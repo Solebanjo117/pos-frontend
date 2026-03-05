@@ -24,6 +24,12 @@ defineProps<{
 }>();
 
 const { isCurrentUrl } = useCurrentUrl();
+
+// Only expand the sidebar group that contains the active page
+const isGroupActive = (item: NavItem): boolean => {
+    if (!item.items) return false;
+    return item.items.some(sub => sub.href && isCurrentUrl(sub.href));
+};
 </script>
 
 <template>
@@ -32,7 +38,7 @@ const { isCurrentUrl } = useCurrentUrl();
         <SidebarMenu>
             <template v-for="item in items" :key="item.title">
                 <!-- Item with Subitems (Collapsible) -->
-                <Collapsible v-if="item.items && item.items.length > 0" as-child default-open class="group/collapsible">
+                <Collapsible v-if="item.items && item.items.length > 0" as-child :default-open="isGroupActive(item)" class="group/collapsible">
                     <SidebarMenuItem>
                         <CollapsibleTrigger as-child>
                             <SidebarMenuButton :tooltip="item.title">

@@ -134,7 +134,7 @@ const formatDate = (date: string | null) => {
                 <!-- Info Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Origin -->
-                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                         <div class="flex items-center gap-2 text-sm text-red-500 mb-1">
                             <Building2 :size="16" />
                             Almacén Origen
@@ -142,7 +142,7 @@ const formatDate = (date: string | null) => {
                         <p class="text-xl font-bold text-gray-900 dark:text-white">{{ transfer.from_warehouse?.name }}</p>
                     </div>
                     <!-- Destination -->
-                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                         <div class="flex items-center gap-2 text-sm text-green-500 mb-1">
                             <Building2 :size="16" />
                             Almacén Destino
@@ -152,7 +152,7 @@ const formatDate = (date: string | null) => {
                 </div>
 
                 <!-- Timeline -->
-                <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+                <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Línea de Tiempo</h3>
                     <div class="space-y-2 text-sm">
                         <div class="flex justify-between">
@@ -171,19 +171,19 @@ const formatDate = (date: string | null) => {
                 </div>
 
                 <!-- Items -->
-                <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+                <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
                         Productos ({{ transfer.items?.length || 0 }})
                     </h3>
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <thead class="bg-gray-50 dark:bg-muted/50">
                             <tr>
                                 <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Producto</th>
                                 <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">SKU</th>
                                 <th class="px-3 py-2 text-center font-medium text-gray-600 dark:text-gray-300">Cantidad</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        <tbody class="divide-y divide-gray-100 dark:divide-border">
                             <tr v-for="item in transfer.items" :key="item.id">
                                 <td class="px-3 py-2 text-gray-900 dark:text-white">{{ item.product?.name }}</td>
                                 <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ item.variant?.sku || item.product?.sku }}</td>
@@ -194,7 +194,7 @@ const formatDate = (date: string | null) => {
                 </div>
 
                 <!-- Notes -->
-                <div v-if="transfer.notes" class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+                <div v-if="transfer.notes" class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                     <h3 class="text-sm font-semibold text-gray-500 mb-1">Notas</h3>
                     <p class="text-gray-700 dark:text-gray-300">{{ transfer.notes }}</p>
                 </div>

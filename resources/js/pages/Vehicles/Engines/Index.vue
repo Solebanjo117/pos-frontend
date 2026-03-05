@@ -91,7 +91,7 @@ const changePage = (newPage: number) => {
                 <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Motores de Vehículos</h1>
                 <Link
                     href="/vehicles/engines/create"
-                    class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                    class="flex items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                 >
                     <Plus class="h-5 w-5" />
                     Nuevo Motor
@@ -99,7 +99,7 @@ const changePage = (newPage: number) => {
             </div>
 
             <!-- Search and Filter -->
-            <div class="flex flex-col gap-4 rounded-lg bg-white p-4 shadow dark:bg-gray-800 md:flex-row">
+            <div class="flex flex-col gap-4 rounded-lg bg-white p-4 shadow dark:bg-card md:flex-row">
                 <!-- Search -->
                 <div class="relative flex-1">
                     <Search class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
@@ -107,7 +107,7 @@ const changePage = (newPage: number) => {
                         v-model="search"
                         type="text"
                         placeholder="Buscar por código o desplazamiento..."
-                        class="w-full rounded-md border border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        class="w-full rounded-md border border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                     />
                 </div>
 
@@ -115,7 +115,7 @@ const changePage = (newPage: number) => {
                 <div class="relative w-full md:w-48">
                     <select
                         v-model="selectedMakeId"
-                        class="w-full rounded-md border border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        class="w-full rounded-md border border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                     >
                         <option :value="undefined">Todas las Marcas</option>
                         <option v-for="make in makes" :key="make.id" :value="make.id">
@@ -129,7 +129,7 @@ const changePage = (newPage: number) => {
                     <select
                         v-model="selectedModelId"
                         :disabled="!selectedMakeId"
-                        class="w-full rounded-md border border-gray-300 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        class="w-full rounded-md border border-gray-300 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400 dark:border-border dark:bg-muted dark:text-white"
                     >
                         <option :value="undefined">Todos los Modelos</option>
                         <option v-for="carModel in models" :key="carModel.id" :value="carModel.id">
@@ -140,9 +140,9 @@ const changePage = (newPage: number) => {
             </div>
 
             <!-- Data Table -->
-            <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
+            <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <thead class="bg-gray-50 dark:bg-muted">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
                                 Vehículo
@@ -161,7 +161,7 @@ const changePage = (newPage: number) => {
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody class="divide-y divide-gray-200 dark:divide-border">
                         <tr v-if="loading" class="animate-pulse">
                             <td colspan="5" class="px-6 py-4 text-center text-gray-500">Cargando...</td>
                         </tr>
@@ -171,7 +171,7 @@ const changePage = (newPage: number) => {
                         <tr
                             v-for="engine in engines"
                             :key="engine.id"
-                            class="hover:bg-gray-50 dark:hover:bg-gray-700"
+                            class="hover:bg-gray-50 dark:hover:bg-muted/50"
                         >
                             <td class="whitespace-nowrap px-6 py-4 text-gray-900 dark:text-white">
                                 <div class="font-medium">{{ engine.model?.make?.name }}</div>
@@ -190,13 +190,13 @@ const changePage = (newPage: number) => {
                                 <div class="flex justify-end gap-2">
                                     <Link
                                         :href="`/vehicles/engines/${engine.id}/edit`"
-                                        class="rounded p-1 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-600"
+                                        class="rounded p-1 text-blue-600 dark:text-primary hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-muted"
                                     >
                                         <Pencil class="h-5 w-5" />
                                     </Link>
                                     <button
                                         @click="handleDelete(engine.id)"
-                                        class="rounded p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-gray-600"
+                                        class="rounded p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-muted"
                                     >
                                         <Trash2 class="h-5 w-5" />
                                     </button>
@@ -207,11 +207,11 @@ const changePage = (newPage: number) => {
                 </table>
 
                 <!-- Pagination -->
-                <div v-if="total > perPage" class="flex items-center justify-between border-t border-gray-200 px-6 py-3 dark:border-gray-700">
+                <div v-if="total > perPage" class="flex items-center justify-between border-t border-gray-200 px-6 py-3 dark:border-border">
                     <button
                         :disabled="page === 1"
                         @click="changePage(page - 1)"
-                        class="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                        class="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
                     >
                         Anterior
                     </button>
@@ -221,7 +221,7 @@ const changePage = (newPage: number) => {
                     <button
                         :disabled="page * perPage >= total"
                         @click="changePage(page + 1)"
-                        class="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                        class="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
                     >
                         Siguiente
                     </button>

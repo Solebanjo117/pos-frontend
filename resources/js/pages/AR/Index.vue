@@ -94,11 +94,11 @@ const onSearch = () => {
 <template>
     <Head title="Cuentas por Cobrar" />
 
-    <div class="h-[calc(100vh-4rem)] flex overflow-hidden bg-gray-100 dark:bg-gray-900">
+    <div class="h-[calc(100vh-4rem)] flex overflow-hidden bg-gray-100 dark:bg-background">
         
         <!-- Left Panel: Debtors list -->
-        <div class="w-1/3 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="w-1/3 border-r border-gray-200 dark:border-border bg-white dark:bg-card flex flex-col">
+            <div class="p-4 border-b border-gray-200 dark:border-border">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Cuentas por Cobrar</h2>
                 <div class="relative">
                     <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -107,7 +107,7 @@ const onSearch = () => {
                         @input="onSearch"
                         type="text"
                         placeholder="Buscar cliente..."
-                        class="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-border rounded-lg text-sm bg-gray-50 dark:bg-muted text-gray-900 dark:text-white"
                     />
                 </div>
             </div>
@@ -126,7 +126,7 @@ const onSearch = () => {
                             'w-full text-left p-3 rounded-lg flex justify-between items-center transition-colors',
                             selectedCustomer?.id === customer.id
                                 ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-200 dark:border-indigo-800'
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                : 'hover:bg-gray-50 dark:hover:bg-muted/50/50'
                         ]"
                     >
                         <div>
@@ -144,7 +144,7 @@ const onSearch = () => {
         </div>
 
         <!-- Right Panel: Customer Details & Open Orders -->
-        <div class="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
+        <div class="flex-1 flex flex-col bg-gray-50 dark:bg-background">
             <div v-if="!selectedCustomer" class="flex-1 flex flex-col items-center justify-center text-gray-400">
                 <FileText class="w-16 h-16 mb-4 opacity-20" />
                 <p>Selecciona un cliente para ver sus deudas</p>
@@ -152,7 +152,7 @@ const onSearch = () => {
 
             <template v-else>
                 <!-- Customer Header -->
-                <div class="bg-white dark:bg-gray-800 p-6 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+                <div class="bg-white dark:bg-card p-6 border-b border-gray-200 dark:border-border shadow-sm">
                     <div class="flex justify-between items-start">
                         <div>
                             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ selectedCustomer.name }}</h2>
@@ -172,17 +172,17 @@ const onSearch = () => {
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Órdenes Pendientes de Pago</h3>
                     
                     <div v-if="loadingDetails" class="text-gray-500">Cargando...</div>
-                    <div v-else-if="customerOrders.length === 0" class="bg-white dark:bg-gray-800 p-6 text-center rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div v-else-if="customerOrders.length === 0" class="bg-white dark:bg-card p-6 text-center rounded-xl border border-gray-200 dark:border-border">
                         <p class="text-gray-500">No hay órdenes pendientes para este cliente.</p>
                     </div>
                     <div v-else class="space-y-4">
                         <div
                             v-for="order in customerOrders"
                             :key="order.id"
-                            class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-between"
+                            class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-5 flex items-center justify-between"
                         >
                             <div class="flex gap-4 items-center">
-                                <div class="bg-indigo-100 dark:bg-indigo-900/30 p-3 rounded-lg text-indigo-600 dark:text-indigo-400">
+                                <div class="bg-indigo-100 dark:bg-indigo-900/30 p-3 rounded-lg text-indigo-600 dark:text-primary dark:text-indigo-400">
                                     <FileText class="w-6 h-6" />
                                 </div>
                                 <div>
@@ -207,7 +207,7 @@ const onSearch = () => {
                                 </div>
                                 <button
                                     @click="openPayment(order)"
-                                    class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-sm"
+                                    class="px-5 py-2.5 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white font-medium rounded-lg transition-colors shadow-sm"
                                 >
                                     Abonar
                                 </button>

@@ -298,7 +298,7 @@ onMounted(() => {
 
             <!-- Loading -->
             <div v-if="loading && !currentProduct" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                 <p class="mt-2 text-gray-600">Cargando producto...</p>
             </div>
 
@@ -317,12 +317,12 @@ onMounted(() => {
                 <!--  TOP-LEVEL GROUP TABS (3 Pills)                           -->
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <div class="mb-6">
-                    <nav class="flex gap-2 rounded-xl bg-gray-100 p-1 dark:bg-gray-900">
+                    <nav class="flex gap-2 rounded-xl bg-gray-100 p-1 dark:bg-background">
                         <button
                             @click="activeTab = 'general'"
                             :class="[
                                 ['general','pricing','photos'].includes(activeTab)
-                                    ? 'bg-white shadow text-blue-700 dark:bg-gray-700 dark:text-blue-400'
+                                    ? 'bg-white shadow text-blue-700 dark:bg-muted dark:text-blue-400'
                                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
                                 'flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all'
                             ]"
@@ -333,7 +333,7 @@ onMounted(() => {
                             @click="activeTab = 'specs'"
                             :class="[
                                 ['specs','vins'].includes(activeTab)
-                                    ? 'bg-white shadow text-blue-700 dark:bg-gray-700 dark:text-blue-400'
+                                    ? 'bg-white shadow text-blue-700 dark:bg-muted dark:text-blue-400'
                                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
                                 'flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all'
                             ]"
@@ -344,7 +344,7 @@ onMounted(() => {
                             @click="activeTab = 'variants'"
                             :class="[
                                 ['variants','references','alternatives'].includes(activeTab)
-                                    ? 'bg-white shadow text-blue-700 dark:bg-gray-700 dark:text-blue-400'
+                                    ? 'bg-white shadow text-blue-700 dark:bg-muted dark:text-blue-400'
                                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
                                 'flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all'
                             ]"
@@ -359,19 +359,19 @@ onMounted(() => {
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <div v-if="['general','pricing','photos'].includes(activeTab)" class="space-y-6">
                     <!-- Sub-tabs -->
-                    <div class="flex gap-1 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex gap-1 border-b border-gray-200 dark:border-border">
                         <button @click="activeTab = 'general'"
-                            :class="[activeTab === 'general' ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
+                            :class="[activeTab === 'general' ? 'border-blue-500 text-blue-600 dark:text-primary dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
                             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
                             Información General
                         </button>
                         <button @click="activeTab = 'pricing'"
-                            :class="[activeTab === 'pricing' ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
+                            :class="[activeTab === 'pricing' ? 'border-blue-500 text-blue-600 dark:text-primary dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
                             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
                             Precios e Inventario
                         </button>
                         <button @click="activeTab = 'photos'"
-                            :class="[activeTab === 'photos' ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
+                            :class="[activeTab === 'photos' ? 'border-blue-500 text-blue-600 dark:text-primary dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
                             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2">
                             Fotos
                             <span v-if="productImages.length" class="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">{{ productImages.length }}</span>
@@ -382,7 +382,7 @@ onMounted(() => {
                     <form v-if="activeTab === 'general' || activeTab === 'pricing'" @submit.prevent="handleSubmit" class="space-y-6">
 
                         <!-- General Information -->
-                        <div v-show="activeTab === 'general'" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                        <div v-show="activeTab === 'general'" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                             <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Información General</h2>
                             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
@@ -390,14 +390,14 @@ onMounted(() => {
                                         SKU <span class="text-red-500">*</span>
                                     </label>
                                     <input v-model="form.sku" type="text" required
-                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" />
                                     <p v-if="validationErrors.sku" class="mt-1 text-sm text-red-600">{{ validationErrors.sku[0] }}</p>
                                 </div>
 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Custom SKU</label>
                                     <input v-model="form.upc" type="text"
-                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" />
                                 </div>
 
                                 <div class="md:col-span-2">
@@ -405,21 +405,21 @@ onMounted(() => {
                                         Nombre <span class="text-red-500">*</span>
                                     </label>
                                     <input v-model="form.name" type="text" required
-                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" />
                                     <p v-if="validationErrors.name" class="mt-1 text-sm text-red-600">{{ validationErrors.name[0] }}</p>
                                 </div>
 
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Notas</label>
                                     <textarea v-model="form.description" rows="3"
-                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                                         placeholder="Notas internas del producto..."></textarea>
                                 </div>
 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Estado</label>
                                     <select v-model="form.status"
-                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white">
                                         <option value="active">Activo</option>
                                         <option value="discontinued">Discontinuado</option>
                                         <option value="pending">Pendiente</option>
@@ -429,7 +429,7 @@ onMounted(() => {
                         </div>
 
                         <!-- Pricing -->
-                        <div v-show="activeTab === 'pricing'" v-if="form.pricing" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                        <div v-show="activeTab === 'pricing'" v-if="form.pricing" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                             <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Precios e Impuestos</h2>
 
                             <!-- Tax Type Selector -->
@@ -437,17 +437,17 @@ onMounted(() => {
                                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Tipo de Impuesto (ITBM)</label>
                                 <div class="flex gap-4">
                                     <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                                        :class="(form.pricing as any).tax_type === 'standard' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-gray-300 dark:border-gray-600'">
+                                        :class="(form.pricing as any).tax_type === 'standard' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-gray-300 dark:border-border'">
                                         <input type="radio" name="tax_type" value="standard" :checked="(form.pricing as any).tax_type === 'standard'" @change="onTaxTypeChange('standard')" class="sr-only" />
                                         <span class="text-sm font-medium">Con ITBM (7%)</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                                        :class="(form.pricing as any).tax_type === 'exempt' ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'border-gray-300 dark:border-gray-600'">
+                                        :class="(form.pricing as any).tax_type === 'exempt' ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'border-gray-300 dark:border-border'">
                                         <input type="radio" name="tax_type" value="exempt" :checked="(form.pricing as any).tax_type === 'exempt'" @change="onTaxTypeChange('exempt')" class="sr-only" />
                                         <span class="text-sm font-medium">Sin ITBM (0%)</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                                        :class="(form.pricing as any).tax_type === 'custom' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' : 'border-gray-300 dark:border-gray-600'">
+                                        :class="(form.pricing as any).tax_type === 'custom' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' : 'border-gray-300 dark:border-border'">
                                         <input type="radio" name="tax_type" value="custom" :checked="(form.pricing as any).tax_type === 'custom'" @change="onTaxTypeChange('custom')" class="sr-only" />
                                         <span class="text-sm font-medium">Tasa personalizada</span>
                                     </label>
@@ -455,25 +455,25 @@ onMounted(() => {
                             </div>
 
                             <!-- 3-Way Calculator -->
-                            <div class="grid grid-cols-1 gap-6 md:grid-cols-3 mb-6 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-dashed border-gray-300 dark:border-gray-600">
+                            <div class="grid grid-cols-1 gap-6 md:grid-cols-3 mb-6 p-4 rounded-lg bg-gray-50 dark:bg-muted/50 border border-dashed border-gray-300 dark:border-border">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Precio Base (USD)</label>
                                     <input v-model.number="form.pricing.base_price" type="number" step="0.01" min="0"
-                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">ITBM (%)</label>
                                     <input v-model.number="form.pricing.tax_rate" type="number" step="0.01" min="0" max="15"
                                         :disabled="(form.pricing as any).tax_type !== 'custom'"
-                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed" />
+                                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 disabled:cursor-not-allowed" />
                                     <p v-if="(form.pricing as any).tax_type !== 'custom'" class="mt-1 text-xs text-gray-500">Selecciona "Tasa personalizada" para editar</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Precio Total (con ITBM)</label>
                                     <input :value="computed_total" @input="onTotalChange(Number(($event.target as HTMLInputElement).value))"
                                         type="number" step="0.01" min="0"
-                                        class="mt-1 w-full rounded-md border border-blue-400 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20 px-3 py-2 dark:text-white font-semibold" />
-                                    <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">Se recalcula automáticamente</p>
+                                        class="mt-1 w-full rounded-md border border-blue-400 bg-blue-50 dark:border-blue-600 dark:border-primary dark:bg-blue-900/20 px-3 py-2 dark:text-white font-semibold" />
+                                    <p class="mt-1 text-xs text-blue-600 dark:text-primary dark:text-blue-400">Se recalcula automáticamente</p>
                                 </div>
                             </div>
 
@@ -487,17 +487,17 @@ onMounted(() => {
                                 Cancelar
                             </button>
                             <button type="submit" :disabled="loading"
-                                class="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
+                                class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-6 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-50">
                                 {{ loading ? 'Guardando...' : 'Guardar Cambios' }}
                             </button>
                         </div>
                     </form>
 
                     <!-- Photos (outside form) -->
-                    <div v-if="activeTab === 'photos'" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div v-if="activeTab === 'photos'" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <div class="flex items-center justify-between mb-6">
                             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Fotos del Producto</h2>
-                            <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition">
+                            <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90 transition">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                 </svg>
@@ -546,7 +546,7 @@ onMounted(() => {
                         <div v-if="productImages.length > 1" class="mt-4 grid grid-cols-6 gap-2 max-w-2xl mx-auto">
                             <button v-for="(img, idx) in productImages" :key="img.id" @click="goToImage(idx)" type="button"
                                 class="relative h-16 rounded-lg overflow-hidden border-2 transition-all"
-                                :class="idx === currentImageIndex ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400 dark:border-gray-600'">
+                                :class="idx === currentImageIndex ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400 dark:border-border'">
                                 <img :src="img.url" class="h-full w-full object-cover" />
                             </button>
                         </div>
@@ -558,21 +558,21 @@ onMounted(() => {
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <div v-if="['specs','vins'].includes(activeTab)" class="space-y-6">
                     <!-- Sub-tabs -->
-                    <div class="flex gap-1 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex gap-1 border-b border-gray-200 dark:border-border">
                         <button @click="activeTab = 'vins'"
-                            :class="[activeTab === 'vins' ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
+                            :class="[activeTab === 'vins' ? 'border-blue-500 text-blue-600 dark:text-primary dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
                             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2">
                             🔑 VINs
                             <span v-if="vins.length" class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{{ vins.length }}</span>
                         </button>
                     </div>
 
-                    <div class="rounded-lg bg-white/60 dark:bg-gray-800/60 p-4 border border-amber-200 dark:border-amber-800/50 mb-4">
+                    <div class="rounded-lg bg-white/60 dark:bg-card/60 p-4 border border-amber-200 dark:border-amber-800/50 mb-4">
                         <p class="text-sm text-amber-700 dark:text-amber-300">💡 Las <strong>especificaciones técnicas</strong> (atributos) ahora pertenecen a cada <strong>variante</strong>, no al producto base. Edítalas desde la pestaña <em>Variantes y Referencias</em>.</p>
                     </div>
 
 
-                    <div v-if="activeTab === 'vins'" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div v-if="activeTab === 'vins'" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">VINs Vinculados</h2>
                         <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Asocia VINs específicos a este producto. Al escanear un VIN en el POS, se mostrarán los productos compatibles.</p>
 
@@ -580,19 +580,19 @@ onMounted(() => {
                             <div class="flex-1">
                                 <input v-model="newVin" type="text" maxlength="40"
                                     placeholder="Ingresa o escanea un VIN"
-                                    class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono uppercase dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                    class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono uppercase dark:border-border dark:bg-muted dark:text-white"
                                     @keyup.enter="handleAddVin" />
                                 <p v-if="vinError" class="mt-1 text-sm text-red-600">{{ vinError }}</p>
                             </div>
                             <button type="button" @click="handleAddVin" :disabled="addingVin || newVin.trim().length < 1"
-                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition text-sm font-medium">
+                                class="px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-50 text-white rounded-lg transition text-sm font-medium">
                                 {{ addingVin ? 'Agregando...' : '+ Agregar VIN' }}
                             </button>
                         </div>
 
                         <div v-if="vins.length" class="space-y-2">
                             <div v-for="vin in vins" :key="vin.id"
-                                class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3 bg-gray-50 dark:bg-gray-900">
+                                class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-border px-4 py-3 bg-gray-50 dark:bg-background">
                                 <span class="font-mono text-sm font-semibold tracking-widest text-gray-800 dark:text-gray-200">{{ vin.vin }}</span>
                                 <button type="button" @click="handleRemoveVin(vin.id)"
                                     class="p-1 text-gray-400 hover:text-red-600 transition" title="Eliminar VIN">
@@ -613,19 +613,19 @@ onMounted(() => {
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <div v-if="['variants','references','alternatives'].includes(activeTab)" class="space-y-6">
                     <!-- Sub-tabs -->
-                    <div class="flex gap-1 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex gap-1 border-b border-gray-200 dark:border-border">
                         <button @click="activeTab = 'variants'"
-                            :class="[activeTab === 'variants' ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
+                            :class="[activeTab === 'variants' ? 'border-blue-500 text-blue-600 dark:text-primary dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
                             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
                             Variantes
                         </button>
                         <button @click="activeTab = 'references'"
-                            :class="[activeTab === 'references' ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
+                            :class="[activeTab === 'references' ? 'border-blue-500 text-blue-600 dark:text-primary dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
                             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
                             Referencias OEM
                         </button>
                         <button @click="activeTab = 'alternatives'"
-                            :class="[activeTab === 'alternatives' ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
+                            :class="[activeTab === 'alternatives' ? 'border-blue-500 text-blue-600 dark:text-primary dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
                             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
                             Alternativas
                         </button>

@@ -35,7 +35,7 @@ const handleConfirm = () => {
 <template>
     <div class="bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800 px-6 py-2 flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div class="bg-indigo-600 rounded-full p-1.5 text-white">
+            <div class="bg-indigo-600 dark:bg-primary dark:text-primary-foreground rounded-full p-1.5 text-white">
                 <Car :size="16" />
             </div>
             
@@ -48,7 +48,7 @@ const handleConfirm = () => {
                 </span>
                 <button 
                     @click="clearVehicle"
-                    class="ml-2 p-1 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full text-indigo-600 dark:text-indigo-400 transition-colors"
+                    class="ml-2 p-1 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full text-indigo-600 dark:text-primary dark:text-indigo-400 transition-colors"
                     title="Quitar vehículo"
                 >
                     <X :size="16" />
@@ -56,7 +56,7 @@ const handleConfirm = () => {
             </div>
             
             <div v-else class="flex items-center gap-2">
-                 <span class="text-sm text-indigo-600 dark:text-indigo-300">
+                 <span class="text-sm text-indigo-600 dark:text-primary dark:text-indigo-300">
                     No hay vehículo seleccionado
                 </span>
             </div>
@@ -64,17 +64,17 @@ const handleConfirm = () => {
 
         <button 
             @click="openModal"
-            class="px-3 py-1.5 text-sm font-medium bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-colors shadow-sm"
+            class="px-3 py-1.5 text-sm font-medium bg-white dark:bg-card border border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-colors shadow-sm"
         >
             {{ isVehicleSelected ? 'Cambiar Vehículo' : 'Seleccionar Vehículo' }}
         </button>
 
         <!-- Modal -->
         <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="closeModal">
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-3xl overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+            <div class="bg-white dark:bg-card rounded-xl shadow-xl w-full max-w-3xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-border flex justify-between items-center bg-gray-50 dark:bg-card/50">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Car :size="20" class="text-indigo-600" />
+                        <Car :size="20" class="text-indigo-600 dark:text-primary" />
                         Seleccionar Vehículo del Cliente
                     </h3>
                     <button @click="closeModal" class="text-gray-400 hover:text-gray-500">
@@ -88,14 +88,14 @@ const handleConfirm = () => {
                     <div class="mt-8 flex justify-end gap-3">
                         <button 
                             @click="closeModal"
-                            class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
+                            class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-muted border border-gray-300 dark:border-border rounded-lg hover:bg-gray-50 dark:hover:bg-muted"
                         >
                             Cancelar
                         </button>
                         <button 
                             @click="handleConfirm"
                             :disabled="!tempSelection.engine_id"
-                            class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-all"
+                            class="px-6 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-all"
                         >
                             Confirmar Vehículo
                         </button>

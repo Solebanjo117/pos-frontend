@@ -214,7 +214,7 @@ const netProfitColor = computed(() => {
             </div>
 
             <!-- Filters -->
-            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                 <div class="flex flex-col lg:flex-row lg:items-end gap-4">
                     <!-- Date Presets -->
                     <div>
@@ -233,8 +233,8 @@ const netProfitColor = computed(() => {
                                 @click="setPreset(p.key as DatePreset)"
                                 class="px-3 py-2 text-sm rounded-lg font-medium transition-all"
                                 :class="activePreset === p.key
-                                    ? 'bg-indigo-600 text-white shadow-sm'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'"
+                                    ? 'bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white shadow-sm'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted'"
                             >
                                 {{ p.label }}
                             </button>
@@ -249,7 +249,7 @@ const netProfitColor = computed(() => {
                                 v-model="filters.date_from"
                                 type="date"
                                 @change="activePreset = 'custom'"
-                                class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
                         </div>
                         <div>
@@ -258,7 +258,7 @@ const netProfitColor = computed(() => {
                                 v-model="filters.date_to"
                                 type="date"
                                 @change="activePreset = 'custom'"
-                                class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
                         </div>
                     </div>
@@ -272,7 +272,7 @@ const netProfitColor = computed(() => {
                         <select
                             v-model="filters.warehouse_id"
                             @change="onWarehouseChange"
-                            class="w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         >
                             <option :value="null">Todas</option>
                             <option v-for="wh in warehouses" :key="wh.id" :value="wh.id">
@@ -285,7 +285,7 @@ const netProfitColor = computed(() => {
                     <button
                         v-if="activePreset === 'custom'"
                         @click="applyFilters"
-                        class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                        class="flex items-center gap-2 rounded-lg bg-indigo-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:hover:bg-primary/90 transition-colors shadow-sm"
                     >
                         <RefreshCw :size="16" />
                         Aplicar
@@ -305,7 +305,7 @@ const netProfitColor = computed(() => {
                 <!-- =================== P&L CARDS =================== -->
                 <div v-if="financialReport?.summary" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <!-- Ingresos -->
-                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700 border-l-4 border-blue-500">
+                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700 border-l-4 border-blue-500">
                         <div class="flex items-center justify-between">
                             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Ingresos</p>
                             <div class="rounded-lg bg-blue-50 p-2 dark:bg-blue-900/30">
@@ -319,7 +319,7 @@ const netProfitColor = computed(() => {
                     </div>
 
                     <!-- Devoluciones -->
-                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700 border-l-4 border-orange-500">
+                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700 border-l-4 border-orange-500">
                         <div class="flex items-center justify-between">
                             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Devoluciones</p>
                             <div class="rounded-lg bg-orange-50 p-2 dark:bg-orange-900/30">
@@ -333,7 +333,7 @@ const netProfitColor = computed(() => {
                     </div>
 
                     <!-- COGS -->
-                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700 border-l-4 border-red-500">
+                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700 border-l-4 border-red-500">
                         <div class="flex items-center justify-between">
                             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Costo de Mercancía</p>
                             <div class="rounded-lg bg-red-50 p-2 dark:bg-red-900/30">
@@ -348,7 +348,7 @@ const netProfitColor = computed(() => {
 
                     <!-- Utilidad Neta -->
                     <div
-                        class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700 border-l-4"
+                        class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700 border-l-4"
                         :class="netProfitColor === 'green' ? 'border-emerald-500' : 'border-red-500'"
                     >
                         <div class="flex items-center justify-between">
@@ -378,7 +378,7 @@ const netProfitColor = computed(() => {
                 <!-- =================== PROFITABILITY SECTION =================== -->
                 <div class="grid gap-6 lg:grid-cols-2">
                     <!-- Brand Profitability -->
-                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                         <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                             <Tag :size="20" class="text-indigo-500" />
                             Top Marcas por Rentabilidad
@@ -393,7 +393,7 @@ const netProfitColor = computed(() => {
                             <div class="overflow-x-auto">
                                 <table class="w-full text-sm">
                                     <thead>
-                                        <tr class="border-b border-gray-200 dark:border-gray-700">
+                                        <tr class="border-b border-gray-200 dark:border-border">
                                             <th class="pb-2 text-left font-semibold text-gray-500 dark:text-gray-400">Marca</th>
                                             <th class="pb-2 text-right font-semibold text-gray-500 dark:text-gray-400">Ganancia</th>
                                             <th class="pb-2 text-right font-semibold text-gray-500 dark:text-gray-400">Margen</th>
@@ -403,7 +403,7 @@ const netProfitColor = computed(() => {
                                         <tr
                                             v-for="(brand, i) in (brandProfitabilityReport || []).slice(0, 5)"
                                             :key="brand.brand_id || 'u-' + i"
-                                            class="border-b border-gray-100 dark:border-gray-700/50"
+                                            class="border-b border-gray-100 dark:border-border/50"
                                         >
                                             <td class="py-2 flex items-center gap-2 text-gray-800 dark:text-gray-200">
                                                 <span class="inline-block w-3 h-3 rounded-full" :style="{ background: chartColors[i] }"></span>
@@ -431,7 +431,7 @@ const netProfitColor = computed(() => {
                     </div>
 
                     <!-- Category Profitability -->
-                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+                    <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                         <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                             <Box :size="20" class="text-violet-500" />
                             Top Categorías por Rentabilidad
@@ -446,7 +446,7 @@ const netProfitColor = computed(() => {
                             <div class="overflow-x-auto">
                                 <table class="w-full text-sm">
                                     <thead>
-                                        <tr class="border-b border-gray-200 dark:border-gray-700">
+                                        <tr class="border-b border-gray-200 dark:border-border">
                                             <th class="pb-2 text-left font-semibold text-gray-500 dark:text-gray-400">Categoría</th>
                                             <th class="pb-2 text-right font-semibold text-gray-500 dark:text-gray-400">Ganancia</th>
                                             <th class="pb-2 text-right font-semibold text-gray-500 dark:text-gray-400">Margen</th>
@@ -456,7 +456,7 @@ const netProfitColor = computed(() => {
                                         <tr
                                             v-for="(cat, i) in (categoryProfitabilityReport || []).slice(0, 5)"
                                             :key="cat.category_id || 'u-' + i"
-                                            class="border-b border-gray-100 dark:border-gray-700/50"
+                                            class="border-b border-gray-100 dark:border-border/50"
                                         >
                                             <td class="py-2 flex items-center gap-2 text-gray-800 dark:text-gray-200">
                                                 <span class="inline-block w-3 h-3 rounded-full" :style="{ background: chartColors[i] }"></span>

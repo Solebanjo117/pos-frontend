@@ -203,7 +203,7 @@ onMounted(async () => {
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                    <FileText class="w-7 h-7 text-indigo-600" />
+                    <FileText class="w-7 h-7 text-indigo-600 dark:text-primary" />
                     Nueva Cotización
                 </h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -216,7 +216,7 @@ onMounted(async () => {
             <!-- Left: product search + cart -->
             <div class="lg:col-span-2 space-y-4">
                 <!-- Product Search -->
-                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-4">
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Buscar productos</label>
                     <div class="relative">
                         <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" :size="18" />
@@ -225,42 +225,42 @@ onMounted(async () => {
                             @input="searchProducts"
                             type="text"
                             placeholder="Escribe SKU o nombre del producto..."
-                            class="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            class="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         />
                     </div>
 
                     <!-- Search Results -->
-                    <div v-if="searchResults.length > 0" class="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                    <div v-if="searchResults.length > 0" class="mt-2 border border-gray-200 dark:border-border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
                         <template v-for="product in searchResults" :key="product.id">
                             <div v-if="product.variants && product.variants.length > 0">
                                 <div v-for="variant in product.variants" :key="variant.id"
                                     @click="addProduct(product, variant)"
-                                    class="px-4 py-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer flex justify-between items-center border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                    class="px-4 py-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer flex justify-between items-center border-b border-gray-100 dark:border-border last:border-0"
                                 >
                                     <div>
                                         <p class="text-sm font-medium text-gray-900 dark:text-white">{{ product.name }}</p>
                                         <p class="text-xs text-gray-500">{{ variant.sku || variant.name }}</p>
                                     </div>
-                                    <span class="text-sm font-bold text-indigo-600">${{ getPrice(product, variant).toFixed(2) }}</span>
+                                    <span class="text-sm font-bold text-indigo-600 dark:text-primary">${{ getPrice(product, variant).toFixed(2) }}</span>
                                 </div>
                             </div>
                             <div v-else
                                 @click="addProduct(product)"
-                                class="px-4 py-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer flex justify-between items-center border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                class="px-4 py-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer flex justify-between items-center border-b border-gray-100 dark:border-border last:border-0"
                             >
                                 <div>
                                     <p class="text-sm font-medium text-gray-900 dark:text-white">{{ product.name }}</p>
                                     <p class="text-xs text-gray-500">{{ product.sku_base }}</p>
                                 </div>
-                                <span class="text-sm font-bold text-indigo-600">${{ getPrice(product).toFixed(2) }}</span>
+                                <span class="text-sm font-bold text-indigo-600 dark:text-primary">${{ getPrice(product).toFixed(2) }}</span>
                             </div>
                         </template>
                     </div>
                 </div>
 
                 <!-- Cart Items -->
-                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border overflow-hidden">
+                    <div class="px-4 py-3 bg-gray-50 dark:bg-background border-b border-gray-200 dark:border-border">
                         <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-2">
                             <Package :size="16" />
                             Artículos ({{ cart.length }})
@@ -273,7 +273,7 @@ onMounted(async () => {
                     </div>
 
                     <div v-else>
-                        <div v-for="(item, idx) in cart" :key="idx" class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center gap-4">
+                        <div v-for="(item, idx) in cart" :key="idx" class="px-4 py-3 border-b border-gray-100 dark:border-border last:border-0 flex items-center gap-4">
                             <!-- Product Info -->
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ item.product_name }}</p>
@@ -288,17 +288,17 @@ onMounted(async () => {
                                     type="number"
                                     step="0.01"
                                     min="0"
-                                    class="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-right text-gray-900 dark:text-white"
+                                    class="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-right text-gray-900 dark:text-white"
                                 />
                             </div>
 
                             <!-- Quantity -->
                             <div class="flex items-center gap-1">
-                                <button @click="changeQty(idx, -1)" class="p-1 rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">
+                                <button @click="changeQty(idx, -1)" class="p-1 rounded bg-gray-100 dark:bg-muted hover:bg-gray-200 dark:hover:bg-muted">
                                     <Minus :size="14" />
                                 </button>
                                 <span class="w-8 text-center text-sm font-bold text-gray-900 dark:text-white">{{ item.quantity }}</span>
-                                <button @click="changeQty(idx, 1)" class="p-1 rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">
+                                <button @click="changeQty(idx, 1)" class="p-1 rounded bg-gray-100 dark:bg-muted hover:bg-gray-200 dark:hover:bg-muted">
                                     <Plus :size="14" />
                                 </button>
                             </div>
@@ -320,7 +320,7 @@ onMounted(async () => {
             <!-- Right: form + totals -->
             <div class="space-y-4">
                 <!-- Customer & Dates -->
-                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+                <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-4 space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                             <User :size="12" class="inline mr-1" />
@@ -328,7 +328,7 @@ onMounted(async () => {
                         </label>
                         <select
                             v-model="selectedCustomerId"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
                         >
                             <option :value="null">Público General</option>
                             <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -343,7 +343,7 @@ onMounted(async () => {
                         <input
                             v-model="validUntil"
                             type="date"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
                         />
                     </div>
 
@@ -353,21 +353,21 @@ onMounted(async () => {
                             v-model="notes"
                             rows="3"
                             placeholder="Comentarios para el cliente..."
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm resize-none"
                         ></textarea>
                     </div>
                 </div>
 
                 <!-- Totals -->
-                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-4">
                     <div class="space-y-2">
                         <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                             <span>Subtotal</span>
                             <span>${{ cartSubtotal.toFixed(2) }}</span>
                         </div>
-                        <div class="flex justify-between text-lg font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex justify-between text-lg font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-border">
                             <span>TOTAL</span>
-                            <span class="text-indigo-600">${{ cartTotal.toFixed(2) }}</span>
+                            <span class="text-indigo-600 dark:text-primary">${{ cartTotal.toFixed(2) }}</span>
                         </div>
                     </div>
                 </div>
@@ -376,7 +376,7 @@ onMounted(async () => {
                 <button
                     @click="handleSave"
                     :disabled="saving || cart.length === 0"
-                    class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-bold rounded-xl shadow-lg transition text-lg"
+                    class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:bg-gray-400 text-white font-bold rounded-xl shadow-lg transition text-lg"
                 >
                     <Save :size="20" />
                     {{ saving ? 'Guardando...' : 'Guardar Cotización' }}

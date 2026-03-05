@@ -107,7 +107,7 @@ const reactivate = async (user: User) => {
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-right space-x-1">
-                                    <a :href="`/users/${user.id}/edit`" class="rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors">Editar</a>
+                                    <a :href="`/users/${user.id}/edit`" class="rounded px-2 py-1 text-xs font-medium text-blue-600 dark:text-primary hover:bg-blue-50 transition-colors">Editar</a>
                                     <button v-if="user.is_active"  @click="deactivate(user)" class="rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">Desactivar</button>
                                     <button v-else @click="reactivate(user)" class="rounded px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50 transition-colors">Reactivar</button>
                                 </td>

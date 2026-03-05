@@ -11,6 +11,7 @@ import { type BreadcrumbItem } from '@/types'
 import { PosSessionsApiService, type PosSessionRecord, type SessionSalesOrder } from '@/services/posSessions'
 import { useWarehouses } from '@/composables/useWarehouses'
 import { useUsers } from '@/composables/useUsers'
+import { usePosSettings } from '@/composables/usePosSettings'
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -20,6 +21,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const { warehouses, fetchWarehouses } = useWarehouses()
 const { users, fetchUsers } = useUsers()
+const { currentWarehouseId, initWarehouse } = usePosSettings()
 
 // State
 const sessions = ref<PosSessionRecord[]>([])
@@ -90,7 +92,8 @@ const closeDetail = () => {
 }
 
 onMounted(async () => {
-    await Promise.all([fetchWarehouses(), fetchUsers()])
+    await Promise.all([initWarehouse(), fetchWarehouses(), fetchUsers()])
+    filterWarehouseId.value = currentWarehouseId.value || undefined
     await fetchSessions()
 })
 
@@ -145,7 +148,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
             </div>
 
             <!-- Filters -->
-            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                 <div class="flex flex-wrap items-end gap-4">
                     <div>
                         <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -154,7 +157,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                         <input
                             v-model="filterDateFrom"
                             type="date"
-                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
                     </div>
                     <div>
@@ -164,7 +167,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                         <input
                             v-model="filterDateTo"
                             type="date"
-                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
                     </div>
                     <div>
@@ -173,7 +176,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                         </label>
                         <select
                             v-model="filterWarehouseId"
-                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         >
                             <option :value="undefined">Todas</option>
                             <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
@@ -185,7 +188,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                         </label>
                         <select
                             v-model="filterUserId"
-                            class="w-44 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-44 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         >
                             <option :value="undefined">Todos</option>
                             <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
@@ -193,7 +196,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                     </div>
                     <button
                         @click="applyFilters"
-                        class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                        class="flex items-center gap-2 rounded-lg bg-indigo-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:hover:bg-primary/90 transition-colors shadow-sm"
                     >
                         <Search :size="16" />
                         Buscar
@@ -216,11 +219,11 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
             </div>
 
             <!-- Table -->
-            <div v-else class="rounded-xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700 overflow-hidden">
+            <div v-else class="rounded-xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
-                            <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                            <tr class="border-b border-gray-200 dark:border-border bg-gray-50 dark:bg-muted/50">
                                 <th class="py-3 px-4 text-left font-semibold text-gray-600 dark:text-gray-400">Cajero</th>
                                 <th class="py-3 px-4 text-left font-semibold text-gray-600 dark:text-gray-400">Sucursal</th>
                                 <th class="py-3 px-4 text-left font-semibold text-gray-600 dark:text-gray-400">Apertura</th>
@@ -236,7 +239,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                             <tr
                                 v-for="session in sessions"
                                 :key="session.id"
-                                class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                                class="border-b border-gray-100 dark:border-border/50 hover:bg-gray-50 dark:hover:bg-muted/50/30 transition-colors"
                             >
                                 <td class="py-3 px-4 font-medium text-gray-900 dark:text-white">
                                     {{ session.user?.name || '—' }}
@@ -288,7 +291,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                 </div>
 
                 <!-- Pagination -->
-                <div v-if="pagination.last_page > 1" class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+                <div v-if="pagination.last_page > 1" class="flex items-center justify-between border-t border-gray-200 dark:border-border px-4 py-3">
                     <span class="text-sm text-gray-500 dark:text-gray-400">
                         {{ pagination.total }} cierre(s) en total
                     </span>
@@ -296,7 +299,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                         <button
                             :disabled="pagination.current_page <= 1"
                             @click="fetchSessions(pagination.current_page - 1)"
-                            class="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                            class="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
                         >
                             <ChevronLeft :size="16" />
                         </button>
@@ -306,7 +309,7 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                         <button
                             :disabled="pagination.current_page >= pagination.last_page"
                             @click="fetchSessions(pagination.current_page + 1)"
-                            class="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                            class="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
                         >
                             <ChevronRight :size="16" />
                         </button>

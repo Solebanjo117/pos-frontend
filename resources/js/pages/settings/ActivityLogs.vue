@@ -86,7 +86,7 @@ onMounted(() => fetchLogs())
         <!-- Header -->
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <Activity class="w-7 h-7 text-indigo-600" />
+                <Activity class="w-7 h-7 text-indigo-600 dark:text-primary" />
                 Bitácora de Actividad
             </h1>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -95,14 +95,14 @@ onMounted(() => fetchLogs())
         </div>
 
         <!-- Filters -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-6">
+        <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-4 mb-6">
             <div class="flex flex-wrap gap-3 items-end">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
                     <select
                         v-model="filterLogName"
                         @change="fetchLogs(1)"
-                        class="text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="text-sm px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                     >
                         <option value="">Todos</option>
                         <option value="auth">Autenticación</option>
@@ -114,7 +114,7 @@ onMounted(() => fetchLogs())
                     <select
                         v-model="filterEvent"
                         @change="fetchLogs(1)"
-                        class="text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="text-sm px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                     >
                         <option value="">Todos</option>
                         <option value="login">Login</option>
@@ -130,7 +130,7 @@ onMounted(() => fetchLogs())
                         v-model="filterDateFrom"
                         @change="fetchLogs(1)"
                         type="date"
-                        class="text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="text-sm px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                     />
                 </div>
                 <div>
@@ -139,7 +139,7 @@ onMounted(() => fetchLogs())
                         v-model="filterDateTo"
                         @change="fetchLogs(1)"
                         type="date"
-                        class="text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="text-sm px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                     />
                 </div>
                 <div class="text-sm text-gray-500 dark:text-gray-400 ml-auto self-end pb-2">
@@ -161,7 +161,7 @@ onMounted(() => fetchLogs())
 
         <!-- Log List -->
         <div v-else class="space-y-2">
-            <div v-if="logs.length === 0" class="bg-white dark:bg-gray-800 rounded-xl p-12 text-center text-gray-400">
+            <div v-if="logs.length === 0" class="bg-white dark:bg-card rounded-xl p-12 text-center text-gray-400">
                 <Activity class="w-12 h-12 mx-auto mb-3 opacity-30" />
                 No hay registros para los filtros seleccionados.
             </div>
@@ -169,7 +169,7 @@ onMounted(() => fetchLogs())
             <div
                 v-for="log in logs"
                 :key="log.id"
-                class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center gap-4"
+                class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border px-5 py-4 flex items-center gap-4"
             >
                 <!-- Icon -->
                 <div class="shrink-0 p-2.5 rounded-xl" :class="getEventColor(log.event)">
@@ -219,8 +219,8 @@ onMounted(() => fetchLogs())
                 :class="[
                     'px-3 py-1.5 text-sm rounded-lg transition-colors',
                     page === currentPage
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        ? 'bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white'
+                        : 'bg-white dark:bg-card text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-muted/50'
                 ]"
             >
                 {{ page }}

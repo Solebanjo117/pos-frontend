@@ -66,7 +66,7 @@ const statusOptions = [
 // Status badge color mapping
 const getStatusColor = (status: SalesOrderStatus) => {
   const colors = {
-    draft: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+    draft: 'bg-gray-100 text-gray-800 dark:bg-card dark:text-gray-300',
     pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
     confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
     processing: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
@@ -149,7 +149,7 @@ watch(currentWarehouseId, async () => {
       </div>
       <Link
         href="/sales-orders/create"
-        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition"
       >
         <Plus :size="20" />
         Nueva Orden
@@ -158,7 +158,7 @@ watch(currentWarehouseId, async () => {
 
     <!-- Statistics Cards -->
     <div v-if="statistics" class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Órdenes</p>
@@ -167,12 +167,12 @@ watch(currentWarehouseId, async () => {
             </p>
           </div>
           <div class="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-            <ShoppingCart class="text-blue-600 dark:text-blue-400" :size="24" />
+            <ShoppingCart class="text-blue-600 dark:text-primary dark:text-blue-400" :size="24" />
           </div>
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Ventas Totales</p>
@@ -186,7 +186,7 @@ watch(currentWarehouseId, async () => {
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Pendientes</p>
@@ -200,7 +200,7 @@ watch(currentWarehouseId, async () => {
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Completadas</p>
@@ -209,14 +209,14 @@ watch(currentWarehouseId, async () => {
             </p>
           </div>
           <div class="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-            <CheckCircle class="text-indigo-600 dark:text-indigo-400" :size="24" />
+            <CheckCircle class="text-indigo-600 dark:text-primary dark:text-indigo-400" :size="24" />
           </div>
         </div>
       </div>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+    <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-4">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -228,7 +228,7 @@ watch(currentWarehouseId, async () => {
               v-model="filters.search"
               type="text"
               placeholder="Número de orden o cliente..."
-              class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
               @input="loadSalesOrders"
             />
           </div>
@@ -240,7 +240,7 @@ watch(currentWarehouseId, async () => {
           </label>
           <select
             v-model="filters.status"
-            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
             @change="loadSalesOrders"
           >
             <option v-for="option in statusOptions" :key="option.value" :value="option.value">
@@ -256,7 +256,7 @@ watch(currentWarehouseId, async () => {
           <input
             v-model="filters.date_from"
             type="date"
-            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
             @change="loadSalesOrders"
           />
         </div>
@@ -268,7 +268,7 @@ watch(currentWarehouseId, async () => {
           <input
             v-model="filters.date_to"
             type="date"
-            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
             @change="loadSalesOrders"
           />
         </div>
@@ -276,10 +276,10 @@ watch(currentWarehouseId, async () => {
     </div>
 
     <!-- Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-900">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+          <thead class="bg-gray-50 dark:bg-background">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 N Orden
@@ -304,7 +304,7 @@ watch(currentWarehouseId, async () => {
               </th>
             </tr>
           </thead>
-          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody class="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
             <tr v-if="loading">
               <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                 Cargando órdenes...
@@ -315,7 +315,7 @@ watch(currentWarehouseId, async () => {
                 No se encontraron órdenes
               </td>
             </tr>
-            <tr v-else v-for="order in salesOrders" :key="order.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+            <tr v-else v-for="order in salesOrders" :key="order.id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900 dark:text-white">
                   {{ order.order_number }}
@@ -354,7 +354,7 @@ watch(currentWarehouseId, async () => {
                 <div class="flex items-center justify-end gap-2">
                   <Link
                     :href="`/sales-orders/${order.id}`"
-                    class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
+                    class="text-indigo-600 dark:text-primary dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
                     title="Ver"
                   >
                     <Eye :size="18" />
@@ -362,7 +362,7 @@ watch(currentWarehouseId, async () => {
                   <Link
                     v-if="order.status === 'draft' || order.status === 'pending'"
                     :href="`/sales-orders/${order.id}/edit`"
-                    class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                    class="text-blue-600 dark:text-primary dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
                     title="Editar"
                   >
                     <Edit :size="18" />
@@ -399,7 +399,7 @@ watch(currentWarehouseId, async () => {
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+      <div v-if="totalPages > 1" class="px-6 py-4 border-t border-gray-200 dark:border-border">
         <div class="flex items-center justify-between">
           <div class="text-sm text-gray-700 dark:text-gray-300">
             Mostrando {{ (currentPage - 1) * perPage + 1 }} a {{ Math.min(currentPage * perPage, total) }} de {{ total }} resultados
@@ -412,8 +412,8 @@ watch(currentWarehouseId, async () => {
               :class="[
                 'px-3 py-1 rounded',
                 page === currentPage
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  ? 'bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white'
+                  : 'bg-gray-200 dark:bg-muted text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-muted'
               ]"
             >
               {{ page }}

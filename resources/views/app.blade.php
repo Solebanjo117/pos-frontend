@@ -26,7 +26,7 @@
             }
 
             html.dark {
-                background-color: oklch(0.145 0 0);
+                background-color: #0B0B0B;
             }
         </style>
 
@@ -42,7 +42,8 @@
         @vite(['resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
         @inertiaHead
     </head>
-    <body class="font-sans antialiased">
+    <body class="font-sans antialiased bg-background text-foreground">
+        <div class="bg-ambient hidden dark:block pointer-events-none"></div>
         @inertia
     </body>
 </html>

@@ -30,11 +30,11 @@ const selectedVehicle = ref<{
                 Prueba del componente de selección jerárquica (Año > Marca > Modelo > Motor).
             </p>
 
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <VehicleSelector v-model="selectedVehicle" />
 
                 <!-- Debug Output -->
-                <div class="mt-8 rounded-md bg-gray-50 p-4 dark:bg-gray-700">
+                <div class="mt-8 rounded-md bg-gray-50 p-4 dark:bg-muted">
                     <h3 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Datos Seleccionados (JSON):</h3>
                     <pre class="overflow-auto text-xs text-gray-600 dark:text-gray-400">{{ JSON.stringify(selectedVehicle, null, 2) }}</pre>
                 </div>

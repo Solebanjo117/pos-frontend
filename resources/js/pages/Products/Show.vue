@@ -48,7 +48,7 @@ const getStatusColor = (status: string) => {
         case 'pending':
             return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
         default:
-            return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+            return 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-200'
     }
 }
 </script>
@@ -66,7 +66,7 @@ const getStatusColor = (status: string) => {
                 <div class="flex gap-2">
                     <a
                         :href="`/products/${productId}/edit`"
-                        class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                        class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                     >
                         <Pencil class="w-4 h-4 mr-2" /> Editar
                     </a>
@@ -75,7 +75,7 @@ const getStatusColor = (status: string) => {
 
             <!-- Loading -->
             <div v-if="loading" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                 <p class="mt-2 text-gray-600">Cargando producto...</p>
             </div>
 
@@ -87,7 +87,7 @@ const getStatusColor = (status: string) => {
             <!-- Product Details -->
             <div v-else-if="currentProduct" class="space-y-6">
                 <!-- General Info -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Información General</h2>
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div>
@@ -124,7 +124,7 @@ const getStatusColor = (status: string) => {
             </div>
 
             <!-- Pricing -->
-            <div v-if="currentProduct.pricing" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div v-if="currentProduct.pricing" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Precios</h2>
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
                     <div>
@@ -155,15 +155,15 @@ const getStatusColor = (status: string) => {
             </div>
 
             <!-- Attributes -->
-            <div v-if="currentProduct.attributes && currentProduct.attributes.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div v-if="currentProduct.attributes && currentProduct.attributes.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Atributos Técnicos</h2>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div v-for="attr in currentProduct.attributes" :key="attr.name" class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                    <div v-for="attr in currentProduct.attributes" :key="attr.name" class="rounded-lg border border-gray-200 p-4 dark:border-border">
                         <label class="block text-sm font-medium text-gray-900 dark:text-white">{{ attr.name }}</label>
                         <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
                             <Link 
                                 :href="`/products?attribute_value=${encodeURIComponent(attr.value)}`"
-                                class="hover:text-blue-600 hover:underline"
+                                class="hover:text-blue-600 dark:text-primary hover:underline"
                                 title="Ver productos con esta característica"
                             >
                                 {{ attr.value }}
@@ -175,13 +175,13 @@ const getStatusColor = (status: string) => {
             </div>
 
             <!-- Inventory -->
-            <div v-if="currentProduct.inventory && currentProduct.inventory.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div v-if="currentProduct.inventory && currentProduct.inventory.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Inventario</h2>
                 
                 <!-- Inventory Table -->
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                        <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Almacén</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Variante</th>
@@ -191,7 +191,7 @@ const getStatusColor = (status: string) => {
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Pto. Reorden</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <tbody class="divide-y divide-gray-200 dark:divide-border">
                             <tr v-for="inv in currentProduct.inventory" :key="inv.id">
                                 <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{{ inv.warehouse?.name || 'N/A' }}</td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ inv.variant_sku || '-' }}</td>
@@ -209,10 +209,10 @@ const getStatusColor = (status: string) => {
             </div>
 
             <!-- Suppliers -->
-            <div v-if="currentProduct.suppliers && currentProduct.suppliers.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div v-if="currentProduct.suppliers && currentProduct.suppliers.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Proveedores</h2>
                 <div class="space-y-3">
-                    <div v-for="supplier in currentProduct.suppliers" :key="supplier.id" class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                    <div v-for="supplier in currentProduct.suppliers" :key="supplier.id" class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-border">
                         <div>
                             <p class="font-semibold text-gray-900 dark:text-white">{{ supplier.name }}</p>
                             <p class="text-sm text-gray-700 dark:text-gray-300">Tiempo de entrega: {{ supplier.lead_time_days }} días</p>
@@ -227,10 +227,10 @@ const getStatusColor = (status: string) => {
             </div>
 
             <!-- Vehicle Compatibility -->
-            <div v-if="currentProduct.compatibility && currentProduct.compatibility.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div v-if="currentProduct.compatibility && currentProduct.compatibility.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Compatibilidad Vehicular</h2>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div v-for="(compat, index) in currentProduct.compatibility" :key="index" class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                    <div v-for="(compat, index) in currentProduct.compatibility" :key="index" class="rounded-lg border border-gray-200 p-4 dark:border-border">
                         <p class="font-semibold text-gray-900 dark:text-white">{{ compat.make }} {{ compat.model }}</p>
                         <p class="text-sm text-gray-800 dark:text-gray-200">{{ compat.year_range }}</p>
                         <p class="text-sm text-gray-700 dark:text-gray-300">Motor: {{ compat.engine }}</p>
@@ -240,12 +240,12 @@ const getStatusColor = (status: string) => {
             </div>
 
             <!-- OEM References -->
-            <div v-if="currentProduct.oem_references && currentProduct.oem_references.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div v-if="currentProduct.oem_references && currentProduct.oem_references.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Referencias OEM</h2>
                 <div class="flex flex-wrap gap-3">
-                    <div v-for="(ref, index) in currentProduct.oem_references" :key="index" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                    <div v-for="(ref, index) in currentProduct.oem_references" :key="index" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 dark:border-border dark:bg-muted hover:bg-gray-100 dark:hover:bg-muted transition">
                         <Link :href="`/products?oem_code=${encodeURIComponent(ref.oem_code)}`" class="block group">
-                            <p class="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 group-hover:underline flex items-center gap-1">
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:text-primary group-hover:underline flex items-center gap-1">
                                 {{ ref.oem_code }}
                                 <span class="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
                             </p>
@@ -254,11 +254,11 @@ const getStatusColor = (status: string) => {
                     </div>
                 </div>
             <!-- Alternatives (Interchange) -->
-            <div v-if="currentProduct.alternatives && currentProduct.alternatives.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div v-if="currentProduct.alternatives && currentProduct.alternatives.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Alternativas y Sustitutos</h2>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                        <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Producto</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Relación</th>
@@ -266,11 +266,11 @@ const getStatusColor = (status: string) => {
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Precio</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <tbody class="divide-y divide-gray-200 dark:divide-border">
                             <tr v-for="alt in currentProduct.alternatives" :key="alt.id">
                                 <td class="px-6 py-4">
                                     <Link :href="`/products/${alt.id}`" class="group">
-                                        <p class="font-semibold text-blue-600 group-hover:underline dark:text-blue-400">{{ alt.sku_base }}</p>
+                                        <p class="font-semibold text-blue-600 dark:text-primary group-hover:underline dark:text-blue-400">{{ alt.sku_base }}</p>
                                         <p class="text-sm text-gray-900 dark:text-white">{{ alt.name }}</p>
                                     </Link>
                                 </td>

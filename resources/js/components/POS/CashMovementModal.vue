@@ -62,14 +62,14 @@ const handleClose = () => {
 
 <template>
     <div v-if="show" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="handleClose">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <!-- Header -->
-            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-border flex items-center justify-between">
                 <h2 class="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
                     <ArrowDownUp :size="20" class="text-indigo-500" />
                     Movimiento de Caja
                 </h2>
-                <button @click="handleClose" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <button @click="handleClose" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors">
                     <X :size="18" />
                 </button>
             </div>
@@ -83,7 +83,7 @@ const handleClose = () => {
                             @click="movementType = 'out'"
                             :class="movementType === 'out'
                                 ? 'ring-2 ring-red-500 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                                : 'bg-gray-50 text-gray-600 dark:bg-gray-700 dark:text-gray-300'"
+                                : 'bg-gray-50 text-gray-600 dark:bg-muted dark:text-gray-300'"
                             class="flex items-center justify-center gap-2 p-3 rounded-xl transition-all text-sm font-medium"
                         >
                             <ArrowUpRight :size="18" />
@@ -93,7 +93,7 @@ const handleClose = () => {
                             @click="movementType = 'in'"
                             :class="movementType === 'in'
                                 ? 'ring-2 ring-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
-                                : 'bg-gray-50 text-gray-600 dark:bg-gray-700 dark:text-gray-300'"
+                                : 'bg-gray-50 text-gray-600 dark:bg-muted dark:text-gray-300'"
                             class="flex items-center justify-center gap-2 p-3 rounded-xl transition-all text-sm font-medium"
                         >
                             <ArrowDownLeft :size="18" />
@@ -115,7 +115,7 @@ const handleClose = () => {
                             step="0.01"
                             min="0.01"
                             placeholder="0.00"
-                            class="w-full pl-8 pr-4 py-3 text-xl text-right border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-full pl-8 pr-4 py-3 text-xl text-right border border-gray-300 dark:border-border rounded-xl bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             autofocus
                         />
                     </div>
@@ -128,7 +128,7 @@ const handleClose = () => {
                     </label>
                     <select
                         v-model="reason"
-                        class="w-full rounded-xl border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        class="w-full rounded-xl border border-gray-300 dark:border-border px-4 py-3 text-sm bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     >
                         <option value="" disabled>Selecciona un motivo...</option>
                         <option v-for="r in reasons" :key="r" :value="r">{{ r }}</option>
@@ -142,7 +142,7 @@ const handleClose = () => {
                         v-model="notes"
                         rows="2"
                         placeholder="Descripción adicional..."
-                        class="w-full rounded-xl border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                        class="w-full rounded-xl border border-gray-300 dark:border-border px-4 py-3 text-sm bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                     />
                 </div>
 
@@ -174,10 +174,10 @@ const handleClose = () => {
             </div>
 
             <!-- Footer -->
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-border flex gap-3">
                 <button
                     @click="handleClose"
-                    class="flex-1 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    class="flex-1 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-border rounded-xl hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors"
                 >
                     Cancelar
                 </button>

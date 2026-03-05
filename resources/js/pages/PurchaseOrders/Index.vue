@@ -4,7 +4,7 @@ import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders'
 import { useSuppliers } from '@/composables/useSuppliers'
-import { Search, Plus, Eye, Send, XCircle, Trash2, DollarSign, Package, Clock, CheckCircle2, TrendingDown } from 'lucide-vue-next'
+import { Search, Plus, Eye, Send, XCircle, Trash2, DollarSign, Package, Clock, CheckCircle2, TrendingDown, AlertCircle } from 'lucide-vue-next'
 import type { PurchaseOrderFilters, PurchaseOrderStatus } from '@/types/purchase-order'
 import { useAuth } from '@/composables/useAuth'
 
@@ -13,18 +13,35 @@ const { purchaseOrders, statistics, loading, error, pagination, fetchPurchaseOrd
 const { fetchActiveSuppliers } = useSuppliers()
 
 const suppliers = ref<any[]>([])
-const filters = ref<PurchaseOrderFilters>({
+const filters = ref<PurchaseOrderFilters & { payment_status?: string }>({
     search: '',
     status: undefined,
     supplier_id: undefined,
+    payment_status: undefined,
     date_from: '',
     date_to: '',
     per_page: 15,
 })
 
+function getPaymentStatusColor(ps: string) {
+    if (ps === 'paid')    return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+    if (ps === 'partial') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+    return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+}
+
+function getPaymentStatusLabel(ps: string) {
+    if (ps === 'paid')    return 'Pagado'
+    if (ps === 'partial') return 'Parcial'
+    return 'Pendiente'
+}
+
+function formatAmount(val: number | string | null | undefined): string {
+    return '$' + Number(val ?? 0).toLocaleString('es', { minimumFractionDigits: 2 })
+}
+
 const statusOptions: { value: string; label: string; color: string }[] = [
     { value: '', label: 'Todos', color: '' },
-    { value: 'draft', label: 'Borrador', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
+    { value: 'draft', label: 'Borrador', color: 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-300' },
     { value: 'sent', label: 'Enviado', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
     { value: 'partial', label: 'Parcial', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
     { value: 'received', label: 'Recibido', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
@@ -90,11 +107,11 @@ onMounted(async () => {
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Gestiona pedidos a proveedores y recepción de mercancía</p>
                 </div>
             <div class="flex items-center gap-3">
-                <Link v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])" href="/purchase-orders/smart-reorder" class="inline-flex items-center gap-2 px-4 py-2 border border-indigo-600 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition">
+                <Link v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])" href="/purchase-orders/smart-reorder" class="inline-flex items-center gap-2 px-4 py-2 border border-indigo-600 dark:border-primary text-indigo-600 dark:text-primary dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition">
                     <TrendingDown :size="20" />
                     Smart Reorder
                 </Link>
-                <Link v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])" href="/purchase-orders/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
+                <Link v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])" href="/purchase-orders/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition">
                     <Plus :size="20" />
                     Nueva Orden
                 </Link>
@@ -103,16 +120,16 @@ onMounted(async () => {
 
             <!-- Stats -->
             <div v-if="statistics" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"><Package :size="20" class="text-gray-600 dark:text-gray-400" /></div>
+                        <div class="p-2 bg-gray-100 dark:bg-muted rounded-lg"><Package :size="20" class="text-gray-600 dark:text-gray-400" /></div>
                         <div>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ statistics.total_orders }}</p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">Total Órdenes</p>
                         </div>
                     </div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg"><DollarSign :size="20" class="text-green-600 dark:text-green-400" /></div>
                         <div>
@@ -121,16 +138,16 @@ onMounted(async () => {
                         </div>
                     </div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><Clock :size="20" class="text-blue-600 dark:text-blue-400" /></div>
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><Clock :size="20" class="text-blue-600 dark:text-primary dark:text-blue-400" /></div>
                         <div>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ statistics.sent_orders + statistics.partial_orders }}</p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">Pendientes</p>
                         </div>
                     </div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg"><CheckCircle2 :size="20" class="text-emerald-600 dark:text-emerald-400" /></div>
                         <div>
@@ -139,34 +156,44 @@ onMounted(async () => {
                         </div>
                     </div>
                 </div>
+                <!-- Por Pagar KPI -->
+                <div class="bg-white dark:bg-card rounded-lg border border-red-200 dark:border-red-900/40 p-4 col-span-2 md:col-span-1" @click="filters.payment_status = filters.payment_status ? undefined : 'pending'; loadOrders()" role="button">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg"><AlertCircle :size="20" class="text-red-600 dark:text-red-400" /></div>
+                        <div>
+                            <p class="text-2xl font-bold text-red-600 dark:text-red-400">{{ formatAmount(statistics.total_unpaid) }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Por Pagar ({{ statistics.pending_payment_orders ?? 0 }} órdenes)</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Filters -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-4">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Buscar</label>
                         <div class="relative">
                             <Search class="absolute left-3 top-2.5 text-gray-400" :size="18" />
-                            <input v-model="filters.search" type="text" placeholder="Nº de orden, proveedor..." class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" @input="loadOrders" />
+                            <input v-model="filters.search" type="text" placeholder="Nº de orden, proveedor..." class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" @input="loadOrders" />
                         </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado</label>
-                        <select v-model="filters.status" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" @change="loadOrders">
+                        <select v-model="filters.status" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" @change="loadOrders">
                             <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value || undefined">{{ opt.label }}</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Proveedor</label>
-                        <select v-model="filters.supplier_id" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" @change="loadOrders">
+                        <select v-model="filters.supplier_id" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" @change="loadOrders">
                             <option :value="undefined">Todos</option>
                             <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Desde</label>
-                        <input v-model="filters.date_from" type="date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" @change="loadOrders" />
+                        <input v-model="filters.date_from" type="date" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" @change="loadOrders" />
                     </div>
                 </div>
             </div>
@@ -177,10 +204,10 @@ onMounted(async () => {
             </div>
 
             <!-- Table -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-900">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                        <thead class="bg-gray-50 dark:bg-background">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nº Orden</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Proveedor</th>
@@ -188,32 +215,33 @@ onMounted(async () => {
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Items</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estado</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Pago</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <tbody class="divide-y divide-gray-200 dark:divide-border">
                             <tr v-if="loading">
-                                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                <td colspan="8" class="px-6 py-12 text-center text-gray-500">
                                     <div class="flex items-center justify-center gap-2">
-                                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600 dark:border-primary"></div>
                                         Cargando...
                                     </div>
                                 </td>
                             </tr>
                             <tr v-else-if="purchaseOrders.length === 0">
-                                <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                <td colspan="8" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                     <Package class="mx-auto mb-3 text-gray-300" :size="48" />
                                     <p>No se encontraron órdenes de compra</p>
                                 </td>
                             </tr>
-                            <tr v-for="po in purchaseOrders" :key="po.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                            <tr v-for="po in purchaseOrders" :key="po.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/50 transition">
                                 <td class="px-6 py-4">
-                                    <Link :href="`/purchase-orders/${po.id}`" class="text-indigo-600 dark:text-indigo-400 hover:underline font-mono font-medium">
+                                    <Link :href="`/purchase-orders/${po.id}`" class="text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline font-mono font-medium">
                                         {{ po.po_number }}
                                     </Link>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <Link v-if="po.supplier" :href="`/suppliers/${po.supplier.id}`" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                                    <Link v-if="po.supplier" :href="`/suppliers/${po.supplier.id}`" class="text-sm text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">
                                         {{ po.supplier.name }}
                                     </Link>
                                 </td>
@@ -231,13 +259,25 @@ onMounted(async () => {
                                         {{ getStatusLabel(po.status) }}
                                     </span>
                                 </td>
+                                <!-- Payment Status Cell -->
+                                <td class="px-6 py-4 text-center">
+                                    <div class="flex flex-col items-center gap-1">
+                                        <span :class="['px-2 py-0.5 text-xs font-semibold rounded-full', getPaymentStatusColor(po.payment_status ?? 'pending')]">
+                                            {{ getPaymentStatusLabel(po.payment_status ?? 'pending') }}
+                                        </span>
+                                        <!-- Show pending amount if not fully paid -->
+                                        <span v-if="po.payment_status !== 'paid' && po.status !== 'cancelled'" class="text-xs font-medium text-red-500 dark:text-red-400">
+                                            {{ formatAmount(po.amount_due) }} por pagar
+                                        </span>
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-1">
-                                        <Link :href="`/purchase-orders/${po.id}`" class="p-2 text-gray-400 hover:text-indigo-600 transition" title="Ver detalle">
+                                        <Link :href="`/purchase-orders/${po.id}`" class="p-2 text-gray-400 hover:text-indigo-600 dark:text-primary transition" title="Ver detalle">
                                             <Eye :size="16" />
                                         </Link>
                                         <template v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])">
-                                            <button v-if="po.status === 'draft'" @click="handleSend(po.id)" class="p-2 text-gray-400 hover:text-blue-600 transition" title="Enviar al proveedor">
+                                            <button v-if="po.status === 'draft'" @click="handleSend(po.id)" class="p-2 text-gray-400 hover:text-blue-600 dark:text-primary transition" title="Enviar al proveedor">
                                                 <Send :size="16" />
                                             </button>
                                             <button v-if="!['received', 'cancelled'].includes(po.status)" @click="handleCancel(po.id)" class="p-2 text-gray-400 hover:text-orange-600 transition" title="Cancelar">
@@ -253,7 +293,7 @@ onMounted(async () => {
                         </tbody>
                     </table>
                 </div>
-                <div v-if="pagination && pagination.last_page > 1" class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div v-if="pagination && pagination.last_page > 1" class="px-6 py-3 border-t border-gray-200 dark:border-border flex items-center justify-between">
                     <p class="text-sm text-gray-500 dark:text-gray-400">Mostrando {{ purchaseOrders.length }} de {{ pagination.total }} órdenes</p>
                 </div>
             </div>

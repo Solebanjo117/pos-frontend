@@ -105,7 +105,7 @@ const emitChange = () => {
         <div>
             <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Marca</label>
             <select v-model="selectedMakeId" :disabled="loadingMakes"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm">
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-border dark:bg-muted dark:text-white sm:text-sm">
                 <option value="">{{ loadingMakes ? 'Cargando...' : 'Selecciona Marca' }}</option>
                 <option v-for="make in makes" :key="make.id" :value="make.id">{{ make.name }}</option>
             </select>
@@ -115,7 +115,7 @@ const emitChange = () => {
         <div>
             <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Modelo</label>
             <select v-model="selectedModelId" :disabled="!selectedMakeId || loadingModels"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm">
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-border dark:bg-muted dark:text-white sm:text-sm">
                 <option value="">{{ loadingModels ? 'Cargando...' : 'Selecciona Modelo' }}</option>
                 <option v-for="model in models" :key="model.id" :value="model.id">
                     {{ model.name }}
@@ -130,7 +130,7 @@ const emitChange = () => {
         <div>
             <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Serie</label>
             <select v-model="selectedSerie" :disabled="!selectedModelId || loadingEngines"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm">
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-border dark:bg-muted dark:text-white sm:text-sm">
                 <option value="">{{ loadingEngines ? 'Cargando...' : 'Selecciona Serie' }}</option>
                 <option v-for="s in seriesOptions" :key="s.engine_code" :value="s.engine_code">
                     {{ s.engine_code }}
@@ -142,7 +142,7 @@ const emitChange = () => {
         <div>
             <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Motor</label>
             <select v-model="selectedEngineId" :disabled="!selectedSerie || loadingEngines"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm">
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-border dark:bg-muted dark:text-white sm:text-sm">
                 <option value="">Selecciona Motor</option>
                 <option v-for="engine in filteredEngines" :key="engine.id" :value="engine.id">
                     {{ engine.displacement }} · {{ engine.fuel_type }}

@@ -149,7 +149,7 @@ const goBack = () => {
       </div>
       <Link
         :href="`/customers/${customerId}/edit`"
-        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-primary/90 transition"
       >
         <Edit :size="20" />
         Editar
@@ -171,13 +171,13 @@ const goBack = () => {
       <!-- Main Info (2 columns) -->
       <div class="lg:col-span-2 space-y-6">
         <!-- Basic Information -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+        <div class="bg-white dark:bg-card rounded-lg shadow-sm p-6">
           <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Información General</h2>
           
           <div class="grid gap-4 md:grid-cols-2">
             <div class="flex items-start gap-3">
               <div class="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-                <component :is="currentCustomer.type === 'business' ? Building2 : User" :size="20" class="text-indigo-600 dark:text-indigo-400" />
+                <component :is="currentCustomer.type === 'business' ? Building2 : User" :size="20" class="text-indigo-600 dark:text-primary dark:text-indigo-400" />
               </div>
               <div>
                 <p class="text-sm text-gray-600 dark:text-gray-400">Tipo</p>
@@ -199,7 +199,7 @@ const goBack = () => {
                     currentCustomer.status === 'active'
                       ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800'
                       : currentCustomer.status === 'inactive'
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+                        ? 'bg-gray-100 dark:bg-muted text-gray-800 dark:text-gray-300 border-gray-200 dark:border-border'
                         : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800'
                   "
                 >
@@ -216,11 +216,11 @@ const goBack = () => {
 
             <div v-if="currentCustomer.email" class="flex items-start gap-3">
               <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Mail :size="20" class="text-blue-600 dark:text-blue-400" />
+                <Mail :size="20" class="text-blue-600 dark:text-primary dark:text-blue-400" />
               </div>
               <div>
                 <p class="text-sm text-gray-600 dark:text-gray-400">Email</p>
-                <a :href="`mailto:${currentCustomer.email}`" class="font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                <a :href="`mailto:${currentCustomer.email}`" class="font-medium text-blue-600 dark:text-primary dark:text-blue-400 hover:underline">
                   {{ currentCustomer.email }}
                 </a>
               </div>
@@ -368,7 +368,7 @@ const goBack = () => {
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Resumen Financiero</h2>
 
           <div class="space-y-4">
-            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div class="p-4 bg-gray-50 dark:bg-muted rounded-lg">
               <div class="flex items-center justify-between mb-1">
                 <span class="text-sm text-gray-600 dark:text-gray-300">Saldo Actual</span>
                 <component
@@ -388,7 +388,7 @@ const goBack = () => {
 
             <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <div class="flex items-center gap-2 mb-1">
-                <CreditCard :size="18" class="text-blue-600 dark:text-blue-400" />
+                <CreditCard :size="18" class="text-blue-600 dark:text-primary dark:text-blue-400" />
                 <span class="text-sm text-gray-600 dark:text-gray-300">Límite de Crédito</span>
               </div>
               <p class="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -427,7 +427,7 @@ const goBack = () => {
             <!-- Adjust Balance Button -->
             <button
               @click="showAdjustModal = true"
-              class="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+              class="w-full px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-primary/90 transition"
             >
               Ajustar Saldo
             </button>
@@ -457,7 +457,7 @@ const goBack = () => {
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
       @click.self="showAdjustModal = false"
     >
-      <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+      <div class="bg-white dark:bg-card rounded-lg p-6 max-w-md w-full">
         <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Ajustar Saldo</h3>
         
         <form @submit.prevent="handleAdjustBalance">
@@ -468,7 +468,7 @@ const goBack = () => {
               type="number"
               step="0.01"
               required
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-muted dark:text-gray-100"
               placeholder="0.00"
             />
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -482,7 +482,7 @@ const goBack = () => {
               v-model="adjustForm.reason"
               required
               rows="3"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-muted dark:text-gray-100"
               placeholder="Describe el motivo del ajuste..."
             ></textarea>
           </div>
@@ -491,14 +491,14 @@ const goBack = () => {
             <button
               type="button"
               @click="showAdjustModal = false"
-              class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              class="px-4 py-2 border border-gray-300 dark:border-border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-muted/50"
               :disabled="adjustLoading"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              class="px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-50"
               :disabled="adjustLoading"
             >
               {{ adjustLoading ? 'Guardando...' : 'Ajustar Saldo' }}

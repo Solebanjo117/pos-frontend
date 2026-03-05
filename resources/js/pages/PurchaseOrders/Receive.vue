@@ -46,9 +46,9 @@ async function handleSubmit() {
                 </div>
             </div>
             <div v-if="error" class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4"><p class="text-red-600 dark:text-red-400">{{ error }}</p></div>
-            <form v-if="purchaseOrder && receiveData.length" @submit.prevent="handleSubmit" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-900"><tr>
+            <form v-if="purchaseOrder && receiveData.length" @submit.prevent="handleSubmit" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <thead class="bg-gray-50 dark:bg-background"><tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pedido</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ya Recibido</th>
@@ -56,7 +56,7 @@ async function handleSubmit() {
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Recibir Ahora</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lote</th>
                     </tr></thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody class="divide-y divide-gray-200 dark:divide-border">
                         <tr v-for="(rd, idx) in receiveData" :key="rd.item_id">
                             <td class="px-6 py-3">
                                 <template v-if="purchaseOrder.items.find(i => i.id === rd.item_id)?.product">
@@ -67,20 +67,20 @@ async function handleSubmit() {
                             <td class="px-6 py-3 text-right text-sm">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.quantity_ordered }}</td>
                             <td class="px-6 py-3 text-right text-sm">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.quantity_received }}</td>
                             <td class="px-6 py-3 text-right text-sm font-semibold text-orange-600">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.pending_quantity }}</td>
-                            <td class="px-6 py-3"><input v-model.number="rd.quantity_received" type="number" min="0" :max="purchaseOrder.items.find(i => i.id === rd.item_id)?.pending_quantity" class="w-20 text-right px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" /></td>
-                            <td class="px-6 py-3"><input v-model="rd.batch_number" type="text" placeholder="Opcional" class="w-28 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" /></td>
+                            <td class="px-6 py-3"><input v-model.number="rd.quantity_received" type="number" min="0" :max="purchaseOrder.items.find(i => i.id === rd.item_id)?.pending_quantity" class="w-20 text-right px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white" /></td>
+                            <td class="px-6 py-3"><input v-model="rd.batch_number" type="text" placeholder="Opcional" class="w-28 px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white text-sm" /></td>
                         </tr>
                     </tbody>
                 </table>
-                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
-                    <Link :href="`/purchase-orders/${purchaseOrderId}`" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">Cancelar</Link>
+                <div class="px-6 py-4 border-t border-gray-200 dark:border-border flex justify-end gap-3">
+                    <Link :href="`/purchase-orders/${purchaseOrderId}`" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted/50 rounded-lg transition">Cancelar</Link>
                     <button type="submit" :disabled="loading" class="inline-flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition">
                         <PackageCheck :size="18" />
                         {{ loading ? 'Procesando...' : 'Confirmar Recepción' }}
                     </button>
                 </div>
             </form>
-            <div v-else-if="purchaseOrder && !receiveData.length" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
+            <div v-else-if="purchaseOrder && !receiveData.length" class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-12 text-center">
                 <PackageCheck class="mx-auto mb-3 text-green-500" :size="48" />
                 <p class="text-gray-600 dark:text-gray-400">Todos los items ya han sido recibidos</p>
             </div>

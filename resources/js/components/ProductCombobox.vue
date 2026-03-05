@@ -159,7 +159,7 @@ onUnmounted(() => {
     <div class="relative" ref="containerRef">
         <div
             @click="toggleOpen"
-            class="flex w-full cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700"
+            class="flex w-full cursor-pointer items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted"
             :class="{ 'border-red-500': error }"
         >
             <span v-if="selectedLabel" class="truncate">
@@ -177,15 +177,15 @@ onUnmounted(() => {
 
         <div
             v-if="isOpen"
-            class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+            class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card"
         >
-            <div class="sticky top-0 border-b border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900">
+            <div class="sticky top-0 border-b border-gray-200 bg-gray-50 p-2 dark:border-border dark:bg-background">
                 <div class="relative">
                     <Search class="absolute left-2 top-2.5 h-3.5 w-3.5 text-gray-400" />
                     <input
                         v-model="searchQuery"
                         type="text"
-                        class="w-full rounded border border-gray-200 bg-white py-1 pl-8 pr-2 text-xs focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                        class="w-full rounded border border-gray-200 bg-white py-1 pl-8 pr-2 text-xs focus:border-blue-500 focus:outline-none dark:border-border dark:bg-card dark:text-white"
                         placeholder="Buscar por nombre, SKU o marca..."
                     />
                 </div>
@@ -196,7 +196,7 @@ onUnmounted(() => {
                     v-for="(item, index) in filteredItems"
                     :key="`${item.type}-${item.id}`"
                     @click="selectItem(item)"
-                    class="relative cursor-pointer select-none px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    class="relative cursor-pointer select-none px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-muted/50 text-gray-900 dark:text-gray-100"
                 >
                     <div class="flex items-center justify-between">
                         <div class="flex flex-col">
@@ -205,7 +205,7 @@ onUnmounted(() => {
                         </div>
                         <Check
                             v-if="modelValue === item.product.id && (item.type === 'product' || variantId === item.variant?.id)"
-                            class="h-4 w-4 text-blue-600"
+                            class="h-4 w-4 text-blue-600 dark:text-primary"
                         />
                     </div>
                 </li>

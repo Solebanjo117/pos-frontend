@@ -85,7 +85,7 @@ const goBack = () => {
             <div class="mx-auto max-w-4xl">
                 <!-- Loading State -->
                 <div v-if="loading" class="text-center py-12">
-                    <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                    <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                     <p class="mt-2 text-gray-800 dark:text-gray-200">Cargando movimiento...</p>
                 </div>
 
@@ -122,7 +122,7 @@ const goBack = () => {
                     </div>
 
                     <!-- Main Info Card (Transaction Level) -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Información General</h2>
                         <dl class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div>
@@ -173,11 +173,11 @@ const goBack = () => {
                     </div>
 
                     <!-- Products List (All items in this transaction) -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                          <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Productos</h2>
                          <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead class="bg-gray-50 dark:bg-gray-700">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                                <thead class="bg-gray-50 dark:bg-muted">
                                     <tr>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Producto</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Cantidad</th>
@@ -185,7 +185,7 @@ const goBack = () => {
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Vencimiento</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                                <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                                     <tr v-for="item in allItems" :key="item.id">
                                         <td class="whitespace-nowrap px-6 py-4">
                                             <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.product.name }}</div>
@@ -212,7 +212,7 @@ const goBack = () => {
                     </div>
 
                     <!-- Reference Info (if exists) -->
-                    <div v-if="currentMovement.reference_type" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div v-if="currentMovement.reference_type" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Referencia</h2>
                         <dl class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div>
@@ -231,13 +231,13 @@ const goBack = () => {
                     </div>
 
                     <!-- Notes -->
-                    <div v-if="currentMovement.notes" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div v-if="currentMovement.notes" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Notas</h2>
                         <p class="text-gray-900 dark:text-white">{{ currentMovement.notes }}</p>
                     </div>
 
                     <!-- User Info (if exists) -->
-                    <div v-if="currentMovement.user" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div v-if="currentMovement.user" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Usuario</h2>
                         <p class="text-gray-900 dark:text-white">{{ currentMovement.user.name }}</p>
                     </div>

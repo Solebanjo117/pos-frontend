@@ -283,7 +283,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
         <div class="mb-6 flex items-center justify-between">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Variantes (Marcas)</h2>
             <Button @click="openCreateModal">
@@ -292,7 +292,7 @@ onMounted(async () => {
         </div>
 
         <div v-if="loading && !variants.length" class="flex justify-center py-8">
-            <div class="h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+            <div class="h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
         </div>
 
         <div v-else-if="variants.length === 0" class="text-center py-8 text-gray-500">
@@ -301,7 +301,7 @@ onMounted(async () => {
 
         <div v-else class="overflow-x-auto">
             <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
-                <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-gray-700 dark:text-gray-400">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-muted dark:text-gray-400">
                     <tr>
                         <th class="px-6 py-3">Marca</th>
                         <th class="px-6 py-3">SKU</th>
@@ -313,7 +313,7 @@ onMounted(async () => {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="variant in variants" :key="variant.id" class="border-b bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-600">
+                    <tr v-for="variant in variants" :key="variant.id" class="border-b bg-white hover:bg-gray-50 dark:border-border dark:bg-card dark:hover:bg-muted">
                         <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
                             {{ variant.brand?.name }}
                             <span v-if="variant.is_default" class="ml-2 rounded bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300">Default</span>
@@ -347,7 +347,7 @@ onMounted(async () => {
                             </span>
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <button @click="openEditModal(variant)" class="font-medium text-blue-600 hover:underline dark:text-blue-500 mr-3">Editar</button>
+                            <button @click="openEditModal(variant)" class="font-medium text-blue-600 dark:text-primary hover:underline dark:text-blue-500 mr-3">Editar</button>
                             <button
                                 v-if="!variant.is_default"
                                 @click="handleDelete(variant)"
@@ -379,7 +379,7 @@ onMounted(async () => {
                             <select
                                 v-model="form.brand_id"
                                 :disabled="!!editingVariant"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white"
                                 required
                             >
                                 <option v-for="brand in brands" :key="brand.id" :value="brand.id">{{ brand.name }}</option>
@@ -395,7 +395,7 @@ onMounted(async () => {
                             <input
                                 v-model="form.sku"
                                 type="text"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono text-sm"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white font-mono text-sm"
                                 :placeholder="autoVariantSku || 'Se genera automáticamente'"
                                 required
                             />
@@ -409,7 +409,7 @@ onMounted(async () => {
                                 v-model="form.upc"
                                 type="text"
                                 placeholder="SKU personalizado del proveedor (opcional)"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white"
                             />
                         </div>
 
@@ -418,7 +418,7 @@ onMounted(async () => {
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado</label>
                             <select
                                 v-model="form.status"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white"
                             >
                                 <option value="active">Activo</option>
                                 <option value="discontinued">Discontinuado</option>
@@ -428,7 +428,7 @@ onMounted(async () => {
                     </div>
 
                     <!-- ═══ Attributes Section ═══ -->
-                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <div class="border-t border-gray-200 dark:border-border pt-4">
                         <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
                             🔧 Especificaciones Técnicas
                             <span v-if="loadingCategoryDefaults" class="text-xs text-gray-400 animate-pulse">cargando guías...</span>
@@ -445,17 +445,17 @@ onMounted(async () => {
                                 class="grid grid-cols-12 gap-2 items-center">
                                 <div class="col-span-4">
                                     <input v-model="attr.name" type="text" placeholder="Nombre"
-                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
                                         :class="attr.required ? 'border-amber-300 dark:border-amber-600' : ''" />
                                 </div>
                                 <div class="col-span-4">
                                     <input v-model="attr.value" type="text" :placeholder="attr.required ? 'Requerido *' : 'Valor'"
-                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
                                         :class="attr.required && !attr.value ? 'border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/10' : ''" />
                                 </div>
                                 <div class="col-span-2">
                                     <input v-model="attr.unit" type="text" placeholder="Unidad"
-                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white" />
                                 </div>
                                 <div class="col-span-2 flex justify-end">
                                     <button type="button" @click="removeAttribute(idx)"
@@ -468,22 +468,22 @@ onMounted(async () => {
                         <div class="grid grid-cols-12 gap-2">
                             <div class="col-span-4">
                                 <input v-model="newAttrName" type="text" placeholder="Nombre (ej: Amperaje)"
-                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
                                     @keyup.enter="addAttribute" />
                             </div>
                             <div class="col-span-4">
                                 <input v-model="newAttrValue" type="text" placeholder="Valor (ej: 90)"
-                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
                                     @keyup.enter="addAttribute" />
                             </div>
                             <div class="col-span-2">
                                 <input v-model="newAttrUnit" type="text" placeholder="Unidad"
-                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
                                     @keyup.enter="addAttribute" />
                             </div>
                             <div class="col-span-2">
                                 <button type="button" @click="addAttribute" :disabled="!newAttrName.trim() || !newAttrValue.trim()"
-                                    class="w-full rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-40 transition">
+                                    class="w-full rounded-md bg-indigo-600 dark:bg-primary dark:text-primary-foreground px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-40 transition">
                                     + Agregar
                                 </button>
                             </div>
@@ -493,23 +493,23 @@ onMounted(async () => {
                     </div>
 
                     <!-- ═══ Pricing Section (3-way calculator) ═══ -->
-                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <div class="border-t border-gray-200 dark:border-border pt-4">
                         <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">💰 Precios de esta Variante</h4>
 
                         <!-- Tax type toggle -->
                         <div class="flex gap-2 mb-4">
                             <button type="button" @click="onTaxTypeChange('standard')"
-                                :class="form.pricing.tax_type === 'standard' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 ring-1 ring-blue-500' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'"
+                                :class="form.pricing.tax_type === 'standard' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 ring-1 ring-blue-500' : 'bg-gray-100 text-gray-600 dark:bg-muted dark:text-gray-400'"
                                 class="rounded-lg px-3 py-1.5 text-xs font-medium transition-all">
                                 ITBM 7%
                             </button>
                             <button type="button" @click="onTaxTypeChange('exempt')"
-                                :class="form.pricing.tax_type === 'exempt' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 ring-1 ring-green-500' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'"
+                                :class="form.pricing.tax_type === 'exempt' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 ring-1 ring-green-500' : 'bg-gray-100 text-gray-600 dark:bg-muted dark:text-gray-400'"
                                 class="rounded-lg px-3 py-1.5 text-xs font-medium transition-all">
                                 Exento
                             </button>
                             <button type="button" @click="onTaxTypeChange('custom')"
-                                :class="form.pricing.tax_type === 'custom' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 ring-1 ring-amber-500' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'"
+                                :class="form.pricing.tax_type === 'custom' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 ring-1 ring-amber-500' : 'bg-gray-100 text-gray-600 dark:bg-muted dark:text-gray-400'"
                                 class="rounded-lg px-3 py-1.5 text-xs font-medium transition-all">
                                 Custom
                             </button>
@@ -521,7 +521,7 @@ onMounted(async () => {
                                 <div class="relative mt-1">
                                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
                                     <input v-model.number="form.pricing.base_price" type="number" step="0.01" min="0"
-                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-7" />
+                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white pl-7" />
                                 </div>
                             </div>
 
@@ -532,7 +532,7 @@ onMounted(async () => {
                                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-green-500 text-sm font-semibold">$</span>
                                     <input :value="computed_total" @input="onTotalChange(Number(($event.target as HTMLInputElement).value))"
                                         type="number" step="0.01" min="0"
-                                        class="block w-full rounded-md border-green-300 dark:border-green-700 shadow-sm focus:border-green-500 focus:ring-green-500 dark:bg-gray-700 dark:text-green-300 pl-7 font-semibold" />
+                                        class="block w-full rounded-md border-green-300 dark:border-green-700 shadow-sm focus:border-green-500 focus:ring-green-500 dark:bg-muted dark:text-green-300 pl-7 font-semibold" />
                                 </div>
                             </div>
                         </div>
@@ -543,13 +543,13 @@ onMounted(async () => {
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">% ITBM</label>
                                 <input v-model.number="form.pricing.tax_rate" type="number" step="0.01" min="0" max="100"
                                     :disabled="form.pricing.tax_type !== 'custom'"
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50" />
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white disabled:opacity-50" />
                             </div>
                         </div>
                     </div>
 
                     <!-- Initial Inventory (Only for create) -->
-                    <div v-if="!editingVariant" class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <div v-if="!editingVariant" class="border-t border-gray-200 dark:border-border pt-4">
                         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-2">📦 Inventario Inicial</h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div>
@@ -557,7 +557,7 @@ onMounted(async () => {
                                 <input
                                     v-model.number="form.initial_inventory[0].stock_available"
                                     type="number" step="1" min="0"
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white"
                                 />
                             </div>
                         </div>

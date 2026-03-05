@@ -543,7 +543,7 @@ onUnmounted(() => {
 <template>
   <Head title="Punto de Venta" />
 
-  <div class="h-[calc(100vh-4rem)] flex flex-col bg-[#F8F9FB] text-gray-900 overflow-hidden" style="font-family: 'Inter', sans-serif">
+  <div class="h-[calc(100vh-4rem)] flex flex-col bg-[#F8F9FB] dark:bg-background text-gray-900 dark:text-foreground overflow-hidden" style="font-family: 'Inter', sans-serif">
 
     <!-- Header - Fixed Height -->
     <div class="shrink-0 z-20 shadow-sm relative">
@@ -579,15 +579,15 @@ onUnmounted(() => {
           </div>
 
           <!-- Multi-Cart Tabs -->
-          <div v-if="allSessions.length > 0" class="shrink-0 flex items-center gap-1.5 px-1 py-1.5 bg-gray-100 rounded-xl overflow-x-auto">
+          <div v-if="allSessions.length > 0" class="shrink-0 flex items-center gap-1.5 px-1 py-1.5 bg-gray-100 dark:bg-muted/50 rounded-xl overflow-x-auto">
             <button
               v-for="s in allSessions"
               :key="s.id"
               @click="switchCart(s.id)"
               class="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
               :class="s.id === activeSessionId
-                ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-200'
-                : 'text-gray-500 hover:bg-white/60 hover:text-gray-700'"
+                ? 'bg-white dark:bg-card text-indigo-700 dark:text-indigo-400 shadow-sm ring-1 ring-indigo-200 dark:ring-indigo-900'
+                : 'text-gray-500 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-card hover:text-gray-700 dark:hover:text-gray-200'"
             >
               <span class="w-2 h-2 rounded-full shrink-0"
                 :class="s.cart.length > 0 ? 'bg-indigo-500' : 'bg-gray-300'"
@@ -604,7 +604,7 @@ onUnmounted(() => {
             <!-- New cart button -->
             <button
               @click="createNewCart()"
-              class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-white hover:text-indigo-600 hover:shadow-sm transition-all text-lg leading-none"
+              class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-white hover:text-indigo-600 dark:text-primary hover:shadow-sm transition-all text-lg leading-none"
               title="Nueva venta"
             >+</button>
           </div>
@@ -626,7 +626,7 @@ onUnmounted(() => {
         </div>
         
         <!-- Right Column: Summary & Actions -->
-        <div class="flex-1 min-w-[300px] max-w-sm bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full overflow-y-auto shrink-0">
+        <div class="flex-1 min-w-[300px] max-w-sm bg-white dark:bg-card p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-border flex flex-col h-full overflow-y-auto shrink-0">
           <div class="shrink-0 mb-4">
             <SummarySection 
                 :subtotal="cartSubtotal"
@@ -674,10 +674,10 @@ onUnmounted(() => {
       v-if="showPaymentModal"
       class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
     >
-      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
+      <div class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-border flex items-center justify-between shrink-0">
           <h2 class="text-xl font-bold text-gray-900 dark:text-white">Procesar Pago</h2>
-          <button @click="closePaymentModal" class="text-gray-400 hover:text-gray-600">
+          <button @click="closePaymentModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -689,7 +689,7 @@ onUnmounted(() => {
           <div class="grid grid-cols-4 gap-2">
             <button
               @click="paymentMethod = 'cash'"
-              :class="paymentMethod === 'cash' ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-700'"
+              :class="paymentMethod === 'cash' ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-muted'"
               class="flex flex-col items-center gap-1 p-3 rounded-xl transition-all text-sm font-medium"
             >
               <Banknote :class="paymentMethod === 'cash' ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'" class="w-5 h-5" />
@@ -697,7 +697,7 @@ onUnmounted(() => {
             </button>
             <button
               @click="paymentMethod = 'card'"
-              :class="paymentMethod === 'card' ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700'"
+              :class="paymentMethod === 'card' ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-muted'"
               class="flex flex-col items-center gap-1 p-3 rounded-xl transition-all text-sm font-medium"
             >
               <CreditCard :class="paymentMethod === 'card' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300'" class="w-5 h-5" />
@@ -705,7 +705,7 @@ onUnmounted(() => {
             </button>
             <button
               @click="paymentMethod = 'transfer'"
-              :class="paymentMethod === 'transfer' ? 'ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'bg-gray-50 dark:bg-gray-700'"
+              :class="paymentMethod === 'transfer' ? 'ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'bg-gray-50 dark:bg-muted'"
               class="flex flex-col items-center gap-1 p-3 rounded-xl transition-all text-sm font-medium"
             >
               <Landmark :class="paymentMethod === 'transfer' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-600 dark:text-gray-300'" class="w-5 h-5" />
@@ -713,7 +713,7 @@ onUnmounted(() => {
             </button>
             <button
               @click="paymentMethod = 'multiple'"
-              :class="paymentMethod === 'multiple' ? 'ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-gray-700'"
+              :class="paymentMethod === 'multiple' ? 'ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-muted'"
               class="flex flex-col items-center gap-1 p-3 rounded-xl transition-all text-sm font-medium"
             >
               <svg :class="paymentMethod === 'multiple' ? 'text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -726,9 +726,9 @@ onUnmounted(() => {
 
 
           <!-- Total -->
-          <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 text-center">
+          <div class="bg-gray-50 dark:bg-muted/50 rounded-xl p-4 text-center">
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total a cobrar</p>
-            <p class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{{ formatCurrency(cartTotal) }}</p>
+            <p class="text-3xl font-bold text-indigo-600 dark:text-primary dark:text-indigo-400">{{ formatCurrency(cartTotal) }}</p>
             <p v-if="shippingCost > 0" class="text-xs text-gray-500 dark:text-gray-400 mt-1">(incl. Envío: {{ formatCurrency(shippingCost) }})</p>
           </div>
 
@@ -743,7 +743,7 @@ onUnmounted(() => {
                   type="number"
                   step="0.01"
                   min="0"
-                  class="w-full pl-7 px-4 py-3 text-xl text-right border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                  class="w-full pl-7 px-4 py-3 text-xl text-right border border-gray-300 dark:border-border rounded-xl bg-white dark:bg-card text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   autofocus
                 />
               </div>
@@ -754,7 +754,7 @@ onUnmounted(() => {
                 v-for="amount in [Math.ceil(cartTotal), Math.ceil(cartTotal / 10) * 10, Math.ceil(cartTotal / 50) * 50, Math.ceil(cartTotal / 100) * 100]"
                 :key="amount"
                 @click="amountReceived = amount"
-                class="py-2 text-sm font-medium bg-gray-100 dark:bg-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300"
+                class="py-2 text-sm font-medium bg-gray-100 dark:bg-muted rounded-lg hover:bg-gray-200 dark:hover:bg-muted/80 text-gray-700 dark:text-gray-300"
               >
                 {{ formatCurrency(amount) }}
               </button>
@@ -771,7 +771,7 @@ onUnmounted(() => {
                <span class="text-sm font-medium"><AlertTriangle class="w-4 h-4 inline mr-1" /> Faltan por cobrar:</span>
                <span class="text-xl font-bold">{{ formatCurrency(totalRemaining) }}</span>
             </div>
-            <div v-else class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3 text-center text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+            <div v-else class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3 text-center text-sm text-indigo-600 dark:text-primary dark:text-indigo-400 font-medium">
                Pago Completo
             </div>
           </div>
@@ -779,17 +779,17 @@ onUnmounted(() => {
           <div v-if="error" class="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 text-sm text-red-600 dark:text-red-400">{{ error }}</div>
         </div>
 
-        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-3 shrink-0">
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-border flex gap-3 shrink-0">
           <button
             @click="closePaymentModal"
-            class="flex-1 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700"
+            class="flex-1 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-border rounded-xl hover:bg-gray-50 dark:hover:bg-muted"
           >
             Cancelar
           </button>
           <button
             @click="handlePayment"
             :disabled="loading || totalPaid < cartTotal || !!error"
-            class="flex-1 py-2.5 text-sm font-bold text-white rounded-xl disabled:opacity-40 shadow-sm bg-indigo-600 hover:bg-indigo-700"
+            class="flex-1 py-2.5 text-sm font-bold text-white rounded-xl disabled:opacity-40 shadow-sm bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90"
           >
             {{ loading ? 'Procesando...' : '✓ Confirmar Venta' }}
           </button>
@@ -803,17 +803,17 @@ onUnmounted(() => {
       class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       @click.self="showShortcutsHelp = false"
     >
-      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+      <div class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-sm p-6">
         <h3 class="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white mb-4"><Keyboard class="w-5 h-5" /> Atajos de Teclado</h3>
         <div class="space-y-2 text-sm">
-          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Buscar producto</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-xs">F1</kbd></div>
-          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Cantidad</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-xs">F2</kbd></div>
-          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Limpiar carrito</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-xs">F4</kbd></div>
-          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Guardar borrador</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-xs">F5</kbd></div>
-          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Cobrar</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-xs">F10</kbd></div>
-          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Esta ayuda</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-xs">F12</kbd></div>
+          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Buscar producto</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-muted rounded font-mono text-xs">F1</kbd></div>
+          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Cantidad</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-muted rounded font-mono text-xs">F2</kbd></div>
+          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Limpiar carrito</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-muted rounded font-mono text-xs">F4</kbd></div>
+          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Guardar borrador</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-muted rounded font-mono text-xs">F5</kbd></div>
+          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Cobrar</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-muted rounded font-mono text-xs">F10</kbd></div>
+          <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Esta ayuda</span><kbd class="px-2 py-0.5 bg-gray-100 dark:bg-muted rounded font-mono text-xs">F12</kbd></div>
         </div>
-        <button @click="showShortcutsHelp = false" class="mt-4 w-full py-2 text-sm font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">Cerrar</button>
+        <button @click="showShortcutsHelp = false" class="mt-4 w-full py-2 text-sm font-medium bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white rounded-xl hover:bg-indigo-700 dark:hover:bg-primary/90">Cerrar</button>
       </div>
     </div>
 

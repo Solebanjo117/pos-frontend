@@ -225,10 +225,10 @@ onMounted(() => {
         </div>
 
         <!-- Table -->
-        <div class="rounded-md border border-gray-200 dark:border-gray-700">
+        <div class="rounded-md border border-gray-200 dark:border-border">
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                    <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-card dark:text-gray-400">
                         <tr>
                             <th class="px-6 py-3 font-medium">Vehículo</th>
                             <th class="px-6 py-3 font-medium">Motor</th>
@@ -236,7 +236,7 @@ onMounted(() => {
                             <th class="px-6 py-3 text-right font-medium">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody class="divide-y divide-gray-200 dark:divide-border">
                         <tr v-if="loading && !engines.length">
                             <td colspan="4" class="px-6 py-4 text-center text-gray-500">Cargando...</td>
                         </tr>
@@ -244,7 +244,7 @@ onMounted(() => {
                             <td colspan="4" class="px-6 py-4 text-center text-gray-500">No hay motores registrados.</td>
                         </tr>
                         <tr v-for="engine in engines" :key="engine.id"
-                            class="bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800">
+                            class="bg-white hover:bg-gray-50 dark:bg-background dark:hover:bg-card">
                             <td class="px-6 py-4 text-gray-900 dark:text-white">
                                 <div class="font-medium">{{ engine.model?.make?.name }}</div>
                                 <div class="text-xs text-gray-500">{{ engine.model?.name }}</div>
@@ -356,9 +356,9 @@ onMounted(() => {
                     <!-- VIN list -->
                     <div v-if="vinsLoading" class="py-2 text-center text-sm text-gray-400">Cargando VINs...</div>
                     <div v-else-if="engineVins.length === 0" class="py-2 text-center text-sm text-gray-400">No hay VINs registrados.</div>
-                    <ul v-else class="max-h-40 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700 rounded-md border border-gray-200 dark:border-gray-700">
+                    <ul v-else class="max-h-40 overflow-y-auto divide-y divide-gray-100 dark:divide-border rounded-md border border-gray-200 dark:border-border">
                         <li v-for="v in engineVins" :key="v.id"
-                            class="flex items-center justify-between px-3 py-2 text-sm bg-white dark:bg-gray-900">
+                            class="flex items-center justify-between px-3 py-2 text-sm bg-white dark:bg-background">
                             <span class="font-mono text-gray-800 dark:text-gray-200 tracking-wide">{{ v.vin }}</span>
                             <button type="button" @click="handleRemoveVin(v.id)" class="ml-2 text-red-500 hover:text-red-700">
                                 <X class="h-4 w-4" />

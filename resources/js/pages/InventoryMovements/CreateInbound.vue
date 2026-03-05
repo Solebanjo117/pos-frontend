@@ -169,22 +169,28 @@ const applyDefaultsToAll = () => {
     })
 }
 
-// 3-way calculator logic
-const handlePriceChange = (item: InboundItem, field: 'cost' | 'tax_type' | 'tax_rate' | 'final_cost') => {
+// 3-way calculator logic (Price + Tax + Quantity)
+const handlePriceChange = (item: InboundItem, field: 'cost' | 'tax_type' | 'tax_rate' | 'final_cost' | 'quantity') => {
     if (field === 'tax_type') {
         if (item.tax_type === 'exempt') item.tax_rate = 0
         else if (item.tax_type === 'standard') item.tax_rate = 7
     }
 
-    if (field === 'cost' || field === 'tax_type' || field === 'tax_rate') {
+    const qty = item.quantity || 1
+
+    if (field === 'cost' || field === 'tax_type' || field === 'tax_rate' || field === 'quantity') {
         if (item.cost !== null && item.cost !== undefined) {
-            item.final_cost = Number((item.cost * (1 + (item.tax_rate / 100))).toFixed(2))
+            // final_cost = (cost * (1 + tax_rate / 100)) * quantity
+            const unitCostWithTax = item.cost * (1 + (item.tax_rate / 100))
+            item.final_cost = Number((unitCostWithTax * qty).toFixed(2))
         } else {
             item.final_cost = null
         }
     } else if (field === 'final_cost') {
-        if (item.final_cost !== null && item.final_cost !== undefined && item.tax_rate !== null) {
-            item.cost = Number((item.final_cost / (1 + (item.tax_rate / 100))).toFixed(2))
+        // user inputs total cost, reverse calculate unit cost: cost = (final_cost / quantity) / (1 + tax_rate / 100)
+        if (item.final_cost !== null && item.final_cost !== undefined && item.tax_rate !== null && qty > 0) {
+            const unitCostWithTax = item.final_cost / qty
+            item.cost = Number((unitCostWithTax / (1 + (item.tax_rate / 100))).toFixed(2))
         } else {
             item.cost = null
         }
@@ -298,7 +304,7 @@ const cancel = () => {
                         <button
                             type="button"
                             @click="cancel"
-                            class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                            class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted/50"
                         >
                             Cancelar
                         </button>
@@ -306,7 +312,7 @@ const cancel = () => {
                             type="button"
                             @click="handleSubmit"
                             :disabled="loading"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                            class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-50"
                         >
                             {{ loading ? 'Procesando...' : 'Confirmar Entrada' }}
                         </button>
@@ -326,14 +332,14 @@ const cancel = () => {
                     <!-- Sidebar: Config & Defaults -->
                     <div class="lg:col-span-1 space-y-6">
                         <!-- General Info -->
-                        <div class="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+                        <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
                             <h2 class="mb-4 font-semibold text-gray-900 dark:text-white">Información General</h2>
                             <div class="space-y-4">
                                 <div v-if="showWarehouseSelect">
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">Almacén Destino</label>
                                     <select
                                         v-model="headerForm.warehouse_id"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     >
                                         <option :value="null">Seleccionar...</option>
                                         <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
@@ -345,7 +351,7 @@ const cancel = () => {
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">Tipo Referencia</label>
                                     <select
                                         v-model="headerForm.reference_type"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     >
                                         <option :value="undefined">Ninguna</option>
                                         <option value="purchase">Compra (PO)</option>
@@ -359,7 +365,7 @@ const cancel = () => {
                                     <input
                                         v-model.number="headerForm.reference_id"
                                         type="number"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     />
                                 </div>
 
@@ -368,21 +374,21 @@ const cancel = () => {
                                     <textarea
                                         v-model="headerForm.notes"
                                         rows="2"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     ></textarea>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Batch Defaults -->
-                        <div class="rounded-lg bg-blue-50 p-4 shadow dark:bg-gray-800 border border-blue-100 dark:border-gray-700">
+                        <div class="rounded-lg bg-blue-50 p-4 shadow dark:bg-card border border-blue-100 dark:border-border">
                             <div class="flex items-center justify-between mb-4">
                                 <h2 class="font-semibold text-blue-900 dark:text-blue-100">Valores por Defecto</h2>
                                 <button
                                     @click="applyDefaultsToAll"
                                     type="button"
                                     title="Aplicar a todas las filas existentes"
-                                    class="text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                                    class="text-blue-600 dark:text-primary hover:text-blue-800 dark:text-blue-400"
                                 >
                                     <Copy :size="16" />
                                 </button>
@@ -396,7 +402,7 @@ const cancel = () => {
                                     <input
                                         v-model="batchDefaults.batch_number"
                                         type="text"
-                                        class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                         placeholder="Ej: LOTE-ABC"
                                     />
                                 </div>
@@ -405,7 +411,7 @@ const cancel = () => {
                                         <label class="block text-xs font-medium text-blue-900 dark:text-blue-200">Impuesto</label>
                                         <select
                                             v-model="batchDefaults.tax_type"
-                                            class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                            class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                         >
                                             <option value="standard">ITBMS (7%)</option>
                                             <option value="exempt">Exento (0%)</option>
@@ -418,7 +424,7 @@ const cancel = () => {
                                             v-model.number="batchDefaults.tax_rate"
                                             type="number"
                                             step="0.1"
-                                            class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                            class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                         />
                                     </div>
                                 </div>
@@ -428,7 +434,7 @@ const cancel = () => {
                                         v-model.number="batchDefaults.cost"
                                         type="number"
                                         step="0.01"
-                                        class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     />
                                 </div>
                             </div>
@@ -437,21 +443,21 @@ const cancel = () => {
 
                     <!-- Items List -->
                     <div class="lg:col-span-3">
-                        <div class="rounded-lg bg-white p-4 shadow dark:bg-gray-800 min-h-[500px] flex flex-col">
+                        <div class="rounded-lg bg-white p-4 shadow dark:bg-card min-h-[500px] flex flex-col">
                             <div class="mb-4 flex items-center justify-between">
                                 <h2 class="font-semibold text-gray-900 dark:text-white">Items de Entrada ({{ items.length }})</h2>
                                 <button
                                     @click="addItem"
                                     type="button"
-                                    class="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                                    class="flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-primary hover:text-blue-800 dark:text-blue-400"
                                 >
                                     <Plus :size="16" /> Agregar Item
                                 </button>
                             </div>
 
                             <div class="flex-1 overflow-auto">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                    <thead class="bg-gray-50 dark:bg-gray-700">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                                    <thead class="bg-gray-50 dark:bg-muted">
                                         <tr>
                                             <th scope="col" class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 w-1/4">Producto Base</th>
                                             <th scope="col" class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 w-1/4">Variante/Marca</th>
@@ -461,7 +467,7 @@ const cancel = () => {
                                             <th scope="col" class="relative px-3 py-3 w-10"><span class="sr-only">Acciones</span></th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                                         <tr v-for="(item, index) in items" :key="item.id">
                                             <td class="px-3 py-4 align-top">
                                                 <ProductCombobox
@@ -482,7 +488,7 @@ const cancel = () => {
                                                         <select
                                                             v-model="item.variant_id"
                                                             @change="handleProductSelect(index, item.product_id, item.variant_id)"
-                                                            class="w-full rounded-md border-gray-300 py-1.5 shadow-sm text-sm dark:border-gray-600 dark:bg-gray-700"
+                                                            class="w-full rounded-md border-gray-300 py-1.5 shadow-sm text-sm dark:border-border dark:bg-muted"
                                                         >
                                                             <option :value="null">Genérico / Default</option>
                                                             <option v-for="v in getProductDetails(item.product_id)?.variants || []" :key="v.id" :value="v.id">
@@ -492,12 +498,12 @@ const cancel = () => {
                                                         <button 
                                                             @click="refreshVariants(index)" 
                                                             title="Refrescar variantes" 
-                                                            class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md dark:text-blue-400 dark:hover:bg-gray-700"
+                                                            class="p-1.5 text-blue-600 dark:text-primary hover:bg-blue-50 rounded-md dark:text-blue-400 dark:hover:bg-muted/50"
                                                         >
                                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                                                         </button>
                                                     </div>
-                                                    <a :href="`/products/${item.product_id}/edit`" target="_blank" class="text-xs text-blue-600 hover:underline dark:text-blue-400 mt-1 flex items-center gap-1">
+                                                    <a :href="`/products/${item.product_id}/edit`" target="_blank" class="text-xs text-blue-600 dark:text-primary hover:underline dark:text-blue-400 mt-1 flex items-center gap-1">
                                                         + Añadir variante
                                                     </a>
                                                 </div>
@@ -508,16 +514,17 @@ const cancel = () => {
                                                     v-model="item.batch_number"
                                                     type="text"
                                                     placeholder="Nº Lote"
-                                                    class="w-full text-sm rounded-md border-gray-300 py-1.5 shadow-sm dark:border-gray-600 dark:bg-gray-700"
+                                                    class="w-full text-sm rounded-md border-gray-300 py-1.5 shadow-sm dark:border-border dark:bg-muted"
                                                     :class="{ 'border-red-500': formErrors[`item_${item.id}_batch`] }"
                                                 />
                                             </td>
                                             <td class="px-3 py-4 align-top">
                                                 <input
                                                     v-model.number="item.quantity"
+                                                    @input="handlePriceChange(item, 'quantity')"
                                                     type="number"
                                                     min="1"
-                                                    class="w-full text-sm rounded-md border-gray-300 text-center shadow-sm py-1.5 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                                    class="w-full text-sm rounded-md border-gray-300 text-center shadow-sm py-1.5 focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                                     :class="{ 'border-red-500': formErrors[`item_${item.id}_quantity`] }"
                                                 />
                                             </td>
@@ -529,7 +536,7 @@ const cancel = () => {
                                                             @input="handlePriceChange(item, 'cost')"
                                                             type="number"
                                                             step="0.01"
-                                                            class="w-full text-sm rounded-md border-gray-300 text-right shadow-sm py-1.5 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                                            class="w-full text-sm rounded-md border-gray-300 text-right shadow-sm py-1.5 focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                                             placeholder="Neto"
                                                         />
                                                     </div>
@@ -537,7 +544,7 @@ const cancel = () => {
                                                         <select
                                                             v-model="item.tax_type"
                                                             @change="handlePriceChange(item, 'tax_type')"
-                                                            class="w-full text-xs rounded-md border-gray-300 py-1.5 shadow-sm dark:border-gray-600 dark:bg-gray-700"
+                                                            class="w-full text-xs rounded-md border-gray-300 py-1.5 shadow-sm dark:border-border dark:bg-muted"
                                                         >
                                                             <option value="standard">7%</option>
                                                             <option value="exempt">0%</option>
@@ -553,13 +560,13 @@ const cancel = () => {
                                                             class="w-full text-xs rounded-md border-gray-300 shadow-sm py-1"
                                                         />
                                                     </div>
-                                                    <div class="flex-1 border-l pl-2 dark:border-gray-600">
+                                                    <div class="flex-1 border-l pl-2 dark:border-border">
                                                         <input
                                                             v-model.number="item.final_cost"
                                                             @input="handlePriceChange(item, 'final_cost')"
                                                             type="number"
                                                             step="0.01"
-                                                            class="w-full text-sm rounded-md border-gray-300 text-right shadow-sm py-1.5 focus:border-green-500 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700 font-semibold text-green-700 dark:text-green-400"
+                                                            class="w-full text-sm rounded-md border-gray-300 text-right shadow-sm py-1.5 focus:border-green-500 focus:ring-green-500 dark:border-border dark:bg-muted font-semibold text-green-700 dark:text-green-400"
                                                             placeholder="Total"
                                                         />
                                                     </div>
@@ -582,7 +589,7 @@ const cancel = () => {
                                 </table>
                             </div>
                             
-                            <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                            <div class="mt-4 border-t border-gray-200 pt-4 dark:border-border">
                                 <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                                     <span>Total Items: {{ items.length }}</span>
                                     <span>Total Cantidad: {{ items.reduce((acc, item) => acc + (item.quantity || 0), 0) }}</span>

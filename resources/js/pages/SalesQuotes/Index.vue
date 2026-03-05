@@ -45,7 +45,7 @@ const statusOptions = [
 
 const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-        draft:     'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+        draft:     'bg-gray-100 text-gray-800 dark:bg-card dark:text-gray-300',
         sent:      'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
         accepted:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
         rejected:  'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -112,9 +112,20 @@ const handleConvert = async (id: number) => {
     }
 }
 
-const openPdf = (id: number, mode: 'standard' | 'blind' = 'standard') => {
+import PrintTicketModal from '@/components/POS/PrintTicketModal.vue'
+
+const openPdf = (id: number, format: 'ticket' | 'proforma', mode: 'standard' | 'blind' = 'standard') => {
+    // Legacy fallback, kept just in case but we use the modal now.
     const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
-    window.open(`${baseUrl}/sales-quotes/${id}/pdf?mode=${mode}`, '_blank')
+    window.open(`${baseUrl}/sales-quotes/${id}/${format}?mode=${mode}`, '_blank')
+}
+
+const showPrintModal = ref(false)
+const selectedQuote = ref<SalesQuote | null>(null)
+
+const openPrintModal = (quote: SalesQuote) => {
+    selectedQuote.value = quote
+    showPrintModal.value = true
 }
 
 const formatDate = (d: string) => {
@@ -133,7 +144,7 @@ onMounted(() => fetchQuotes())
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                    <FileText class="w-8 h-8 text-indigo-600" />
+                    <FileText class="w-8 h-8 text-indigo-600 dark:text-primary" />
                     Cotizaciones
                 </h1>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -142,7 +153,7 @@ onMounted(() => fetchQuotes())
             </div>
             <Link
                 href="/sales-quotes/create"
-                class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-medium shadow-sm"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition font-medium shadow-sm"
             >
                 <Plus :size="20" />
                 Nueva Cotización
@@ -150,7 +161,7 @@ onMounted(() => fetchQuotes())
         </div>
 
         <!-- Filters -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-4">
             <div class="flex flex-wrap gap-4 items-end">
                 <div class="flex-1 min-w-[200px]">
                     <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
@@ -160,7 +171,7 @@ onMounted(() => fetchQuotes())
                             v-model="search"
                             type="text"
                             placeholder="Número o cliente..."
-                            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
                             @input="fetchQuotes(1)"
                         />
                     </div>
@@ -170,7 +181,7 @@ onMounted(() => fetchQuotes())
                     <select
                         v-model="statusFilter"
                         @change="fetchQuotes(1)"
-                        class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        class="px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
                     >
                         <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
@@ -188,20 +199,20 @@ onMounted(() => fetchQuotes())
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="quotes.length === 0" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
+        <div v-else-if="quotes.length === 0" class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-12 text-center">
             <FileText class="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
             <p class="text-gray-500 dark:text-gray-400">No hay cotizaciones para mostrar.</p>
-            <Link href="/sales-quotes/create" class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-sm">
+            <Link href="/sales-quotes/create" class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition text-sm">
                 <Plus :size="16" />
                 Crear primera cotización
             </Link>
         </div>
 
         <!-- Table -->
-        <div v-else class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div v-else class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-900">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <thead class="bg-gray-50 dark:bg-background">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">N° Cotización</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cliente</th>
@@ -212,23 +223,31 @@ onMounted(() => fetchQuotes())
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                        <tr v-for="q in quotes" :key="q.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <tbody class="divide-y divide-gray-200 dark:divide-border">
+                        <tr v-for="q in quotes" :key="q.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="relative group inline-block">
-                                    <button class="text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 uppercase transition flex items-center gap-1">
+                                    <button class="text-sm font-semibold text-indigo-600 dark:text-primary dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 uppercase transition flex items-center gap-1">
                                         {{ q.quote_number }}
                                         <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                     </button>
-                                    <div class="absolute left-0 mt-1 w-44 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                    <div class="absolute left-0 mt-1 w-44 bg-white dark:bg-card rounded-md shadow-lg border border-gray-200 dark:border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                                         <div class="py-1">
-                                            <button @click="openPdf(q.id, 'standard')" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
+                                            <button @click="openPdf(q.id, 'ticket', 'standard')" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted/50 flex items-center gap-2">
                                                 <FileText class="w-4 h-4 text-gray-400" />
-                                                Interna (Con SKU)
+                                                Ticket Interno (80mm)
                                             </button>
-                                            <button @click="openPdf(q.id, 'blind')" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
+                                            <button @click="openPdf(q.id, 'ticket', 'blind')" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted/50 flex items-center gap-2">
                                                 <EyeOff class="w-4 h-4 text-gray-400" />
-                                                Pública (Sin SKU)
+                                                Ticket Cliente (80mm)
+                                            </button>
+                                            <button @click="openPdf(q.id, 'proforma', 'standard')" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted/50 flex items-center gap-2">
+                                                <FileText class="w-4 h-4 text-gray-400" />
+                                                Proforma Interna (A4)
+                                            </button>
+                                            <button @click="openPdf(q.id, 'proforma', 'blind')" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted/50 flex items-center gap-2">
+                                                <EyeOff class="w-4 h-4 text-gray-400" />
+                                                Proforma Cliente (A4)
                                             </button>
                                         </div>
                                     </div>
@@ -259,7 +278,7 @@ onMounted(() => fetchQuotes())
                                 <div class="flex items-center justify-end gap-1.5">
                                     <Link
                                         :href="`/sales-quotes/${q.id}`"
-                                        class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
+                                        class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 dark:text-primary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
                                         title="Ver detalle"
                                     >
                                         <Eye :size="16" />
@@ -272,23 +291,13 @@ onMounted(() => fetchQuotes())
                                     >
                                         <Edit :size="16" />
                                     </Link>
-                                    <div class="relative group">
-                                        <button class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition" title="Descargar PDF">
-                                            <Download :size="16" />
-                                        </button>
-                                        <div class="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                            <div class="py-1">
-                                                <button @click="openPdf(q.id, 'standard')" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
-                                                    <FileText class="w-4 h-4 text-gray-400" />
-                                                    Interna (Con SKU)
-                                                </button>
-                                                <button @click="openPdf(q.id, 'blind')" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
-                                                    <EyeOff class="w-4 h-4 text-gray-400" />
-                                                    Pública (Sin SKU)
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <button 
+                                        @click="openPrintModal(q)"
+                                        class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 dark:text-primary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition" 
+                                        title="Imprimir Ticket / Documento"
+                                    >
+                                        <Download :size="16" />
+                                    </button>
                                     <button
                                         v-if="q.status !== 'converted' && q.status !== 'rejected' && q.status !== 'expired'"
                                         @click="handleConvert(q.id)"
@@ -313,7 +322,7 @@ onMounted(() => fetchQuotes())
             </div>
 
             <!-- Pagination -->
-            <div v-if="lastPage > 1" class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-center gap-2">
+            <div v-if="lastPage > 1" class="px-6 py-4 border-t border-gray-200 dark:border-border flex justify-center gap-2">
                 <button
                     v-for="page in lastPage"
                     :key="page"
@@ -321,13 +330,21 @@ onMounted(() => fetchQuotes())
                     :class="[
                         'px-3 py-1.5 text-sm rounded-lg transition-colors',
                         page === currentPage
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            ? 'bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white'
+                            : 'bg-white dark:bg-card text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-muted/50'
                     ]"
                 >
                     {{ page }}
                 </button>
             </div>
         </div>
+        
+        <PrintTicketModal
+            :show="showPrintModal"
+            :order-id="selectedQuote?.id ?? null"
+            :order-number="selectedQuote?.quote_number"
+            sourceRoute="sales-quotes"
+            @close="showPrintModal = false"
+        />
     </div>
 </template>

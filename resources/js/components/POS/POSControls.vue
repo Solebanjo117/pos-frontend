@@ -98,7 +98,7 @@ defineExpose({ focus })
 </script>
 
 <template>
-  <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
+  <div class="bg-white dark:bg-card p-4 rounded-xl shadow-sm border border-gray-100 dark:border-border space-y-3">
     <!-- Row 1: Search Mode Toggle + Search Bar + Qty + Button -->
     <div class="flex flex-col md:flex-row items-stretch gap-3">
       <!-- Mode Toggle Button -->
@@ -106,8 +106,8 @@ defineExpose({ focus })
         @click="toggleSearchMode"
         class="shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all h-10"
         :class="searchMode === 'vehicle'
-          ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
-          : 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100'"
+          ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+          : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-300 dark:border-indigo-700/50 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40'"
         :title="searchMode === 'vehicle' ? 'Cambiar a búsqueda por artículo' : 'Cambiar a búsqueda por vehículo'"
       >
         <component :is="searchMode === 'vehicle' ? Car : Package" class="w-4 h-4" />
@@ -125,7 +125,7 @@ defineExpose({ focus })
           :placeholder="searchMode === 'vehicle'
             ? 'VIN, marca o modelo del vehículo… (Enter para buscar)'
             : 'SKU, nombre o código de barras… (Enter para buscar/agregar)'"
-          class="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700 placeholder:text-gray-400 transition-shadow h-10"
+          class="w-full pl-10 pr-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-shadow h-10"
         />
       </div>
 
@@ -134,7 +134,7 @@ defineExpose({ focus })
         <select
           v-model="selectedCategory"
           @change="handleCategoryChange"
-          class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer h-10"
+          class="flex-1 px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-xs text-gray-600 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer h-10"
         >
           <option value="">Todas las Categorías</option>
           <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
@@ -142,7 +142,7 @@ defineExpose({ focus })
         <select
           v-model="selectedBrand"
           @change="handleBrandChange"
-          class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer h-10"
+          class="flex-1 px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-xs text-gray-600 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer h-10"
         >
           <option value="">Todas las Marcas</option>
           <option v-for="b in brands" :key="b.id" :value="b.id">{{ b.name }}</option>
@@ -156,13 +156,13 @@ defineExpose({ focus })
             v-model.number="quantity"
             type="number"
             min="1"
-            class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-center font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 h-10 text-sm"
+            class="w-full px-2 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-center font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 h-10 text-sm dark:text-foreground"
             placeholder="Qty"
           />
         </div>
         <button
           @click="handleSearch"
-          class="h-10 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors border border-gray-200 text-sm whitespace-nowrap"
+          class="h-10 px-4 bg-gray-100 dark:bg-muted hover:bg-gray-200 dark:hover:bg-muted/80 text-gray-700 dark:text-foreground font-medium rounded-lg transition-colors border border-gray-200 dark:border-border text-sm whitespace-nowrap"
         >
           Buscar
         </button>
@@ -177,7 +177,7 @@ defineExpose({ focus })
         v-for="qf in quickFilters"
         :key="qf.search"
         @click="handleQuickFilter(qf.search)"
-        class="px-3 py-1 text-xs font-medium bg-gray-100 hover:bg-indigo-100 hover:text-indigo-700 text-gray-600 rounded-full border border-gray-200 hover:border-indigo-300 transition-all"
+        class="px-3 py-1 text-xs font-medium bg-gray-100 dark:bg-muted hover:bg-indigo-100 dark:hover:bg-indigo-900/20 hover:text-indigo-700 dark:hover:text-indigo-400 text-gray-600 dark:text-gray-300 rounded-full border border-gray-200 dark:border-border hover:border-indigo-300 dark:hover:border-indigo-700/50 transition-all"
       >
         {{ qf.label }}
       </button>

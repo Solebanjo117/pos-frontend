@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import { Clock, AlertCircle, TrendingUp, Download, Calendar } from 'lucide-vue-next'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useReports } from '@/composables/useReports'
 import { useWarehouses } from '@/composables/useWarehouses'
+import { usePosSettings } from '@/composables/usePosSettings'
 import { useUsers } from '@/composables/useUsers'
 import { useProducts } from '@/composables/useProducts'
 import MovementTrendChart from '@/components/charts/MovementTrendChart.vue'
@@ -22,6 +23,7 @@ const { movementHistoryReport, loading, error, fetchMovementHistory, exportRepor
 const { warehouses, fetchWarehouses } = useWarehouses()
 const { users, fetchUsers } = useUsers()
 const { products, fetchProducts } = useProducts()
+const { currentWarehouseId, initWarehouse } = usePosSettings()
 
 // Calculate default date range (last 30 days)
 const today = new Date()
@@ -42,11 +44,18 @@ const exporting = ref(false)
 
 onMounted(async () => {
     await Promise.all([
-        fetchMovementHistory(filters.value),
+        initWarehouse(),
         fetchWarehouses(),
         fetchUsers(),
         fetchProducts(),
     ])
+    filters.value.warehouse_id = currentWarehouseId.value
+    await fetchMovementHistory(filters.value)
+})
+
+watch(currentWarehouseId, (val) => {
+    filters.value.warehouse_id = val
+    applyFilters()
 })
 
 const applyFilters = async () => {
@@ -96,8 +105,8 @@ const getTypeColor = (type: string) => {
     switch (type) {
         case 'in': return 'text-green-600 bg-green-50 dark:bg-green-900/20'
         case 'out': return 'text-red-600 bg-red-50 dark:bg-red-900/20'
-        case 'transfer': return 'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
-        default: return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20'
+        case 'transfer': return 'text-blue-600 dark:text-primary bg-blue-50 dark:bg-blue-900/20'
+        default: return 'text-gray-600 bg-gray-50 dark:bg-background/20'
     }
 }
 
@@ -165,7 +174,7 @@ const formatDate = (dateString: string) => {
             </div>
 
             <!-- Filters -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
                     <Calendar :size="20" />
                     Filtros
@@ -176,7 +185,7 @@ const formatDate = (dateString: string) => {
                         <input
                             v-model="filters.date_from"
                             type="date"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
 
@@ -185,7 +194,7 @@ const formatDate = (dateString: string) => {
                         <input
                             v-model="filters.date_to"
                             type="date"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
 
@@ -193,7 +202,7 @@ const formatDate = (dateString: string) => {
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Almacén</label>
                         <select
                             v-model="filters.warehouse_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="null">Todos los almacenes</option>
                             <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
@@ -206,7 +215,7 @@ const formatDate = (dateString: string) => {
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Usuario / Responsable</label>
                         <select
                             v-model="filters.user_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="null">Todos</option>
                             <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
@@ -226,7 +235,7 @@ const formatDate = (dateString: string) => {
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Tipo</label>
                         <select
                             v-model="filters.movement_type"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="null">Todos los tipos</option>
                             <option value="in">Entradas</option>
@@ -239,7 +248,7 @@ const formatDate = (dateString: string) => {
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Agrupar por</label>
                         <select
                             v-model="filters.group_by"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option value="day">Día</option>
                             <option value="week">Semana</option>
@@ -250,7 +259,7 @@ const formatDate = (dateString: string) => {
                     <div class="flex items-end gap-2 md:col-span-3 lg:col-span-1">
                         <button
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 h-[42px]"
+                            class="flex-1 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90 h-[42px]"
                         >
                             Aplicar
                         </button>
@@ -266,7 +275,7 @@ const formatDate = (dateString: string) => {
 
             <!-- Summary Cards -->
             <div v-if="movementHistoryReport" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Total Movimientos</p>
@@ -274,7 +283,7 @@ const formatDate = (dateString: string) => {
                                 {{ movementHistoryReport.summary.total_movements }}
                             </p>
                         </div>
-                        <TrendingUp :size="32" class="text-blue-600" />
+                        <TrendingUp :size="32" class="text-blue-600 dark:text-primary" />
                     </div>
                 </div>
 
@@ -322,14 +331,14 @@ const formatDate = (dateString: string) => {
             <!-- Charts Section -->
             <div v-if="movementHistoryReport" class="grid gap-6 md:grid-cols-2">
                 <!-- Trend Chart -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="h-80">
                         <MovementTrendChart :data="movementHistoryReport.timeline" />
                     </div>
                 </div>
 
                 <!-- Type Chart -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="h-80">
                         <MovementTypeChart :data="movementHistoryReport.timeline" />
                     </div>
@@ -337,11 +346,11 @@ const formatDate = (dateString: string) => {
             </div>
 
             <!-- Top Products Table -->
-            <div v-if="movementHistoryReport && movementHistoryReport.by_product.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div v-if="movementHistoryReport && movementHistoryReport.by_product.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Top 10 Productos con Más Movimientos</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
+                        <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">SKU</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Producto</th>
@@ -351,14 +360,14 @@ const formatDate = (dateString: string) => {
                                 <th class="px-6 py-3 text-center text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Transferencias</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr v-for="product in movementHistoryReport.by_product" :key="product.product_id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <tbody class="divide-y divide-gray-200 dark:divide-border">
+                            <tr v-for="product in movementHistoryReport.by_product" :key="product.product_id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ product.product_sku }}</td>
                                 <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{{ product.product_name }}</td>
                                 <td class="px-6 py-4 text-center text-sm font-bold text-gray-900 dark:text-white">{{ product.total_movements }}</td>
                                 <td class="px-6 py-4 text-center text-sm text-green-600">{{ product.inbound }}</td>
                                 <td class="px-6 py-4 text-center text-sm text-red-600">{{ product.outbound }}</td>
-                                <td class="px-6 py-4 text-center text-sm text-blue-600">{{ product.transfers }}</td>
+                                <td class="px-6 py-4 text-center text-sm text-blue-600 dark:text-primary">{{ product.transfers }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -366,14 +375,14 @@ const formatDate = (dateString: string) => {
             </div>
 
             <!-- Movements Table -->
-            <div v-if="movementHistoryReport" class="rounded-lg bg-white shadow dark:bg-gray-800">
-                <div class="border-b border-gray-200 p-6 dark:border-gray-700">
+            <div v-if="movementHistoryReport" class="rounded-lg bg-white shadow dark:bg-card">
+                <div class="border-b border-gray-200 p-6 dark:border-border">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Detalle de Movimientos</h3>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Mostrando los últimos 100 movimientos</p>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
+                        <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Fecha</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">SKU</th>
@@ -385,8 +394,8 @@ const formatDate = (dateString: string) => {
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Usuario</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr v-for="movement in movementHistoryReport.movements" :key="movement.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <tbody class="divide-y divide-gray-200 dark:divide-border">
+                            <tr v-for="movement in movementHistoryReport.movements" :key="movement.id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
                                 <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ formatDate(movement.date) }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ movement.product_sku }}</td>
                                 <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{{ movement.product_name }}</td>

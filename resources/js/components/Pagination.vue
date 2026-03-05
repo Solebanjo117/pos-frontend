@@ -88,7 +88,7 @@ const endItem = computed(() => {
 </script>
 
 <template>
-    <div class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="px-6 py-3 border-t border-gray-200 dark:border-border flex flex-col sm:flex-row items-center justify-between gap-4">
         <!-- Info Text -->
         <p class="text-sm text-gray-500 dark:text-gray-400">
             Mostrando <span class="font-medium">{{ startItem }}</span> a 
@@ -102,7 +102,7 @@ const endItem = computed(() => {
             <button
                 @click="previousPage"
                 :disabled="!canGoPrevious || loading"
-                class="inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                class="inline-flex items-center px-2 py-2 border border-gray-300 dark:border-border text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 :class="{ 'cursor-not-allowed': !canGoPrevious || loading }"
             >
                 <ChevronLeft :size="16" />
@@ -118,8 +118,8 @@ const endItem = computed(() => {
                     class="inline-flex items-center px-3 py-2 border text-sm font-medium rounded-md transition"
                     :class="[
                         page === pagination.current_page
-                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
-                            : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700',
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-primary dark:text-indigo-400'
+                            : 'border-gray-300 dark:border-border text-gray-700 dark:text-gray-300 bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-muted/50',
                         { 'cursor-not-allowed opacity-50': loading }
                     ]"
                 >
@@ -137,7 +137,7 @@ const endItem = computed(() => {
             <button
                 @click="nextPage"
                 :disabled="!canGoNext || loading"
-                class="inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                class="inline-flex items-center px-2 py-2 border border-gray-300 dark:border-border text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 :class="{ 'cursor-not-allowed': !canGoNext || loading }"
             >
                 <span class="mr-1 hidden sm:inline">Siguiente</span>

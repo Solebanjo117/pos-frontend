@@ -250,51 +250,80 @@ Route::middleware(['auth'])->prefix('categories')->name('categories.')->group(fu
 // ==================== USERS (Admin only) ====================
 Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->group(function () {
     Route::get('/', function () {
-        $users = \App\Models\User::select('id', 'name', 'email', 'role', 'is_active')->get();
+        $users = \App\Models\User::select('id', 'name', 'username', 'email', 'role', 'is_active')
+            ->with('warehouses:id,name')
+            ->get();
         return Inertia::render('Users/Index', ['users' => $users]);
     })->name('index');
 
     Route::get('/create', function () {
-        return Inertia::render('Users/Form');
+        $warehouses = \App\Models\Warehouse::where('status', 'active')->select('id', 'name')->orderBy('name')->get();
+        return Inertia::render('Users/Form', ['warehouses' => $warehouses]);
     })->name('create');
 
     Route::get('/{id}/edit', function ($id) {
-        $user = \App\Models\User::findOrFail($id);
+        $user = \App\Models\User::with('warehouses:id')->findOrFail($id);
+        $warehouses = \App\Models\Warehouse::where('status', 'active')->select('id', 'name')->orderBy('name')->get();
         return Inertia::render('Users/Form', [
             'userId'   => (int) $id,
-            'userData' => $user->only('id', 'name', 'email', 'role', 'is_active'),
+            'userData' => array_merge(
+                $user->only('id', 'name', 'username', 'email', 'role', 'is_active'),
+                ['warehouse_ids' => $user->warehouses->pluck('id')->toArray()]
+            ),
+            'warehouses' => $warehouses,
         ]);
     })->name('edit');
 
-    // CRUD API endpoints (same app, no cross-origin auth issues)
+    // CRUD API endpoints
     Route::post('/', function (\Illuminate\Http\Request $request) {
         $validated = $request->validate([
             'name'                  => 'required|string|max:255',
+            'username'              => 'required|string|max:50|unique:users,username',
             'email'                 => 'required|email|unique:users,email',
             'password'              => 'required|string|min:8|confirmed',
             'role'                  => 'required|in:admin,manager,buyer,seller,cashier,assistant',
+            'warehouse_ids'         => 'nullable|array',
+            'warehouse_ids.*'       => 'exists:warehouses,id',
         ]);
+        unset($validated['warehouse_ids']);
         $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
         $user = \App\Models\User::create($validated);
-        return response()->json(['message' => 'Usuario creado', 'data' => $user], 201);
+
+        if ($request->has('warehouse_ids')) {
+            $user->warehouses()->sync($request->input('warehouse_ids', []));
+            // Set first warehouse as current
+            $firstWh = $request->input('warehouse_ids')[0] ?? null;
+            if ($firstWh) $user->update(['current_warehouse_id' => $firstWh]);
+        }
+
+        return response()->json(['message' => 'Usuario creado', 'data' => $user->load('warehouses:id,name')], 201);
     })->name('store');
 
     Route::put('/{id}', function (\Illuminate\Http\Request $request, $id) {
         $user = \App\Models\User::findOrFail($id);
         $validated = $request->validate([
-            'name'     => 'sometimes|string|max:255',
-            'email'    => 'sometimes|email|unique:users,email,' . $id,
-            'password' => 'nullable|string|min:8|confirmed',
-            'role'     => 'sometimes|in:admin,manager,buyer,seller,cashier,assistant',
-            'is_active'=> 'sometimes|boolean',
+            'name'             => 'sometimes|string|max:255',
+            'username'         => 'sometimes|string|max:50|unique:users,username,' . $id,
+            'email'            => 'sometimes|email|unique:users,email,' . $id,
+            'password'         => 'nullable|string|min:8|confirmed',
+            'role'             => 'sometimes|in:admin,manager,buyer,seller,cashier,assistant',
+            'is_active'        => 'sometimes|boolean',
+            'warehouse_ids'    => 'nullable|array',
+            'warehouse_ids.*'  => 'exists:warehouses,id',
         ]);
+        unset($validated['warehouse_ids']);
         if (!empty($validated['password'])) {
             $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
         } else {
             unset($validated['password']);
         }
         $user->update($validated);
-        return response()->json(['message' => 'Usuario actualizado', 'data' => $user]);
+
+        if ($request->has('warehouse_ids')) {
+            $user->warehouses()->sync($request->input('warehouse_ids', []));
+        }
+
+        return response()->json(['message' => 'Usuario actualizado', 'data' => $user->load('warehouses:id,name')]);
     })->name('update');
 
     Route::delete('/{id}', function ($id) {
@@ -315,6 +344,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('settings')->name('settings.')
     Route::get('/activity-logs', function () {
         return Inertia::render('settings/ActivityLogs');
     })->name('activity-logs');
+    Route::get('/store', function () {
+        return Inertia::render('settings/Store');
+    })->name('store');
 });
 
 // ==================== SALES QUOTES (Cotizaciones) ====================

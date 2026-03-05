@@ -87,7 +87,7 @@ onUnmounted(() => {
       <div
         v-if="show"
         ref="menuRef"
-        class="fixed z-[100] w-72 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        class="fixed z-[100] w-72 bg-white dark:bg-card rounded-xl shadow-2xl border border-gray-200 dark:border-border overflow-hidden"
         :style="{ left: adjustedPosition.x + 'px', top: adjustedPosition.y + 'px' }"
       >
         <!-- Header -->
@@ -131,7 +131,7 @@ onUnmounted(() => {
           <div v-if="batches.length > 0">
             <span class="text-gray-500 text-xs font-medium uppercase tracking-wider block mb-1">Lotes</span>
             <div class="space-y-1">
-              <div v-for="b in batches" :key="b.id" class="flex justify-between text-xs bg-gray-50 dark:bg-gray-700 rounded px-2 py-1">
+              <div v-for="b in batches" :key="b.id" class="flex justify-between text-xs bg-gray-50 dark:bg-muted rounded px-2 py-1">
                 <span class="text-gray-600 dark:text-gray-300">{{ b.batch_number }}</span>
                 <span class="font-medium text-gray-800 dark:text-gray-200">{{ b.quantity }} uds</span>
               </div>
@@ -142,7 +142,7 @@ onUnmounted(() => {
           <div v-if="vehicles.length > 0">
             <span class="text-gray-500 text-xs font-medium uppercase tracking-wider block mb-1">VINs Compatibles</span>
             <div class="space-y-1">
-              <div v-for="v in vehicles" :key="v.id" class="text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 rounded px-2 py-1">
+              <div v-for="v in vehicles" :key="v.id" class="text-xs font-mono text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-muted rounded px-2 py-1">
                 {{ v.vin || v.vehicle?.vin || '—' }}
               </div>
             </div>
@@ -154,7 +154,7 @@ onUnmounted(() => {
           <!-- Notes -->
           <div v-if="notes">
             <span class="text-gray-500 text-xs font-medium uppercase tracking-wider block mb-1">Notas</span>
-            <p class="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 rounded px-2 py-1.5 line-clamp-3">
+            <p class="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-muted rounded px-2 py-1.5 line-clamp-3">
               {{ notes }}
             </p>
           </div>

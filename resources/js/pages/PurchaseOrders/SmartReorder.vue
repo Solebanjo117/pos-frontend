@@ -134,14 +134,14 @@ onMounted(async () => {
                     <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Reabastecimiento Inteligente</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Genera órdenes de compra basadas en puntos de reorden</p>
                 </div>
-                <Link href="/purchase-orders" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">
+                <Link href="/purchase-orders" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted/50 rounded-lg transition">
                     Volver
                 </Link>
             </div>
 
             <!-- Stats -->
             <div v-if="stats" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg"><TrendingDown :size="20" class="text-orange-600 dark:text-orange-400" /></div>
                         <div>
@@ -150,7 +150,7 @@ onMounted(async () => {
                         </div>
                     </div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg"><PackageX :size="20" class="text-red-600 dark:text-red-400" /></div>
                         <div>
@@ -159,9 +159,9 @@ onMounted(async () => {
                         </div>
                     </div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><Check :size="20" class="text-blue-600 dark:text-blue-400" /></div>
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><Check :size="20" class="text-blue-600 dark:text-primary dark:text-blue-400" /></div>
                         <div>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ selectedCount }}</p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">Productos Seleccionados</p>
@@ -171,10 +171,10 @@ onMounted(async () => {
             </div>
 
             <!-- Filter -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-4">
                 <div class="flex items-center gap-4">
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Almacén:</label>
-                    <select v-model="selectedWarehouse" @change="loadData" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <select v-model="selectedWarehouse" @change="loadData" class="px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white">
                         <option :value="undefined">Todos</option>
                         <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
                     </select>
@@ -188,23 +188,23 @@ onMounted(async () => {
 
             <!-- Loading -->
             <div v-if="loading" class="flex justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-primary"></div>
             </div>
 
             <!-- Grouped by Supplier -->
             <div v-else-if="lowStockData.length" class="space-y-6">
-                <div v-for="group in lowStockData" :key="group.supplier.id" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div class="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div v-for="group in lowStockData" :key="group.supplier.id" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border overflow-hidden">
+                    <div class="px-6 py-4 bg-gray-50 dark:bg-background border-b border-gray-200 dark:border-border flex items-center justify-between">
                         <div>
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ group.supplier.name }}</h3>
                             <p class="text-sm text-gray-500">{{ group.items.length }} productos</p>
                         </div>
-                        <button @click="toggleAllForSupplier(group.supplier.id)" class="px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition">
+                        <button @click="toggleAllForSupplier(group.supplier.id)" class="px-3 py-1 text-sm text-indigo-600 dark:text-primary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition">
                             {{ group.items.every(i => selectedItems[group.supplier.id]?.[i.product_id]) ? 'Deseleccionar' : 'Seleccionar' }} Todo
                         </button>
                     </div>
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-900">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                        <thead class="bg-gray-50 dark:bg-background">
                             <tr>
                                 <th class="px-4 py-2 w-10"></th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
@@ -215,7 +215,7 @@ onMounted(async () => {
                                 <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Cantidad</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <tbody class="divide-y divide-gray-200 dark:divide-border">
                             <tr v-for="item in group.items" :key="item.product_id" :class="selectedItems[group.supplier.id]?.[item.product_id] ? 'bg-indigo-50 dark:bg-indigo-900/10' : ''">
                                 <td class="px-4 py-3 text-center">
                                     <input type="checkbox" :checked="selectedItems[group.supplier.id]?.[item.product_id]" @change="toggleItem(group.supplier.id, item.product_id)" class="rounded" />
@@ -233,7 +233,7 @@ onMounted(async () => {
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-center gap-2">
                                         <button @click="adjustQuantity(group.supplier.id, item.product_id, -1)" class="p-1 text-gray-400 hover:text-gray-600 transition"><Minus :size="16" /></button>
-                                        <input v-model.number="quantities[group.supplier.id][item.product_id]" type="number" min="1" class="w-16 text-center px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                                        <input v-model.number="quantities[group.supplier.id][item.product_id]" type="number" min="1" class="w-16 text-center px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white" />
                                         <button @click="adjustQuantity(group.supplier.id, item.product_id, 1)" class="p-1 text-gray-400 hover:text-gray-600 transition"><Plus :size="16" /></button>
                                     </div>
                                 </td>
@@ -243,14 +243,14 @@ onMounted(async () => {
                 </div>
             </div>
 
-            <div v-else class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
+            <div v-else class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-12 text-center">
                 <AlertTriangle class="mx-auto mb-3 text-green-500" :size="48" />
                 <p class="text-gray-600 dark:text-gray-400">¡Todos los productos tienen stock suficiente!</p>
             </div>
 
             <!-- Floating Action Button -->
             <div v-if="selectedCount > 0" class="fixed bottom-8 right-8 z-50">
-                <button @click="handleGenerate" :disabled="loading" class="inline-flex items-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-full shadow-lg transition">
+                <button @click="handleGenerate" :disabled="loading" class="inline-flex items-center gap-3 px-6 py-4 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-50 text-white rounded-full shadow-lg transition">
                     <ShoppingCart :size="20" />
                     <span class="font-semibold">Generar {{ ordersToCreate.length }} {{ ordersToCreate.length === 1 ? 'Orden' : 'Órdenes' }}</span>
                 </button>

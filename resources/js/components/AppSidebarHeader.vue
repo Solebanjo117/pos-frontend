@@ -69,7 +69,7 @@ const switchWarehouse = async (event: Event) => {
                 :value="currentWarehouseId"
                 @change="switchWarehouse"
                 :disabled="switching || allowedWarehouses.length <= 1"
-                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors"
+                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-primary focus:border-transparent dark:border-border dark:bg-card dark:text-gray-200 dark:hover:bg-muted transition-colors"
                 :class="{ 'opacity-60 cursor-not-allowed': switching }"
             >
                 <option v-for="w in allowedWarehouses" :key="w.id" :value="w.id">

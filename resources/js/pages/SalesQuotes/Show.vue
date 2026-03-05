@@ -58,7 +58,7 @@ const loading = ref(true)
 const error = ref('')
 
 const statusColors: Record<string, string> = {
-    draft:     'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+    draft:     'bg-gray-100 text-gray-800 dark:bg-card dark:text-gray-300',
     sent:      'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
     accepted:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     rejected:  'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -88,15 +88,19 @@ const formatDate = (d: string) => {
     return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+import PrintTicketModal from '@/components/POS/PrintTicketModal.vue'
+
 const formatCurrency = (v: number) => {
     return '$' + Number(v || 0).toFixed(2)
 }
 
-const openPdf = (mode: 'standard' | 'blind' = 'standard') => {
+const openPdf = (format: 'ticket' | 'proforma', mode: 'standard' | 'blind' = 'standard') => {
+    // Legacy fallback, kept just in case but we use the modal now.
     const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
-    window.open(`${baseUrl}/sales-quotes/${props.id}/pdf?mode=${mode}`, '_blank')
+    window.open(`${baseUrl}/sales-quotes/${props.id}/${format}?mode=${mode}`, '_blank')
 }
 
+const showPrintModal = ref(false)
 const canEdit = () => quote.value && ['draft', 'sent'].includes(quote.value.status)
 const canConvert = () => quote.value && ['draft', 'sent', 'accepted'].includes(quote.value.status) && !quote.value.converted_order_id
 
@@ -130,7 +134,7 @@ onMounted(fetchQuote)
         <!-- Error -->
         <div v-else-if="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center">
             <p class="text-red-600 dark:text-red-400 font-medium">{{ error }}</p>
-            <Link href="/sales-quotes" class="text-sm text-indigo-600 hover:underline mt-2 inline-block">← Volver al listado</Link>
+            <Link href="/sales-quotes" class="text-sm text-indigo-600 dark:text-primary hover:underline mt-2 inline-block">← Volver al listado</Link>
         </div>
 
         <!-- Content -->
@@ -138,12 +142,12 @@ onMounted(fetchQuote)
             <!-- Header -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <Link href="/sales-quotes" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    <Link href="/sales-quotes" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-muted/50 transition">
                         <ArrowLeft :size="20" class="text-gray-500" />
                     </Link>
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                            <FileText class="w-7 h-7 text-indigo-600" />
+                            <FileText class="w-7 h-7 text-indigo-600 dark:text-primary" />
                             {{ quote.quote_number }}
                         </h1>
                         <div class="flex items-center gap-2 mt-1">
@@ -157,13 +161,14 @@ onMounted(fetchQuote)
                 </div>
 
                 <div class="flex items-center gap-2 flex-wrap">
-                    <button @click="openPdf('standard')" class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition text-gray-700 dark:text-gray-300">
-                        <Download :size="16" /> PDF Interna
+                    <!-- Print Modal Trigger -->
+                    <button 
+                        @click="showPrintModal = true"
+                        class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 dark:border-border rounded-lg hover:bg-gray-50 dark:hover:bg-muted/50 transition text-gray-700 dark:text-gray-300"
+                    >
+                        <Download :size="16" /> Imprimir Documento
                     </button>
-                    <button @click="openPdf('blind')" class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition text-gray-700 dark:text-gray-300">
-                        <EyeOff :size="16" /> PDF Pública
-                    </button>
-                    <Link v-if="canEdit()" :href="`/sales-quotes/${quote.id}/edit`" class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-medium">
+                    <Link v-if="canEdit()" :href="`/sales-quotes/${quote.id}/edit`" class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition font-medium">
                         <Edit :size="16" /> Editar
                     </Link>
                     <button v-if="canConvert()" @click="handleConvert" class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-medium">
@@ -175,7 +180,7 @@ onMounted(fetchQuote)
             <!-- Info cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Customer -->
-                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-5">
                     <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
                         <User :size="14" /> Cliente
                     </h3>
@@ -186,7 +191,7 @@ onMounted(fetchQuote)
                 </div>
 
                 <!-- Dates -->
-                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-5">
                     <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
                         <Calendar :size="14" /> Fechas
                     </h3>
@@ -203,14 +208,14 @@ onMounted(fetchQuote)
                 </div>
 
                 <!-- Warehouse / OV link -->
-                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-5">
                     <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
                         <MapPin :size="14" /> Almacén
                     </h3>
                     <p class="font-medium text-gray-900 dark:text-white">{{ quote.warehouse?.name || '—' }}</p>
-                    <div v-if="quote.converted_order_id" class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div v-if="quote.converted_order_id" class="mt-3 pt-3 border-t border-gray-200 dark:border-border">
                         <p class="text-xs text-gray-500 mb-1">Convertida a:</p>
-                        <Link :href="`/sales-orders/${quote.converted_order_id}`" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition">
+                        <Link :href="`/sales-orders/${quote.converted_order_id}`" class="text-sm font-semibold text-indigo-600 dark:text-primary hover:text-indigo-800 transition">
                             OV #{{ quote.converted_order?.order_number || quote.converted_order_id }}
                         </Link>
                     </div>
@@ -218,15 +223,15 @@ onMounted(fetchQuote)
             </div>
 
             <!-- Items table -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-border">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <Package :size="18" /> Productos ({{ quote.items.length }})
                     </h2>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-900">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                        <thead class="bg-gray-50 dark:bg-background">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Producto</th>
@@ -237,8 +242,8 @@ onMounted(fetchQuote)
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr v-for="(item, idx) in quote.items" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <tbody class="divide-y divide-gray-200 dark:divide-border">
+                            <tr v-for="(item, idx) in quote.items" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/30">
                                 <td class="px-6 py-4 text-sm text-gray-400 font-mono">{{ idx + 1 }}</td>
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.product_name }}</div>
@@ -264,7 +269,7 @@ onMounted(fetchQuote)
                 </div>
 
                 <!-- Totals -->
-                <div class="border-t border-gray-200 dark:border-gray-700 px-6 py-5">
+                <div class="border-t border-gray-200 dark:border-border px-6 py-5">
                     <div class="flex justify-end">
                         <div class="w-72 space-y-2">
                             <div class="flex justify-between text-sm">
@@ -279,9 +284,9 @@ onMounted(fetchQuote)
                                 <span class="text-gray-500">Impuestos</span>
                                 <span class="text-gray-900 dark:text-white">{{ formatCurrency(quote.tax_amount) }}</span>
                             </div>
-                            <div class="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+                            <div class="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-border pt-2 mt-2">
                                 <span class="text-gray-900 dark:text-white">Total</span>
-                                <span class="text-indigo-600">{{ quote.formatted_total }}</span>
+                                <span class="text-indigo-600 dark:text-primary">{{ quote.formatted_total }}</span>
                             </div>
                         </div>
                     </div>
@@ -289,10 +294,18 @@ onMounted(fetchQuote)
             </div>
 
             <!-- Notes -->
-            <div v-if="quote.notes" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div v-if="quote.notes" class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-5">
                 <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notas</h3>
                 <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ quote.notes }}</p>
             </div>
+            
+            <PrintTicketModal
+                :show="showPrintModal"
+                :order-id="quote.id ?? null"
+                :order-number="quote.quote_number"
+                sourceRoute="sales-quotes"
+                @close="showPrintModal = false"
+            />
         </template>
     </div>
 </template>

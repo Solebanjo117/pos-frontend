@@ -59,9 +59,9 @@ const formatCurrency = (v: number) =>
             v-if="show"
             class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
         >
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" @vue:mounted="handleOpen">
+            <div class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-md" @vue:mounted="handleOpen">
                 <!-- Header -->
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-border">
                     <div>
                         <h2 class="text-lg font-bold text-gray-900 dark:text-white">Registrar Pago</h2>
                         <p v-if="customerName" class="text-xs text-gray-500 dark:text-gray-400">{{ customerName }}</p>
@@ -79,7 +79,7 @@ const formatCurrency = (v: number) =>
                     </div>
 
                     <!-- Balance summary -->
-                    <div class="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 space-y-1 text-sm">
+                    <div class="bg-gray-50 dark:bg-background/50 rounded-xl p-4 space-y-1 text-sm">
                         <div class="flex justify-between">
                             <span class="text-gray-500">Total de la orden</span>
                             <span class="font-medium">{{ formatCurrency(orderTotal) }}</span>
@@ -88,7 +88,7 @@ const formatCurrency = (v: number) =>
                             <span>Pagado anteriormente</span>
                             <span>- {{ formatCurrency(amountPaid) }}</span>
                         </div>
-                        <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
+                        <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white border-t border-gray-200 dark:border-border pt-1 mt-1">
                             <span>Saldo pendiente</span>
                             <span class="text-orange-600 dark:text-orange-400">{{ formatCurrency(amountDue) }}</span>
                         </div>
@@ -112,7 +112,7 @@ const formatCurrency = (v: number) =>
                                     'py-2 px-1 rounded-lg text-xs font-semibold border-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed',
                                     paymentMethod === m.key
                                         ? `border-${m.color}-500 bg-${m.color}-50 dark:bg-${m.color}-900/20 text-${m.color}-700 dark:text-${m.color}-400`
-                                        : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-300'
+                                        : 'border-gray-200 dark:border-border text-gray-500 dark:text-gray-400 hover:border-gray-300'
                                 ]"
                             >
                                 {{ m.label }}
@@ -136,11 +136,11 @@ const formatCurrency = (v: number) =>
                                 min="0"
                                 :max="amountDue"
                                 step="0.01"
-                                class="w-full pl-7 pr-3 py-3 text-2xl font-bold rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                class="w-full pl-7 pr-3 py-3 text-2xl font-bold rounded-xl border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
                         </div>
                         <div class="flex gap-2 mt-2">
-                            <button @click="paymentAmount = amountDue" class="text-xs px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                            <button @click="paymentAmount = amountDue" class="text-xs px-3 py-1 bg-gray-100 dark:bg-muted rounded-lg hover:bg-gray-200 transition-colors">
                                 Pagar todo ({{ formatCurrency(amountDue) }})
                             </button>
                         </div>
@@ -158,7 +158,7 @@ const formatCurrency = (v: number) =>
                             v-model="notes"
                             type="text"
                             placeholder="Notas (opcional)..."
-                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white"
                         />
                     </div>
 
@@ -166,7 +166,7 @@ const formatCurrency = (v: number) =>
                     <button
                         @click="handleSubmit"
                         :disabled="!canSubmit || loading"
-                        class="w-full py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                        class="w-full py-3 rounded-xl font-bold text-white bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-40 transition-colors"
                     >
                         {{ loading ? 'Registrando...' : `Registrar ${formatCurrency(paymentAmount)}` }}
                     </button>

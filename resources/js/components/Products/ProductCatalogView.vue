@@ -98,7 +98,7 @@ const closeDetail = () => {
 <template>
     <div>
         <!-- Catalog Header: Search + View Toggle -->
-        <div class="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div class="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card">
             <div class="flex items-center gap-4">
                 <!-- Search -->
                 <div class="flex-1 relative">
@@ -109,15 +109,15 @@ const closeDetail = () => {
                     </svg>
                     <input v-model="searchQuery" type="text"
                         placeholder="Buscar por código, nombre o SKU..."
-                        class="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400" />
+                        class="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400" />
                 </div>
 
                 <!-- Grid/List toggle -->
-                <div class="flex rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
+                <div class="flex rounded-lg border border-gray-200 dark:border-border overflow-hidden">
                     <button @click="catalogViewMode = 'grid'" :class="[
                         catalogViewMode === 'grid'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                            ? 'bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white'
+                            : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-card dark:text-gray-400 dark:hover:bg-muted/50'
                     ]" class="p-2.5 transition-colors">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -126,9 +126,9 @@ const closeDetail = () => {
                     </button>
                     <button @click="catalogViewMode = 'list'" :class="[
                         catalogViewMode === 'list'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
-                    ]" class="p-2.5 transition-colors border-l border-gray-200 dark:border-gray-600">
+                            ? 'bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white'
+                            : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-card dark:text-gray-400 dark:hover:bg-muted/50'
+                    ]" class="p-2.5 transition-colors border-l border-gray-200 dark:border-border">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -157,7 +157,7 @@ const closeDetail = () => {
                 <!-- Loading -->
                 <div v-if="loading" class="text-center py-16">
                     <div
-                        class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent">
+                        class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent">
                     </div>
                     <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Cargando catálogo...</p>
                 </div>

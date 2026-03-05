@@ -111,7 +111,7 @@ onMounted(fetchBackups)
                                 <td class="px-4 py-3 text-right">
                                     <button
                                         @click="downloadBackup(backup.filename)"
-                                        class="rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                                        class="rounded px-2 py-1 text-xs font-medium text-blue-600 dark:text-primary hover:bg-blue-50 transition-colors"
                                     >
                                         Descargar
                                     </button>

@@ -19,7 +19,7 @@ const formatDate = (dateString: string) => {
         <ul v-if="activities && activities.length > 0" role="list" class="-mb-8">
             <li v-for="(activity, activityIdx) in activities" :key="activity.id">
                 <div class="relative pb-8">
-                    <span v-if="activityIdx !== activities.length - 1" class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
+                    <span v-if="activityIdx !== activities.length - 1" class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200 dark:bg-muted" aria-hidden="true" />
                     <div class="relative flex space-x-3">
                         <div>
                             <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white dark:ring-gray-800" 

@@ -26,8 +26,8 @@ const emit = defineEmits(['request-open', 'request-close', 'request-cash-movemen
 <template>
   <div>
     <!-- Session Closed Warning -->
-    <div v-if="!hasOpenSession" class="bg-blue-50 border-b border-blue-100 px-6 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3 text-blue-700">
+    <div v-if="!hasOpenSession" class="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-900/50 px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3 text-blue-700 dark:text-blue-400">
         <AlertCircle class="w-5 h-5 flex-shrink-0" />
         <span class="font-medium text-sm md:text-base">Caja no iniciada – Debes abrir una sesión para habilitar las ventas.</span>
       </div>
@@ -35,7 +35,7 @@ const emit = defineEmits(['request-open', 'request-close', 'request-cash-movemen
       <div class="flex items-center gap-3">
         <button 
           @click="emit('request-open')"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap whitespace-nowrap"
+          class="bg-blue-600 dark:bg-primary dark:text-primary-foreground dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-primary/90 dark:hover:bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
         >
           <Lock class="w-4 h-4" />
           Abrir Caja
@@ -44,8 +44,8 @@ const emit = defineEmits(['request-open', 'request-close', 'request-cash-movemen
     </div>
 
     <!-- Session Open Status -->
-    <div v-else class="bg-emerald-50 border-b border-emerald-100 px-6 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3 text-emerald-800">
+    <div v-else class="bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-900/50 px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3 text-emerald-800 dark:text-emerald-400">
         <LockOpen class="w-5 h-5 flex-shrink-0" />
         <span class="font-medium text-sm md:text-base">
           Caja Abierta (Usuario: {{ userName }})
@@ -53,12 +53,12 @@ const emit = defineEmits(['request-open', 'request-close', 'request-cash-movemen
       </div>
       
       <div class="flex items-center gap-4">
-        <div class="text-sm text-emerald-700">
+        <div class="text-sm text-emerald-700 dark:text-emerald-300">
           <span class="hidden md:inline">Fondo inicial:</span> <span class="font-bold">{{ formatCurrency(session?.opening_amount || 0) }}</span>
         </div>
         <button 
           @click="emit('request-cash-movement')"
-          class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
+          class="bg-amber-500 dark:bg-amber-600 hover:bg-amber-600 dark:hover:bg-amber-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
           title="Registrar retiro o ingreso de efectivo"
         >
           <ArrowDownUp class="w-4 h-4" />
@@ -66,7 +66,7 @@ const emit = defineEmits(['request-open', 'request-close', 'request-cash-movemen
         </button>
         <button 
           @click="emit('request-close')"
-          class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
+          class="bg-emerald-600 dark:bg-emerald-700 hover:bg-emerald-700 dark:hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
         >
           <Lock class="w-4 h-4" />
           Cerrar Caja

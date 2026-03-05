@@ -246,10 +246,10 @@ const getVariants = (product: any) => {
 
                 <div class="flex items-center gap-4">
                     <!-- View Toggle Switch -->
-                    <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
+                    <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-border dark:bg-muted">
                         <button @click="viewMode = 'table'" :class="[
                             viewMode === 'table'
-                                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                                ? 'bg-white text-gray-900 shadow-sm dark:bg-card dark:text-white'
                                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                         ]" class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,7 +260,7 @@ const getVariants = (product: any) => {
                         </button>
                         <button @click="viewMode = 'catalog'" :class="[
                             viewMode === 'catalog'
-                                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                                ? 'bg-white text-gray-900 shadow-sm dark:bg-card dark:text-white'
                                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                         ]" class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,7 +280,7 @@ const getVariants = (product: any) => {
 
                     <!-- New Product Button -->
                     <a href="/products/create"
-                        class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors">
+                        class="inline-flex items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 dark:hover:bg-primary/90 transition-colors">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 4v16m8-8H4" />
@@ -296,12 +296,12 @@ const getVariants = (product: any) => {
             <!-- ========== TABLE VIEW ========== -->
             <template v-else>
                 <!-- Archive Tabs -->
-                <div class="mb-4 flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800 w-fit">
+                <div class="mb-4 flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-border dark:bg-card w-fit">
                     <button @click="switchArchiveTab('active')"
                         :class="[
                             'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200',
                             archiveTab === 'active'
-                                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                                ? 'bg-white text-gray-900 shadow-sm dark:bg-muted dark:text-white'
                                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                         ]">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -327,14 +327,14 @@ const getVariants = (product: any) => {
                     </p>
                 </div>
                 <!-- Filters -->
-                <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-900/50">
+                <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-card dark:shadow-gray-900/50">
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                                 Buscar
                             </label>
                             <input v-model="filters.search" type="text" placeholder="SKU o nombre..."
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                                 @keyup.enter="applyFilters" />
                         </div>
 
@@ -343,7 +343,7 @@ const getVariants = (product: any) => {
                                 Estado
                             </label>
                             <select v-model="filters.status"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white">
                                 <option :value="undefined">Todos</option>
                                 <option value="active">Activo</option>
                                 <option value="discontinued">Discontinuado</option>
@@ -357,7 +357,7 @@ const getVariants = (product: any) => {
                                 Almacén
                             </label>
                             <select v-model="filters.warehouse_id"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white">
                                 <option :value="undefined">Todos</option>
                                 <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
                             </select>
@@ -366,18 +366,18 @@ const getVariants = (product: any) => {
                         <div class="flex items-end">
                             <label class="flex items-center">
                                 <input v-model="filters.has_stock" type="checkbox"
-                                    class="mr-2 rounded border-gray-300 dark:border-gray-600" />
+                                    class="mr-2 rounded border-gray-300 dark:border-border" />
                                 <span class="text-sm text-gray-900 dark:text-gray-100">Solo con stock</span>
                             </label>
                         </div>
 
                         <div class="flex items-end gap-2">
                             <button @click="applyFilters"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
+                                class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white transition-colors hover:bg-blue-700 dark:hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
                                 Filtrar
                             </button>
                             <button @click="clearFilters"
-                                class="rounded-lg bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500 dark:focus:ring-offset-gray-800">
+                                class="rounded-lg bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:bg-muted dark:text-gray-100 dark:hover:bg-muted/80 dark:focus:ring-offset-gray-800">
                                 Limpiar
                             </button>
                         </div>
@@ -387,21 +387,21 @@ const getVariants = (product: any) => {
                 <!-- Advanced Filters Toggle & Panel -->
                 <div class="mb-6">
                     <button @click="showAdvancedFilters = !showAdvancedFilters"
-                        class="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
+                        class="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-primary hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
                         <component :is="showAdvancedFilters ? ChevronUp : ChevronDown" class="h-4 w-4" />
                         {{ showAdvancedFilters ? 'Ocultar' : 'Mostrar' }} Filtros Avanzados
                     </button>
 
                     <transition name="slide">
                         <div v-if="showAdvancedFilters"
-                            class="mt-3 rounded-lg bg-white p-4 shadow border border-blue-100 dark:bg-gray-800 dark:border-blue-800/30 dark:shadow-gray-900/50">
+                            class="mt-3 rounded-lg bg-white p-4 shadow border border-blue-100 dark:bg-card dark:border-border dark:shadow-gray-900/50">
                             <h3 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Filtros Avanzados</h3>
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                                 <!-- VIN -->
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">VIN</label>
                                     <input v-model="filters.vin" type="text" placeholder="Ej: 1HGBH41JXMN109186" maxlength="40"
-                                        class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                                        class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                                         @keyup.enter="applyFilters" />
                                 </div>
 
@@ -409,7 +409,7 @@ const getVariants = (product: any) => {
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Código OEM</label>
                                     <input v-model="filters.oem_code" type="text" placeholder="Ej: 0986JR1520"
-                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                                         @keyup.enter="applyFilters" />
                                 </div>
 
@@ -417,7 +417,7 @@ const getVariants = (product: any) => {
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Categoría</label>
                                     <select v-model="filters.category_id"
-                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white">
                                         <option :value="undefined">Todas</option>
                                         <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                                     </select>
@@ -427,14 +427,14 @@ const getVariants = (product: any) => {
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Especificación (valor)</label>
                                     <input v-model="filters.attribute_value" type="text" placeholder="Ej: 17 o Rojo"
-                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                                         @keyup.enter="applyFilters" />
                                 </div>
                             </div>
 
                             <div class="mt-3 flex items-center gap-2">
                                 <button @click="applyFilters"
-                                    class="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700">
+                                    class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700 dark:hover:bg-primary/90">
                                     Aplicar
                                 </button>
                             </div>
@@ -446,9 +446,9 @@ const getVariants = (product: any) => {
                 <div v-if="activeDeepLinkFilters.length > 0" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 dark:border-blue-800/40 dark:bg-blue-900/20">
                     <span class="text-xs font-semibold text-blue-700 dark:text-blue-400">Filtro activo:</span>
                     <span v-for="tag in activeDeepLinkFilters" :key="tag.key"
-                        class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-blue-800 shadow-sm dark:bg-gray-800 dark:text-blue-300">
+                        class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-blue-800 shadow-sm dark:bg-card dark:text-blue-300">
                         {{ tag.label }}
-                        <button @click="removeDeepLinkFilter(tag.key)" class="ml-0.5 rounded-full p-0.5 text-blue-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/50 transition-colors" title="Quitar filtro">
+                        <button @click="removeDeepLinkFilter(tag.key)" class="ml-0.5 rounded-full p-0.5 text-blue-400 hover:bg-blue-100 hover:text-blue-600 dark:text-primary dark:hover:bg-blue-900/50 transition-colors" title="Quitar filtro">
                             <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                         </button>
                     </span>
@@ -457,7 +457,7 @@ const getVariants = (product: any) => {
                 <!-- Loading State -->
                 <div v-if="loading" class="text-center py-12">
                     <div
-                        class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent">
+                        class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent">
                     </div>
                     <p class="mt-2 text-gray-800 dark:text-gray-200">Cargando productos...</p>
                 </div>
@@ -469,9 +469,9 @@ const getVariants = (product: any) => {
 
                 <!-- Products Table -->
                 <div v-else-if="products.length > 0"
-                    class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
+                    class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                        <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th
                                     class="px-6 py-3 w-12 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
@@ -481,7 +481,7 @@ const getVariants = (product: any) => {
                                     Foto
                                 </th>
                                 <th @click="toggleSort('sku')"
-                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none">
+                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors select-none">
                                     <span class="inline-flex items-center gap-1">
                                         SKU
                                         <svg v-if="sortField === 'sku'" class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -492,7 +492,7 @@ const getVariants = (product: any) => {
                                     </span>
                                 </th>
                                 <th @click="toggleSort('name')"
-                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none">
+                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors select-none">
                                     <span class="inline-flex items-center gap-1">
                                         Producto
                                         <svg v-if="sortField === 'name'" class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -511,7 +511,7 @@ const getVariants = (product: any) => {
                                     Stock
                                 </th>
                                 <th @click="toggleSort('status')"
-                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none">
+                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors select-none">
                                     <span class="inline-flex items-center gap-1">
                                         Estado
                                         <svg v-if="sortField === 'status'" class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -527,10 +527,10 @@ const getVariants = (product: any) => {
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                             <template v-for="product in products" :key="product.id">
                                 <!-- Parent Row -->
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                                <tr class="hover:bg-gray-50 dark:hover:bg-muted/50 cursor-pointer"
                                     @click="toggleRow(product.id)">
                                     <td class="px-6 py-4 text-sm">
                                         <button
@@ -548,7 +548,7 @@ const getVariants = (product: any) => {
                                         </button>
                                     </td>
                                     <td class="px-3 py-2">
-                                        <div class="h-10 w-10 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0 flex items-center justify-center">
+                                        <div class="h-10 w-10 rounded-md overflow-hidden bg-gray-100 dark:bg-muted flex-shrink-0 flex items-center justify-center">
                                             <img v-if="product.image_url" :src="product.image_url" :alt="product.name" class="h-full w-full object-cover" />
                                             <svg v-else class="h-5 w-5 text-gray-300 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                         </div>
@@ -588,11 +588,11 @@ const getVariants = (product: any) => {
                                         @click.stop>
                                         <template v-if="archiveTab === 'active'">
                                             <button @click="openDetail(product)"
-                                                class="text-blue-600 hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+                                                class="text-blue-600 dark:text-primary hover:text-blue-900 mr-3 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
                                                 Ver Detalle
                                             </button>
                                             <a :href="`/products/${product.id}/edit`"
-                                                class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">
+                                                class="text-indigo-600 dark:text-primary hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">
                                                 Editar
                                             </a>
                                             <button @click="archiveProduct(product)"
@@ -614,17 +614,17 @@ const getVariants = (product: any) => {
 
                                 <!-- Expanded Variants Row -->
                                 <tr v-if="expandedRows.has(product.id)"
-                                    class="bg-gray-50 dark:bg-gray-900">
+                                    class="bg-gray-50 dark:bg-muted">
                                     <td colspan="8" class="px-6 py-4">
                                         <div class="ml-12">
                                             <h4
                                                 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
                                                 Variantes por Marca:</h4>
                                             <div
-                                                class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                                                class="overflow-hidden rounded-lg border border-gray-200 dark:border-border">
                                                 <table
-                                                    class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                                    <thead class="bg-gray-100 dark:bg-gray-800">
+                                                    class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                                                    <thead class="bg-gray-100 dark:bg-card">
                                                         <tr>
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
@@ -647,10 +647,10 @@ const getVariants = (product: any) => {
                                                         </tr>
                                                     </thead>
                                                     <tbody
-                                                        class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                                                        class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                                                         <tr v-for="variant in getVariants(product)"
                                                             :key="variant.id"
-                                                            class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                            class="hover:bg-gray-50 dark:hover:bg-muted/50">
                                                             <td class="px-4 py-3">
                                                                 <div class="flex items-center">
                                                                     <div
@@ -666,7 +666,7 @@ const getVariants = (product: any) => {
                                                             <td
                                                                 class="px-4 py-3 text-sm text-gray-900 dark:text-white">
                                                                 <code
-                                                                    class="rounded bg-gray-100 px-2 py-1 text-xs dark:bg-gray-700">{{
+                                                                    class="rounded bg-gray-100 px-2 py-1 text-xs dark:bg-muted">{{
                                                                         variant.sku }}</code>
                                                             </td>
                                                             <td
@@ -706,7 +706,7 @@ const getVariants = (product: any) => {
                                                                     </template>
                                                                 </button>
                                                                 <a :href="`/products/${product.id}/edit?variant=${variant.id}`"
-                                                                    class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                                                    class="text-indigo-600 dark:text-primary hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
                                                                     Editar
                                                                 </a>
                                                             </td>
@@ -723,14 +723,14 @@ const getVariants = (product: any) => {
 
                     <!-- Pagination -->
                     <div
-                        class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 dark:border-gray-700 dark:bg-gray-800">
+                        class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 dark:border-border dark:bg-card">
                         <div class="flex flex-1 justify-between sm:hidden">
                             <button @click="prevPage(filters)" :disabled="currentPage === 1"
-                                class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">
+                                class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80">
                                 Anterior
                             </button>
                             <button @click="nextPage(filters)" :disabled="currentPage === lastPage"
-                                class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">
+                                class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80">
                                 Siguiente
                             </button>
                         </div>
@@ -748,14 +748,14 @@ const getVariants = (product: any) => {
                             </div>
                             <div class="flex gap-2">
                                 <button @click="prevPage(filters)" :disabled="currentPage === 1"
-                                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">
+                                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80">
                                     Anterior
                                 </button>
                                 <span class="flex items-center px-4 text-sm text-gray-900 dark:text-white">
                                     Página {{ currentPage }} de {{ lastPage }}
                                 </span>
                                 <button @click="nextPage(filters)" :disabled="currentPage === lastPage"
-                                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">
+                                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80">
                                     Siguiente
                                 </button>
                             </div>
@@ -774,7 +774,7 @@ const getVariants = (product: any) => {
                     <p class="mt-1 text-sm text-gray-500">Comienza creando un nuevo producto.</p>
                     <div class="mt-6">
                         <a href="/products/create"
-                            class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                            class="inline-flex items-center rounded-md bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90">
                             Nuevo Producto
                         </a>
                     </div>

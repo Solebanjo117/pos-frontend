@@ -86,7 +86,7 @@ const clearInventoryFilters = () => {
 const getStatusColor = (status: string) => {
     return status === 'active'
         ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+        : 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-200'
 }
 
 // Get status label
@@ -121,7 +121,7 @@ const getStockStatusColor = (item: any) => {
         <div class="p-4">
             <!-- Loading State -->
             <div v-if="loading" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                 <p class="mt-2 text-gray-800 dark:text-gray-200">Cargando almacén...</p>
             </div>
 
@@ -143,7 +143,7 @@ const getStockStatusColor = (item: any) => {
                     <div class="flex gap-2">
                         <a
                             :href="`/warehouses/${warehouseId}/edit`"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                            class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                         >
                             <Pencil class="w-4 h-4 mr-2" /> Editar
                         </a>
@@ -151,7 +151,7 @@ const getStockStatusColor = (item: any) => {
                 </div>
 
                 <!-- General Info Card -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Información General</h2>
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <div>
@@ -192,7 +192,7 @@ const getStockStatusColor = (item: any) => {
                 <!-- Statistics Cards -->
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
                     <!-- Total Products -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Total Productos</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                             {{ currentWarehouse.total_products || 0 }}
@@ -200,7 +200,7 @@ const getStockStatusColor = (item: any) => {
                     </div>
 
                     <!-- Total Units -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Total Unidades</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                             {{ currentWarehouse.total_units || 0 }}
@@ -208,7 +208,7 @@ const getStockStatusColor = (item: any) => {
                     </div>
 
                     <!-- Total Value -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Valor Total</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                             {{ currentWarehouse.total_value ? formatCurrency(currentWarehouse.total_value) : '$0.00' }}
@@ -216,7 +216,7 @@ const getStockStatusColor = (item: any) => {
                     </div>
 
                     <!-- Low Stock Products -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Stock Bajo</p>
                         <p class="mt-2 text-3xl font-bold text-yellow-600 dark:text-yellow-400">
                             {{ currentWarehouse.low_stock_products || 0 }}
@@ -225,7 +225,7 @@ const getStockStatusColor = (item: any) => {
                 </div>
 
                 <!-- Inventory Section -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Inventario del Almacén</h2>
 
                     <!-- Filters -->
@@ -235,7 +235,7 @@ const getStockStatusColor = (item: any) => {
                                 v-model="inventoryFilters.search"
                                 type="text"
                                 placeholder="Buscar producto..."
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                                 @keyup.enter="applyInventoryFilters"
                             />
                         </div>
@@ -244,7 +244,7 @@ const getStockStatusColor = (item: any) => {
                                 <input
                                     v-model="inventoryFilters.low_stock"
                                     type="checkbox"
-                                    class="mr-2 rounded border-gray-300 dark:border-gray-600"
+                                    class="mr-2 rounded border-gray-300 dark:border-border"
                                 />
                                 <span class="text-sm text-gray-900 dark:text-gray-100">Stock bajo</span>
                             </label>
@@ -252,7 +252,7 @@ const getStockStatusColor = (item: any) => {
                                 <input
                                     v-model="inventoryFilters.out_of_stock"
                                     type="checkbox"
-                                    class="mr-2 rounded border-gray-300 dark:border-gray-600"
+                                    class="mr-2 rounded border-gray-300 dark:border-border"
                                 />
                                 <span class="text-sm text-gray-900 dark:text-gray-100">Sin stock</span>
                             </label>
@@ -260,7 +260,7 @@ const getStockStatusColor = (item: any) => {
                         <div class="flex justify-end gap-2">
                             <button
                                 @click="applyInventoryFilters"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                                class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                             >
                                 Filtrar
                             </button>
@@ -275,7 +275,7 @@ const getStockStatusColor = (item: any) => {
 
                     <!-- Inventory Loading -->
                     <div v-if="inventoryLoading" class="text-center py-8">
-                        <div class="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                        <div class="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                     </div>
 
                     <!-- Inventory Error -->
@@ -285,8 +285,8 @@ const getStockStatusColor = (item: any) => {
 
                     <!-- Inventory Table -->
                     <div v-else-if="inventory.length > 0" class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                            <thead class="bg-gray-50 dark:bg-muted">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                         Producto
@@ -308,8 +308,8 @@ const getStockStatusColor = (item: any) => {
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
-                                <tr v-for="item in inventory" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
+                                <tr v-for="item in inventory" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
                                     <td class="px-6 py-4">
                                         <div class="text-sm font-medium text-gray-900 dark:text-white">
                                             {{ item.product?.name || 'N/A' }}
@@ -348,14 +348,14 @@ const getStockStatusColor = (item: any) => {
                                 <button
                                     @click="fetchInventory(inventoryCurrentPage - 1)"
                                     :disabled="inventoryCurrentPage === 1"
-                                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                                 >
                                     Anterior
                                 </button>
                                 <button
                                     @click="fetchInventory(inventoryCurrentPage + 1)"
                                     :disabled="inventoryCurrentPage === inventoryLastPage"
-                                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                                 >
                                     Siguiente
                                 </button>

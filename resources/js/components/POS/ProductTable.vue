@@ -71,17 +71,17 @@ const displaySku = (item: any) => {
 </script>
 
 <template>
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden">
+  <div class="bg-white dark:bg-card rounded-xl shadow-sm border border-gray-100 dark:border-border flex flex-col h-full overflow-hidden">
     <div class="flex-1 overflow-auto relative">
       <table class="w-full text-left border-collapse min-w-[500px]">
-        <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
-          <tr class="border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold tracking-wider">
-            <th class="px-2 py-3 text-center w-10 bg-gray-50">#</th>
-            <th class="px-4 py-3 bg-gray-50">Producto</th>
-            <th class="px-4 py-3 text-right bg-gray-50">Precio</th>
-            <th class="px-4 py-3 text-center bg-gray-50 w-32">Cant.</th>
-            <th class="px-4 py-3 text-right bg-gray-50">Total</th>
-            <th class="px-2 py-3 text-center w-12 bg-gray-50"></th>
+        <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-muted shadow-sm">
+          <tr class="border-b border-gray-100 dark:border-border text-xs uppercase text-gray-500 dark:text-gray-400 font-semibold tracking-wider">
+            <th class="px-2 py-3 text-center w-10 bg-gray-50 dark:bg-muted">#</th>
+            <th class="px-4 py-3 bg-gray-50 dark:bg-muted">Producto</th>
+            <th class="px-4 py-3 text-right bg-gray-50 dark:bg-muted">Precio</th>
+            <th class="px-4 py-3 text-center bg-gray-50 dark:bg-muted w-32">Cant.</th>
+            <th class="px-4 py-3 text-right bg-gray-50 dark:bg-muted">Total</th>
+            <th class="px-2 py-3 text-center w-12 bg-gray-50 dark:bg-muted"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50">
@@ -94,8 +94,8 @@ const displaySku = (item: any) => {
           <template v-for="(item, index) in items" :key="item.id">
             <!-- Main row -->
             <tr
-              class="hover:bg-gray-50/50 transition-colors group cursor-pointer"
-              :class="{ 'bg-indigo-50/40': expandedItemId === item.id }"
+              class="hover:bg-gray-50/50 dark:hover:bg-muted/30 transition-colors group cursor-pointer border-b border-gray-50 dark:border-border/40"
+              :class="{ 'bg-indigo-50/40 dark:bg-indigo-900/20': expandedItemId === item.id }"
               @click="toggleExpand(item.id)"
               @contextmenu.prevent="showContextMenu($event, item)"
               @touchstart="startLongPress(item, $event)"
@@ -112,8 +112,8 @@ const displaySku = (item: any) => {
                     class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform"
                   />
                   <div class="flex flex-col">
-                    <span class="font-medium text-gray-900 text-sm">{{ item.product_name }}</span>
-                    <span class="text-xs text-gray-500">
+                    <span class="font-medium text-gray-900 dark:text-white text-sm">{{ item.product_name }}</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
                       {{ displaySku(item) }}
                     </span>
                     <div class="flex flex-wrap gap-1 mt-0.5">
@@ -123,7 +123,7 @@ const displaySku = (item: any) => {
                       <span v-if="item.tax_percent === 0" class="text-xs text-orange-600 bg-orange-100 px-1 py-0.5 rounded inline-block w-max">
                         Exento
                       </span>
-                      <span v-if="item.seller_id" class="text-xs text-blue-600 bg-blue-100 px-1 py-0.5 rounded inline-block w-max">
+                      <span v-if="item.seller_id" class="text-xs text-blue-600 dark:text-primary bg-blue-100 px-1 py-0.5 rounded inline-block w-max">
                         {{ users.find(u => u.id === item.seller_id)?.name || 'Vendedor' }}
                       </span>
                       <span v-if="item.notes" class="text-xs text-purple-600 bg-purple-100 px-1 py-0.5 rounded inline-block w-max" title="Tiene nota interna">
@@ -134,9 +134,9 @@ const displaySku = (item: any) => {
                 </div>
               </td>
               
-              <td class="px-4 py-3 text-right font-medium text-gray-600 text-sm" @click.stop>
+              <td class="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300 text-sm" @click.stop>
                 <div>{{ formatCurrency(item.product_price) }}</div>
-                <div v-if="item.tax_percent > 0" class="text-[10px] text-gray-400 leading-tight">
+                <div v-if="item.tax_percent > 0" class="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">
                   +{{ item.tax_percent }}% ITBMS
                 </div>
                 <div v-else class="text-[10px] text-orange-500 leading-tight">Exento</div>
@@ -146,7 +146,7 @@ const displaySku = (item: any) => {
                 <div class="flex items-center justify-center gap-2">
                   <button 
                     @click="emit('update-quantity', index, item.quantity - 1)"
-                    class="p-0.5 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                    class="p-0.5 rounded-md hover:bg-gray-200 dark:hover:bg-muted/50 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   >
                     <Minus class="w-3.5 h-3.5" />
                   </button>
@@ -155,25 +155,25 @@ const displaySku = (item: any) => {
                     min="1"
                     :value="item.quantity"
                     @change="emit('update-quantity', index, parseInt(($event.target as HTMLInputElement).value))"
-                    class="font-semibold text-gray-900 w-12 text-center text-sm bg-transparent border-0 focus:ring-0 p-0"
+                    class="font-semibold text-gray-900 dark:text-white w-12 text-center text-sm bg-transparent border-0 focus:ring-0 p-0"
                   />
                   <button 
                     @click="emit('update-quantity', index, item.quantity + 1)"
-                    class="p-0.5 rounded-md hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                    class="p-0.5 rounded-md hover:bg-gray-200 dark:hover:bg-muted/50 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   >
                     <Plus class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </td>
               
-              <td class="px-4 py-3 text-right font-bold text-gray-900 bg-blue-50/30 text-sm">
+              <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white bg-blue-50/30 dark:bg-blue-900/10 text-sm">
                 {{ formatCurrency(item.total) }}
               </td>
               
               <td class="px-2 py-3 text-center" @click.stop>
                 <button 
                   @click="emit('remove', index)"
-                  class="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                  class="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                 >
                   <Trash2 class="w-4 h-4" />
                 </button>
@@ -183,7 +183,7 @@ const displaySku = (item: any) => {
             <!-- Expandable options row -->
             <tr v-if="expandedItemId === item.id">
               <td colspan="6" class="px-0 py-0">
-                <div class="bg-gradient-to-b from-indigo-50/60 to-white border-t border-indigo-100 px-6 py-4 animate-slide-down">
+                <div class="bg-gradient-to-b from-indigo-50/60 dark:from-indigo-900/20 to-white dark:to-card border-t border-indigo-100 dark:border-indigo-900/50 px-6 py-4 animate-slide-down">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
                     <!-- Tax exempt toggle -->
@@ -213,12 +213,12 @@ const displaySku = (item: any) => {
                           max="100"
                           :value="item.tax_percent"
                           @change.stop="emit('update-item-tax', item.id, parseFloat(($event.target as HTMLInputElement).value))"
-                          class="w-20 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          class="w-20 px-2 py-1 text-sm text-right border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-card text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         />
                         <span class="text-xs text-gray-500">%</span>
                       </div>
                       <div class="text-xs text-gray-400 mt-1">
-                        Monto: <span class="font-medium text-gray-600">{{ formatCurrency(item.tax_amount) }}</span>
+                        Monto: <span class="font-medium text-gray-600 dark:text-gray-300">{{ formatCurrency(item.tax_amount) }}</span>
                       </div>
                     </div>
 
@@ -228,7 +228,7 @@ const displaySku = (item: any) => {
                       <select
                         :value="item.seller_id ?? ''"
                         @change.stop="emit('update-item-seller', item.id, ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : undefined)"
-                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-card text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       >
                         <option value="">Sin vendedor asignado</option>
                         <option v-for="user in users" :key="user.id" :value="user.id">
@@ -246,7 +246,7 @@ const displaySku = (item: any) => {
                         @change.stop="emit('update-item-notes', item.id, ($event.target as HTMLTextAreaElement).value)"
                         placeholder="Nota interna (no se imprime en ticket)…"
                         rows="2"
-                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-card text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
                       />
                       <p class="text-xs text-gray-400">Solo visible internamente</p>
                     </div>
@@ -254,18 +254,18 @@ const displaySku = (item: any) => {
                     <!-- Summary mini-card -->
                     <div class="space-y-2">
                       <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Resumen</label>
-                      <div class="bg-white rounded-lg border border-gray-200 p-3 space-y-1.5">
+                      <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-3 space-y-1.5">
                         <div class="flex justify-between text-xs">
                           <span class="text-gray-500">Subtotal</span>
-                          <span class="font-medium text-gray-700">{{ formatCurrency(item.subtotal) }}</span>
+                          <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatCurrency(item.subtotal) }}</span>
                         </div>
                         <div class="flex justify-between text-xs">
                           <span class="text-gray-500">Impuesto ({{ item.tax_percent }}%)</span>
-                          <span class="font-medium text-gray-700">{{ formatCurrency(item.tax_amount) }}</span>
+                          <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatCurrency(item.tax_amount) }}</span>
                         </div>
-                        <div class="flex justify-between text-sm font-bold border-t border-gray-100 pt-1.5">
-                          <span class="text-gray-900">Total</span>
-                          <span class="text-indigo-600">{{ formatCurrency(item.total) }}</span>
+                        <div class="flex justify-between text-sm font-bold border-t border-gray-100 dark:border-border pt-1.5">
+                          <span class="text-gray-900 dark:text-white">Total</span>
+                          <span class="text-indigo-600 dark:text-primary dark:text-indigo-400">{{ formatCurrency(item.total) }}</span>
                         </div>
                       </div>
                     </div>
@@ -279,7 +279,7 @@ const displaySku = (item: any) => {
       </table>
     </div>
     
-    <div class="bg-gray-50 px-4 py-2 border-t border-gray-100 text-xs text-gray-400 text-center uppercase tracking-widest shrink-0">
+    <div class="bg-gray-50 dark:bg-muted px-4 py-2 border-t border-gray-100 dark:border-border text-xs text-gray-400 text-center uppercase tracking-widest shrink-0">
       {{ items.length }} {{ items.length === 1 ? 'producto' : 'productos' }} en lista
     </div>
 

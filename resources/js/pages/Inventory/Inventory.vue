@@ -38,6 +38,7 @@ interface BatchItem {
     expiry_date: string | null
     manufacturing_date: string | null
     cost: number
+    notes: string | null
     total_quantity: number
     product_count: number
     products: Product[]
@@ -166,6 +167,22 @@ const fetchBatches = async (page = 1) => {
         console.error(err)
     } finally {
         loading.value = false
+    }
+}
+
+const savingNotes = ref<Set<string>>(new Set())
+
+const updateBatchNote = async (batch: BatchItem) => {
+    if (savingNotes.value.has(batch.batch_number)) return
+    
+    savingNotes.value.add(batch.batch_number)
+    try {
+        await apiClient.put(`/inventory/batches/${batch.batch_number}/notes`, { notes: batch.notes })
+    } catch (err: any) {
+        console.error('Error saving batch notes:', err)
+        alert('Hubo un error al guardar la nota del lote.')
+    } finally {
+        savingNotes.value.delete(batch.batch_number)
     }
 }
 
@@ -368,7 +385,7 @@ const viewMovement = (id: number) => {
                     <a
                         href="/inventory-movements/transfer/create"
                         v-if="hasRole(['admin', 'manager'])"
-                        class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                        class="flex items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                     >
                         <ArrowLeftRight :size="18" />
                         Nueva Transferencia
@@ -378,16 +395,16 @@ const viewMovement = (id: number) => {
 
             <!-- Metrics Cards -->
             <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-                <div class="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Lotes Activos</p>
                             <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ metrics.total_batches }}</p>
                         </div>
-                        <Package class="h-8 w-8 text-blue-600" />
+                        <Package class="h-8 w-8 text-blue-600 dark:text-primary" />
                     </div>
                 </div>
-                <div class="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Stock Total</p>
@@ -396,7 +413,7 @@ const viewMovement = (id: number) => {
                         <TrendingUp class="h-8 w-8 text-green-600" />
                     </div>
                 </div>
-                <div class="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Por Vencer (30d)</p>
@@ -405,7 +422,7 @@ const viewMovement = (id: number) => {
                         <AlertCircle class="h-8 w-8 text-yellow-600" />
                     </div>
                 </div>
-                <div class="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Movimientos Hoy</p>
@@ -417,14 +434,14 @@ const viewMovement = (id: number) => {
             </div>
 
             <!-- View Toggle -->
-            <div class="mb-6 flex items-center justify-center gap-2 rounded-lg bg-white p-2 shadow dark:bg-gray-800">
+            <div class="mb-6 flex items-center justify-center gap-2 rounded-lg bg-white p-2 shadow dark:bg-card">
                 <button
                     @click="viewMode = 'batches'"
                     :class="[
                         'flex items-center gap-2 rounded-lg px-6 py-3 font-medium transition-all',
                         viewMode === 'batches'
-                            ? 'bg-blue-600 text-white shadow-lg'
-                            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                            ? 'bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white shadow-lg'
+                            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50'
                     ]"
                 >
                     <Package :size="20" />
@@ -435,8 +452,8 @@ const viewMovement = (id: number) => {
                     :class="[
                         'flex items-center gap-2 rounded-lg px-6 py-3 font-medium transition-all',
                         viewMode === 'movements'
-                            ? 'bg-blue-600 text-white shadow-lg'
-                            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                            ? 'bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white shadow-lg'
+                            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50'
                     ]"
                 >
                     <Calendar :size="20" />
@@ -445,7 +462,7 @@ const viewMovement = (id: number) => {
             </div>
 
             <!-- Filters -->
-            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-card">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-6">
                     <!-- Search -->
                     <div class="md:col-span-2">
@@ -456,7 +473,7 @@ const viewMovement = (id: number) => {
                             v-model="filters.search"
                             type="text"
                             :placeholder="viewMode === 'batches' ? 'Lote, Producto o SKU...' : 'Producto o SKU...'"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                             @keyup.enter="applyFilters"
                         />
                     </div>
@@ -468,7 +485,7 @@ const viewMovement = (id: number) => {
                         </label>
                         <select
                             v-model="filters.warehouse_id"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="undefined">Todos</option>
                             <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
@@ -484,7 +501,7 @@ const viewMovement = (id: number) => {
                             <input
                                 v-model="filters.date_from"
                                 type="date"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                             />
                         </div>
                         <div>
@@ -494,7 +511,7 @@ const viewMovement = (id: number) => {
                             <input
                                 v-model="filters.date_to"
                                 type="date"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                             />
                         </div>
                         <div>
@@ -503,7 +520,7 @@ const viewMovement = (id: number) => {
                             </label>
                             <select
                                 v-model="filters.movement_type"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                             >
                                 <option :value="undefined">Todos</option>
                                 <option value="in">Entradas</option>
@@ -520,7 +537,7 @@ const viewMovement = (id: number) => {
                         </label>
                         <select
                             v-model="filters.expiry_status"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="undefined">Todos</option>
                             <option value="expiring_soon">Por Vencer (30 días)</option>
@@ -532,7 +549,7 @@ const viewMovement = (id: number) => {
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                            class="flex-1 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                         >
                             Filtrar
                         </button>
@@ -550,25 +567,25 @@ const viewMovement = (id: number) => {
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Rápido:</span>
                     <button
                         @click="setDatePreset('today')"
-                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted"
                     >
                         Hoy
                     </button>
                     <button
                         @click="setDatePreset('week')"
-                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted"
                     >
                         Esta semana
                     </button>
                     <button
                         @click="setDatePreset('month')"
-                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted"
                     >
                         Este mes
                     </button>
                     <button
                         @click="setDatePreset('30days')"
-                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted"
                     >
                         Últimos 30 días
                     </button>
@@ -577,7 +594,7 @@ const viewMovement = (id: number) => {
 
             <!-- Loading State -->
             <div v-if="loading" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                 <p class="mt-2 text-gray-800 dark:text-gray-200">Cargando...</p>
             </div>
 
@@ -587,9 +604,9 @@ const viewMovement = (id: number) => {
             </div>
 
             <!-- Batches View -->
-            <div v-else-if="viewMode === 'batches' && batches.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
+            <div v-else-if="viewMode === 'batches' && batches.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <thead class="bg-gray-50 dark:bg-muted">
                         <tr>
                             <th class="w-12 px-6 py-3"></th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
@@ -601,23 +618,26 @@ const viewMovement = (id: number) => {
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                 Productos
                             </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                Notas
+                            </th>
                             <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                 Cantidad Total
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                         <template v-for="batch in batches" :key="batch.batch_number">
                             <!-- Main Batch Row -->
                             <tr 
-                                class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                                class="hover:bg-gray-50 dark:hover:bg-muted/50 cursor-pointer"
                                 @click="toggleBatch(batch.batch_number)"
                             >
                                 <td class="px-6 py-4">
                                     <ChevronRight v-if="!expandedBatches.has(batch.batch_number)" class="h-4 w-4 text-gray-500" />
                                     <ChevronDown v-else class="h-4 w-4 text-gray-500" />
                                 </td>
-                                <td class="px-6 py-4 text-sm text-blue-600 font-medium dark:text-blue-400">
+                                <td class="px-6 py-4 text-sm text-blue-600 dark:text-primary font-medium dark:text-blue-400">
                                     {{ batch.batch_number }}
                                 </td>
                                 <td class="px-6 py-4 text-sm">
@@ -628,6 +648,22 @@ const viewMovement = (id: number) => {
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
                                     {{ batch.product_count }} producto(s)
                                 </td>
+                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-white" @click.stop>
+                                    <div class="relative flex items-center min-w-[150px]">
+                                        <input 
+                                            v-model="batch.notes" 
+                                            @blur="updateBatchNote(batch)"
+                                            @keyup.enter="($event.target as HTMLInputElement).blur()"
+                                            type="text" 
+                                            placeholder="Añadir nota..."
+                                            class="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 text-sm py-1 px-1 transition-colors dark:text-white"
+                                            :disabled="savingNotes.has(batch.batch_number)"
+                                        />
+                                        <div v-if="savingNotes.has(batch.batch_number)" class="absolute right-1 top-1/2 -translate-y-1/2">
+                                            <div class="h-3 w-3 animate-spin rounded-full border-2 border-solid border-blue-600 border-r-transparent"></div>
+                                        </div>
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white">
                                     {{ batch.total_quantity }}
                                 </td>
@@ -635,14 +671,14 @@ const viewMovement = (id: number) => {
                             
                             <!-- Expanded Products Detail -->
                             <tr v-if="expandedBatches.has(batch.batch_number)">
-                                <td colspan="5" class="px-6 py-4 bg-gray-50 dark:bg-gray-900">
+                                <td colspan="6" class="px-6 py-4 bg-gray-50 dark:bg-background">
                                     <div class="pl-8">
                                         <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Productos en este lote:</h4>
                                         <div class="space-y-2">
                                             <div 
                                                 v-for="product in batch.products" 
                                                 :key="product.product_id"
-                                                class="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
+                                                class="flex items-center justify-between bg-white dark:bg-card rounded-lg p-3 border border-gray-200 dark:border-border"
                                             >
                                                 <div class="flex-1">
                                                     <p class="text-sm font-medium text-gray-900 dark:text-white">{{ product.product_name }}</p>
@@ -669,7 +705,7 @@ const viewMovement = (id: number) => {
                 </table>
 
                 <!-- Pagination -->
-                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
                     <div>
                         <p class="text-sm text-gray-900 dark:text-white">
                             Mostrando {{ (pagination.current_page - 1) * pagination.per_page + 1 }} a {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} de {{ pagination.total }} {{ viewMode === 'batches' ? 'lotes' : 'movimientos' }}
@@ -679,14 +715,14 @@ const viewMovement = (id: number) => {
                         <button
                             @click="goToPage(pagination.current_page - 1)"
                             :disabled="pagination.current_page === 1"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                         >
                             Anterior
                         </button>
                         <button
                             @click="goToPage(pagination.current_page + 1)"
                             :disabled="pagination.current_page === pagination.last_page"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                         >
                             Siguiente
                         </button>
@@ -695,9 +731,9 @@ const viewMovement = (id: number) => {
             </div>
 
             <!-- Movements View -->
-            <div v-else-if="viewMode === 'movements' && movements.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
+            <div v-else-if="viewMode === 'movements' && movements.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <thead class="bg-gray-50 dark:bg-muted">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                 Fecha
@@ -722,8 +758,8 @@ const viewMovement = (id: number) => {
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
-                        <tr v-for="movement in movements" :key="movement.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
+                        <tr v-for="movement in movements" :key="movement.id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                                 {{ formatDate(movement.created_at) }}
                             </td>
@@ -734,7 +770,7 @@ const viewMovement = (id: number) => {
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                                 <div v-if="movement.product_batch">
-                                    <span class="font-medium text-blue-600 dark:text-blue-400">{{ movement.product_batch.batch_number }}</span>
+                                    <span class="font-medium text-blue-600 dark:text-primary dark:text-blue-400">{{ movement.product_batch.batch_number }}</span>
                                     <div v-if="movement.product_batch.expiry_date" class="text-xs text-gray-500">
                                         Vence: {{ formatDate(movement.product_batch.expiry_date).split(',')[0] }}
                                     </div>
@@ -756,7 +792,7 @@ const viewMovement = (id: number) => {
                             <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                 <button
                                     @click="viewMovement(movement.id)"
-                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                    class="text-blue-600 dark:text-primary hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     Ver detalle
                                 </button>
@@ -766,7 +802,7 @@ const viewMovement = (id: number) => {
                 </table>
 
                 <!-- Pagination -->
-                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
                     <div>
                         <p class="text-sm text-gray-900 dark:text-white">
                             Mostrando {{ (pagination.current_page - 1) * pagination.per_page + 1 }} a {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} de {{ pagination.total }} movimientos
@@ -776,14 +812,14 @@ const viewMovement = (id: number) => {
                         <button
                             @click="goToPage(pagination.current_page - 1)"
                             :disabled="pagination.current_page === 1"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                         >
                             Anterior
                         </button>
                         <button
                             @click="goToPage(pagination.current_page + 1)"
                             :disabled="pagination.current_page === pagination.last_page"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                         >
                             Siguiente
                         </button>
@@ -792,7 +828,7 @@ const viewMovement = (id: number) => {
             </div>
 
             <!-- Empty State -->
-            <div v-else class="rounded-lg bg-white p-12 text-center shadow dark:bg-gray-800">
+            <div v-else class="rounded-lg bg-white p-12 text-center shadow dark:bg-card">
                 <p class="text-gray-700 dark:text-gray-300">
                     {{ viewMode === 'batches' ? 'No se encontraron lotes activos.' : 'No hay movimientos registrados.' }}
                 </p>

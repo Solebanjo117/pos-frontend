@@ -11,9 +11,9 @@ defineProps<Props>()
 <template>
     <div class="space-y-4">
         <template v-if="cashiers && cashiers.length > 0">
-            <div v-for="(cashier, index) in cashiers" :key="index" class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+            <div v-for="(cashier, index) in cashiers" :key="index" class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-muted/50">
                 <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-primary dark:text-blue-300">
                         <UserIcon class="h-5 w-5" />
                     </div>
                     <div>

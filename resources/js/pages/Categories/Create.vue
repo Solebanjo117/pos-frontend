@@ -71,7 +71,7 @@ function goBack() {
             </div>
 
             <!-- Form -->
-            <form @submit.prevent="handleSubmit" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-6">
+            <form @submit.prevent="handleSubmit" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6 space-y-6">
                 <!-- Name -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -81,7 +81,7 @@ function goBack() {
                         v-model="form.name"
                         type="text"
                         required
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         placeholder="Ej: Motor, Suspensión, Frenos..."
                     />
                 </div>
@@ -93,7 +93,7 @@ function goBack() {
                     </label>
                     <select
                         v-model="form.parent_id"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                     >
                         <option :value="null">Ninguna (categoría raíz)</option>
                         <option v-for="cat in parentCategories" :key="cat.id" :value="cat.id">
@@ -111,7 +111,7 @@ function goBack() {
                     <textarea
                         v-model="form.description"
                         rows="3"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         placeholder="Descripción de la categoría..."
                     ></textarea>
                 </div>
@@ -129,7 +129,7 @@ function goBack() {
                         <input
                             v-model="attr.name"
                             type="text"
-                            class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            class="flex-1 px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
                             placeholder="Ej: Largo, Ancho, Material..."
                         />
                         <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
@@ -142,7 +142,7 @@ function goBack() {
                         </button>
                     </div>
                     <button type="button" @click="addAttribute"
-                        class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition">
+                        class="inline-flex items-center gap-1 text-sm text-indigo-600 dark:text-primary hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition">
                         + Añadir Atributo
                     </button>
                 </div>
@@ -155,7 +155,7 @@ function goBack() {
                     <input
                         v-model="form.icon"
                         type="text"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         placeholder="Ej: engine, brake, suspension..."
                     />
                     <p class="mt-1 text-xs text-gray-500">Nombre del icono (opcional)</p>
@@ -170,25 +170,25 @@ function goBack() {
                         v-model.number="form.priority"
                         type="number"
                         min="0"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         placeholder="0"
                     />
                     <p class="mt-1 text-xs text-gray-500">Mayor prioridad aparece primero</p>
                 </div>
 
                 <!-- Actions -->
-                <div class="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div class="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-border">
                     <button
                         type="button"
                         @click="goBack"
-                        class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                        class="px-4 py-2 border border-gray-300 dark:border-border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-muted/50 transition"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition disabled:opacity-50"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition disabled:opacity-50"
                     >
                         <Save :size="18" />
                         Guardar

@@ -138,7 +138,7 @@ const handleReturnSubmit = async (payload: { reason: string; refund_method: stri
 
 const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+    draft: 'bg-gray-100 text-gray-800 dark:bg-card dark:text-gray-300',
     pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
     confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
     processing: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
@@ -173,7 +173,7 @@ onMounted(() => {
         <div class="flex items-center gap-4">
           <button
             @click="router.visit('/sales-orders')"
-            class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            class="p-2 hover:bg-gray-100 dark:hover:bg-muted/50 rounded-lg"
           >
             <ArrowLeft :size="24" />
           </button>
@@ -190,7 +190,7 @@ onMounted(() => {
         <div class="flex gap-2">
           <button
             @click="showPrintModal = true"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-card hover:bg-gray-200 dark:hover:bg-muted/50 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
           >
             <Printer :size="18" />
             Imprimir
@@ -198,7 +198,7 @@ onMounted(() => {
           <button
             v-if="currentSalesOrder.status === 'draft' || currentSalesOrder.status === 'pending'"
             @click="router.visit(`/sales-orders/${props.id}/edit`)"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-primary dark:text-primary-foreground hover:bg-blue-700 dark:hover:bg-primary/90 text-white rounded-lg"
           >
             <Edit :size="18" />
             Editar
@@ -214,7 +214,7 @@ onMounted(() => {
           <button
             v-if="currentSalesOrder.status === 'confirmed' || currentSalesOrder.status === 'processing'"
             @click="handleComplete"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg"
           >
             <CheckCircle :size="18" />
             Completar
@@ -248,10 +248,10 @@ onMounted(() => {
 
       <!-- Order Info Cards -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
           <div class="flex items-center gap-3">
             <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <User class="text-blue-600 dark:text-blue-400" :size="20" />
+              <User class="text-blue-600 dark:text-primary dark:text-blue-400" :size="20" />
             </div>
             <div>
               <p class="text-sm text-gray-600 dark:text-gray-400">Cliente</p>
@@ -262,7 +262,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
           <div class="flex items-center gap-3">
             <div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
               <Calendar class="text-purple-600 dark:text-purple-400" :size="20" />
@@ -276,7 +276,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
           <div class="flex items-center gap-3">
             <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
               <DollarSign class="text-green-600 dark:text-green-400" :size="20" />
@@ -290,7 +290,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
           <div class="flex items-center gap-3">
             <div class="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
               <Package class="text-yellow-600 dark:text-yellow-400" :size="20" />
@@ -306,14 +306,14 @@ onMounted(() => {
       </div>
 
       <!-- Items Table -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-border">
           <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Productos</h2>
         </div>
 
         <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-900">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+            <thead class="bg-gray-50 dark:bg-background">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Producto</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Almacén</th>
@@ -325,7 +325,7 @@ onMounted(() => {
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
               </tr>
             </thead>
-            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody class="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
               <tr v-for="item in currentSalesOrder.items" :key="item.id">
                 <td class="px-6 py-4">
                   <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.product_name }}</div>
@@ -352,7 +352,7 @@ onMounted(() => {
         </div>
 
         <!-- Totals -->
-        <div class="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-gray-50 dark:bg-gray-900">
+        <div class="border-t border-gray-200 dark:border-border px-6 py-4 bg-gray-50 dark:bg-background">
           <div class="max-w-md ml-auto space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-gray-600 dark:text-gray-400">Subtotal:</span>
@@ -370,7 +370,7 @@ onMounted(() => {
               <span class="text-gray-600 dark:text-gray-400">Envío:</span>
               <span class="text-gray-900 dark:text-white font-medium">${{ currentSalesOrder.shipping_cost }}</span>
             </div>
-            <div class="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-gray-700 pt-2">
+            <div class="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-border pt-2">
               <span class="text-gray-900 dark:text-white">Total:</span>
               <span class="text-gray-900 dark:text-white">{{ currentSalesOrder.formatted_total }}</span>
             </div>
@@ -379,18 +379,18 @@ onMounted(() => {
       </div>
 
       <!-- Notes -->
-      <div v-if="currentSalesOrder.notes" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div v-if="currentSalesOrder.notes" class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-6">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Notas</h3>
         <p class="text-gray-700 dark:text-gray-300">{{ currentSalesOrder.notes }}</p>
       </div>
       <!-- Returns History -->
-      <div v-if="orderReturns.length > 0" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div v-if="orderReturns.length > 0" class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-6">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Devoluciones</h3>
         <div class="space-y-3">
           <div
             v-for="ret in orderReturns"
             :key="ret.id"
-            class="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+            class="border border-gray-200 dark:border-border rounded-lg p-4"
           >
             <div class="flex items-center justify-between mb-2">
               <div>
@@ -415,14 +415,14 @@ onMounted(() => {
       </div>
 
       <!-- Audit Logs Timeline -->
-      <div v-if="currentSalesOrder" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div v-if="currentSalesOrder" class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border overflow-hidden">
         <button
           @click="showAuditLogs = !showAuditLogs"
-          class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+          class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-muted/50/50 transition-colors"
         >
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <ClipboardList class="w-5 h-5 text-gray-500" /> Auditoría de Caja
-            <span class="text-xs font-normal text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+            <span class="text-xs font-normal text-gray-500 bg-gray-100 dark:bg-muted px-2 py-0.5 rounded-full">
               {{ (currentSalesOrder as any).audit_logs?.length || 0 }} eventos
             </span>
           </h3>
@@ -434,7 +434,7 @@ onMounted(() => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        <div v-if="showAuditLogs" class="px-6 pb-5 border-t border-gray-100 dark:border-gray-700">
+        <div v-if="showAuditLogs" class="px-6 pb-5 border-t border-gray-100 dark:border-border">
           <div v-if="(currentSalesOrder as any).audit_logs?.length" class="relative pl-6 mt-4">
             <!-- Vertical line -->
             <div class="absolute left-2 top-1 bottom-1 w-0.5 bg-gray-200 dark:bg-gray-600"></div>
@@ -444,7 +444,7 @@ onMounted(() => {
               class="relative flex items-start gap-3 pb-3 last:pb-0"
             >
               <!-- Dot -->
-              <div class="absolute -left-[16px] top-1 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 z-10"
+              <div class="absolute -left-[16px] top-1 w-3 h-3 rounded-full border-2 border-white dark:border-border z-10"
                 :class="log.action === 'checkout_success' ? 'bg-green-500' : log.action === 'checkout_error' ? 'bg-red-500' : 'bg-indigo-400'"
               ></div>
               <!-- Content -->

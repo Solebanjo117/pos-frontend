@@ -32,6 +32,7 @@ interface BatchInventoryItem {
     expiry_date: string | null
     manufacturing_date: string | null
     cost: number
+    notes: string | null
     total_quantity: number
     product_count: number
     products: Product[]
@@ -109,6 +110,22 @@ const fetchBatches = async (page = 1) => {
     }
 }
 
+const savingNotes = ref<Set<string>>(new Set())
+
+const updateBatchNote = async (batch: BatchInventoryItem) => {
+    if (savingNotes.value.has(batch.batch_number)) return
+    
+    savingNotes.value.add(batch.batch_number)
+    try {
+        await apiClient.put(`/inventory/batches/${batch.batch_number}/notes`, { notes: batch.notes })
+    } catch (err: any) {
+        console.error('Error saving batch notes:', err)
+        alert('Hubo un error al guardar la nota del lote.')
+    } finally {
+        savingNotes.value.delete(batch.batch_number)
+    }
+}
+
 const fetchWarehouses = async () => {
     try {
         const response = await apiClient.get('/warehouses')
@@ -178,14 +195,14 @@ const getExpiryColor = (dateString: string | null) => {
                     Vista detallada de existencias agrupadas por número de lote.
                 </p>
                 <div class="mt-4 flex gap-2">
-                    <a href="/inventory-movements" class="text-blue-600 hover:underline text-sm">
+                    <a href="/inventory-movements" class="text-blue-600 dark:text-primary hover:underline text-sm">
                         &larr; Ver Historial de Movimientos (Bitácora)
                     </a>
                 </div>
             </div>
 
             <!-- Filters -->
-            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-card">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <!-- Search -->
                     <div class="md:col-span-1">
@@ -196,7 +213,7 @@ const getExpiryColor = (dateString: string | null) => {
                             v-model="filters.search"
                             type="text"
                             placeholder="Lote, Producto o SKU..."
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                             @keyup.enter="applyFilters"
                         />
                     </div>
@@ -208,7 +225,7 @@ const getExpiryColor = (dateString: string | null) => {
                         </label>
                         <select
                             v-model="filters.warehouse_id"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="undefined">Todos</option>
                             <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
@@ -222,7 +239,7 @@ const getExpiryColor = (dateString: string | null) => {
                         </label>
                         <select
                             v-model="filters.expiry_status"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="undefined">Todos</option>
                             <option value="expiring_soon">Por Vencer (30 días)</option>
@@ -234,7 +251,7 @@ const getExpiryColor = (dateString: string | null) => {
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                            class="flex-1 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                         >
                             Filtrar
                         </button>
@@ -250,7 +267,7 @@ const getExpiryColor = (dateString: string | null) => {
 
             <!-- Loading State -->
             <div v-if="loading" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                 <p class="mt-2 text-gray-800 dark:text-gray-200">Cargando inventario...</p>
             </div>
 
@@ -260,9 +277,9 @@ const getExpiryColor = (dateString: string | null) => {
             </div>
 
             <!-- Table -->
-            <div v-else-if="batches.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
+            <div v-else-if="batches.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <thead class="bg-gray-50 dark:bg-muted">
                         <tr>
                             <th class="w-12 px-6 py-3"></th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
@@ -274,23 +291,26 @@ const getExpiryColor = (dateString: string | null) => {
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                 Productos
                             </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                Notas
+                            </th>
                             <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                 Cantidad Total
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                         <template v-for="batch in batches" :key="batch.batch_number">
                             <!-- Main Batch Row -->
                             <tr 
-                                class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                                class="hover:bg-gray-50 dark:hover:bg-muted/50 cursor-pointer"
                                 @click="toggleBatch(batch.batch_number)"
                             >
                                 <td class="px-6 py-4">
                                     <ChevronRight v-if="!expandedBatches.has(batch.batch_number)" class="h-4 w-4 text-gray-500" />
                                     <ChevronDown v-else class="h-4 w-4 text-gray-500" />
                                 </td>
-                                <td class="px-6 py-4 text-sm text-blue-600 font-medium dark:text-blue-400">
+                                <td class="px-6 py-4 text-sm text-blue-600 dark:text-primary font-medium dark:text-blue-400">
                                     {{ batch.batch_number }}
                                 </td>
                                 <td class="px-6 py-4 text-sm">
@@ -301,6 +321,22 @@ const getExpiryColor = (dateString: string | null) => {
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
                                     {{ batch.product_count }} producto(s)
                                 </td>
+                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-white" @click.stop>
+                                    <div class="relative flex items-center min-w-[150px]">
+                                        <input 
+                                            v-model="batch.notes" 
+                                            @blur="updateBatchNote(batch)"
+                                            @keyup.enter="($event.target as HTMLInputElement).blur()"
+                                            type="text" 
+                                            placeholder="Añadir nota..."
+                                            class="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 text-sm py-1 px-1 transition-colors dark:text-white"
+                                            :disabled="savingNotes.has(batch.batch_number)"
+                                        />
+                                        <div v-if="savingNotes.has(batch.batch_number)" class="absolute right-1 top-1/2 -translate-y-1/2">
+                                            <div class="h-3 w-3 animate-spin rounded-full border-2 border-solid border-blue-600 border-r-transparent"></div>
+                                        </div>
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white">
                                     {{ batch.total_quantity }}
                                 </td>
@@ -308,14 +344,14 @@ const getExpiryColor = (dateString: string | null) => {
                             
                             <!-- Expanded Products Detail -->
                             <tr v-if="expandedBatches.has(batch.batch_number)">
-                                <td colspan="5" class="px-6 py-4 bg-gray-50 dark:bg-gray-900">
+                                <td colspan="6" class="px-6 py-4 bg-gray-50 dark:bg-background">
                                     <div class="pl-8">
                                         <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Productos en este lote:</h4>
                                         <div class="space-y-2">
                                             <div 
                                                 v-for="product in batch.products" 
                                                 :key="product.product_id"
-                                                class="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
+                                                class="flex items-center justify-between bg-white dark:bg-card rounded-lg p-3 border border-gray-200 dark:border-border"
                                             >
                                                 <div class="flex-1">
                                                     <p class="text-sm font-medium text-gray-900 dark:text-white">{{ product.product_name }}</p>
@@ -342,7 +378,7 @@ const getExpiryColor = (dateString: string | null) => {
                 </table>
 
                 <!-- Pagination -->
-                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
                     <div>
                         <p class="text-sm text-gray-900 dark:text-white">
                             Mostrando {{ (pagination.current_page - 1) * pagination.per_page + 1 }} a {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} de {{ pagination.total }} lotes
@@ -352,14 +388,14 @@ const getExpiryColor = (dateString: string | null) => {
                         <button
                             @click="goToPage(pagination.current_page - 1)"
                             :disabled="pagination.current_page === 1"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                         >
                             Anterior
                         </button>
                         <button
                             @click="goToPage(pagination.current_page + 1)"
                             :disabled="pagination.current_page === pagination.last_page"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                         >
                             Siguiente
                         </button>
@@ -368,7 +404,7 @@ const getExpiryColor = (dateString: string | null) => {
             </div>
 
             <!-- Empty State -->
-            <div v-else class="rounded-lg bg-white p-12 text-center shadow dark:bg-gray-800">
+            <div v-else class="rounded-lg bg-white p-12 text-center shadow dark:bg-card">
                 <p class="text-gray-700 dark:text-gray-300">No se encontraron lotes activos.</p>
                 <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
                     Ajusta los filtros o registra una nueva entrada de inventario.

@@ -80,7 +80,7 @@ const totalItems = (items: any[]) => items?.reduce((sum: number, i: any) => sum 
                 </div>
                 <a
                     href="/inventory-transfers/create"
-                    class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 shadow-sm transition-colors"
+                    class="flex items-center gap-2 rounded-lg bg-indigo-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:hover:bg-primary/90 shadow-sm transition-colors"
                 >
                     <Plus :size="16" />
                     Nueva Transferencia
@@ -92,7 +92,7 @@ const totalItems = (items: any[]) => items?.reduce((sum: number, i: any) => sum 
                 <select
                     v-model="statusFilter"
                     @change="fetchTransfers"
-                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200"
                 >
                     <option value="">Todos los estados</option>
                     <option value="draft">Borrador</option>
@@ -112,9 +112,9 @@ const totalItems = (items: any[]) => items?.reduce((sum: number, i: any) => sum 
             </div>
 
             <!-- Table -->
-            <div v-else class="rounded-xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700 overflow-hidden">
+            <div v-else class="rounded-xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700 overflow-hidden">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <thead class="bg-gray-50 dark:bg-muted/50">
                         <tr>
                             <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Referencia</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Origen → Destino</th>
@@ -125,9 +125,9 @@ const totalItems = (items: any[]) => items?.reduce((sum: number, i: any) => sum 
                             <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-gray-300">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                        <tr v-for="t in transfers" :key="t.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                            <td class="px-4 py-3 font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{{ t.reference }}</td>
+                    <tbody class="divide-y divide-gray-100 dark:divide-border">
+                        <tr v-for="t in transfers" :key="t.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/30 transition-colors">
+                            <td class="px-4 py-3 font-mono text-indigo-600 dark:text-primary dark:text-indigo-400 font-semibold">{{ t.reference }}</td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-1 text-gray-700 dark:text-gray-300">
                                     <Building2 :size="14" class="text-red-400" />
@@ -150,7 +150,7 @@ const totalItems = (items: any[]) => items?.reduce((sum: number, i: any) => sum 
                             <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{{ formatDate(t.created_at) }}</td>
                             <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ t.creator?.name }}</td>
                             <td class="px-4 py-3 text-center">
-                                <a :href="`/inventory-transfers/${t.id}`" class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
+                                <a :href="`/inventory-transfers/${t.id}`" class="text-indigo-600 dark:text-primary hover:text-indigo-800 dark:text-indigo-400">
                                     <Eye :size="16" />
                                 </a>
                             </td>

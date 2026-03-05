@@ -103,17 +103,17 @@ onMounted(() => {
         </div>
 
         <!-- Table -->
-        <div class="rounded-md border border-gray-200 dark:border-gray-700">
+        <div class="rounded-md border border-gray-200 dark:border-border">
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                    <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-card dark:text-gray-400">
                         <tr>
                             <th class="px-6 py-3 font-medium">Nombre</th>
                             <th class="px-6 py-3 font-medium">Modelos</th>
                             <th class="px-6 py-3 text-right font-medium">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody class="divide-y divide-gray-200 dark:divide-border">
                         <tr v-if="loading && !makes.length">
                             <td colspan="3" class="px-6 py-4 text-center text-gray-500">Cargando...</td>
                         </tr>
@@ -123,7 +123,7 @@ onMounted(() => {
                         <tr 
                             v-for="make in makes" 
                             :key="make.id"
-                            class="bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800"
+                            class="bg-white hover:bg-gray-50 dark:bg-background dark:hover:bg-card"
                         >
                             <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
                                 {{ make.name }}

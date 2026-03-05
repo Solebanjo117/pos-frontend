@@ -181,7 +181,7 @@ onMounted(async () => {
             </div>
 
             <!-- Form Card -->
-            <div class="rounded-xl bg-white shadow dark:bg-gray-800 p-6 space-y-5">
+            <div class="rounded-xl bg-white shadow dark:bg-card p-6 space-y-5">
                 <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Nueva Merma</h2>
 
                 <!-- Alerts -->
@@ -216,7 +216,7 @@ onMounted(async () => {
                         <select
                             v-model="selectedVariant"
                             @change="fetchStock"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="null" disabled>Selecciona variante</option>
                             <option v-for="v in variants" :key="v.id" :value="v">
@@ -233,7 +233,7 @@ onMounted(async () => {
                         <select
                             v-model="warehouseId"
                             @change="fetchStock"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
                         </select>
@@ -252,7 +252,7 @@ onMounted(async () => {
                             type="number"
                             min="1"
                             :max="availableStock ?? undefined"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
 
@@ -263,7 +263,7 @@ onMounted(async () => {
                         </label>
                         <select
                             v-model="reason"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option value="" disabled>Selecciona motivo</option>
                             <option v-for="r in REASONS" :key="r" :value="r">{{ r }}</option>
@@ -279,7 +279,7 @@ onMounted(async () => {
                             v-model="notes"
                             rows="2"
                             placeholder="Descripción opcional..."
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
                 </div>
@@ -297,7 +297,7 @@ onMounted(async () => {
             </div>
 
             <!-- History Table -->
-            <div class="rounded-xl bg-white shadow dark:bg-gray-800 p-6">
+            <div class="rounded-xl bg-white shadow dark:bg-card p-6">
                 <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Historial Reciente</h2>
 
                 <div v-if="historyLoading" class="text-center py-8 text-gray-400">Cargando...</div>
@@ -308,7 +308,7 @@ onMounted(async () => {
                 <div v-else class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
-                            <tr class="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase tracking-wider">
+                            <tr class="border-b border-gray-200 dark:border-border text-left text-xs text-gray-500 uppercase tracking-wider">
                                 <th class="pb-3 pr-4">Producto</th>
                                 <th class="pb-3 pr-4">SKU</th>
                                 <th class="pb-3 pr-4">Almacén</th>
@@ -318,8 +318,8 @@ onMounted(async () => {
                                 <th class="pb-3">Fecha</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                            <tr v-for="entry in history" :key="entry.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <tbody class="divide-y divide-gray-100 dark:divide-border">
+                            <tr v-for="entry in history" :key="entry.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/30">
                                 <td class="py-3 pr-4 font-medium text-gray-900 dark:text-white">{{ entry.product_name }}</td>
                                 <td class="py-3 pr-4 font-mono text-gray-500">{{ entry.sku }}</td>
                                 <td class="py-3 pr-4 text-gray-600 dark:text-gray-300">{{ entry.warehouse }}</td>

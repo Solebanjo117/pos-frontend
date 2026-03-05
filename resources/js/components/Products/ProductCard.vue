@@ -31,7 +31,7 @@ const getBrandNames = (product: Product): string => {
 <template>
     <!-- LIST VIEW -->
     <div v-if="viewMode === 'list'"
-        class="group rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:border-blue-200 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600 cursor-pointer"
+        class="group rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:border-blue-200 dark:border-border dark:bg-card dark:hover:border-blue-600 dark:border-primary cursor-pointer"
         @click="emit('select', product)">
         <div class="flex gap-5">
             <!-- Product Image -->
@@ -53,7 +53,7 @@ const getBrandNames = (product: Product): string => {
                             product.product_line.name }}</p>
                         <div class="flex items-center gap-2 mt-1.5">
                             <span
-                                class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-muted dark:text-gray-300">
                                 <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -68,7 +68,7 @@ const getBrandNames = (product: Product): string => {
                     </div>
                     <div class="text-right flex-shrink-0 ml-4">
                         <p class="text-xs text-gray-500 dark:text-gray-400">Desde</p>
-                        <p class="text-xl font-bold text-blue-600 dark:text-blue-400">
+                        <p class="text-xl font-bold text-blue-600 dark:text-primary dark:text-blue-400">
                             {{ getMinPrice(product) > 0 ? formatCurrency(getMinPrice(product)) : 'N/A' }}
                         </p>
                     </div>
@@ -94,7 +94,7 @@ const getBrandNames = (product: Product): string => {
                             Sin Stock
                         </span>
                         <button
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors">
+                            class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 dark:hover:bg-primary/90 transition-colors">
                             Ver Opciones
                         </button>
                     </div>
@@ -105,7 +105,7 @@ const getBrandNames = (product: Product): string => {
 
     <!-- GRID VIEW -->
     <div v-else
-        class="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:shadow-lg hover:border-blue-200 hover:-translate-y-0.5 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600 cursor-pointer"
+        class="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:shadow-lg hover:border-blue-200 hover:-translate-y-0.5 dark:border-border dark:bg-card dark:hover:border-blue-600 dark:border-primary cursor-pointer"
         @click="emit('select', product)">
         <!-- Product Image -->
         <div
@@ -129,7 +129,7 @@ const getBrandNames = (product: Product): string => {
             <!-- Badges -->
             <div class="flex flex-wrap gap-1.5 mb-3">
                 <span
-                    class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-muted dark:text-gray-300">
                     <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -154,15 +154,15 @@ const getBrandNames = (product: Product): string => {
             </div>
 
             <!-- Price + CTA -->
-            <div class="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
+            <div class="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-border">
                 <div>
                     <p class="text-xs text-gray-500 dark:text-gray-400">Desde</p>
-                    <p class="text-lg font-bold text-blue-600 dark:text-blue-400">
+                    <p class="text-lg font-bold text-blue-600 dark:text-primary dark:text-blue-400">
                         {{ getMinPrice(product) > 0 ? formatCurrency(getMinPrice(product)) : 'N/A' }}
                     </p>
                 </div>
                 <button
-                    class="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors">
+                    class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 dark:hover:bg-primary/90 transition-colors">
                     Ver Opciones
                 </button>
             </div>

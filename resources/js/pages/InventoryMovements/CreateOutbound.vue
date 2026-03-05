@@ -261,7 +261,7 @@ const cancel = () => {
                         <button
                             type="button"
                             @click="cancel"
-                            class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                            class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted/50"
                         >
                             Cancelar
                         </button>
@@ -288,14 +288,14 @@ const cancel = () => {
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
                     <!-- Sidebar: Config -->
                     <div class="lg:col-span-1 space-y-6">
-                        <div class="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+                        <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
                             <h2 class="mb-4 font-semibold text-gray-900 dark:text-white">Configuración</h2>
                             <div class="space-y-4">
                                 <div v-if="showWarehouseSelect">
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">Almacén Origen</label>
                                     <select
                                         v-model="headerForm.warehouse_id"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     >
                                         <option :value="null">Seleccionar...</option>
                                         <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
@@ -307,7 +307,7 @@ const cancel = () => {
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">Tipo Referencia</label>
                                     <select
                                         v-model="headerForm.reference_type"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     >
                                         <option :value="undefined">Ninguna</option>
                                         <option value="sale">Venta</option>
@@ -321,7 +321,7 @@ const cancel = () => {
                                     <input
                                         v-model.number="headerForm.reference_id"
                                         type="number"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     />
                                 </div>
 
@@ -330,7 +330,7 @@ const cancel = () => {
                                     <textarea
                                         v-model="headerForm.notes"
                                         rows="3"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     ></textarea>
                                 </div>
                             </div>
@@ -339,21 +339,21 @@ const cancel = () => {
 
                     <!-- Items List -->
                     <div class="lg:col-span-3">
-                        <div class="rounded-lg bg-white p-4 shadow dark:bg-gray-800 min-h-[500px] flex flex-col">
+                        <div class="rounded-lg bg-white p-4 shadow dark:bg-card min-h-[500px] flex flex-col">
                             <div class="mb-4 flex items-center justify-between">
                                 <h2 class="font-semibold text-gray-900 dark:text-white">Items de Salida ({{ items.length }})</h2>
                                 <button
                                     @click="addItem"
                                     type="button"
-                                    class="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                                    class="flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-primary hover:text-blue-800 dark:text-blue-400"
                                 >
                                     <Plus :size="16" /> Agregar Item
                                 </button>
                             </div>
 
                             <div class="flex-1 overflow-auto">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                    <thead class="bg-gray-50 dark:bg-gray-700">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                                    <thead class="bg-gray-50 dark:bg-muted">
                                         <tr>
                                             <th scope="col" class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 w-1/4">Producto Base</th>
                                             <th scope="col" class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 w-1/4">Variante/Marca</th>
@@ -362,7 +362,7 @@ const cancel = () => {
                                             <th scope="col" class="relative px-3 py-3 w-10"><span class="sr-only">Acciones</span></th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                                         <tr v-for="(item, index) in items" :key="item.id">
                                             <td class="px-3 py-4 align-top">
                                                 <ProductCombobox
@@ -383,7 +383,7 @@ const cancel = () => {
                                                         <select
                                                             v-model="item.variant_id"
                                                             @change="handleVariantChange(index)"
-                                                            class="w-full rounded-md border-gray-300 py-1.5 shadow-sm text-sm dark:border-gray-600 dark:bg-gray-700"
+                                                            class="w-full rounded-md border-gray-300 py-1.5 shadow-sm text-sm dark:border-border dark:bg-muted"
                                                         >
                                                             <option :value="null">Genérico / Default</option>
                                                             <option v-for="v in getProductDetails(item.product_id)?.variants || []" :key="v.id" :value="v.id">
@@ -393,12 +393,12 @@ const cancel = () => {
                                                         <button
                                                             @click="refreshVariants(index)"
                                                             title="Refrescar variantes"
-                                                            class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md dark:text-blue-400 dark:hover:bg-gray-700"
+                                                            class="p-1.5 text-blue-600 dark:text-primary hover:bg-blue-50 rounded-md dark:text-blue-400 dark:hover:bg-muted/50"
                                                         >
                                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                                                         </button>
                                                     </div>
-                                                    <a :href="`/products/${item.product_id}/edit`" target="_blank" class="text-xs text-blue-600 hover:underline dark:text-blue-400 mt-1 flex items-center gap-1">
+                                                    <a :href="`/products/${item.product_id}/edit`" target="_blank" class="text-xs text-blue-600 dark:text-primary hover:underline dark:text-blue-400 mt-1 flex items-center gap-1">
                                                         + Añadir variante
                                                     </a>
                                                 </div>
@@ -408,7 +408,7 @@ const cancel = () => {
                                                 <div v-if="item.batches.length > 0">
                                                     <select
                                                         v-model="item.product_batch_id"
-                                                        class="w-full text-sm rounded-md border-gray-300 py-1.5 shadow-sm dark:border-gray-600 dark:bg-gray-700"
+                                                        class="w-full text-sm rounded-md border-gray-300 py-1.5 shadow-sm dark:border-border dark:bg-muted"
                                                         :class="{ 'border-red-500': formErrors[`item_${item.id}_batch`] }"
                                                     >
                                                         <option :value="null">Seleccionar lote...</option>
@@ -430,7 +430,7 @@ const cancel = () => {
                                                     type="number"
                                                     min="1"
                                                     :max="getStockAvailable(item) || undefined"
-                                                    class="w-full text-sm rounded-md border-gray-300 text-center shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                                    class="w-full text-sm rounded-md border-gray-300 text-center shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                                     :class="{ 'border-red-500': formErrors[`item_${item.id}_quantity`] }"
                                                 />
                                                 <p v-if="getStockAvailable(item) !== null" class="text-[10px] text-center text-gray-500 mt-1">
@@ -457,7 +457,7 @@ const cancel = () => {
                                 </table>
                             </div>
                             
-                            <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                            <div class="mt-4 border-t border-gray-200 pt-4 dark:border-border">
                                 <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                                     <span>Total Items: {{ items.length }}</span>
                                     <span>Total Cantidad: {{ items.reduce((acc, item) => acc + (item.quantity || 0), 0) }}</span>

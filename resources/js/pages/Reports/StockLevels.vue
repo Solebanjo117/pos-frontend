@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import { BarChart3, AlertCircle, TrendingUp, Package, Download } from 'lucide-vue-next'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useReports } from '@/composables/useReports'
 import { useWarehouses } from '@/composables/useWarehouses'
+import { usePosSettings } from '@/composables/usePosSettings'
 import { useBrands } from '@/composables/useBrands'
 import { useCategories } from '@/composables/useCategories'
 import StockStatusChart from '@/components/charts/StockStatusChart.vue'
@@ -22,6 +23,7 @@ const { stockLevelsReport, loading, error, fetchStockLevels, exportReport } = us
 const { warehouses, fetchWarehouses } = useWarehouses()
 const { brands, fetchBrands } = useBrands()
 const { categories, fetchCategories } = useCategories()
+const { currentWarehouseId, initWarehouse } = usePosSettings()
 
 const filters = ref({
     warehouse_id: null as number | null,
@@ -30,15 +32,22 @@ const filters = ref({
     status: null as 'critical' | 'low' | 'normal' | 'optimal' | null,
 })
 
+watch(currentWarehouseId, (val) => {
+    filters.value.warehouse_id = val
+    applyFilters()
+})
+
 const exporting = ref(false)
 
 onMounted(async () => {
     await Promise.all([
-        fetchStockLevels(),
+        initWarehouse(),
         fetchWarehouses(),
         fetchBrands(),
         fetchCategories(),
     ])
+    filters.value.warehouse_id = currentWarehouseId.value
+    await fetchStockLevels(filters.value.warehouse_id ? { warehouse_id: filters.value.warehouse_id } : {})
 })
 
 const applyFilters = async () => {
@@ -76,9 +85,9 @@ const getStatusColor = (status: string) => {
     switch (status) {
         case 'critical': return 'text-red-600 bg-red-50 dark:bg-red-900/20'
         case 'low': return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20'
-        case 'normal': return 'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
+        case 'normal': return 'text-blue-600 dark:text-primary bg-blue-50 dark:bg-blue-900/20'
         case 'optimal': return 'text-green-600 bg-green-50 dark:bg-green-900/20'
-        default: return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20'
+        default: return 'text-gray-600 bg-gray-50 dark:bg-background/20'
     }
 }
 
@@ -145,7 +154,7 @@ const formatCurrency = (value: number) => {
 
             <!-- Summary Cards -->
             <div v-if="stockLevelsReport" class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Total Productos</p>
@@ -153,7 +162,7 @@ const formatCurrency = (value: number) => {
                                 {{ stockLevelsReport.summary.total_products }}
                             </p>
                         </div>
-                        <Package :size="32" class="text-blue-600" />
+                        <Package :size="32" class="text-blue-600 dark:text-primary" />
                     </div>
                 </div>
 
@@ -189,7 +198,7 @@ const formatCurrency = (value: number) => {
                                 {{ stockLevelsReport.summary.normal_stock }}
                             </p>
                         </div>
-                        <BarChart3 :size="32" class="text-blue-600" />
+                        <BarChart3 :size="32" class="text-blue-600 dark:text-primary" />
                     </div>
                 </div>
 
@@ -209,7 +218,7 @@ const formatCurrency = (value: number) => {
             <!-- Charts Section -->
             <div v-if="stockLevelsReport" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <!-- Stock Status Chart -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="h-80">
                         <StockStatusChart
                             :critical="stockLevelsReport.summary.critical_stock"
@@ -221,7 +230,7 @@ const formatCurrency = (value: number) => {
                 </div>
 
                 <!-- Warehouse Distribution Chart -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="h-80">
                         <WarehouseDistributionChart
                             :data="stockLevelsReport.by_warehouse"
@@ -230,7 +239,7 @@ const formatCurrency = (value: number) => {
                 </div>
 
                 <!-- Top Products Chart -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800 md:col-span-2 lg:col-span-1">
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card md:col-span-2 lg:col-span-1">
                     <div class="h-80">
                         <TopProductsChart
                             :products="stockLevelsReport.products"
@@ -241,7 +250,7 @@ const formatCurrency = (value: number) => {
             </div>
 
             <!-- Filters -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Filtros</h2>
                 <div class="grid gap-4 md:grid-cols-4 lg:grid-cols-5 items-end">
                     <!-- Warehouse -->
@@ -249,7 +258,7 @@ const formatCurrency = (value: number) => {
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Almacén</label>
                         <select
                             v-model="filters.warehouse_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="null">Todos los almacenes</option>
                             <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
@@ -263,7 +272,7 @@ const formatCurrency = (value: number) => {
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Marca</label>
                         <select
                             v-model="filters.brand_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="null">Todas las marcas</option>
                             <option v-for="brand in brands" :key="brand.id" :value="brand.id">
@@ -277,7 +286,7 @@ const formatCurrency = (value: number) => {
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Categoría</label>
                         <select
                             v-model="filters.category_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="null">Todas las categorías</option>
                             <option v-for="category in categories" :key="category.id" :value="category.id">
@@ -291,7 +300,7 @@ const formatCurrency = (value: number) => {
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Estado</label>
                         <select
                             v-model="filters.status"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="null">Todos los estados</option>
                             <option value="critical">Crítico</option>
@@ -304,7 +313,7 @@ const formatCurrency = (value: number) => {
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                            class="flex-1 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                         >
                             Aplicar
                         </button>
@@ -319,10 +328,10 @@ const formatCurrency = (value: number) => {
             </div>
 
             <!-- Products Table -->
-            <div v-if="stockLevelsReport" class="rounded-lg bg-white shadow dark:bg-gray-800">
+            <div v-if="stockLevelsReport" class="rounded-lg bg-white shadow dark:bg-card">
                 <div class="overflow-x-auto">
                     <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
+                        <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">SKU</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Producto</th>
@@ -334,8 +343,8 @@ const formatCurrency = (value: number) => {
                                 <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Valor</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr v-for="product in stockLevelsReport.products" :key="`${product.id}-${product.warehouse_id}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <tbody class="divide-y divide-gray-200 dark:divide-border">
+                            <tr v-for="product in stockLevelsReport.products" :key="`${product.id}-${product.warehouse_id}`" class="hover:bg-gray-50 dark:hover:bg-muted/50">
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ product.sku }}</td>
                                 <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{{ product.name }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ product.brand || '-' }}</td>

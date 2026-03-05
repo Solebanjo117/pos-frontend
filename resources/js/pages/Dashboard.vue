@@ -78,7 +78,7 @@ const navigateTo = (path: string) => {
                 <!-- Stats Cards -->
                 <div class="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
                     <!-- Ventas del Día -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Ventas del Día</p>
@@ -86,8 +86,8 @@ const navigateTo = (path: string) => {
                                     ${{ stats.today_sales.toLocaleString('es-MX', { minimumFractionDigits: 2 }) }}
                                 </p>
                             </div>
-                            <div class="rounded-full bg-green-100 p-3 dark:bg-green-900">
-                                <svg class="h-8 w-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="rounded-full bg-green-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
+                                <svg class="h-8 w-8 text-green-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                             </div>
@@ -95,7 +95,7 @@ const navigateTo = (path: string) => {
                     </div>
 
                     <!-- Utilidad del Día -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Utilidad del Día</p>
@@ -106,8 +106,8 @@ const navigateTo = (path: string) => {
                                     {{ stats.today_sales > 0 ? ((stats.today_profit / stats.today_sales) * 100).toFixed(1) + '% margen' : '—' }}
                                 </p>
                             </div>
-                            <div class="rounded-full bg-emerald-100 p-3 dark:bg-emerald-900">
-                                <svg class="h-8 w-8 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="rounded-full bg-emerald-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
+                                <svg class="h-8 w-8 text-emerald-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                                 </svg>
                             </div>
@@ -115,14 +115,14 @@ const navigateTo = (path: string) => {
                     </div>
 
                     <!-- Órdenes Pendientes -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Órdenes Pendientes</p>
                                 <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.pending_orders }}</p>
                             </div>
-                            <div class="rounded-full bg-blue-100 p-3 dark:bg-blue-900">
-                                <svg class="h-8 w-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="rounded-full bg-blue-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
+                                <svg class="h-8 w-8 text-blue-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                                 </svg>
                             </div>
@@ -130,14 +130,14 @@ const navigateTo = (path: string) => {
                     </div>
 
                     <!-- Stock Bajo -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Stock Bajo</p>
                                 <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.low_stock_items }}</p>
                             </div>
-                            <div class="rounded-full bg-yellow-100 p-3 dark:bg-yellow-900">
-                                <svg class="h-8 w-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="rounded-full bg-yellow-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
+                                <svg class="h-8 w-8 text-yellow-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                                 </svg>
                             </div>
@@ -145,14 +145,14 @@ const navigateTo = (path: string) => {
                     </div>
 
                     <!-- Alertas -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Alertas Activas</p>
                                 <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.active_alerts }}</p>
                             </div>
-                            <div class="rounded-full bg-red-100 p-3 dark:bg-red-900">
-                                <svg class="h-8 w-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="rounded-full bg-red-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
+                                <svg class="h-8 w-8 text-red-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                 </svg>
                             </div>
@@ -160,7 +160,7 @@ const navigateTo = (path: string) => {
                     </div>
 
                     <!-- Inventario Valorado -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Valor Inventario</p>
@@ -168,8 +168,8 @@ const navigateTo = (path: string) => {
                                     ${{ (stats.total_inventory_value || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) }}
                                 </p>
                             </div>
-                            <div class="rounded-full bg-indigo-100 p-3 dark:bg-indigo-900">
-                                <svg class="h-8 w-8 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="rounded-full bg-indigo-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
+                                <svg class="h-8 w-8 text-indigo-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                 </svg>
                             </div>
@@ -178,7 +178,7 @@ const navigateTo = (path: string) => {
                 </div>
 
                 <!-- Sales Chart Section -->
-                <div class="mb-8 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <div class="mb-8 rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="mb-4 flex items-center justify-between">
                         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Tendencia de Ventas</h2>
                         <div class="flex gap-2">
@@ -189,8 +189,8 @@ const navigateTo = (path: string) => {
                                 :class="[
                                     'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
                                     selectedPeriod === option.value
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                                        ? 'bg-blue-600 dark:bg-primary text-white dark:text-primary-foreground'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted/80'
                                 ]"
                             >
                                 {{ option.label }}
@@ -205,7 +205,7 @@ const navigateTo = (path: string) => {
                 <!-- Secondary Charts Grid -->
                 <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <!-- Categorías Doughnut -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Ventas por Categoría</h2>
                         <div class="h-64">
                             <CategorySalesChart :data="salesByCategory || []" />
@@ -213,7 +213,7 @@ const navigateTo = (path: string) => {
                     </div>
                     
                     <!-- Mejores Cajeros -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Desempeño del Personal</h2>
                         <TopCashiers :cashiers="topCashiers || []" />
                     </div>
@@ -222,7 +222,7 @@ const navigateTo = (path: string) => {
                 <!-- Content Grid -->
                 <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <!-- Productos Más Vendidos -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Productos Más Vendidos</h2>
                         <div class="space-y-3">
                             <div v-for="(product, index) in topProducts" :key="index" class="flex items-center justify-between">
@@ -238,14 +238,14 @@ const navigateTo = (path: string) => {
                     </div>
                     
                     <!-- Actividad Reciente -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Actividad Reciente</h2>
                         <RecentActivityFeed :activities="recentActivity || []" />
                     </div>
 
                     <div class="flex flex-col gap-6">
                         <!-- Stock Bajo -->
-                        <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                        <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                             <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Stock Bajo</h2>
                             <div class="space-y-3">
                                 <div v-for="(product, index) in lowStockProducts" :key="index" class="flex items-center justify-between">
@@ -264,47 +264,47 @@ const navigateTo = (path: string) => {
                         </div>
     
                         <!-- Accesos Rápidos -->
-                        <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                        <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                             <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Accesos Rápidos</h2>
                             <div class="grid grid-cols-2 gap-3">
-                                <button @click="navigateTo('/products/create')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-blue-500 hover:bg-blue-50 dark:border-gray-700 dark:hover:border-blue-500 dark:hover:bg-gray-700">
-                                    <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <button @click="navigateTo('/products/create')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-primary hover:bg-primary/10 dark:border-border dark:hover:border-primary dark:hover:bg-primary/10">
+                                    <svg class="h-6 w-6 text-blue-600 dark:text-primary mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                                     </svg>
                                     <span class="mt-2 text-xs font-medium text-gray-900 dark:text-white">Nuevo</span>
                                 </button>
     
-                                <button @click="navigateTo('/products')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-blue-500 hover:bg-blue-50 dark:border-gray-700 dark:hover:border-blue-500 dark:hover:bg-gray-700">
-                                    <svg class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <button @click="navigateTo('/products')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-green-500 hover:bg-green-50 dark:border-border dark:hover:border-primary dark:hover:bg-primary/10">
+                                    <svg class="h-6 w-6 text-green-600 dark:text-primary mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                                     </svg>
                                     <span class="mt-2 text-xs font-medium text-gray-900 dark:text-white">Buscar</span>
                                 </button>
     
-                                <button @click="navigateTo('/inventory')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-blue-500 hover:bg-blue-50 dark:border-gray-700 dark:hover:border-blue-500 dark:hover:bg-gray-700">
-                                    <svg class="h-6 w-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <button @click="navigateTo('/inventory')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-purple-500 hover:bg-purple-50 dark:border-border dark:hover:border-primary dark:hover:bg-primary/10">
+                                    <svg class="h-6 w-6 text-purple-600 dark:text-primary mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                                     </svg>
                                     <span class="mt-2 text-xs font-medium text-gray-900 dark:text-white">Stock</span>
                                 </button>
     
-                                <button class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 opacity-50 cursor-not-allowed dark:border-gray-700">
+                                <button class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 opacity-50 cursor-not-allowed dark:border-border">
                                     <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                                     </svg>
-                                    <span class="mt-2 text-xs font-medium text-gray-400">POS</span>
+                                    <span class="mt-2 text-xs font-medium text-gray-400 opacity-50">POS</span>
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
                     <!-- Rentabilidad por Marca -->
-                    <div v-if="profitByBrand.length > 0" class="lg:col-span-3 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                    <div v-if="profitByBrand.length > 0" class="lg:col-span-3 rounded-lg bg-white p-6 shadow dark:bg-card">
                         <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Rentabilidad por Marca</h2>
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
                                 <thead>
-                                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                                    <tr class="border-b border-gray-200 dark:border-border">
                                         <th class="py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Marca</th>
                                         <th class="py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Ingresos</th>
                                         <th class="py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Costo</th>
@@ -314,7 +314,7 @@ const navigateTo = (path: string) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="(brand, idx) in profitByBrand" :key="idx" class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                    <tr v-for="(brand, idx) in profitByBrand" :key="idx" class="border-b border-gray-100 dark:border-border/50 hover:bg-gray-50 dark:hover:bg-muted/50">
                                         <td class="py-3 font-medium text-gray-900 dark:text-white">{{ brand.brand }}</td>
                                         <td class="py-3 text-right text-gray-700 dark:text-gray-300">${{ brand.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</td>
                                         <td class="py-3 text-right text-gray-500 dark:text-gray-400">${{ brand.cost.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</td>

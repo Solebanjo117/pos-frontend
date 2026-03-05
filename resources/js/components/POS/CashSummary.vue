@@ -45,7 +45,7 @@ const formatCurrency = (value: number) => {
             <!-- Efectivo Esperado -->
             <div class="flex flex-col">
                 <span class="text-xs text-gray-500 mb-1">Efectivo Esperado</span>
-                <span class="text-lg font-bold text-blue-600">
+                <span class="text-lg font-bold text-blue-600 dark:text-primary">
                     {{ formatCurrency(summary?.expected_cash ?? 0) }}
                 </span>
             </div>

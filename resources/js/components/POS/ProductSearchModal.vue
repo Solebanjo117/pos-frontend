@@ -117,10 +117,10 @@ const submitSelection = () => {
           v-if="show"
           ref="modalRef"
           tabindex="-1"
-          class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden outline-none ring-1 ring-gray-200 dark:ring-gray-700"
+          class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden outline-none ring-1 ring-gray-200 dark:ring-gray-700"
         >
           <!-- ═══════════ HEADER (sticky) ═══════════ -->
-          <div class="shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+          <div class="shrink-0 px-6 py-4 border-b border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card">
             <div>
               <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <Search class="w-5 h-5 text-indigo-500" />
@@ -133,7 +133,7 @@ const submitSelection = () => {
             </div>
             <button
               @click="emit('close')"
-              class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors"
             >
               <X class="h-5 w-5" />
             </button>
@@ -150,7 +150,7 @@ const submitSelection = () => {
 
             <table v-else class="w-full text-left">
               <!-- Table Header -->
-              <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-gray-700">
+              <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-border">
                 <tr>
                   <th class="w-12 px-4 py-3 text-center">
                     <input
@@ -158,7 +158,7 @@ const submitSelection = () => {
                       :checked="allSelected"
                       :indeterminate="selectedCount > 0 && !allSelected"
                       @change="toggleAll"
-                      class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      class="h-4 w-4 rounded border-gray-300 text-indigo-600 dark:text-primary focus:ring-indigo-500 cursor-pointer"
                     />
                   </th>
                   <th class="w-14 px-2 py-3"></th>
@@ -170,7 +170,7 @@ const submitSelection = () => {
               </thead>
 
               <!-- Table Body -->
-              <tbody class="divide-y divide-gray-100 dark:divide-gray-700/50">
+              <tbody class="divide-y divide-gray-100 dark:divide-border/50">
                 <tr
                   v-for="product in products"
                   :key="product.id"
@@ -178,7 +178,7 @@ const submitSelection = () => {
                   class="group cursor-pointer transition-colors"
                   :class="isSelected(product.id)
                     ? 'bg-indigo-50/70 dark:bg-indigo-900/15 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/25'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'"
+                    : 'hover:bg-gray-50 dark:hover:bg-muted/50/30'"
                 >
                   <!-- Checkbox -->
                   <td class="px-4 py-3 text-center">
@@ -187,13 +187,13 @@ const submitSelection = () => {
                       :checked="isSelected(product.id)"
                       @click.stop
                       @change="toggleProduct(product.id)"
-                      class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      class="h-4 w-4 rounded border-gray-300 text-indigo-600 dark:text-primary focus:ring-indigo-500 cursor-pointer"
                     />
                   </td>
 
                   <!-- Image Thumbnail -->
                   <td class="px-2 py-3">
-                    <div class="h-10 w-10 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+                    <div class="h-10 w-10 bg-gray-100 dark:bg-muted rounded-lg overflow-hidden flex-shrink-0">
                       <img
                         v-if="product.image_url"
                         :src="product.image_url"
@@ -218,7 +218,7 @@ const submitSelection = () => {
 
                   <!-- SKU -->
                   <td class="px-3 py-3">
-                    <span class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                    <span class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-muted px-1.5 py-0.5 rounded">
                       {{ getSKU(product) }}
                     </span>
                   </td>
@@ -247,15 +247,15 @@ const submitSelection = () => {
           </div>
 
           <!-- ═══════════ FOOTER (sticky) ═══════════ -->
-          <div class="shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+          <div class="shrink-0 px-6 py-4 border-t border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card">
             <span class="text-sm text-gray-500">
-              <span class="font-semibold text-indigo-600">{{ selectedCount }}</span>
+              <span class="font-semibold text-indigo-600 dark:text-primary">{{ selectedCount }}</span>
               seleccionado{{ selectedCount !== 1 ? 's' : '' }}
             </span>
             <div class="flex gap-3">
               <button
                 @click="emit('close')"
-                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-border rounded-xl hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors"
               >
                 Cancelar
               </button>
@@ -264,7 +264,7 @@ const submitSelection = () => {
                 :disabled="selectedCount === 0"
                 class="px-6 py-2 text-sm font-bold text-white rounded-xl transition-all"
                 :class="selectedCount > 0
-                  ? 'bg-indigo-600 hover:bg-indigo-700 shadow-sm hover:shadow-md'
+                  ? 'bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 shadow-sm hover:shadow-md'
                   : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed opacity-50'"
               >
                 Agregar ({{ selectedCount }})

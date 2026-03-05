@@ -37,7 +37,7 @@ const colorMap = {
     },
     info: {
         container: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
-        icon: 'text-blue-600 dark:text-blue-400',
+        icon: 'text-blue-600 dark:text-primary dark:text-blue-400',
         text: 'text-blue-800 dark:text-blue-200',
     },
 }

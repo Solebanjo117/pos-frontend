@@ -123,7 +123,7 @@ const submit = async () => {
             </div>
 
             <!-- Warehouses Selection -->
-            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <Building2 :size="20" class="text-indigo-500" />
                     Almacenes
@@ -131,14 +131,14 @@ const submit = async () => {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Almacén Origen</label>
-                        <select v-model="fromWarehouseId" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
+                        <select v-model="fromWarehouseId" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200">
                             <option :value="null" disabled>Seleccionar...</option>
                             <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Almacén Destino</label>
-                        <select v-model="toWarehouseId" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
+                        <select v-model="toWarehouseId" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200">
                             <option :value="null" disabled>Seleccionar...</option>
                             <option v-for="w in availableDestinations" :key="w.id" :value="w.id">{{ w.name }}</option>
                         </select>
@@ -147,12 +147,12 @@ const submit = async () => {
                 <div class="mt-4">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notas (opcional)</label>
                     <input v-model="notes" type="text" placeholder="Ej: Reabastecimiento semanal Monterrey"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200" />
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200" />
                 </div>
             </div>
 
             <!-- Product Search -->
-            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-card dark:ring-gray-700">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Agregar Productos</h3>
                 <div class="relative">
                     <Search :size="16" class="absolute left-3 top-2.5 text-gray-400" />
@@ -161,21 +161,21 @@ const submit = async () => {
                         @input="searchProducts"
                         type="text"
                         placeholder="Buscar por nombre o SKU..."
-                        class="w-full pl-9 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                        class="w-full pl-9 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200"
                     />
                     <!-- Results -->
-                    <div v-if="searchResults.length > 0" class="absolute z-10 mt-1 w-full rounded-lg bg-white border border-gray-200 shadow-lg dark:bg-gray-800 dark:border-gray-600 max-h-60 overflow-y-auto">
+                    <div v-if="searchResults.length > 0" class="absolute z-10 mt-1 w-full rounded-lg bg-white border border-gray-200 shadow-lg dark:bg-card dark:border-border max-h-60 overflow-y-auto">
                         <div v-for="p in searchResults" :key="p.id">
                             <template v-if="p.variants && p.variants.length > 0">
                                 <button v-for="v in p.variants" :key="v.id"
                                     @click="addItem(p, v)"
-                                    class="w-full text-left px-4 py-2 hover:bg-indigo-50 dark:hover:bg-gray-700 text-sm border-b border-gray-100 dark:border-gray-700">
+                                    class="w-full text-left px-4 py-2 hover:bg-indigo-50 dark:hover:bg-muted/50 text-sm border-b border-gray-100 dark:border-border">
                                     <span class="font-medium">{{ p.name }}</span>
                                     <span class="text-gray-500 ml-2">{{ v.sku }}</span>
                                 </button>
                             </template>
                             <button v-else @click="addItem(p)"
-                                class="w-full text-left px-4 py-2 hover:bg-indigo-50 dark:hover:bg-gray-700 text-sm border-b border-gray-100 dark:border-gray-700">
+                                class="w-full text-left px-4 py-2 hover:bg-indigo-50 dark:hover:bg-muted/50 text-sm border-b border-gray-100 dark:border-border">
                                 <span class="font-medium">{{ p.name }}</span>
                                 <span class="text-gray-500 ml-2">{{ p.sku }}</span>
                             </button>
@@ -186,7 +186,7 @@ const submit = async () => {
                 <!-- Items Table -->
                 <div v-if="items.length > 0" class="mt-4">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <thead class="bg-gray-50 dark:bg-muted/50">
                             <tr>
                                 <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Producto</th>
                                 <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">SKU</th>
@@ -194,13 +194,13 @@ const submit = async () => {
                                 <th class="px-3 py-2 text-center font-medium text-gray-600 dark:text-gray-300"></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        <tbody class="divide-y divide-gray-100 dark:divide-border">
                             <tr v-for="(item, idx) in items" :key="idx">
                                 <td class="px-3 py-2">{{ item.product_name }}</td>
                                 <td class="px-3 py-2 font-mono text-xs text-gray-500">{{ item.variant_sku }}</td>
                                 <td class="px-3 py-2 text-center">
                                     <input v-model.number="item.quantity" type="number" min="1"
-                                        class="w-20 text-center rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200" />
+                                        class="w-20 text-center rounded border border-gray-300 px-2 py-1 text-sm dark:border-border dark:bg-muted dark:text-gray-200" />
                                 </td>
                                 <td class="px-3 py-2 text-center">
                                     <button @click="removeItem(idx)" class="text-red-500 hover:text-red-700">
@@ -220,11 +220,11 @@ const submit = async () => {
 
             <!-- Submit -->
             <div class="flex justify-end gap-3">
-                <a href="/inventory-transfers" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300">
+                <a href="/inventory-transfers" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300">
                     Cancelar
                 </a>
                 <button @click="submit" :disabled="submitting"
-                    class="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition-colors">
+                    class="flex items-center gap-2 rounded-lg bg-indigo-600 dark:bg-primary dark:text-primary-foreground px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-50 shadow-sm transition-colors">
                     <Plus :size="16" />
                     {{ submitting ? 'Creando...' : 'Crear Transferencia (Borrador)' }}
                 </button>

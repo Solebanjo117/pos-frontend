@@ -122,7 +122,7 @@ const refundMethodColor = (method: string, color: string) => {
     if (refundMethod.value === method) {
         return `border-${color}-400 bg-${color}-50 dark:bg-${color}-900/20 dark:border-${color}-600`
     }
-    return 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+    return 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-muted/50/50'
 }
 </script>
 
@@ -153,10 +153,10 @@ const refundMethodColor = (method: string, color: string) => {
                 >
                     <div
                         v-if="show"
-                        class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col ring-1 ring-gray-200 dark:ring-gray-700"
+                        class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col ring-1 ring-gray-200 dark:ring-gray-700"
                     >
                         <!-- ═══════════ HEADER ═══════════ -->
-                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-border shrink-0">
                             <div class="flex items-center gap-3">
                                 <div class="p-2 bg-red-100 dark:bg-red-900/30 rounded-xl">
                                     <RotateCcw class="w-5 h-5 text-red-600 dark:text-red-400" />
@@ -168,7 +168,7 @@ const refundMethodColor = (method: string, color: string) => {
                                     </p>
                                 </div>
                             </div>
-                            <button @click="emit('close')" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                            <button @click="emit('close')" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors">
                                 <X class="w-5 h-5" />
                             </button>
                         </div>
@@ -186,9 +186,9 @@ const refundMethodColor = (method: string, color: string) => {
                                 <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
                                     Seleccione las cantidades a devolver
                                 </label>
-                                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-border">
                                     <table class="w-full text-left">
-                                        <thead class="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                                        <thead class="bg-gray-50 dark:bg-background/50 border-b border-gray-200 dark:border-border">
                                             <tr>
                                                 <th class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Producto</th>
                                                 <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">SKU</th>
@@ -197,14 +197,14 @@ const refundMethodColor = (method: string, color: string) => {
                                                 <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Devuelve</th>
                                             </tr>
                                         </thead>
-                                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700/50">
+                                        <tbody class="divide-y divide-gray-100 dark:divide-border/50">
                                             <tr
                                                 v-for="item in items"
                                                 :key="item.id"
                                                 class="transition-colors"
                                                 :class="(quantities[item.id] ?? 0) > 0
                                                     ? 'bg-red-50/50 dark:bg-red-900/10'
-                                                    : 'bg-white dark:bg-gray-800'"
+                                                    : 'bg-white dark:bg-card'"
                                             >
                                                 <!-- Product name -->
                                                 <td class="px-4 py-3">
@@ -219,7 +219,7 @@ const refundMethodColor = (method: string, color: string) => {
 
                                                 <!-- SKU -->
                                                 <td class="px-3 py-3">
-                                                    <span class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                                                    <span class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-muted px-1.5 py-0.5 rounded">
                                                         {{ item.product_sku || '—' }}
                                                     </span>
                                                 </td>
@@ -238,7 +238,7 @@ const refundMethodColor = (method: string, color: string) => {
                                                             type="number"
                                                             min="0"
                                                             :max="item.quantity"
-                                                            class="w-16 px-2 py-1.5 text-center text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                                            class="w-16 px-2 py-1.5 text-center text-sm font-bold rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
                                                         />
                                                         <span class="text-xs text-gray-400">/ {{ item.quantity }}</span>
                                                     </div>
@@ -249,7 +249,7 @@ const refundMethodColor = (method: string, color: string) => {
                                                     <div class="relative">
                                                         <select
                                                             v-model="returnUsers[item.id]"
-                                                            class="w-full appearance-none text-sm pl-3 pr-8 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent cursor-pointer"
+                                                            class="w-full appearance-none text-sm pl-3 pr-8 py-1.5 rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent cursor-pointer"
                                                         >
                                                             <option :value="null">— Sin asignar —</option>
                                                             <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
@@ -270,7 +270,7 @@ const refundMethodColor = (method: string, color: string) => {
                                     v-model="reason"
                                     type="text"
                                     placeholder="Ej: Producto defectuoso, error de envío, etc."
-                                    class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white"
                                 />
                             </div>
 
@@ -284,7 +284,7 @@ const refundMethodColor = (method: string, color: string) => {
                                         class="flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors"
                                         :class="refundMethod === m.value
                                             ? `border-${m.color}-400 bg-${m.color}-50 dark:bg-${m.color}-900/20 dark:border-${m.color}-600`
-                                            : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'"
+                                            : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-muted/50/50'"
                                     >
                                         <input type="radio" v-model="refundMethod" :value="m.value" class="sr-only" />
                                         <component :is="m.icon" class="w-5 h-5" :class="`text-${m.color}-600 dark:text-${m.color}-400`" />
@@ -308,7 +308,7 @@ const refundMethodColor = (method: string, color: string) => {
                         </div>
 
                         <!-- ═══════════ FOOTER ═══════════ -->
-                        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+                        <div class="px-6 py-4 border-t border-gray-200 dark:border-border shrink-0">
                             <button
                                 @click="handleSubmit"
                                 :disabled="!hasSelectedItems || loading"

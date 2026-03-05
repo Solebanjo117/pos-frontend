@@ -4,12 +4,13 @@ export interface PurchaseOrderItem {
     id: number
     purchase_order_id: number
     product_id: number
+    variant_id?: number
     product?: {
         id: number
-        sku: string
+        sku_base: string
         name: string
         brand?: { id: number; name: string }
-        pricing?: { id: number; cost: number; sell_price: number }
+        pricing?: { id: number; cost: number; base_price: number }
     }
     quantity_ordered: number
     quantity_received: number
@@ -22,6 +23,8 @@ export interface PurchaseOrderItem {
     updated_at: string
 }
 
+export type PurchaseOrderPaymentStatus = 'pending' | 'partial' | 'paid'
+
 export interface PurchaseOrder {
     id: number
     po_number: string
@@ -33,6 +36,8 @@ export interface PurchaseOrder {
     user?: { id: number; name: string }
     status: PurchaseOrderStatus
     status_label: string
+    payment_status: PurchaseOrderPaymentStatus
+    payment_status_label: string
     order_date: string
     expected_date?: string
     received_date?: string
@@ -41,6 +46,8 @@ export interface PurchaseOrder {
     shipping_cost: number
     total: number
     formatted_total: string
+    amount_paid: number
+    amount_due: number
     notes?: string
     items: PurchaseOrderItem[]
     items_count?: number
@@ -53,6 +60,7 @@ export interface PurchaseOrderFilters {
     search?: string
     status?: PurchaseOrderStatus
     supplier_id?: number
+    payment_status?: PurchaseOrderPaymentStatus | string
     date_from?: string
     date_to?: string
     sort_by?: string
@@ -69,6 +77,8 @@ export interface PurchaseOrderStatistics {
     received_orders: number
     cancelled_orders: number
     average_order_value: number
+    total_unpaid: number
+    pending_payment_orders: number
 }
 
 export interface CreatePurchaseOrderData {

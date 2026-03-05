@@ -58,7 +58,7 @@ const goBack = () => {
     <div class="flex items-center gap-4 mb-6">
       <button
         @click="goBack"
-        class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+        class="p-2 hover:bg-gray-100 dark:hover:bg-muted/50 rounded-lg transition"
         title="Volver"
       >
         <ArrowLeft :size="24" />
@@ -75,7 +75,7 @@ const goBack = () => {
     </div>
 
     <!-- Form -->
-    <form @submit.prevent="handleSubmit" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+    <form @submit.prevent="handleSubmit" class="bg-white dark:bg-card rounded-lg shadow-sm p-6">
       <!-- Type Selection -->
       <div class="mb-6">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Tipo de Cliente *</label>
@@ -85,7 +85,7 @@ const goBack = () => {
             :class="
               form.type === 'individual'
                 ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                : 'border-gray-300 dark:border-border hover:border-gray-400 dark:hover:border-gray-500'
             "
           >
             <input
@@ -94,7 +94,7 @@ const goBack = () => {
               value="individual"
               class="sr-only"
             />
-            <User :size="24" :class="form.type === 'individual' ? 'text-indigo-600' : 'text-gray-400'" />
+            <User :size="24" :class="form.type === 'individual' ? 'text-indigo-600 dark:text-primary' : 'text-gray-400'" />
             <div>
               <div class="font-medium text-gray-900 dark:text-gray-100">Individual</div>
               <div class="text-sm text-gray-500 dark:text-gray-400">Persona física</div>
@@ -115,7 +115,7 @@ const goBack = () => {
               value="business"
               class="sr-only"
             />
-            <Building2 :size="24" :class="form.type === 'business' ? 'text-indigo-600' : 'text-gray-400'" />
+            <Building2 :size="24" :class="form.type === 'business' ? 'text-indigo-600 dark:text-primary' : 'text-gray-400'" />
             <div>
               <div class="font-medium text-gray-900 dark:text-gray-100">Empresa</div>
               <div class="text-sm text-gray-500 dark:text-gray-400">Persona moral</div>
@@ -134,7 +134,7 @@ const goBack = () => {
               v-model="form.name"
               type="text"
               required
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-muted dark:text-gray-100"
               placeholder="Nombre del cliente"
             />
           </div>
@@ -325,18 +325,18 @@ const goBack = () => {
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-border">
         <button
           type="button"
           @click="goBack"
-          class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+          class="px-6 py-2 border border-gray-300 dark:border-border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-muted/50 transition"
           :disabled="loading"
         >
           Cancelar
         </button>
         <button
           type="submit"
-          class="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+          class="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-primary/90 transition disabled:opacity-50"
           :disabled="loading"
         >
           <Save :size="20" />

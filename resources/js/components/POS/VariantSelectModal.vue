@@ -83,10 +83,10 @@ const brandColor = (name: string): string => {
                         v-if="show && product"
                         ref="modalRef"
                         tabindex="-1"
-                        class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden outline-none ring-1 ring-gray-200 dark:ring-gray-700"
+                        class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden outline-none ring-1 ring-gray-200 dark:ring-gray-700"
                     >
                         <!-- ═══════════ HEADER ═══════════ -->
-                        <div class="shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+                        <div class="shrink-0 px-6 py-4 border-b border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card">
                             <div>
                                 <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <Layers class="w-5 h-5 text-indigo-500" />
@@ -99,7 +99,7 @@ const brandColor = (name: string): string => {
                             </div>
                             <button
                                 @click="emit('close')"
-                                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors"
                             >
                                 <X class="h-5 w-5" />
                             </button>
@@ -114,7 +114,7 @@ const brandColor = (name: string): string => {
                             </div>
 
                             <table v-else class="w-full text-left">
-                                <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-gray-700">
+                                <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-border">
                                     <tr>
                                         <th class="px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Marca</th>
                                         <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">SKU</th>
@@ -123,7 +123,7 @@ const brandColor = (name: string): string => {
                                         <th class="w-14 px-3 py-3"></th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700/50">
+                                <tbody class="divide-y divide-gray-100 dark:divide-border/50">
                                     <tr
                                         v-for="variant in variants"
                                         :key="variant.id"
@@ -141,7 +141,7 @@ const brandColor = (name: string): string => {
                                                         {{ (variant.brand?.name ?? '?').slice(0, 2) }}
                                                     </span>
                                                 </div>
-                                                <span class="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                                <span class="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:text-primary dark:group-hover:text-indigo-400 transition-colors">
                                                     {{ variant.brand?.name ?? 'Sin marca' }}
                                                 </span>
                                             </div>
@@ -149,7 +149,7 @@ const brandColor = (name: string): string => {
 
                                         <!-- SKU -->
                                         <td class="px-3 py-4">
-                                            <span class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                                            <span class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-muted px-1.5 py-0.5 rounded">
                                                 {{ variant.sku ?? '—' }}
                                             </span>
                                         </td>
@@ -185,11 +185,11 @@ const brandColor = (name: string): string => {
                         </div>
 
                         <!-- ═══════════ FOOTER ═══════════ -->
-                        <div class="shrink-0 px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
+                        <div class="shrink-0 px-6 py-3 border-t border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card">
                             <p class="text-xs text-gray-400">Haz clic en una variante para agregarla al carrito</p>
                             <button
                                 @click="emit('close')"
-                                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-border rounded-xl hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors"
                             >
                                 Cancelar
                             </button>

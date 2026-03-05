@@ -192,7 +192,7 @@ onMounted(async () => {
     <div class="flex items-center gap-4">
       <button
         @click="router.visit(`/sales-orders/${props.id}`)"
-        class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+        class="p-2 hover:bg-gray-100 dark:hover:bg-muted/50 rounded-lg"
       >
         <ArrowLeft :size="24" />
       </button>
@@ -215,7 +215,7 @@ onMounted(async () => {
 
     <form v-if="currentSalesOrder" @submit.prevent="handleSubmit" class="space-y-6">
       <!-- General Info -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-6">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Información General</h2>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -224,7 +224,7 @@ onMounted(async () => {
             <select
               v-model="form.customer_id"
               :disabled="!canEdit"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white disabled:opacity-50"
             >
               <option :value="undefined">Sin cliente</option>
               <option v-for="customer in customers" :key="customer.id" :value="customer.id">
@@ -239,7 +239,7 @@ onMounted(async () => {
               v-model="form.date"
               type="date"
               :disabled="!canEdit"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white disabled:opacity-50"
             />
           </div>
         </div>
@@ -250,13 +250,13 @@ onMounted(async () => {
             v-model="form.notes"
             rows="2"
             :disabled="!canEdit"
-            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50"
+            class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white disabled:opacity-50"
           />
         </div>
       </div>
 
       <!-- Add Items (only if can edit) -->
-      <div v-if="canEdit" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div v-if="canEdit" class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-6">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Agregar Productos</h2>
         
         <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -266,15 +266,15 @@ onMounted(async () => {
               v-model="productSearch"
               type="text"
               placeholder="Buscar producto..."
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
             />
-            <div v-if="productSearch && filteredProducts.length > 0" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            <div v-if="productSearch && filteredProducts.length > 0" class="absolute z-10 w-full mt-1 bg-white dark:bg-muted border border-gray-200 dark:border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
               <button
                 v-for="product in filteredProducts"
                 :key="product.id"
                 type="button"
                 @click="selectProduct(product)"
-                class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600"
+                class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-muted"
               >
                 <div class="font-medium text-gray-900 dark:text-white">{{ product.name }}</div>
                 <div class="text-sm text-gray-500 dark:text-gray-400">{{ product.sku }} - ${{ product.price }}</div>
@@ -286,7 +286,7 @@ onMounted(async () => {
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Almacén</label>
             <select
               v-model="newItem.warehouse_id"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
             >
               <option :value="0">Seleccionar...</option>
               <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
@@ -301,7 +301,7 @@ onMounted(async () => {
               v-model.number="newItem.quantity"
               type="number"
               min="1"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
             />
           </div>
 
@@ -311,7 +311,7 @@ onMounted(async () => {
               v-model.number="newItem.unit_price"
               type="number"
               step="0.01"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
             />
           </div>
 
@@ -319,7 +319,7 @@ onMounted(async () => {
             <button
               type="button"
               @click="addItem"
-              class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center gap-2"
+              class="w-full px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg flex items-center justify-center gap-2"
             >
               <Plus :size="18" />
               Agregar
@@ -329,14 +329,14 @@ onMounted(async () => {
       </div>
 
       <!-- Items Table -->
-      <div v-if="form.items && form.items.length > 0" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div v-if="form.items && form.items.length > 0" class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-border">
           <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Productos ({{ form.items.length }})</h2>
         </div>
 
         <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-900">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+            <thead class="bg-gray-50 dark:bg-background">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Producto</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Almacén</th>
@@ -347,7 +347,7 @@ onMounted(async () => {
                 <th v-if="canEdit" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acción</th>
               </tr>
             </thead>
-            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody class="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
               <tr v-for="(item, index) in form.items" :key="index">
                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
                   {{ products.find(p => p.id === item.product_id)?.name || 'Producto' }}
@@ -359,7 +359,7 @@ onMounted(async () => {
                   <select
                     v-model="item.seller_id"
                     :disabled="!canEdit"
-                    class="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50"
+                    class="w-full px-2 py-1 text-sm border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white disabled:opacity-50"
                   >
                     <option :value="undefined">—</option>
                     <option v-for="user in users" :key="user.id" :value="user.id">
@@ -387,7 +387,7 @@ onMounted(async () => {
         </div>
 
         <!-- Totals -->
-        <div class="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-gray-50 dark:bg-gray-900">
+        <div class="border-t border-gray-200 dark:border-border px-6 py-4 bg-gray-50 dark:bg-background">
           <div class="max-w-md ml-auto space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-gray-600 dark:text-gray-400">Subtotal:</span>
@@ -406,7 +406,7 @@ onMounted(async () => {
                 step="0.01"
                 min="0"
                 :disabled="!canEdit"
-                class="w-32 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-right disabled:opacity-50"
+                class="w-32 px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white text-right disabled:opacity-50"
               />
             </div>
             
@@ -418,11 +418,11 @@ onMounted(async () => {
                 step="0.01"
                 min="0"
                 :disabled="!canEdit"
-                class="w-32 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-right disabled:opacity-50"
+                class="w-32 px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white text-right disabled:opacity-50"
               />
             </div>
             
-            <div class="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-gray-700 pt-2">
+            <div class="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-border pt-2">
               <span class="text-gray-900 dark:text-white">Total:</span>
               <span class="text-gray-900 dark:text-white">${{ orderTotal.toFixed(2) }}</span>
             </div>
@@ -435,7 +435,7 @@ onMounted(async () => {
         <button
           type="button"
           @click="router.visit(`/sales-orders/${props.id}`)"
-          class="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+          class="px-6 py-2 border border-gray-300 dark:border-border text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-muted/50"
         >
           Cancelar
         </button>
@@ -443,7 +443,7 @@ onMounted(async () => {
           v-if="canEdit"
           type="submit"
           :disabled="loading || !form.items || form.items.length === 0"
-          class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg flex items-center gap-2"
+          class="px-6 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:bg-gray-400 text-white rounded-lg flex items-center gap-2"
         >
           <Save :size="18" />
           {{ loading ? 'Guardando...' : 'Actualizar Orden' }}

@@ -158,9 +158,9 @@ const handlePrint = () => {
     <!-- Backdrop -->
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="emit('close')">
         <!-- Modal Container -->
-        <div class="relative mx-4 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-gray-800 print:shadow-none print:max-w-none print:max-h-none print:overflow-visible print:rounded-none print:m-0">
+        <div class="relative mx-4 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-card print:shadow-none print:max-w-none print:max-h-none print:overflow-visible print:rounded-none print:m-0">
             <!-- Header (hidden on print) -->
-            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95 print:hidden">
+            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur-sm dark:border-border dark:bg-card/95 print:hidden">
                 <h2 class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
                     <Receipt :size="24" class="text-indigo-500" />
                     Detalle del Cierre de Caja
@@ -173,7 +173,7 @@ const handlePrint = () => {
                         <Printer :size="16" />
                         Imprimir
                     </button>
-                    <button @click="emit('close')" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <button @click="emit('close')" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors">
                         <X :size="20" />
                     </button>
                 </div>
@@ -234,8 +234,8 @@ const handlePrint = () => {
                 <div v-if="summary" class="grid grid-cols-1 lg:grid-cols-2 gap-5 print:grid-cols-2 print:gap-3">
 
                     <!-- LEFT: Arqueo de Denominaciones -->
-                    <div class="rounded-xl bg-gray-50 dark:bg-gray-700/30 print:bg-white print:border print:border-gray-400 overflow-hidden">
-                        <div class="bg-gray-100 dark:bg-gray-700/60 px-4 py-2.5 print:bg-gray-200">
+                    <div class="rounded-xl bg-gray-50 dark:bg-muted/30 print:bg-white print:border print:border-gray-400 overflow-hidden">
+                        <div class="bg-gray-100 dark:bg-muted/60 px-4 py-2.5 print:bg-gray-200">
                             <h3 class="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 flex items-center gap-2">
                                 <Banknote :size="14" class="print:hidden" />
                                 Arqueo de Denominaciones
@@ -245,14 +245,14 @@ const handlePrint = () => {
                         <div v-if="denomData.length > 0" class="p-0">
                             <table class="w-full text-sm print:text-[10px]">
                                 <thead>
-                                    <tr class="bg-gray-100/50 dark:bg-gray-700/40 print:bg-gray-100">
+                                    <tr class="bg-gray-100/50 dark:bg-muted/40 print:bg-gray-100">
                                         <th class="py-1.5 px-3 text-left font-semibold text-gray-500 dark:text-gray-400">Denominación</th>
                                         <th class="py-1.5 px-3 text-center font-semibold text-gray-500 dark:text-gray-400">Cantidad</th>
                                         <th class="py-1.5 px-3 text-right font-semibold text-gray-500 dark:text-gray-400">Subtotal</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="d in denomData" :key="d.id" class="border-t border-gray-100 dark:border-gray-700/50 print:border-gray-300">
+                                    <tr v-for="d in denomData" :key="d.id" class="border-t border-gray-100 dark:border-border/50 print:border-gray-300">
                                         <td class="py-1.5 px-3 font-medium text-gray-700 dark:text-gray-300">
                                             <span class="inline-flex items-center gap-1">
                                                 <span class="w-2 h-2 rounded-full flex-shrink-0" :class="d.value >= 20 ? 'bg-green-400' : 'bg-amber-400'"></span>
@@ -264,7 +264,7 @@ const handlePrint = () => {
                                     </tr>
                                 </tbody>
                                 <tfoot>
-                                    <tr class="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100/70 dark:bg-gray-700/50 print:bg-gray-100">
+                                    <tr class="border-t-2 border-gray-300 dark:border-border bg-gray-100/70 dark:bg-muted/50 print:bg-gray-100">
                                         <td colspan="2" class="py-2 px-3 font-bold text-gray-700 dark:text-gray-300 text-right uppercase text-xs">Total Contado</td>
                                         <td class="py-2 px-3 text-right font-bold text-lg text-gray-900 dark:text-white print:text-sm">{{ formatCurrency(totalDenominations) }}</td>
                                     </tr>
@@ -279,15 +279,15 @@ const handlePrint = () => {
                     <!-- RIGHT: Reconciliación / Arqueo -->
                     <div class="space-y-4 print:space-y-2">
                         <!-- Cash Reconciliation Table -->
-                        <div class="rounded-xl bg-gray-50 dark:bg-gray-700/30 overflow-hidden print:bg-white print:border print:border-gray-400">
-                            <div class="bg-gray-100 dark:bg-gray-700/60 px-4 py-2.5 print:bg-gray-200">
+                        <div class="rounded-xl bg-gray-50 dark:bg-muted/30 overflow-hidden print:bg-white print:border print:border-gray-400">
+                            <div class="bg-gray-100 dark:bg-muted/60 px-4 py-2.5 print:bg-gray-200">
                                 <h3 class="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 flex items-center gap-2">
                                     <Receipt :size="14" class="print:hidden" />
                                     Reconciliación de Efectivo
                                 </h3>
                             </div>
 
-                            <div class="divide-y divide-gray-100 dark:divide-gray-700/50 print:divide-gray-300">
+                            <div class="divide-y divide-gray-100 dark:divide-border/50 print:divide-gray-300">
                                 <!-- Opening -->
                                 <div class="flex justify-between items-center px-4 py-2.5 print:py-1.5 print:text-[11px]">
                                     <span class="text-gray-600 dark:text-gray-400">Fondo de Apertura</span>
@@ -315,12 +315,12 @@ const handlePrint = () => {
                                 </div>
                                 <!-- Declared -->
                                 <div class="flex justify-between items-center px-4 py-2.5 print:py-1.5 print:text-[11px]">
-                                    <span class="text-blue-600 dark:text-blue-400 font-medium">Efectivo Declarado</span>
+                                    <span class="text-blue-600 dark:text-primary dark:text-blue-400 font-medium">Efectivo Declarado</span>
                                     <span class="font-bold text-blue-700 dark:text-blue-300">{{ formatCurrency(summary.declared_cash) }}</span>
                                 </div>
                                 <!-- Difference -->
                                 <div class="flex justify-between items-center px-4 py-3 print:py-2 print:text-[11px]"
-                                    :class="difference > 0.005 ? 'bg-emerald-50 dark:bg-emerald-900/20 print:bg-white' : difference < -0.005 ? 'bg-red-50 dark:bg-red-900/20 print:bg-white' : 'bg-gray-50 dark:bg-gray-700/30 print:bg-white'"
+                                    :class="difference > 0.005 ? 'bg-emerald-50 dark:bg-emerald-900/20 print:bg-white' : difference < -0.005 ? 'bg-red-50 dark:bg-red-900/20 print:bg-white' : 'bg-gray-50 dark:bg-muted/30 print:bg-white'"
                                 >
                                     <span class="font-bold uppercase text-xs flex items-center gap-1.5" :class="differenceClass">
                                         <TrendingUp v-if="differenceIcon === 'up'" :size="14" class="print:hidden" />
@@ -336,8 +336,8 @@ const handlePrint = () => {
                         </div>
 
                         <!-- Payment Method Breakdown -->
-                        <div class="rounded-xl bg-gray-50 dark:bg-gray-700/30 overflow-hidden print:bg-white print:border print:border-gray-400">
-                            <div class="bg-gray-100 dark:bg-gray-700/60 px-4 py-2.5 print:bg-gray-200">
+                        <div class="rounded-xl bg-gray-50 dark:bg-muted/30 overflow-hidden print:bg-white print:border print:border-gray-400">
+                            <div class="bg-gray-100 dark:bg-muted/60 px-4 py-2.5 print:bg-gray-200">
                                 <h3 class="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 flex items-center gap-2">
                                     <CreditCard :size="14" class="print:hidden" />
                                     Desglose por Método de Pago
@@ -346,7 +346,7 @@ const handlePrint = () => {
                             <table class="w-full text-sm print:text-[10px]">
                                 <tbody>
                                     <!-- Efectivo -->
-                                    <tr class="border-b border-gray-100 dark:border-gray-700/50 print:border-gray-300">
+                                    <tr class="border-b border-gray-100 dark:border-border/50 print:border-gray-300">
                                         <td class="py-2 px-4 flex items-center gap-2">
                                             <Banknote :size="14" class="text-green-500 print:hidden" />
                                             <span class="text-gray-700 dark:text-gray-300">Efectivo</span>
@@ -355,7 +355,7 @@ const handlePrint = () => {
                                     </tr>
                                     <!-- Electronic payment methods — detailed breakdown from closing_details.electronic_payments -->
                                     <tr v-for="ep in electronicPaymentRows" :key="ep.key"
-                                        class="border-b border-gray-100 dark:border-gray-700/50 print:border-gray-300">
+                                        class="border-b border-gray-100 dark:border-border/50 print:border-gray-300">
                                         <td class="py-2 px-4">
                                             <div class="flex items-center gap-2">
                                                 <CreditCard :size="14" class="text-blue-400 print:hidden flex-shrink-0" />
@@ -369,7 +369,7 @@ const handlePrint = () => {
 
                                 </tbody>
                                 <tfoot>
-                                    <tr class="border-t-2 border-gray-300 dark:border-gray-600 bg-indigo-50/70 dark:bg-indigo-900/20 print:bg-gray-100">
+                                    <tr class="border-t-2 border-gray-300 dark:border-border bg-indigo-50/70 dark:bg-indigo-900/20 print:bg-gray-100">
                                         <td class="py-2.5 px-4 font-bold text-indigo-700 dark:text-indigo-300 uppercase text-xs">Total Ventas</td>
                                         <td class="py-2.5 px-4 text-right font-bold text-indigo-700 dark:text-indigo-300">{{ formatCurrency(summary.total_sales) }}</td>
                                     </tr>
@@ -391,10 +391,10 @@ const handlePrint = () => {
                         <Receipt :size="16" class="print:hidden" />
                         Ventas del Turno ({{ salesOrders.length }})
                     </h3>
-                    <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 print:border print:border-gray-400">
+                    <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-border print:border print:border-gray-400">
                         <table class="w-full text-sm print:text-[10px]">
                             <thead>
-                                <tr class="bg-gray-50 dark:bg-gray-700/50 print:bg-gray-100">
+                                <tr class="bg-gray-50 dark:bg-muted/50 print:bg-gray-100">
                                     <th class="py-2 px-3 text-left font-semibold text-gray-600 dark:text-gray-400">Folio</th>
                                     <th class="py-2 px-3 text-left font-semibold text-gray-600 dark:text-gray-400">Hora</th>
                                     <th class="py-2 px-3 text-left font-semibold text-gray-600 dark:text-gray-400">Cliente</th>
@@ -407,7 +407,7 @@ const handlePrint = () => {
                                 <tr
                                     v-for="order in salesOrders"
                                     :key="order.id"
-                                    class="border-t border-gray-100 dark:border-gray-700/50 print:border-gray-300"
+                                    class="border-t border-gray-100 dark:border-border/50 print:border-gray-300"
                                 >
                                     <td class="py-2 px-3 font-mono text-xs font-medium text-gray-900 dark:text-white">
                                         {{ order.order_number }}

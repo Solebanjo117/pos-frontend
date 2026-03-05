@@ -29,10 +29,10 @@ const handleSubmit = () => {
             <div class="flex items-center gap-4 flex-wrap">
                 <!-- Icon + text -->
                 <div class="flex items-center gap-2 flex-1 min-w-0">
-                    <LogIn class="text-blue-600 dark:text-blue-400 flex-shrink-0" :size="18" />
+                    <LogIn class="text-blue-600 dark:text-primary dark:text-blue-400 flex-shrink-0" :size="18" />
                     <div>
                         <p class="text-sm font-semibold text-blue-800 dark:text-blue-200">Caja no iniciada</p>
-                        <p class="text-xs text-blue-600 dark:text-blue-400">Ingresa el fondo inicial para habilitar ventas.</p>
+                        <p class="text-xs text-blue-600 dark:text-primary dark:text-blue-400">Ingresa el fondo inicial para habilitar ventas.</p>
                     </div>
                 </div>
 
@@ -54,14 +54,14 @@ const handleSubmit = () => {
                             min="0"
                             step="0.01"
                             required
-                            class="w-36 rounded-lg border border-gray-300 bg-white pl-8 pr-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-36 rounded-lg border border-gray-300 bg-white pl-8 pr-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                             placeholder="Fondo: 0.00"
                         />
                     </div>
                     <button
                         type="submit"
                         :disabled="loading || openingAmount < 0"
-                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                        class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
                     >
                         {{ loading ? 'Abriendo...' : 'Abrir Caja' }}
                     </button>

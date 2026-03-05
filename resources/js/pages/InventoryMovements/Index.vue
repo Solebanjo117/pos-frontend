@@ -161,7 +161,7 @@ const formatDate = (dateString: string) => {
                     <a
                         v-if="!isSingleWarehouseMode()"
                         href="/inventory-movements/transfer/create"
-                        class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                        class="flex items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                     >
                         <ArrowLeftRight :size="18" />
                         Nueva Transferencia
@@ -170,7 +170,7 @@ const formatDate = (dateString: string) => {
             </div>
 
             <!-- Filters -->
-            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-card">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-5">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -180,7 +180,7 @@ const formatDate = (dateString: string) => {
                             v-model="filters.search"
                             type="text"
                             placeholder="SKU o nombre..."
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                             @keyup.enter="applyFilters"
                         />
                     </div>
@@ -191,7 +191,7 @@ const formatDate = (dateString: string) => {
                         </label>
                         <select
                             v-model="filters.movement_type"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option :value="undefined">Todos</option>
                             <option value="in">Entrada</option>
@@ -207,7 +207,7 @@ const formatDate = (dateString: string) => {
                         <input
                             v-model="filters.date_from"
                             type="date"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
 
@@ -218,14 +218,14 @@ const formatDate = (dateString: string) => {
                         <input
                             v-model="filters.date_to"
                             type="date"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
 
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                            class="flex-1 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                         >
                             Filtrar
                         </button>
@@ -241,7 +241,7 @@ const formatDate = (dateString: string) => {
 
             <!-- Loading State -->
             <div v-if="loading" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                 <p class="mt-2 text-gray-800 dark:text-gray-200">Cargando movimientos...</p>
             </div>
 
@@ -251,9 +251,9 @@ const formatDate = (dateString: string) => {
             </div>
 
             <!-- Movements Table -->
-            <div v-else-if="movements.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
+            <div v-else-if="movements.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <thead class="bg-gray-50 dark:bg-muted">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                 Fecha
@@ -281,8 +281,8 @@ const formatDate = (dateString: string) => {
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
-                        <tr v-for="movement in movements" :key="movement.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
+                        <tr v-for="movement in movements" :key="movement.id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                                 {{ formatDate(movement.created_at) }}
                             </td>
@@ -302,7 +302,7 @@ const formatDate = (dateString: string) => {
                                     </div>
                                     
                                     <div v-if="movement.product_batch" class="mt-1">
-                                        <span class="font-medium text-blue-600 dark:text-blue-400">{{ movement.product_batch.batch_number }}</span>
+                                        <span class="font-medium text-blue-600 dark:text-primary dark:text-blue-400">{{ movement.product_batch.batch_number }}</span>
                                         <div v-if="movement.product_batch.expiry_date" class="text-xs text-gray-500">
                                             Vence: {{ formatDate(movement.product_batch.expiry_date).split(',')[0] }}
                                         </div>
@@ -334,7 +334,7 @@ const formatDate = (dateString: string) => {
                             <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                 <button
                                     @click="viewMovement(movement.id)"
-                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                    class="text-blue-600 dark:text-primary hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     Ver detalle
                                 </button>
@@ -344,7 +344,7 @@ const formatDate = (dateString: string) => {
                 </table>
 
                 <!-- Pagination -->
-                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
                     <div>
                         <p class="text-sm text-gray-900 dark:text-white">
                             Mostrando {{ (currentPage - 1) * 20 + 1 }} a {{ Math.min(currentPage * 20, total) }} de {{ total }} movimientos
@@ -354,14 +354,14 @@ const formatDate = (dateString: string) => {
                         <button
                             @click="goToPage(currentPage - 1)"
                             :disabled="currentPage === 1"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                         >
                             Anterior
                         </button>
                         <button
                             @click="goToPage(currentPage + 1)"
                             :disabled="currentPage === lastPage"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
                         >
                             Siguiente
                         </button>
@@ -370,7 +370,7 @@ const formatDate = (dateString: string) => {
             </div>
 
             <!-- Empty State -->
-            <div v-else class="rounded-lg bg-white p-12 text-center shadow dark:bg-gray-800">
+            <div v-else class="rounded-lg bg-white p-12 text-center shadow dark:bg-card">
                 <p class="text-gray-700 dark:text-gray-300">No hay movimientos registrados.</p>
                 <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
                     Registra tu primer movimiento usando los botones de arriba.

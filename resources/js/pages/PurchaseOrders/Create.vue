@@ -200,40 +200,40 @@ onMounted(async () => {
 
             <form @submit.prevent="handleSubmit" class="space-y-6">
                 <!-- Order Info -->
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Información del Pedido</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Proveedor *</label>
-                            <select v-model.number="form.supplier_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <select v-model.number="form.supplier_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white">
                                 <option :value="0" disabled>Selecciona un proveedor</option>
                                 <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Almacén destino *</label>
-                            <select v-model.number="form.warehouse_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <select v-model.number="form.warehouse_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white">
                                 <option :value="0" disabled>Selecciona un almacén</option>
                                 <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha del Pedido</label>
-                            <input v-model="form.order_date" type="date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                            <input v-model="form.order_date" type="date" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha Esperada</label>
-                            <input v-model="form.expected_date" type="date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                            <input v-model="form.expected_date" type="date" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" />
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notas</label>
-                            <textarea v-model="form.notes" rows="2" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                            <textarea v-model="form.notes" rows="2" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"></textarea>
                         </div>
                     </div>
                 </div>
 
                 <!-- Products -->
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Productos</h2>
 
                     <!-- Product Search -->
@@ -244,22 +244,22 @@ onMounted(async () => {
                                 v-model="productSearch"
                                 type="text"
                                 placeholder="Buscar producto por nombre o SKU..."
-                                class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                                 @input="searchProducts"
                             />
                         </div>
                         <!-- Search Results Dropdown -->
-                        <div v-if="searchResults.length" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                        <div v-if="searchResults.length" class="absolute z-10 w-full mt-1 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg max-h-64 overflow-y-auto">
                             <button
                                 v-for="row in searchResults" :key="row.variant_id"
                                 type="button"
                                 @click="addProduct(row)"
-                                class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-muted/50 flex items-center justify-between border-b border-gray-100 dark:border-border last:border-0"
                             >
                                 <div class="min-w-0">
                                     <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ row.product_name }}</p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                                        <span v-if="row.brand_name" class="font-semibold text-indigo-600 dark:text-indigo-400 mr-1.5">{{ row.brand_name }}</span>
+                                        <span v-if="row.brand_name" class="font-semibold text-indigo-600 dark:text-primary dark:text-indigo-400 mr-1.5">{{ row.brand_name }}</span>
                                         <span class="font-mono">{{ row.sku }}</span>
                                     </p>
                                 </div>
@@ -270,8 +270,8 @@ onMounted(async () => {
 
                     <!-- Items Table -->
                     <div v-if="form.items.length" class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-900">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                            <thead class="bg-gray-50 dark:bg-background">
                                 <tr>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                                     <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
@@ -280,20 +280,20 @@ onMounted(async () => {
                                     <th class="px-4 py-2"></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <tbody class="divide-y divide-gray-200 dark:divide-border">
                                 <tr v-for="(item, idx) in form.items" :key="idx">
                                     <td class="px-4 py-2">
                                         <p class="text-sm font-medium text-gray-900 dark:text-white">{{ (item as any)._name }}</p>
                                         <p class="text-xs text-gray-500">
-                                            <span v-if="(item as any)._brand" class="font-medium text-indigo-600 dark:text-indigo-400 mr-1">{{ (item as any)._brand }}</span>
+                                            <span v-if="(item as any)._brand" class="font-medium text-indigo-600 dark:text-primary dark:text-indigo-400 mr-1">{{ (item as any)._brand }}</span>
                                             {{ (item as any)._sku }}
                                         </p>
                                     </td>
                                     <td class="px-4 py-2">
-                                        <input v-model.number="item.quantity_ordered" type="number" min="1" class="w-20 text-right px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                                        <input v-model.number="item.quantity_ordered" type="number" min="1" class="w-20 text-right px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white" />
                                     </td>
                                     <td class="px-4 py-2">
-                                        <input v-model.number="item.unit_cost" type="number" min="0" step="0.01" class="w-24 text-right px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                                        <input v-model.number="item.unit_cost" type="number" min="0" step="0.01" class="w-24 text-right px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white" />
                                     </td>
                                     <td class="px-4 py-2 text-right text-sm font-medium text-gray-900 dark:text-white">
                                         ${{ (item.quantity_ordered * item.unit_cost).toFixed(2) }}
@@ -314,15 +314,15 @@ onMounted(async () => {
                 </div>
 
                 <!-- Totals & Submit -->
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Impuestos</label>
-                            <input v-model.number="form.tax_amount" type="number" min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                            <input v-model.number="form.tax_amount" type="number" min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Envío</label>
-                            <input v-model.number="form.shipping_cost" type="number" min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                            <input v-model.number="form.shipping_cost" type="number" min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" />
                         </div>
                         <div class="flex flex-col items-end justify-end">
                             <p class="text-sm text-gray-500 dark:text-gray-400">Subtotal: ${{ subtotal.toFixed(2) }}</p>
@@ -330,11 +330,11 @@ onMounted(async () => {
                         </div>
                     </div>
 
-                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <Link href="/purchase-orders" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-border">
+                        <Link href="/purchase-orders" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted/50 rounded-lg transition">
                             Cancelar
                         </Link>
-                        <button type="submit" :disabled="loading || form.items.length === 0" class="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition">
+                        <button type="submit" :disabled="loading || form.items.length === 0" class="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-50 text-white rounded-lg transition">
                             <Save :size="18" />
                             {{ loading ? (isEditing ? 'Actualizando...' : 'Creando...') : (isEditing ? 'Actualizar Orden' : 'Crear Orden de Compra') }}
                         </button>

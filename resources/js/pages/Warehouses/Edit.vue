@@ -85,7 +85,7 @@ const handleCancel = () => {
 
             <!-- Loading State -->
             <div v-if="loading && !currentWarehouse" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
                 <p class="mt-2 text-gray-800 dark:text-gray-200">Cargando almacén...</p>
             </div>
 
@@ -95,7 +95,7 @@ const handleCancel = () => {
             </div>
 
             <!-- Form -->
-            <form v-else @submit.prevent="handleSubmit" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <form v-else @submit.prevent="handleSubmit" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <!-- Name -->
                     <div>
@@ -107,7 +107,7 @@ const handleCancel = () => {
                             v-model="form.name"
                             type="text"
                             required
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                             :class="{ 'border-red-500': formErrors.name }"
                         />
                         <p v-if="formErrors.name" class="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -125,7 +125,7 @@ const handleCancel = () => {
                             v-model="form.code"
                             type="text"
                             required
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                             :class="{ 'border-red-500': formErrors.code }"
                         />
                         <p v-if="formErrors.code" class="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -142,7 +142,7 @@ const handleCancel = () => {
                             id="location"
                             v-model="form.location"
                             type="text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
 
@@ -156,7 +156,7 @@ const handleCancel = () => {
                             v-model.number="form.capacity"
                             type="number"
                             min="0"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
 
@@ -169,7 +169,7 @@ const handleCancel = () => {
                             id="status"
                             v-model="form.status"
                             required
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option value="active">Activo</option>
                             <option value="inactive">Inactivo</option>
@@ -185,7 +185,7 @@ const handleCancel = () => {
                             id="notes"
                             v-model="form.notes"
                             rows="4"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         ></textarea>
                     </div>
                 </div>
@@ -195,14 +195,14 @@ const handleCancel = () => {
                     <button
                         type="button"
                         @click="handleCancel"
-                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-muted dark:text-gray-200 dark:hover:bg-muted"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                        class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-50"
                     >
                         {{ loading ? 'Guardando...' : 'Actualizar Almacén' }}
                     </button>

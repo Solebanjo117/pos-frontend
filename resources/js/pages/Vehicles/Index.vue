@@ -277,7 +277,7 @@ const handleRemoveVin = async (vinId: number) => {
             </div>
 
             <!-- Vehicle Tree -->
-            <div class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+            <div class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-background">
 
                 <!-- Empty state -->
                 <div v-if="filteredMakes.length === 0" class="flex flex-col items-center justify-center py-16 text-center text-gray-400">
@@ -288,10 +288,10 @@ const handleRemoveVin = async (vinId: number) => {
 
                 <!-- Makes list -->
                 <div v-for="(make, makeIdx) in filteredMakes" :key="make.id"
-                    :class="makeIdx > 0 ? 'border-t border-gray-200 dark:border-gray-700' : ''">
+                    :class="makeIdx > 0 ? 'border-t border-gray-200 dark:border-border' : ''">
 
                     <!-- Make row -->
-                    <div class="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                    <div class="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 dark:hover:bg-card/50 cursor-pointer"
                         @click="toggleMake(make.id)">
                         <button class="text-gray-400">
                             <ChevronDown v-if="expandedMakes.has(make.id)" class="h-4 w-4" />
@@ -320,10 +320,10 @@ const handleRemoveVin = async (vinId: number) => {
                         </div>
 
                         <div v-for="(model, modelIdx) in (modelsByMake[make.id] ?? [])" :key="model.id"
-                            :class="['border-t border-gray-100 dark:border-gray-800']">
+                            :class="['border-t border-gray-100 dark:border-border']">
 
                             <!-- Model row -->
-                            <div class="flex items-center gap-2 py-2.5 pl-10 pr-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                            <div class="flex items-center gap-2 py-2.5 pl-10 pr-4 hover:bg-gray-50 dark:hover:bg-card/50 cursor-pointer"
                                 @click="toggleModel(model.id)">
                                 <button class="text-gray-400">
                                     <ChevronDown v-if="expandedModels.has(model.id)" class="h-4 w-4" />
@@ -355,7 +355,7 @@ const handleRemoveVin = async (vinId: number) => {
                                 </div>
 
                                 <div v-for="engine in (enginesByModel[model.id] ?? [])" :key="engine.id"
-                                    class="border-t border-gray-100 dark:border-gray-800 flex items-center gap-3 py-2 pl-20 pr-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
+                                    class="border-t border-gray-100 dark:border-border flex items-center gap-3 py-2 pl-20 pr-4 hover:bg-gray-50/50 dark:hover:bg-card/30">
                                     <div class="flex-1">
                                         <span class="font-mono text-xs font-semibold text-gray-800 dark:text-gray-200">{{ engine.engine_code }}</span>
                                         <span v-if="engine.displacement" class="ml-2 text-xs text-gray-500">{{ engine.displacement }}</span>
@@ -473,9 +473,9 @@ const handleRemoveVin = async (vinId: number) => {
 
                     <div v-if="vinsLoading" class="py-2 text-center text-xs text-gray-400">Cargando VINs...</div>
                     <div v-else-if="engineVins.length === 0" class="py-2 text-center text-xs text-gray-400">Sin VINs registrados.</div>
-                    <ul v-else class="max-h-36 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700 rounded-md border border-gray-200 dark:border-gray-700">
+                    <ul v-else class="max-h-36 overflow-y-auto divide-y divide-gray-100 dark:divide-border rounded-md border border-gray-200 dark:border-border">
                         <li v-for="v in engineVins" :key="v.id"
-                            class="flex items-center justify-between px-3 py-1.5 text-sm bg-white dark:bg-gray-900">
+                            class="flex items-center justify-between px-3 py-1.5 text-sm bg-white dark:bg-background">
                             <span class="font-mono text-xs tracking-wide text-gray-800 dark:text-gray-200">{{ v.vin }}</span>
                             <button type="button" @click="handleRemoveVin(v.id)" class="ml-2 text-red-500 hover:text-red-700">
                                 <X class="h-3.5 w-3.5" />

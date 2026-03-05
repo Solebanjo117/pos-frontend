@@ -230,10 +230,10 @@ const handleViewAlternative = async (altId: number) => {
     <!-- Backdrop -->
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
         @click.self="emit('close')">
-        <div class="relative max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-gray-800">
+        <div class="relative max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-card">
 
             <!-- Header -->
-            <div class="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-gray-200 bg-white/95 backdrop-blur px-6 py-4 dark:border-gray-700 dark:bg-gray-800/95">
+            <div class="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-gray-200 bg-white/95 backdrop-blur px-6 py-4 dark:border-border dark:bg-card/95">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ product.name }}</h2>
                     <p v-if="product.sku_base && !blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ product.sku_base }}</p>
@@ -263,7 +263,7 @@ const handleViewAlternative = async (altId: number) => {
 
                     <!-- Close -->
                     <button @click="emit('close')"
-                        class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition dark:hover:bg-gray-700 dark:hover:text-gray-300">
+                        class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition dark:hover:bg-muted/50 dark:hover:text-gray-300">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -279,9 +279,9 @@ const handleViewAlternative = async (altId: number) => {
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
                     <!-- 🔹 IZQUIERDA: Info Producto + Specs (col-md-5) -->
                     <div class="lg:col-span-5 flex flex-col gap-4">
-                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                        <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-5">
                             <!-- Image Carousel (Reuse existing) -->
-                            <div class="relative h-64 mb-6 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 dark:bg-gray-900 dark:border-gray-700 group/img flex-shrink-0 flex items-center justify-center">
+                            <div class="relative h-64 mb-6 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 dark:bg-background dark:border-border group/img flex-shrink-0 flex items-center justify-center">
                                 <img v-if="currentImage" :src="currentImage.url" :alt="product.name" :key="currentImage.id"
                                     class="max-h-full max-w-full object-contain transition-opacity duration-300" />
                                 <div v-else class="flex h-full w-full flex-col items-center justify-center gap-2">
@@ -309,14 +309,14 @@ const handleViewAlternative = async (altId: number) => {
 
                             <!-- Especificaciones Técnicas -->
                             <div>
-                                <h6 class="font-bold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2 mb-3">
+                                <h6 class="font-bold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-border pb-2 mb-3">
                                     Especificaciones Técnicas
                                     <span v-if="loadingVariantAttrs" class="text-xs font-normal text-gray-400 animate-pulse ml-2">cargando...</span>
                                 </h6>
                                 <div v-if="loadingAttrs" class="text-sm text-gray-400 animate-pulse py-2">Cargando especificaciones...</div>
                                 <div v-else-if="mergedSpecs.length === 0" class="text-sm text-gray-400 italic py-2">Sin especificaciones registradas.</div>
                                 <div v-else class="grid grid-cols-2 gap-x-4 gap-y-2">
-                                    <div v-for="spec in mergedSpecs" :key="spec.name" class="flex justify-between items-center text-sm py-1 border-b border-gray-50 dark:border-gray-800 last:border-0 relative group">
+                                    <div v-for="spec in mergedSpecs" :key="spec.name" class="flex justify-between items-center text-sm py-1 border-b border-gray-50 dark:border-border last:border-0 relative group">
                                         <span class="text-gray-500 capitalize">{{ spec.name }}</span>
                                         <span class="font-medium text-gray-900 dark:text-gray-200 text-right">
                                             {{ spec.value }}<span v-if="spec.unit" class="text-xs text-gray-500 ml-1">{{ spec.unit }}</span>
@@ -329,9 +329,9 @@ const handleViewAlternative = async (altId: number) => {
 
                     <!-- 🔹 DERECHA: Marcas Disponibles -->
                     <div class="lg:col-span-7">
-                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full max-h-[600px] lg:max-h-[800px]">
+                        <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border flex flex-col h-full max-h-[600px] lg:max-h-[800px]">
                             
-                            <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 rounded-t-lg shrink-0">
+                            <div class="p-4 border-b border-gray-100 dark:border-border flex justify-between items-center bg-gray-50 dark:bg-background rounded-t-lg shrink-0">
                                 <h2 class="font-bold text-gray-900 dark:text-white text-lg">Marcas Disponibles</h2>
                                 <span class="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-medium px-2.5 py-0.5 rounded-full">
                                     {{ variants.length }} opciones
@@ -341,7 +341,7 @@ const handleViewAlternative = async (altId: number) => {
                             <div class="overflow-y-auto p-4 custom-scrollbar flex-1">
                                 <div v-if="variants.length > 0" class="space-y-3">
                                     <div v-for="variant in variants" :key="variant.id" 
-                                        class="group flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all gap-4 cursor-pointer"
+                                        class="group flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border border-gray-200 dark:border-border rounded-lg hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all gap-4 cursor-pointer"
                                         :class="activeVariantId === variant.id ? 'bg-blue-50/50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700' : ''"
                                         @click="activeVariantId = variant.id">
                                         
@@ -357,10 +357,10 @@ const handleViewAlternative = async (altId: number) => {
                                         <!-- Precio y Action -->
                                         <div class="flex items-center gap-6 self-end sm:self-auto">
                                             <!-- Quantities -->
-                                            <div class="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 rounded-md p-1 border border-gray-200 dark:border-gray-700 shrink-0">
-                                                 <button @click.stop="changeQty(variant.id, -1)" :disabled="(variant.total_stock ?? 0) === 0" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 disabled:opacity-30 dark:hover:bg-gray-700">-</button>
+                                            <div class="flex items-center gap-2 bg-gray-50 dark:bg-background rounded-md p-1 border border-gray-200 dark:border-border shrink-0">
+                                                 <button @click.stop="changeQty(variant.id, -1)" :disabled="(variant.total_stock ?? 0) === 0" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 disabled:opacity-30 dark:hover:bg-muted/50">-</button>
                                                  <span class="text-sm font-medium w-6 text-center text-gray-900 dark:text-white">{{ quantities[variant.id] ?? 1 }}</span>
-                                                 <button @click.stop="changeQty(variant.id, 1)" :disabled="(variant.total_stock ?? 0) === 0 || (quantities[variant.id] ?? 1) >= (variant.total_stock ?? 0)" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 disabled:opacity-30 dark:hover:bg-gray-700">+</button>
+                                                 <button @click.stop="changeQty(variant.id, 1)" :disabled="(variant.total_stock ?? 0) === 0 || (quantities[variant.id] ?? 1) >= (variant.total_stock ?? 0)" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 disabled:opacity-30 dark:hover:bg-muted/50">+</button>
                                             </div>
 
                                             <div class="text-right min-w-[90px] shrink-0">
@@ -384,7 +384,7 @@ const handleViewAlternative = async (altId: number) => {
                                             <button 
                                                 @click.stop="handleAddToCart(variant)"
                                                 :disabled="(variant.total_stock ?? 0) === 0"
-                                                class="bg-blue-600 text-white hover:bg-blue-700 w-12 h-12 rounded-lg flex items-center justify-center shadow-sm transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                                                class="bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white hover:bg-blue-700 dark:hover:bg-primary/90 w-12 h-12 rounded-lg flex items-center justify-center shadow-sm transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                                                 title="Agregar al carrito"
                                             >
                                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" /></svg>
@@ -398,7 +398,7 @@ const handleViewAlternative = async (altId: number) => {
                                 </div>
                             </div>
 
-                            <div class="p-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 rounded-b-lg text-center text-xs text-gray-500 shrink-0">
+                            <div class="p-3 bg-gray-50 dark:bg-background border-t border-gray-100 dark:border-border rounded-b-lg text-center text-xs text-gray-500 shrink-0">
                                 Precios y stock sincronizados en tiempo real.
                             </div>
                         </div>
@@ -412,11 +412,11 @@ const handleViewAlternative = async (altId: number) => {
                 <div class="mt-auto space-y-6">
                     
                     <!-- Vehículos Compatibles (Full Width Table) -->
-                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col max-h-[350px]">
-                        <div class="p-4 border-b border-gray-100 dark:border-gray-700 font-bold text-gray-900 dark:text-white flex items-center gap-2 bg-gray-50 dark:bg-gray-900 rounded-t-lg shrink-0">
+                    <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border flex flex-col max-h-[350px]">
+                        <div class="p-4 border-b border-gray-100 dark:border-border font-bold text-gray-900 dark:text-white flex items-center gap-2 bg-gray-50 dark:bg-background rounded-t-lg shrink-0">
                             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>
                             Vehículos Compatibles
-                            <span v-if="!loadingVehicle && vehicleRows.length > 0" class="text-xs font-normal text-gray-500 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+                            <span v-if="!loadingVehicle && vehicleRows.length > 0" class="text-xs font-normal text-gray-500 bg-gray-200 dark:bg-muted px-2 py-0.5 rounded-full">
                                 {{ vehicleRows.length }} modelos
                             </span>
                         </div>
@@ -428,17 +428,17 @@ const handleViewAlternative = async (altId: number) => {
                                 Sin vehículos vinculados. Agrega VINs al producto para ver compatibilidad aquí.
                             </div>
                             <table v-else class="w-full text-sm text-left">
-                                <thead class="bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold sticky top-0 z-10 shadow-sm">
+                                <thead class="bg-gray-50 dark:bg-background text-gray-700 dark:text-gray-300 font-semibold sticky top-0 z-10 shadow-sm">
                                     <tr>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">Marca</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">Modelo</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">Años</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">Motor</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">VIN (Chasis)</th>
+                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Marca</th>
+                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Modelo</th>
+                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Años</th>
+                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Motor</th>
+                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">VIN (Chasis)</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-800">
-                                    <tr v-for="row in vehicleRows" :key="row.vin" class="hover:bg-blue-50 dark:hover:bg-gray-700/50 transition-colors">
+                                <tbody class="divide-y divide-gray-100 dark:divide-border bg-white dark:bg-card">
+                                    <tr v-for="row in vehicleRows" :key="row.vin" class="hover:bg-blue-50 dark:hover:bg-muted/50/50 transition-colors">
                                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ row.make }}</td>
                                         <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ row.model }}</td>
                                         <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
@@ -449,7 +449,7 @@ const handleViewAlternative = async (altId: number) => {
                                             {{ row.engine }}<span v-if="row.displacement" class="ml-1 text-[10px] text-gray-500">{{ row.displacement }}</span>
                                         </td>
                                         <td class="px-4 py-3 font-mono text-gray-500 break-all">
-                                            <a :href="deepLink('vin', row.vin)" target="_blank" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors hover:underline">
+                                            <a :href="deepLink('vin', row.vin)" target="_blank" class="hover:text-blue-600 dark:text-primary dark:hover:text-blue-400 transition-colors hover:underline">
                                                 {{ row.vin }}
                                             </a>
                                         </td>
@@ -462,14 +462,14 @@ const handleViewAlternative = async (altId: number) => {
                     <!-- OEM y Alternativas (Grid lado a lado si hay de ambos) -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6" v-if="!loadingRefs && (oemData.length > 0 || alternativesData.length > 0)">
                         <!-- OEM -->
-                        <div v-if="oemData.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                            <div class="p-4 border-b border-gray-100 dark:border-gray-700 font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 rounded-t-lg">
+                        <div v-if="oemData.length > 0" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border">
+                            <div class="p-4 border-b border-gray-100 dark:border-border font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-background rounded-t-lg">
                                 Referencias OEM
                             </div>
                             <div class="overflow-hidden rounded-b-lg">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
-                                        <tr v-for="oem in oemData" :key="oem.oem_code" class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-border text-sm">
+                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
+                                        <tr v-for="oem in oemData" :key="oem.oem_code" class="hover:bg-gray-50 dark:hover:bg-muted/50/50">
                                             <td class="px-4 py-3 font-mono font-semibold text-amber-700 dark:text-amber-400">
                                                 <a :href="deepLink('oem_code', oem.oem_code)" target="_blank" class="hover:underline">{{ oem.oem_code }}</a>
                                             </td>
@@ -481,19 +481,19 @@ const handleViewAlternative = async (altId: number) => {
                         </div>
 
                         <!-- Alternativas -->
-                        <div v-if="alternativesData.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700" :class="oemData.length === 0 ? 'md:col-span-2' : ''">
-                            <div class="p-4 border-b border-gray-100 dark:border-gray-700 font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 rounded-t-lg">
+                        <div v-if="alternativesData.length > 0" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border" :class="oemData.length === 0 ? 'md:col-span-2' : ''">
+                            <div class="p-4 border-b border-gray-100 dark:border-border font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-background rounded-t-lg">
                                 Alternativas y Ref. Cruzadas
                             </div>
                             <div class="overflow-x-auto rounded-b-lg">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-border text-sm">
+                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                                         <tr v-for="alt in alternativesData" :key="alt.id" 
-                                            class="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
+                                            class="hover:bg-gray-50 dark:hover:bg-muted/50/50 cursor-pointer transition-colors"
                                             @click="handleViewAlternative(alt.id)"
                                             :title="'Ver detalle de ' + alt.name">
                                             <td class="whitespace-nowrap px-4 py-3">
-                                                <code class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">{{ alt.sku }}</code>
+                                                <code class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-muted dark:text-gray-300">{{ alt.sku }}</code>
                                             </td>
                                             <td class="px-4 py-3 text-gray-900 dark:text-white">
                                                 <div class="flex items-center gap-2">

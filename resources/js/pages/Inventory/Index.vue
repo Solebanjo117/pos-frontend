@@ -112,14 +112,14 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                     </p>
                 </div>
                 <div>
-                     <a href="/inventory/batches" class="text-blue-600 hover:underline text-sm font-medium">
+                     <a href="/inventory/batches" class="text-blue-600 dark:text-primary hover:underline text-sm font-medium">
                         Ver Inventario de Lotes &rarr;
                     </a>
                 </div>
             </div>
 
             <!-- Filters -->
-            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-card">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <!-- Search -->
                     <div class="md:col-span-2">
@@ -128,7 +128,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                             v-model="filters.search"
                             type="text"
                             placeholder="Nombre o SKU del producto..."
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                             @keyup.enter="applyFilters"
                         />
                     </div>
@@ -138,7 +138,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                         <label class="block text-sm font-medium text-gray-900 dark:text-white">Almacén</label>
                         <select
                             v-model="filters.warehouse_id"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                             @change="applyFilters"
                         >
                             <option :value="undefined">Todos</option>
@@ -155,7 +155,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                             <input
                                 v-model="filters.low_stock"
                                 type="checkbox"
-                                class="h-4 w-4 rounded border-gray-300 text-blue-600"
+                                class="h-4 w-4 rounded border-gray-300 text-blue-600 dark:text-primary"
                                 @change="applyFilters"
                             />
                             <span class="ml-2 text-sm text-gray-900 dark:text-white">Solo stock bajo</span>
@@ -166,7 +166,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                 <div class="mt-4 flex justify-end">
                     <button
                         @click="applyFilters"
-                        class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                        class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                         :disabled="loading"
                     >
                         {{ loading ? 'Cargando...' : 'Aplicar Filtros' }}
@@ -180,10 +180,10 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
             </div>
 
             <!-- Inventory Table -->
-            <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+            <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-900">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                        <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Producto
@@ -214,7 +214,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
                             <tr v-if="loading">
                                 <td colspan="9" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                                     Cargando inventario...
@@ -225,7 +225,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                                     No se encontraron productos
                                 </td>
                             </tr>
-                            <tr v-else v-for="item in inventory" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <tr v-else v-for="item in inventory" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
                                 <!-- Product Name -->
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">
@@ -251,7 +251,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                                         v-model.number="editForm.stock_available"
                                         type="number"
                                         min="0"
-                                        class="w-20 rounded border border-gray-300 px-2 py-1 text-center dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                        class="w-20 rounded border border-gray-300 px-2 py-1 text-center dark:border-border dark:bg-muted dark:text-white"
                                     />
                                     <span v-else class="text-sm font-semibold text-gray-900 dark:text-white">
                                         {{ item.stock_available }}
@@ -270,7 +270,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                                         v-model.number="editForm.reorder_point"
                                         type="number"
                                         min="0"
-                                        class="w-20 rounded border border-gray-300 px-2 py-1 text-center dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                        class="w-20 rounded border border-gray-300 px-2 py-1 text-center dark:border-border dark:bg-muted dark:text-white"
                                     />
                                     <span v-else class="text-sm text-gray-900 dark:text-white">
                                         {{ item.reorder_point }}
@@ -284,7 +284,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                                         v-model.number="editForm.target_level"
                                         type="number"
                                         min="0"
-                                        class="w-20 rounded border border-gray-300 px-2 py-1 text-center dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                        class="w-20 rounded border border-gray-300 px-2 py-1 text-center dark:border-border dark:bg-muted dark:text-white"
                                     />
                                     <span v-else class="text-sm text-gray-900 dark:text-white">
                                         {{ item.target_level }}
@@ -317,7 +317,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                                     <button
                                         v-else
                                         @click="startEdit(item)"
-                                        class="text-blue-600 hover:text-blue-900 dark:text-blue-400"
+                                        class="text-blue-600 dark:text-primary hover:text-blue-900 dark:text-blue-400"
                                     >
                                         ✎ Editar
                                     </button>
@@ -328,7 +328,7 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                 </div>
 
                 <!-- Pagination -->
-                <div v-if="inventory.length > 0" class="border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
+                <div v-if="inventory.length > 0" class="border-t border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card sm:px-6">
                     <div class="flex items-center justify-between">
                         <div class="text-sm text-gray-700 dark:text-gray-300">
                             Mostrando <span class="font-medium">{{ (pagination.current_page - 1) * pagination.per_page + 1 }}</span>
@@ -340,14 +340,14 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                             <button
                                 @click="changePage(pagination.current_page - 1)"
                                 :disabled="pagination.current_page === 1"
-                                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80"
                             >
                                 Anterior
                             </button>
                             <button
                                 @click="changePage(pagination.current_page + 1)"
                                 :disabled="pagination.current_page === pagination.last_page"
-                                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80"
                             >
                                 Siguiente
                             </button>

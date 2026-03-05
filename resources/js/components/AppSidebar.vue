@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Package, Warehouse, List, BarChart3, Users, ShoppingCart, Truck, ClipboardList, Factory, ArrowLeftRight, Tag, Car, Wrench, Banknote, Settings, Shield, FileText, Receipt } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Package, Warehouse, List, BarChart3, Users, ShoppingCart, Truck, ClipboardList, Factory, ArrowLeftRight, Tag, Car, Wrench, Banknote, Settings, Shield, FileText, Receipt, Store } from 'lucide-vue-next';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -211,6 +211,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                     title: 'Bitácora',
                     href: '/settings/activity-logs',
                     icon: BarChart3,
+                },
+                {
+                    title: 'Config. de Tienda',
+                    href: '/settings/store',
+                    icon: Store,
                 },
             ],
         });

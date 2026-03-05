@@ -44,7 +44,7 @@ const handleAdd = async () => {
 <template>
     <div class="space-y-6">
         <!-- Header / Add Bar -->
-        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-card">
             <h3 class="mb-4 text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 <Plus class="h-4 w-4" />
                 Agregar Compatibilidad
@@ -62,13 +62,13 @@ const handleAdd = async () => {
                             v-model="notes"
                             type="text" 
                             placeholder="Ej: Solo delantero, Transmisión Automática..."
-                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
                         >
                     </div>
                     <button
                         @click="handleAdd"
                         :disabled="!selectedVehicle.engine_id || adding"
-                        class="flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        class="flex items-center justify-center rounded-md bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 dark:hover:bg-primary/90 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                         <span v-if="adding">Guardando...</span>
                         <span v-else>Agregar Vehículo</span>
@@ -78,8 +78,8 @@ const handleAdd = async () => {
         </div>
 
         <!-- Matrix List -->
-        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <div class="border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-background">
+            <div class="border-b border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">Vehículos Compatibles (Fitment)</h3>
             </div>
             
@@ -93,8 +93,8 @@ const handleAdd = async () => {
                 <p class="text-sm text-gray-400">Es considerado "Universal" o falta información.</p>
             </div>
 
-            <table v-else class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-800">
+            <table v-else class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                <thead class="bg-gray-50 dark:bg-card">
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Vehículo</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Motor</th>
@@ -104,8 +104,8 @@ const handleAdd = async () => {
                         </th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
-                    <tr v-for="fitment in fitments" :key="fitment.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-background">
+                    <tr v-for="fitment in fitments" :key="fitment.id" class="hover:bg-gray-50 dark:hover:bg-card/50">
                         <td class="whitespace-nowrap px-6 py-4">
                             <div class="text-sm font-medium text-gray-900 dark:text-white">
                                 {{ fitment.engine?.model?.make?.name }} {{ fitment.engine?.model?.name }}

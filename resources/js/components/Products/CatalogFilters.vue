@@ -62,9 +62,9 @@ const hasActiveFilters = computed(() => {
 </script>
 
 <template>
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 sticky top-4">
+    <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card sticky top-4">
         <!-- Header -->
-        <div class="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
+        <div class="flex items-center justify-between p-4 border-b border-gray-100 dark:border-border">
             <div class="flex items-center gap-2">
                 <svg class="h-4 w-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24">
@@ -74,7 +74,7 @@ const hasActiveFilters = computed(() => {
                 <h2 class="font-semibold text-gray-900 dark:text-white">Filtros</h2>
             </div>
             <button v-if="hasActiveFilters" @click="clearAll"
-                class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                class="text-xs text-blue-600 dark:text-primary hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
                 Limpiar todo
             </button>
         </div>
@@ -88,7 +88,7 @@ const hasActiveFilters = computed(() => {
                         class="flex items-center space-x-2 cursor-pointer group">
                         <input type="checkbox" :checked="filters.categories.includes(cat.name)"
                             @change="toggleCategory(cat.name)"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 dark:text-primary focus:ring-blue-500 dark:border-border dark:bg-muted" />
                         <span
                             class="text-sm text-gray-700 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">
                             {{ cat.name }}
@@ -109,7 +109,7 @@ const hasActiveFilters = computed(() => {
                         <input type="radio" name="availability" :value="opt.value"
                             :checked="filters.availability === opt.value"
                             @change="setAvailability(opt.value as any)"
-                            class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600" />
+                            class="h-4 w-4 border-gray-300 text-blue-600 dark:text-primary focus:ring-blue-500 dark:border-border" />
                         <span
                             class="text-sm text-gray-700 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">
                             {{ opt.label }}
@@ -126,7 +126,7 @@ const hasActiveFilters = computed(() => {
                         class="flex items-center space-x-2 cursor-pointer group">
                         <input type="checkbox" :checked="filters.brands.includes(brand.name)"
                             @change="toggleBrand(brand.name)"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 dark:text-primary focus:ring-blue-500 dark:border-border dark:bg-muted" />
                         <span
                             class="text-sm text-gray-700 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">
                             {{ brand.name }}

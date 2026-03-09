@@ -21,7 +21,7 @@ interface ProductImage   { id: number; url: string; original_filename: string; d
 interface ProductAttribute { id: number; name: string; value: string; unit?: string | null; variant_id?: number | null }
 interface OemReference   { id?: number; oem_code: string; manufacturer: string }
 interface AlternativeRecord { id: number; sku: string; name: string; relationship_type: string; pivot?: { relationship_type?: string; source?: string; shared_codes?: string } }
-interface VehicleRow     { vin: string; make: string; model: string; year_from?: number; year_to?: number; engine: string; displacement?: string }
+interface VehicleRow     { id: number; make: string; model: string; year_from?: number; year_to?: number; engine: string; displacement?: string }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const deepLink = (param: string, value: string | number) =>
@@ -169,10 +169,23 @@ const loadingVehicle = ref(false)
 const fetchVehicleCompatibility = async () => {
     loadingVehicle.value = true
     try {
-        const res = await apiClient.get(`/products/${props.product.id}/vehicle-compatibility`)
-        vehicleRows.value = res.data.data ?? []
-    } catch (e) { console.error(e) }
-    finally { loadingVehicle.value = false }
+        const res = await apiClient.get(`/products/${props.product.id}/compatibility`)
+        const compat = res.data.data ?? []
+        vehicleRows.value = compat.map((c: any) => ({
+            id: c.id,
+            make: c.engine?.model?.make?.name ?? '—',
+            model: c.engine?.model?.name ?? '—',
+            year_from: c.engine?.model?.year_from,
+            year_to: c.engine?.model?.year_to,
+            engine: c.engine?.engine_code ?? 'Varios',
+            displacement: c.engine?.displacement
+        }))
+    } catch (e) {
+        console.error(e)
+        vehicleRows.value = []
+    } finally {
+        loadingVehicle.value = false
+    }
 }
 
 // ── OEM + Alternatives ────────────────────────────────────────────────────────
@@ -235,7 +248,10 @@ const handleViewAlternative = async (altId: number) => {
             <!-- Header -->
             <div class="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-gray-200 bg-white/95 backdrop-blur px-6 py-4 dark:border-border dark:bg-card/95">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ product.name }}</h2>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ product.name }}</h2>
+                        <span v-if="product.is_universal" class="flex-shrink-0 inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/20" title="Universal">🌐 Universal</span>
+                    </div>
                     <p v-if="product.sku_base && !blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ product.sku_base }}</p>
                 </div>
                 <div class="flex items-center gap-3">
@@ -416,16 +432,21 @@ const handleViewAlternative = async (altId: number) => {
                         <div class="p-4 border-b border-gray-100 dark:border-border font-bold text-gray-900 dark:text-white flex items-center gap-2 bg-gray-50 dark:bg-background rounded-t-lg shrink-0">
                             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>
                             Vehículos Compatibles
-                            <span v-if="!loadingVehicle && vehicleRows.length > 0" class="text-xs font-normal text-gray-500 bg-gray-200 dark:bg-muted px-2 py-0.5 rounded-full">
+                            <span v-if="!loadingVehicle && vehicleRows.length > 0 && !product.is_universal" class="text-xs font-normal text-gray-500 bg-gray-200 dark:bg-muted px-2 py-0.5 rounded-full">
                                 {{ vehicleRows.length }} modelos
                             </span>
                         </div>
 
                         <div class="overflow-y-auto flex-1 custom-scrollbar">
                             <div v-if="loadingVehicle" class="text-sm text-gray-400 animate-pulse p-4">Cargando compatibilidad...</div>
+                            <div v-else-if="product.is_universal" class="text-sm text-blue-600 dark:text-blue-400 italic p-6 text-center bg-blue-50/50 dark:bg-blue-900/10">
+                                <svg class="w-12 h-12 text-blue-300 dark:text-blue-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <p class="font-medium text-blue-700 dark:text-blue-300 text-base not-italic">Este es un Producto Universal</p>
+                                <p class="mt-1">Es compatible con cualquier vehículo o su uso es general.</p>
+                            </div>
                             <div v-else-if="vehicleRows.length === 0" class="text-sm text-gray-400 italic p-6 text-center">
                                 <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>
-                                Sin vehículos vinculados. Agrega VINs al producto para ver compatibilidad aquí.
+                                Sin vehículos vinculados. Agrega compatibilidad vehicular editando el producto.
                             </div>
                             <table v-else class="w-full text-sm text-left">
                                 <thead class="bg-gray-50 dark:bg-background text-gray-700 dark:text-gray-300 font-semibold sticky top-0 z-10 shadow-sm">
@@ -433,12 +454,11 @@ const handleViewAlternative = async (altId: number) => {
                                         <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Marca</th>
                                         <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Modelo</th>
                                         <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Años</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Motor</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">VIN (Chasis)</th>
+                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Motor / Disp.</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-border bg-white dark:bg-card">
-                                    <tr v-for="row in vehicleRows" :key="row.vin" class="hover:bg-blue-50 dark:hover:bg-muted/50/50 transition-colors">
+                                    <tr v-for="row in vehicleRows" :key="row.id" class="hover:bg-blue-50 dark:hover:bg-muted/50/50 transition-colors">
                                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ row.make }}</td>
                                         <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ row.model }}</td>
                                         <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
@@ -446,12 +466,7 @@ const handleViewAlternative = async (altId: number) => {
                                             <span v-else>—</span>
                                         </td>
                                         <td class="px-4 py-3 font-mono text-gray-600 dark:text-gray-400">
-                                            {{ row.engine }}<span v-if="row.displacement" class="ml-1 text-[10px] text-gray-500">{{ row.displacement }}</span>
-                                        </td>
-                                        <td class="px-4 py-3 font-mono text-gray-500 break-all">
-                                            <a :href="deepLink('vin', row.vin)" target="_blank" class="hover:text-blue-600 dark:text-primary dark:hover:text-blue-400 transition-colors hover:underline">
-                                                {{ row.vin }}
-                                            </a>
+                                            {{ row.engine }}<span v-if="row.displacement" class="ml-1 text-[10px] text-gray-500"> ({{ row.displacement }}L)</span>
                                         </td>
                                     </tr>
                                 </tbody>

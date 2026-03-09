@@ -10,6 +10,7 @@ import {
     DialogDescription
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 
 const props = defineProps<{
     productId: number
@@ -63,6 +64,8 @@ const fetchBrands = async () => {
     } catch { brands.value = [] }
     finally { loadingBrands.value = false }
 }
+
+const brandOptions = computed(() => brands.value.map(b => ({ value: b.id, label: b.name })))
 
 // Category default attributes
 const categoryDefaults = ref<{ name: string; unit: string; required: boolean }[]>([])
@@ -136,6 +139,20 @@ const autoVariantSku = computed(() => {
 })
 
 const previousAutoSku = ref('')
+const skuManuallyEdited = ref(false)
+const onSkuInput = () => { skuManuallyEdited.value = true }
+const customSkuManuallyEdited = ref(false)
+const onCustomSkuInput = () => { customSkuManuallyEdited.value = true }
+
+// Auto custom SKU fill
+watch(
+    () => form.value.sku,
+    (newSku) => {
+        if (!customSkuManuallyEdited.value) {
+            form.value.upc = newSku || ''
+        }
+    }
+)
 
 const loadVariants = async () => {
     try {
@@ -188,7 +205,10 @@ const openCreateModal = () => {
     }
     // Auto-fill SKU after brand is set
     previousAutoSku.value = autoVariantSku.value
+    skuManuallyEdited.value = false
+    customSkuManuallyEdited.value = false
     form.value.sku = autoVariantSku.value
+    form.value.upc = autoVariantSku.value
     showModal.value = true
 }
 
@@ -229,9 +249,9 @@ const openEditModal = (variant: any) => {
 
 // Watch brand changes to auto-update SKU (only for new variants or if SKU hasn't been manually changed)
 watch(
-    [() => form.value.brand_id, () => variantAttributes.value],
+    [() => form.value.brand_id, () => variantAttributes.value, autoVariantSku],
     () => {
-        if (!editingVariant.value && (!form.value.sku || form.value.sku === previousAutoSku.value)) {
+        if (!editingVariant.value && (!form.value.sku || form.value.sku === previousAutoSku.value || !skuManuallyEdited.value)) {
             form.value.sku = autoVariantSku.value
             previousAutoSku.value = autoVariantSku.value
         }
@@ -244,6 +264,7 @@ const handleSubmit = async () => {
     try {
         const payload = {
             ...form.value,
+            sku: form.value.sku || autoVariantSku.value,
             attributes: variantAttributes.value.filter(a => a.name.trim() && a.value.trim()),
         }
         if (editingVariant.value) {
@@ -272,6 +293,32 @@ const handleDelete = async (variant: any) => {
     }
 }
 
+// === Inline Brand Creation ===
+const showBrandModal = ref(false)
+const newBrandName = ref('')
+const creatingBrand = ref(false)
+const brandError = ref<string | null>(null)
+
+const openBrandModal = () => {
+    newBrandName.value = ''
+    brandError.value = null
+    showBrandModal.value = true
+}
+
+const submitNewBrand = async () => {
+    if (!newBrandName.value.trim()) { brandError.value = 'El nombre es requerido'; return }
+    creatingBrand.value = true
+    brandError.value = null
+    try {
+        const { data } = await apiClient.post('/brands', { name: newBrandName.value.trim() })
+        const newBrand = data.data ?? data
+        brands.value.push(newBrand)
+        form.value.brand_id = newBrand.id
+        showBrandModal.value = false
+    } catch (e: any) {
+        brandError.value = e.response?.data?.message || 'Error al crear la marca'
+    } finally { creatingBrand.value = false }
+}
 
 onMounted(async () => {
     await Promise.all([
@@ -373,42 +420,48 @@ onMounted(async () => {
 
                 <form @submit.prevent="handleSubmit" class="space-y-4 py-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Brand -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Marca</label>
-                            <select
-                                v-model="form.brand_id"
-                                :disabled="!!editingVariant"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white"
-                                required
-                            >
-                                <option v-for="brand in brands" :key="brand.id" :value="brand.id">{{ brand.name }}</option>
-                            </select>
-                        </div>
-
-                        <!-- SKU (Auto-generated) -->
+                        <!-- SKU (Auto-generated) - NOW FIRST -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 SKU Variante
-                                <span v-if="!editingVariant && autoVariantSku" class="text-xs text-green-600 dark:text-green-400 ml-1">(auto-generado)</span>
+                                <span v-if="!editingVariant && autoVariantSku && !skuManuallyEdited" class="text-xs text-green-600 dark:text-green-400 ml-1">(auto)</span>
                             </label>
                             <input
-                                v-model="form.sku"
+                                v-model="form.sku" @input="onSkuInput"
                                 type="text"
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white font-mono text-sm"
                                 :placeholder="autoVariantSku || 'Se genera automáticamente'"
-                                required
                             />
                             <p v-if="skuBase" class="mt-1 text-xs text-gray-400">Base: {{ skuBase }}</p>
+                        </div>
+
+                        <!-- Brand - NOW SECOND -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Marca</label>
+                            <div :class="editingVariant ? '' : 'flex gap-1'">
+                                <SearchableSelect
+                                    :options="brandOptions"
+                                    :model-value="form.brand_id"
+                                    @update:model-value="v => form.brand_id = v as number"
+                                    placeholder="-- Selecciona marca --"
+                                    :loading="loadingBrands"
+                                    :disabled="!!editingVariant"
+                                />
+                                <button v-if="!editingVariant" type="button" @click="openBrandModal"
+                                    class="flex-shrink-0 rounded-md border border-gray-300 dark:border-border bg-white dark:bg-muted p-2 text-gray-500 hover:text-blue-600 hover:border-blue-400 dark:hover:text-blue-400 transition"
+                                    title="Crear nueva marca">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Custom SKU (was UPC) -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Custom SKU</label>
                             <input
-                                v-model="form.upc"
+                                v-model="form.upc" @input="onCustomSkuInput"
                                 type="text"
-                                placeholder="SKU personalizado del proveedor (opcional)"
+                                placeholder="Se llena automáticamente"
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white"
                             />
                         </div>
@@ -582,6 +635,30 @@ onMounted(async () => {
                         </Button>
                     </div>
                 </form>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Brand Creation Mini-Modal -->
+        <Dialog :open="showBrandModal" @update:open="v => { if (!v) showBrandModal = false }">
+            <DialogContent class="sm:max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Nueva Marca</DialogTitle>
+                </DialogHeader>
+                <div class="space-y-4 pt-2">
+                    <p v-if="brandError" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">{{ brandError }}</p>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre de la Marca <span class="text-red-500">*</span></label>
+                        <input v-model="newBrandName" type="text" @keyup.enter="submitNewBrand"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Ej: Bosch, NGK, BERU..." />
+                    </div>
+                    <div class="flex justify-end gap-3">
+                        <Button type="button" variant="outline" @click="showBrandModal = false">Cancelar</Button>
+                        <Button type="button" @click="submitNewBrand" :disabled="creatingBrand">
+                            {{ creatingBrand ? 'Creando...' : 'Crear Marca' }}
+                        </Button>
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
     </div>

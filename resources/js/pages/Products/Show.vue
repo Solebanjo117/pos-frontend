@@ -116,9 +116,14 @@ const getStatusColor = (status: string) => {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-white">Estado</label>
-                        <span :class="getStatusColor(currentProduct.status)" class="mt-1 inline-flex rounded-full px-3 py-1 text-sm font-semibold">
-                            {{ currentProduct.status }}
-                        </span>
+                        <div class="mt-1 flex items-center gap-2 flex-wrap">
+                            <span :class="getStatusColor(currentProduct.status)" class="inline-flex rounded-full px-3 py-1 text-sm font-semibold">
+                                {{ currentProduct.status }}
+                            </span>
+                            <span v-if="currentProduct.is_universal" class="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-3 py-1 text-sm font-semibold text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                🌐 Universal
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -227,15 +232,32 @@ const getStatusColor = (status: string) => {
             </div>
 
             <!-- Vehicle Compatibility -->
-            <div v-if="currentProduct.compatibility && currentProduct.compatibility.length > 0" class="rounded-lg bg-white p-6 shadow dark:bg-card">
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Compatibilidad Vehicular</h2>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div v-for="(compat, index) in currentProduct.compatibility" :key="index" class="rounded-lg border border-gray-200 p-4 dark:border-border">
-                        <p class="font-semibold text-gray-900 dark:text-white">{{ compat.make }} {{ compat.model }}</p>
-                        <p class="text-sm text-gray-800 dark:text-gray-200">{{ compat.year_range }}</p>
-                        <p class="text-sm text-gray-700 dark:text-gray-300">Motor: {{ compat.engine }}</p>
-                        <p v-if="compat.notes" class="mt-2 text-xs text-gray-700 dark:text-gray-300">{{ compat.notes }}</p>
+                
+                <!-- Universal banner -->
+                <div v-if="currentProduct.is_universal" class="flex items-center gap-3 rounded-lg bg-indigo-50 border border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800/50 p-4">
+                    <span class="text-3xl">🌐</span>
+                    <div>
+                        <p class="font-semibold text-indigo-800 dark:text-indigo-300">Producto Universal</p>
+                        <p class="text-sm text-indigo-600 dark:text-indigo-400">Este producto es compatible con todas las marcas y modelos de vehículos.</p>
                     </div>
+                </div>
+                
+                <!-- Specific compatibility -->
+                <div v-else-if="currentProduct.compatibility && currentProduct.compatibility.length > 0">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div v-for="(compat, index) in currentProduct.compatibility" :key="index" class="rounded-lg border border-gray-200 p-4 dark:border-border">
+                            <p class="font-semibold text-gray-900 dark:text-white">{{ compat.make }} {{ compat.model }}</p>
+                            <p class="text-sm text-gray-800 dark:text-gray-200">{{ compat.year_range }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300">Motor: {{ compat.engine }}</p>
+                            <p v-if="compat.notes" class="mt-2 text-xs text-gray-700 dark:text-gray-300">{{ compat.notes }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="text-center py-6 text-gray-400">
+                    <p class="text-sm">No hay compatibilidad vehicular definida</p>
                 </div>
             </div>
 

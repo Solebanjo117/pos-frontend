@@ -64,6 +64,10 @@ const getBrandNames = (product: Product): string => {
                                 class="inline-flex rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                                 {{ product.category.name }}
                             </span>
+                            <span v-if="product.is_universal"
+                                class="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/20" title="Universal">
+                                🌐 Universal
+                            </span>
                         </div>
                     </div>
                     <div class="text-right flex-shrink-0 ml-4">
@@ -139,6 +143,10 @@ const getBrandNames = (product: Product): string => {
                 <span v-if="product.category"
                     class="inline-flex rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                     {{ product.category.name }}
+                </span>
+                <span v-if="product.is_universal"
+                    class="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/20" title="Universal">
+                    🌐 Universal
                 </span>
             </div>
 

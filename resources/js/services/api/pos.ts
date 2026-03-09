@@ -23,7 +23,10 @@ export const posService = {
         })
     },
 
-    async getWarehouseContext(): Promise<{ current_warehouse_id: number | null }> {
+    async getWarehouseContext(): Promise<{
+        current_warehouse_id: number | null;
+        allowed_warehouses?: Array<{ id: number; name: string }>;
+    }> {
         const response = await apiClient.get('/user/warehouse-context')
         return response.data
     }

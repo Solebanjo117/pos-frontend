@@ -9,6 +9,14 @@ import type { CreateProductRequest } from '@/types/product'
 import type { Category } from '@/types/category'
 import type { Brand } from '@/types/brand'
 import apiClient from '@/services/api/client'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Plus, X, Globe } from 'lucide-vue-next'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -114,7 +122,29 @@ const autoVariantSku = computed(() => {
     return `${base}-${brandCode}`
 })
 
-// === Live Name Preview (Category + Vehicles ONLY, no brand/attributes) ===
+// === Custom SKU auto-fill ===
+const customSkuManuallyEdited = ref(false)
+watch(
+    [() => form.value.sku_base, skuPreview],
+    () => {
+        if (!customSkuManuallyEdited.value) {
+            form.value.upc = form.value.sku_base || skuPreview.value || ''
+        }
+    }
+)
+const onCustomSkuInput = () => {
+    customSkuManuallyEdited.value = true
+}
+
+// === Live Name Preview ===
+const nameManuallyEdited = ref(false)
+const onNameInput = () => { nameManuallyEdited.value = true }
+
+// === Arrays ===
+const addedEngines = ref<{ engine_id: number; make: string; model: string; engine: string }[]>([])
+const addedVins = ref<string[]>([])
+const addedRefs = ref<string[]>([])
+
 const namePreview = computed(() => {
     const parts: string[] = []
     const catId = (form.value as any).category_id
@@ -123,7 +153,6 @@ const namePreview = computed(() => {
         if (cat) parts.push(cat.name)
     }
     let name = parts.join(' ') || 'Producto sin nombre'
-    // Vehicle labels from added engines
     const vehicleLabels = [...new Set(addedEngines.value.map(e => `${e.make} ${e.model}`))]
     if (vehicleLabels.length > 0) {
         const displayed = vehicleLabels.slice(0, 3).join(', ')
@@ -136,7 +165,23 @@ const namePreview = computed(() => {
     return name
 })
 
-// Watch category to fetch preview + attribute definitions
+watch(namePreview, (newVal) => {
+    if (!nameManuallyEdited.value && newVal !== 'Producto sin nombre') {
+        form.value.name = newVal
+    }
+})
+
+// === Auto SKU Base Preview ===
+const skuBaseManuallyEdited = ref(false)
+const onSkuBaseInput = () => { skuBaseManuallyEdited.value = true }
+
+watch(skuPreview, (newVal) => {
+    if (!skuBaseManuallyEdited.value && newVal) {
+        form.value.sku_base = newVal
+    }
+})
+
+// Watch category for SKU preview + attributes
 watch(
     () => (form.value as any).category_id,
     async (newCategoryId: number | undefined) => {
@@ -147,17 +192,14 @@ watch(
             const cat = resp.data
             if (cat.default_attributes && Array.isArray(cat.default_attributes)) {
                 variantAttributes.value = cat.default_attributes.map((attr: any) => ({
-                    name: attr.name,
-                    value: '',
-                    unit: attr.unit || '',
-                    required: attr.required || false,
+                    name: attr.name, value: '', unit: attr.unit || '', required: attr.required || false,
                 }))
             } else { variantAttributes.value = [] }
         } catch { variantAttributes.value = [] }
     }
 )
 
-// When brand changes, auto-fill variant SKU
+// Auto variant SKU
 watch(
     [() => form.value.brand_id, () => form.value.sku_base, skuPreview],
     () => {
@@ -171,7 +213,7 @@ const previousAutoSku = ref('')
 
 // === Vehicle Compatibility ===
 interface VehicleMake { id: number; name: string }
-interface VehicleModelItem { id: number; name: string; year_from?: number; year_to?: number }
+interface VehicleModelItem { id: number; name: string; year_from?: number; year_to?: number; generation?: string }
 interface VehicleEngineItem { id: number; engine_code: string; displacement?: string }
 
 const vehicleMakes = ref<VehicleMake[]>([])
@@ -181,12 +223,11 @@ const vehicleEngines = ref<VehicleEngineItem[]>([])
 const selectedMakeId = ref<number | null>(null)
 const selectedModelId = ref<number | null>(null)
 const selectedEngineId = ref<number | null>(null)
-
-const addedEngines = ref<{ engine_id: number; make: string; model: string; engine: string }[]>([])
+const isUniversal = ref(false)
 
 const loadingMakes = ref(false)
-const loadingModels = ref(false)
-const loadingEngines = ref(false)
+const loadingModelsV = ref(false)
+const loadingEnginesV = ref(false)
 
 const fetchMakes = async () => {
     loadingMakes.value = true
@@ -201,24 +242,32 @@ watch(selectedMakeId, async (makeId) => {
     vehicleModels.value = []; vehicleEngines.value = []
     selectedModelId.value = null; selectedEngineId.value = null
     if (!makeId) return
-    loadingModels.value = true
+    loadingModelsV.value = true
     try {
         const { data } = await apiClient.get(`/vehicle-makes/${makeId}/models`)
         vehicleModels.value = data.data ?? data
     } catch { vehicleModels.value = [] }
-    finally { loadingModels.value = false }
+    finally { loadingModelsV.value = false }
 })
 
 watch(selectedModelId, async (modelId) => {
     vehicleEngines.value = []; selectedEngineId.value = null
     if (!modelId) return
-    loadingEngines.value = true
+    loadingEnginesV.value = true
     try {
         const { data } = await apiClient.get(`/vehicle-models/${modelId}/engines`)
         vehicleEngines.value = data.data ?? data
     } catch { vehicleEngines.value = [] }
-    finally { loadingEngines.value = false }
+    finally { loadingEnginesV.value = false }
 })
+
+const toggleUniversal = () => {
+    isUniversal.value = !isUniversal.value
+    if (isUniversal.value) {
+        addedEngines.value = []
+        selectedMakeId.value = null
+    }
+}
 
 const addEngine = () => {
     if (!selectedEngineId.value) return
@@ -226,9 +275,10 @@ const addEngine = () => {
     const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
     const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
     const engine = vehicleEngines.value.find(e => e.id === selectedEngineId.value)
+    const modelNameFull = model ? `${model.name}${model.generation ? ` - ${model.generation}` : ''}` : ''
     addedEngines.value.push({
         engine_id: selectedEngineId.value,
-        make: make?.name || '', model: model?.name || '', engine: engine?.engine_code || '',
+        make: make?.name || '', model: modelNameFull, engine: engine?.engine_code || '',
     })
     selectedEngineId.value = null
 }
@@ -236,13 +286,93 @@ const removeEngine = (idx: number) => addedEngines.value.splice(idx, 1)
 
 // === VINs ===
 const vinInput = ref('')
-const addedVins = ref<string[]>([])
 const addVin = () => {
     const v = vinInput.value.trim().toUpperCase()
     if (!v || addedVins.value.includes(v)) return
     addedVins.value.push(v); vinInput.value = ''
 }
 const removeVin = (idx: number) => addedVins.value.splice(idx, 1)
+
+// === OEM / Cross References ===
+const refInput = ref('')
+const addRef = () => {
+    const r = refInput.value.trim()
+    if (!r || addedRefs.value.includes(r)) return
+    addedRefs.value.push(r); refInput.value = ''
+}
+const removeRef = (idx: number) => addedRefs.value.splice(idx, 1)
+
+// === Inline Creation Modals ===
+const inlineModal = ref<'category' | 'brand' | 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | null>(null)
+const inlineForm = ref<Record<string, any>>({})
+const inlineProcessing = ref(false)
+const inlineError = ref<string | null>(null)
+
+const openInline = (type: typeof inlineModal.value) => {
+    inlineModal.value = type
+    inlineError.value = null
+    inlineProcessing.value = false
+    if (type === 'category') inlineForm.value = { name: '', parent_id: null }
+    else if (type === 'brand') inlineForm.value = { name: '' }
+    else if (type === 'vehicleMake') inlineForm.value = { name: '' }
+    else if (type === 'vehicleModel') inlineForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear() }
+    else if (type === 'vehicleEngine') inlineForm.value = { engine_code: '', displacement: '' }
+}
+const closeInline = () => { inlineModal.value = null }
+
+const submitInline = async () => {
+    inlineProcessing.value = true
+    inlineError.value = null
+    try {
+        if (inlineModal.value === 'category') {
+            const { data } = await apiClient.post('/categories', inlineForm.value)
+            categories.value.push(data.data ?? data)
+            ;(form.value as any).category_id = (data.data ?? data).id
+        } else if (inlineModal.value === 'brand') {
+            const { data } = await apiClient.post('/brands', inlineForm.value)
+            const newBrand = data.data ?? data
+            brands.value.push(newBrand)
+            form.value.brand_id = newBrand.id
+        } else if (inlineModal.value === 'vehicleMake') {
+            const { data } = await apiClient.post('/vehicle-makes', inlineForm.value)
+            const newMake = data.data ?? data
+            vehicleMakes.value.push(newMake)
+            selectedMakeId.value = newMake.id
+        } else if (inlineModal.value === 'vehicleModel') {
+            const { data } = await apiClient.post('/vehicle-models', { ...inlineForm.value, make_id: selectedMakeId.value })
+            const newModel = data.data ?? data
+            vehicleModels.value.push(newModel)
+            selectedModelId.value = newModel.id
+        } else if (inlineModal.value === 'vehicleEngine') {
+            const { data } = await apiClient.post('/vehicle-engines', { ...inlineForm.value, model_id: selectedModelId.value, fuel_type: 'N/A', aspiration: 'N/A' })
+            const newEngine = data.data ?? data
+            vehicleEngines.value.push(newEngine)
+            selectedEngineId.value = newEngine.id
+        }
+        closeInline()
+    } catch (e: any) {
+        inlineError.value = e.response?.data?.message || 'Error al crear'
+    } finally { inlineProcessing.value = false }
+}
+
+// SearchableSelect option formatters
+const categoryOptions = computed(() => categories.value.filter(c => !c.parent_id).flatMap(parent => [
+    { value: parent.id, label: parent.name, sublabel: '' },
+    ...categories.value.filter(c => c.parent_id === parent.id).map(child => ({
+        value: child.id, label: `↳ ${child.name}`, sublabel: parent.name,
+    })),
+]))
+const brandOptions = computed(() => brands.value.map(b => ({ value: b.id, label: b.name })))
+const makeOptions = computed(() => vehicleMakes.value.map(m => ({ value: m.id, label: m.name })))
+const modelOptions = computed(() => vehicleModels.value.map(m => {
+    const years = m.year_from ? `${m.year_from}-${m.year_to || '...'}` : ''
+    const gen = m.generation ? `${m.generation}` : ''
+    const parts = [years, gen].filter(Boolean)
+    return { value: m.id, label: m.name, sublabel: parts.join(' - ') }
+}))
+const engineOptions = computed(() => vehicleEngines.value.map(e => ({
+    value: e.id, label: e.engine_code, sublabel: e.displacement || '',
+})))
 
 // === onMounted ===
 onMounted(async () => {
@@ -273,12 +403,14 @@ const handleSubmit = async () => {
     try {
         const payload = {
             ...form.value,
-            // Attributes go to the variant, not the product
+            sku: form.value.sku || autoVariantSku.value,
             attributes: variantAttributes.value
                 .filter(a => a.value.trim())
                 .map(a => ({ name: a.name, value: a.value, unit: a.unit })),
             vehicle_compatibility: addedEngines.value.map(e => e.engine_id),
+            is_universal: isUniversal.value,
             vins: addedVins.value,
+            oem_references: addedRefs.value,
         }
         await createProduct(payload)
         successMessage.value = 'Producto creado exitosamente'
@@ -295,6 +427,7 @@ const handleSubmit = async () => {
 }
 
 const cancel = () => { window.location.href = '/products' }
+const getError = (field: string) => validationErrors.value[field]?.[0] || ''
 </script>
 
 <template>
@@ -315,23 +448,41 @@ const cancel = () => { window.location.href = '/products' }
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Nombre del Producto</label>
-                        <input v-model="form.name" type="text"
+                        <input v-model="form.name" type="text" @input="onNameInput"
                             class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="Déjalo en blanco para autogenerar"
+                            placeholder="Categoría + Vehículos..."
                         />
-                        <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">Se autogenera si lo dejas vacío</p>
+                        <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">Se autogenera si no lo editas</p>
                         <div v-if="!form.name && namePreview" class="mt-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-700/50">
                             <p class="text-xs text-amber-500 dark:text-amber-400 font-medium mb-0.5">Preview del nombre base:</p>
                             <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">{{ namePreview }}</p>
                         </div>
-                        <p v-if="validationErrors.name" class="mt-1 text-sm text-red-600">{{ validationErrors.name[0] }}</p>
+                        <p v-if="getError('name')" class="mt-1 text-sm text-red-600">{{ getError('name') }}</p>
                     </div>
 
+                    <!-- Categoría con + Crear -->
                     <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Categoría</label>
+                            <button type="button" @click="openInline('category')" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
+                                <Plus class="h-3 w-3" /> Crear
+                            </button>
+                        </div>
+                        <SearchableSelect
+                            :options="categoryOptions"
+                            :model-value="(form as any).category_id ?? null"
+                            @update:model-value="v => (form as any).category_id = v"
+                            placeholder="-- Selecciona categoría --"
+                            :loading="loadingCategories"
+                        />
+                        <p v-if="getError('category_id')" class="mt-1 text-sm text-red-600">{{ getError('category_id') }}</p>
+                    </div>
+
+                    <div class="md:col-span-1">
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">SKU Base</label>
-                        <input v-model="form.sku_base" type="text"
+                        <input v-model="form.sku_base" type="text" @input="onSkuBaseInput"
                             class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                            :placeholder="skuPreview || 'Autogenerar al guardar'"
+                            placeholder="Autogenerar al guardar"
                         />
                         <div class="mt-1">
                             <p v-if="skuPreview && !form.sku_base" class="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
@@ -340,20 +491,6 @@ const cancel = () => { window.location.href = '/products' }
                             </p>
                             <p v-else-if="loadingSkuPreview" class="text-xs text-gray-400">Calculando SKU...</p>
                         </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Categoría</label>
-                        <select v-model="form.category_id"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white">
-                            <option :value="undefined">-- Selecciona una categoría --</option>
-                            <optgroup v-for="category in categories.filter(c => !c.parent_id)" :key="category.id" :label="category.name">
-                                <option :value="category.id">{{ category.name }}</option>
-                                <option v-for="child in categories.filter(c => c.parent_id === category.id)" :key="child.id" :value="child.id">
-                                    &nbsp;&nbsp;↳ {{ child.name }}
-                                </option>
-                            </optgroup>
-                        </select>
                     </div>
 
                     <div>
@@ -375,71 +512,105 @@ const cancel = () => { window.location.href = '/products' }
                 </div>
             </div>
 
-            <!-- ══════════ SECTION 2: Compatibilidad Vehicular + VIN ══════════ -->
+            <!-- ══════════ SECTION 2: Compatibilidad Vehicular + Specs + Refs ══════════ -->
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card border-l-4 border-teal-500">
                 <h2 class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Compatibilidad Vehicular</h2>
-                <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Vehículos y VINs afectan el nombre del producto base.</p>
+                <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Vehículos, especificaciones y referencias cruzadas.</p>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-4 mb-4">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Marca del Vehículo</label>
-                        <select v-model="selectedMakeId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white">
-                            <option :value="null">-- Marca --</option>
-                            <option v-for="m in vehicleMakes" :key="m.id" :value="m.id">{{ m.name }}</option>
-                        </select>
+                <!-- Universal toggle -->
+                <div class="mb-4">
+                    <button type="button" @click="toggleUniversal"
+                        class="flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors text-sm font-medium"
+                        :class="isUniversal ? 'border-teal-500 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-600' : 'border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:border-teal-400'">
+                        <Globe class="h-4 w-4" />
+                        {{ isUniversal ? '✓ Compatible con TODOS los vehículos' : 'Marcar como Universal (TODOS)' }}
+                    </button>
+                </div>
+
+                <!-- Vehicle selectors (hidden when universal) -->
+                <div v-if="!isUniversal">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-4 mb-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Marca Vehículo</label>
+                                <button type="button" @click="openInline('vehicleMake')" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
+                                    <Plus class="h-3 w-3" />
+                                </button>
+                            </div>
+                            <SearchableSelect
+                                :options="makeOptions"
+                                :model-value="selectedMakeId"
+                                @update:model-value="v => selectedMakeId = v as number | null"
+                                placeholder="-- Marca --"
+                                :loading="loadingMakes"
+                            />
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Modelo</label>
+                                <button v-if="selectedMakeId" type="button" @click="openInline('vehicleModel')" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
+                                    <Plus class="h-3 w-3" />
+                                </button>
+                            </div>
+                            <SearchableSelect
+                                :options="modelOptions"
+                                :model-value="selectedModelId"
+                                @update:model-value="v => selectedModelId = v as number | null"
+                                placeholder="-- Modelo --"
+                                :disabled="!selectedMakeId"
+                                :loading="loadingModelsV"
+                            />
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Motor</label>
+                                <button v-if="selectedModelId" type="button" @click="openInline('vehicleEngine')" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
+                                    <Plus class="h-3 w-3" />
+                                </button>
+                            </div>
+                            <SearchableSelect
+                                :options="engineOptions"
+                                :model-value="selectedEngineId"
+                                @update:model-value="v => selectedEngineId = v as number | null"
+                                placeholder="-- Motor --"
+                                :disabled="!selectedModelId"
+                                :loading="loadingEnginesV"
+                            />
+                        </div>
+                        <div class="flex items-end">
+                            <button type="button" @click="addEngine" :disabled="!selectedEngineId"
+                                class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
+                                + Agregar
+                            </button>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Modelo</label>
-                        <select v-model="selectedModelId" :disabled="!selectedMakeId || loadingModels"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50">
-                            <option :value="null">{{ loadingModels ? 'Cargando...' : '-- Modelo --' }}</option>
-                            <option v-for="m in vehicleModels" :key="m.id" :value="m.id">
-                                {{ m.name }} {{ m.year_from ? `(${m.year_from}-${m.year_to || '...'})` : '' }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Motor</label>
-                        <select v-model="selectedEngineId" :disabled="!selectedModelId || loadingEngines"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50">
-                            <option :value="null">{{ loadingEngines ? 'Cargando...' : '-- Motor --' }}</option>
-                            <option v-for="e in vehicleEngines" :key="e.id" :value="e.id">
-                                {{ e.engine_code }} {{ e.displacement ? `(${e.displacement})` : '' }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class="flex items-end">
-                        <button type="button" @click="addEngine" :disabled="!selectedEngineId"
-                            class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
-                            + Agregar
-                        </button>
+
+                    <div v-if="addedEngines.length > 0" class="mb-6 overflow-hidden rounded-lg border border-gray-200 dark:border-border">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-50 dark:bg-background/50">
+                                <tr>
+                                    <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Marca</th>
+                                    <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Modelo</th>
+                                    <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Motor</th>
+                                    <th class="w-10 px-2 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-border/50">
+                                <tr v-for="(eng, idx) in addedEngines" :key="eng.engine_id" class="bg-white dark:bg-card">
+                                    <td class="px-4 py-2 text-gray-900 dark:text-white">{{ eng.make }}</td>
+                                    <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ eng.model }}</td>
+                                    <td class="px-4 py-2 font-mono text-gray-600 dark:text-gray-400">{{ eng.engine }}</td>
+                                    <td class="px-2 py-2 text-center">
+                                        <button type="button" @click="removeEngine(idx)" class="text-red-400 hover:text-red-600 text-xs">✕</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <div v-if="addedEngines.length > 0" class="mb-6 overflow-hidden rounded-lg border border-gray-200 dark:border-border">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-gray-50 dark:bg-background/50">
-                            <tr>
-                                <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Marca</th>
-                                <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Modelo</th>
-                                <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Motor</th>
-                                <th class="w-10 px-2 py-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                            <tr v-for="(eng, idx) in addedEngines" :key="eng.engine_id" class="bg-white dark:bg-card">
-                                <td class="px-4 py-2 text-gray-900 dark:text-white">{{ eng.make }}</td>
-                                <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ eng.model }}</td>
-                                <td class="px-4 py-2 font-mono text-gray-600 dark:text-gray-400">{{ eng.engine }}</td>
-                                <td class="px-2 py-2 text-center">
-                                    <button type="button" @click="removeEngine(idx)" class="text-red-400 hover:text-red-600 text-xs">✕</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div>
+                <!-- VINs -->
+                <div class="mb-6">
                     <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-2">VINs del producto</label>
                     <div class="flex gap-2 mb-3">
                         <input v-model="vinInput" type="text" @keydown.enter.prevent="addVin"
@@ -458,47 +629,35 @@ const cancel = () => { window.location.href = '/products' }
                         </span>
                     </div>
                 </div>
-            </div>
 
-            <!-- ══════════ SECTION 3: Variante Inicial ══════════ -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-card border-l-4 border-indigo-500">
-                <h2 class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Variante Inicial (Default)</h2>
-                <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Marca, atributos técnicos, SKU y precio de la primera variante. Podrás agregar más marcas después.</p>
-
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Marca <span class="text-red-500">*</span></label>
-                        <select v-model="form.brand_id" required :disabled="loadingBrands"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white">
-                            <option v-if="loadingBrands" :value="undefined">Cargando marcas...</option>
-                            <option v-for="brand in brands" :key="brand.id" :value="brand.id">{{ brand.name }}</option>
-                        </select>
+                <!-- Otras Referencias (OEM / Cross References) -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-1">Otras Referencias</label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Códigos cruzados de marcas (Bosch, Fram, OEM, etc.)</p>
+                    <div class="flex gap-2 mb-3">
+                        <input v-model="refInput" type="text" @keydown.enter.prevent="addRef"
+                            class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
+                            placeholder="Ej: Bosch B123, Fram F455, OEM 90915-YZZF2" />
+                        <button type="button" @click="addRef" :disabled="!refInput.trim()"
+                            class="rounded-md bg-indigo-600 dark:bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors">
+                            + Agregar Referencia
+                        </button>
                     </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">SKU de la Variante</label>
-                        <input v-model="form.sku" type="text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                            :placeholder="autoVariantSku || 'Ej: ALT-0012-BOS'" />
-                        <p v-if="autoVariantSku" class="mt-1 text-xs text-indigo-600 dark:text-primary dark:text-indigo-400">
-                            Auto: <span class="font-mono font-bold">{{ autoVariantSku }}</span>
-                        </p>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Custom SKU / UPC</label>
-                        <input v-model="form.upc" type="text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="123456789012" />
+                    <div v-if="addedRefs.length > 0" class="flex flex-wrap gap-2">
+                        <span v-for="(ref, idx) in addedRefs" :key="ref"
+                            class="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 px-3 py-1 text-xs font-mono">
+                            {{ ref }}
+                            <button type="button" @click="removeRef(idx)" class="text-indigo-600 hover:text-red-500 text-sm leading-none">&times;</button>
+                        </span>
                     </div>
                 </div>
 
-                <!-- Variant Attributes (from category) -->
-                <div v-if="variantAttributes.length > 0" class="mt-6 pt-6 border-t border-gray-200 dark:border-border">
+                <!-- Especificaciones Técnicas (from category) — MOVED HERE from old Variante section -->
+                <div v-if="variantAttributes.length > 0" class="pt-6 border-t border-gray-200 dark:border-border">
                     <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        🔧 Especificaciones Técnicas de esta Variante
+                        🔧 Especificaciones Técnicas
                     </h3>
-                    <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">Estos atributos pertenecen a la variante, no al producto base. Cada marca puede tener especificaciones distintas.</p>
+                    <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">Estos atributos pertenecen a la variante. Cada marca puede tener especificaciones distintas.</p>
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div v-for="(attr, index) in variantAttributes" :key="index">
                             <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -513,54 +672,104 @@ const cancel = () => { window.location.href = '/products' }
                 </div>
             </div>
 
-            <!-- ══════════ SECTION 4: Precios ══════════ -->
-            <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Precios e Impuestos</h2>
+            <!-- ══════════ SECTION 3: Variante + Precios (MERGED) ══════════ -->
+            <div class="rounded-lg bg-white p-6 shadow dark:bg-card border-l-4 border-indigo-500">
+                <h2 class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Variante Inicial + Precios</h2>
+                <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Marca, SKU, precio e impuestos de la primera variante.</p>
 
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Tipo de Impuesto (ITBM)</label>
-                    <div class="flex gap-4">
-                        <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                            :class="form.pricing.tax_type === 'standard' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-gray-300 dark:border-border'">
-                            <input type="radio" name="tax_type" value="standard" :checked="form.pricing.tax_type === 'standard'" @change="onTaxTypeChange('standard')" class="sr-only" />
-                            <span class="text-sm font-medium">Con ITBM (7%)</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                            :class="form.pricing.tax_type === 'exempt' ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'border-gray-300 dark:border-border'">
-                            <input type="radio" name="tax_type" value="exempt" :checked="form.pricing.tax_type === 'exempt'" @change="onTaxTypeChange('exempt')" class="sr-only" />
-                            <span class="text-sm font-medium">Sin ITBM (0%)</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
-                            :class="form.pricing.tax_type === 'custom' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' : 'border-gray-300 dark:border-border'">
-                            <input type="radio" name="tax_type" value="custom" :checked="form.pricing.tax_type === 'custom'" @change="onTaxTypeChange('custom')" class="sr-only" />
-                            <span class="text-sm font-medium">Tasa personalizada</span>
-                        </label>
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+                    <!-- SKU de Variante FIRST (invertido) -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">SKU de la Variante</label>
+                        <input v-model="form.sku" type="text"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            :placeholder="autoVariantSku || 'Ej: ALT-0012-BOS'" />
+                        <p v-if="autoVariantSku" class="mt-1 text-xs text-indigo-600 dark:text-indigo-400">
+                            Auto: <span class="font-mono font-bold">{{ autoVariantSku }}</span>
+                        </p>
+                        <p v-if="getError('sku')" class="mt-1 text-sm text-red-600">{{ getError('sku') }}</p>
+                    </div>
+
+                    <!-- Marca SECOND (invertido) -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Marca <span class="text-red-500">*</span></label>
+                            <button type="button" @click="openInline('brand')" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
+                                <Plus class="h-3 w-3" /> Crear
+                            </button>
+                        </div>
+                        <SearchableSelect
+                            :options="brandOptions"
+                            :model-value="form.brand_id"
+                            @update:model-value="v => form.brand_id = v as number"
+                            placeholder="-- Selecciona marca --"
+                            :loading="loadingBrands"
+                        />
+                        <p v-if="getError('brand_id')" class="mt-1 text-sm text-red-600">{{ getError('brand_id') }}</p>
+                    </div>
+
+                    <!-- Custom SKU (auto-filled) -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Custom SKU</label>
+                        <input v-model="form.upc" type="text" @input="onCustomSkuInput"
+                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Se llena con SKU Base" />
+                        <p v-if="!customSkuManuallyEdited" class="mt-1 text-xs text-gray-400">Se llena automáticamente con el SKU base</p>
+                        <p v-if="getError('upc')" class="mt-1 text-sm text-red-600">{{ getError('upc') }}</p>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-3 p-4 rounded-lg bg-gray-50 dark:bg-muted/50 border border-dashed border-gray-300 dark:border-border">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Precio Base (USD) <span class="text-red-500">*</span></label>
-                        <input v-model.number="form.pricing.base_price" type="number" step="0.01" min="0" required
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" placeholder="100.00" />
+                <!-- Precios (was separate section, now merged) -->
+                <div class="mt-6 pt-6 border-t border-gray-200 dark:border-border">
+                    <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Precios e Impuestos</h3>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Tipo de Impuesto (ITBM)</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
+                                :class="form.pricing.tax_type === 'standard' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'border-gray-300 dark:border-border'">
+                                <input type="radio" name="tax_type" value="standard" :checked="form.pricing.tax_type === 'standard'" @change="onTaxTypeChange('standard')" class="sr-only" />
+                                <span class="text-sm font-medium">Con ITBM (7%)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
+                                :class="form.pricing.tax_type === 'exempt' ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'border-gray-300 dark:border-border'">
+                                <input type="radio" name="tax_type" value="exempt" :checked="form.pricing.tax_type === 'exempt'" @change="onTaxTypeChange('exempt')" class="sr-only" />
+                                <span class="text-sm font-medium">Sin ITBM (0%)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer rounded-lg border px-4 py-2 transition-colors"
+                                :class="form.pricing.tax_type === 'custom' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' : 'border-gray-300 dark:border-border'">
+                                <input type="radio" name="tax_type" value="custom" :checked="form.pricing.tax_type === 'custom'" @change="onTaxTypeChange('custom')" class="sr-only" />
+                                <span class="text-sm font-medium">Tasa personalizada</span>
+                            </label>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">ITBM (%) <span class="text-red-500">*</span></label>
-                        <input v-model.number="form.pricing.tax_rate" type="number" step="0.01" min="0" max="15" required
-                            :disabled="form.pricing.tax_type !== 'custom'"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white disabled:opacity-50" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Precio Total (con ITBM)</label>
-                        <input :value="computed_total" @input="onTotalChange(Number(($event.target as HTMLInputElement).value))"
-                            type="number" step="0.01" min="0"
-                            class="mt-1 w-full rounded-md border border-blue-400 bg-blue-50 dark:border-blue-600 dark:border-primary dark:bg-blue-900/20 px-3 py-2 dark:text-white font-semibold" />
-                        <p class="mt-1 text-xs text-blue-600 dark:text-primary dark:text-blue-400">Se recalcula automáticamente</p>
+
+                    <div class="grid grid-cols-1 gap-6 md:grid-cols-3 p-4 rounded-lg bg-gray-50 dark:bg-muted/50 border border-dashed border-gray-300 dark:border-border">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Precio Base (USD) <span class="text-red-500">*</span></label>
+                            <input v-model.number="form.pricing.base_price" type="number" step="0.01" min="0" required
+                                class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" placeholder="100.00" />
+                            <p v-if="getError('pricing.base_price')" class="mt-1 text-sm text-red-600">{{ getError('pricing.base_price') }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">ITBM (%) <span class="text-red-500">*</span></label>
+                            <input v-model.number="form.pricing.tax_rate" type="number" step="0.01" min="0" max="15" required
+                                :disabled="form.pricing.tax_type !== 'custom'"
+                                class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white disabled:opacity-50" />
+                            <p v-if="getError('pricing.tax_rate')" class="mt-1 text-sm text-red-600">{{ getError('pricing.tax_rate') }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Precio Total (con ITBM)</label>
+                            <input :value="computed_total" @input="onTotalChange(Number(($event.target as HTMLInputElement).value))"
+                                type="number" step="0.01" min="0"
+                                class="mt-1 w-full rounded-md border border-blue-400 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20 px-3 py-2 dark:text-white font-semibold" />
+                            <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">Se recalcula automáticamente</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ══════════ SECTION 5: Inventario ══════════ -->
+            <!-- ══════════ SECTION 4: Inventario ══════════ -->
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Inventario Inicial (Opcional)</h2>
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -595,5 +804,91 @@ const cancel = () => { window.location.href = '/products' }
             </div>
         </form>
     </div>
+
+    <!-- ── Inline Creation Modal ── -->
+    <Dialog :open="inlineModal !== null" @update:open="v => { if (!v) closeInline() }">
+        <DialogContent class="sm:max-w-sm">
+            <DialogHeader>
+                <DialogTitle>
+                    {{ inlineModal === 'category' ? 'Nueva Categoría' :
+                       inlineModal === 'brand' ? 'Nueva Marca de Artículo' :
+                       inlineModal === 'vehicleMake' ? 'Nueva Marca Vehicular' :
+                       inlineModal === 'vehicleModel' ? 'Nuevo Modelo' :
+                       inlineModal === 'vehicleEngine' ? 'Nuevo Motor' : '' }}
+                </DialogTitle>
+            </DialogHeader>
+            <form @submit.prevent="submitInline" class="space-y-4 py-2">
+                <!-- Category -->
+                <template v-if="inlineModal === 'category'">
+                    <div class="space-y-4">
+                        <div class="space-y-2">
+                            <Label>Nombre de la Categoría <span class="text-red-500">*</span></Label>
+                            <Input v-model="inlineForm.name" required placeholder="Ej: Filtros, Frenos" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label>Categoría Padre (Opcional)</Label>
+                            <SearchableSelect
+                                :options="categoryOptions"
+                                :model-value="inlineForm.parent_id"
+                                @update:model-value="v => inlineForm.parent_id = v as number | null"
+                                placeholder="-- Selecciona categoría padre --"
+                            />
+                        </div>
+                    </div>
+                </template>
+                <!-- Brand -->
+                <template v-if="inlineModal === 'brand'">
+                    <div class="space-y-2">
+                        <Label>Nombre de la Marca <span class="text-red-500">*</span></Label>
+                        <Input v-model="inlineForm.name" required placeholder="Ej: KYB, Bosch, Monroe" />
+                    </div>
+                </template>
+                <!-- Vehicle Make -->
+                <template v-if="inlineModal === 'vehicleMake'">
+                    <div class="space-y-2">
+                        <Label>Nombre de la Marca <span class="text-red-500">*</span></Label>
+                        <Input v-model="inlineForm.name" required placeholder="Ej: Toyota, Honda, Ford" />
+                    </div>
+                </template>
+                <!-- Vehicle Model -->
+                <template v-if="inlineModal === 'vehicleModel'">
+                    <div class="space-y-2">
+                        <Label>Nombre del Modelo <span class="text-red-500">*</span></Label>
+                        <Input v-model="inlineForm.name" required placeholder="Ej: Corolla, Civic" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <Label>Año Desde</Label>
+                            <Input v-model.number="inlineForm.year_from" type="number" placeholder="2005" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label>Año Hasta</Label>
+                            <Input v-model.number="inlineForm.year_to" type="number" placeholder="2024" />
+                        </div>
+                    </div>
+                </template>
+                <!-- Vehicle Engine -->
+                <template v-if="inlineModal === 'vehicleEngine'">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <Label>Motor <span class="text-red-500">*</span></Label>
+                            <Input v-model="inlineForm.engine_code" required placeholder="Ej: 2AZ-FE" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label>Desplazamiento</Label>
+                            <Input v-model="inlineForm.displacement" placeholder="Ej: 2.4L" />
+                        </div>
+                    </div>
+                </template>
+
+                <div v-if="inlineError" class="text-sm text-red-600">{{ inlineError }}</div>
+                <div class="flex justify-end gap-2">
+                    <Button type="button" variant="outline" @click="closeInline">Cancelar</Button>
+                    <Button type="submit" :disabled="inlineProcessing">{{ inlineProcessing ? 'Guardando...' : 'Guardar' }}</Button>
+                </div>
+            </form>
+        </DialogContent>
+    </Dialog>
+
     </AppLayout>
 </template>

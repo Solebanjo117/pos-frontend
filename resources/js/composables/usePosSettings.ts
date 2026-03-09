@@ -50,11 +50,27 @@ export function usePosSettings() {
         // Try to fetch from backend first (source of truth)
         try {
             const context = await posService.getWarehouseContext()
+
             if (context.current_warehouse_id) {
                 currentWarehouseId.value = context.current_warehouse_id
                 localStorage.setItem(CURRENT_WAREHOUSE_KEY, String(context.current_warehouse_id))
                 return
             }
+
+            // Backend returned null for current_warehouse_id — pick first allowed warehouse
+            const allowed = context.allowed_warehouses ?? []
+            if (allowed.length > 0) {
+                const firstId = allowed[0].id
+                currentWarehouseId.value = firstId
+                localStorage.setItem(CURRENT_WAREHOUSE_KEY, String(firstId))
+                try { await posService.setWarehouseContext(firstId) } catch { }
+                return
+            }
+
+            // User has no warehouses assigned at all — leave as null
+            currentWarehouseId.value = null
+            localStorage.removeItem(CURRENT_WAREHOUSE_KEY)
+            return
         } catch (err: any) {
             // If 401, silently fall back
             if (err.response?.status !== 401) {
@@ -62,20 +78,21 @@ export function usePosSettings() {
             }
         }
 
-        // Fallback to localStorage (backend had no warehouse set or was unreachable)
+        // Fallback to localStorage (backend was unreachable)
         const stored = localStorage.getItem(CURRENT_WAREHOUSE_KEY)
         if (stored) {
             currentWarehouseId.value = Number(stored)
-            // Sync localStorage value to backend so it becomes the source of truth
-            try { await posService.setWarehouseContext(Number(stored)) } catch { }
-        } else {
-            // Default to settings default or 1 if nothing set
-            const defaultId = getDefaultWarehouseId() || 1
-            currentWarehouseId.value = defaultId
-            localStorage.setItem(CURRENT_WAREHOUSE_KEY, String(defaultId))
-            // Sync to backend
-            try { await posService.setWarehouseContext(defaultId) } catch { }
+            // Try to sync — if 403 the stored warehouse is not allowed, clear it
+            try {
+                await posService.setWarehouseContext(Number(stored))
+            } catch (err: any) {
+                if (err.response?.status === 403) {
+                    localStorage.removeItem(CURRENT_WAREHOUSE_KEY)
+                    currentWarehouseId.value = null
+                }
+            }
         }
+        // Do NOT default to warehouse 1 — the user may not have access to it
     }
 
     const setWarehouse = async (id: number) => {

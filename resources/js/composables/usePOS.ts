@@ -256,6 +256,7 @@ export function usePOS() {
                 tax_percent: resolvedTaxRate,
                 default_tax_percent: resolvedTaxRate,
                 is_tax_overridden: false,
+                seller_id: (page.props.auth?.user as any)?.id,
                 warehouse_id,
                 notes: undefined,
                 subtotal: 0,

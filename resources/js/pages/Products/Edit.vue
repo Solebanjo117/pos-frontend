@@ -10,6 +10,11 @@ import AttributeManager from '@/components/Products/AttributeManager.vue'
 import VariantManager from '@/components/Products/VariantManager.vue'
 import OemReferenceManager from '@/components/Products/OemReferenceManager.vue'
 import AlternativeManager from '@/components/Products/AlternativeManager.vue'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
+import { Plus } from 'lucide-vue-next'
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 
 const props = defineProps<{
     productId: number
@@ -25,12 +30,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 ]
 
 const form = ref<UpdateProductRequest>({
-    sku: '',
+    sku_base: '',
     upc: '',
     product_line_id: undefined,
     name: '',
     description: '',
     status: 'active',
+    is_universal: false,
     pricing: {
         base_price: 0,
         msrp: 0,
@@ -57,11 +63,12 @@ onMounted(async () => {
         // Populate form with existing data
             const variantPricing = currentProduct.value.pricing
             form.value = {
-                sku: currentProduct.value.sku_base || '',
+                sku_base: currentProduct.value.sku_base || '',
                 upc: currentProduct.value.default_variant?.upc || '',
                 name: currentProduct.value.name,
                 description: currentProduct.value.description || '',
                 status: currentProduct.value.status,
+                is_universal: currentProduct.value.is_universal ?? false, // Added this line
                 batch_tracking: currentProduct.value.batch_tracking,
                 pricing: variantPricing ? {
                     base_price: variantPricing.base_price,
@@ -284,6 +291,192 @@ const handleRemoveVin = async (vinId: number) => {
 onMounted(() => {
     fetchVins()
 })
+
+// ===== Vehicle Compatibility Management =====
+interface CompatibleEngine {
+    id: number
+    compat_id: number  // ID of the compatibility record (for deletion)
+    engine_code: string
+    displacement?: string
+    model?: { id: number; name: string; year_from?: number; year_to?: number; make?: { id: number; name: string }; generation?: string }
+}
+
+interface VehicleMake { id: number; name: string }
+interface VehicleModelItem { id: number; name: string; year_from?: number; year_to?: number; generation?: string }
+interface VehicleEngineItem { id: number; engine_code: string; displacement?: string }
+
+const compatibleEngines = ref<CompatibleEngine[]>([])
+const loadingCompat = ref(false)
+const addingCompat = ref(false)
+
+const vehicleMakes = ref<VehicleMake[]>([])
+const vehicleModels = ref<VehicleModelItem[]>([])
+const vehicleEnginesList = ref<VehicleEngineItem[]>([])
+
+const selectedMakeId = ref<number | null>(null)
+const selectedModelId = ref<number | null>(null)
+const selectedEngineId = ref<number | null>(null)
+
+const loadingMakes = ref(false)
+const loadingModelsV = ref(false)
+const loadingEnginesV = ref(false)
+
+const fetchCompatibleEngines = async () => {
+    loadingCompat.value = true
+    try {
+        const res = await apiClient.get(`/products/${props.productId}/compatibility`)
+        const compat = res.data.data ?? []
+        compatibleEngines.value = compat.map((c: any) => ({
+            id: c.engine?.id ?? c.engine_id,
+            compat_id: c.id,  // the compatibility record ID
+            engine_code: c.engine?.engine_code ?? 'N/A',
+            displacement: c.engine?.displacement,
+            model: c.engine?.model ? {
+                id: c.engine.model.id,
+                name: c.engine.model.name,
+                year_from: c.engine.model.year_from,
+                year_to: c.engine.model.year_to,
+                generation: c.engine.model.generation,
+                make: c.engine.model.make,
+            } : undefined,
+        }))
+    } catch (e) {
+        compatibleEngines.value = []
+    } finally {
+        loadingCompat.value = false
+    }
+}
+
+const fetchVehicleMakes = async () => {
+    loadingMakes.value = true
+    try {
+        const { data } = await apiClient.get('/vehicle-makes')
+        vehicleMakes.value = data.data ?? data
+    } catch { vehicleMakes.value = [] }
+    finally { loadingMakes.value = false }
+}
+
+watch(selectedMakeId, async (makeId) => {
+    vehicleModels.value = []; vehicleEnginesList.value = []
+    selectedModelId.value = null; selectedEngineId.value = null
+    if (!makeId) return
+    loadingModelsV.value = true
+    try {
+        const { data } = await apiClient.get(`/vehicle-makes/${makeId}/models`)
+        vehicleModels.value = data.data ?? data
+    } catch { vehicleModels.value = [] }
+    finally { loadingModelsV.value = false }
+})
+
+watch(selectedModelId, async (modelId) => {
+    vehicleEnginesList.value = []; selectedEngineId.value = null
+    if (!modelId) return
+    loadingEnginesV.value = true
+    try {
+        const { data } = await apiClient.get(`/vehicle-models/${modelId}/engines`)
+        vehicleEnginesList.value = data.data ?? data
+    } catch { vehicleEnginesList.value = [] }
+    finally { loadingEnginesV.value = false }
+})
+
+const makeSelectOptions = computed(() => vehicleMakes.value.map(m => ({ value: m.id, label: m.name })))
+const modelSelectOptions = computed(() => vehicleModels.value.map(m => {
+    const years = m.year_from ? `${m.year_from}-${m.year_to || '...'}` : ''
+    const gen = m.generation ? `${m.generation}` : ''
+    const parts = [years, gen].filter(Boolean)
+    return { value: m.id, label: m.name, sublabel: parts.join(' - ') }
+}))
+const engineSelectOptions = computed(() => vehicleEnginesList.value.map(e => ({
+    value: e.id, label: e.engine_code, sublabel: e.displacement || '',
+})))
+
+const handleAddCompatibility = async () => {
+    if (!selectedEngineId.value) return
+    if (compatibleEngines.value.some(e => e.id === selectedEngineId.value)) return
+    addingCompat.value = true
+    try {
+        await apiClient.post('/products/compatibility', {
+            product_id: props.productId,
+            engine_id: selectedEngineId.value,
+        })
+        await fetchCompatibleEngines()
+        selectedEngineId.value = null
+    } catch (e: any) {
+        console.error('Error adding compatibility', e)
+    } finally {
+        addingCompat.value = false
+    }
+}
+
+const handleRemoveCompatibility = async (compatId: number) => {
+    if (!confirm('¿Eliminar esta compatibilidad?')) return
+    try {
+        await apiClient.delete(`/products/compatibility/${compatId}`)
+        compatibleEngines.value = compatibleEngines.value.filter(e => e.compat_id !== compatId)
+    } catch (e) {
+        console.error('Error removing compatibility', e)
+    }
+}
+
+const toggleUniversalStatus = async () => {
+    try {
+        await apiClient.put(`/products/${props.productId}`, {
+            is_universal: form.value.is_universal
+        })
+        // success is silent
+    } catch (e: any) {
+        console.error('Error updating universal status', e)
+        // Reset if failed
+        form.value.is_universal = !form.value.is_universal
+    }
+}
+
+// === Inline Creation Modals (Vehicles) ===
+const inlineModal = ref<'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | null>(null)
+const inlineForm = ref<Record<string, any>>({})
+const inlineProcessing = ref(false)
+const inlineError = ref<string | null>(null)
+
+const openInline = (type: typeof inlineModal.value) => {
+    inlineModal.value = type
+    inlineError.value = null
+    inlineProcessing.value = false
+    if (type === 'vehicleMake') inlineForm.value = { name: '' }
+    else if (type === 'vehicleModel') inlineForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), generation: '' }
+    else if (type === 'vehicleEngine') inlineForm.value = { engine_code: '', displacement: '' }
+}
+const closeInline = () => { inlineModal.value = null }
+
+const submitInline = async () => {
+    inlineProcessing.value = true
+    inlineError.value = null
+    try {
+        if (inlineModal.value === 'vehicleMake') {
+            const { data } = await apiClient.post('/vehicle-makes', inlineForm.value)
+            const newMake = data.data ?? data
+            vehicleMakes.value.push(newMake)
+            selectedMakeId.value = newMake.id
+        } else if (inlineModal.value === 'vehicleModel') {
+            const { data } = await apiClient.post('/vehicle-models', { ...inlineForm.value, make_id: selectedMakeId.value })
+            const newModel = data.data ?? data
+            vehicleModels.value.push(newModel)
+            selectedModelId.value = newModel.id
+        } else if (inlineModal.value === 'vehicleEngine') {
+            const { data } = await apiClient.post('/vehicle-engines', { ...inlineForm.value, model_id: selectedModelId.value, fuel_type: 'N/A', aspiration: 'N/A' })
+            const newEngine = data.data ?? data
+            vehicleEnginesList.value.push(newEngine)
+            selectedEngineId.value = newEngine.id
+        }
+        closeInline()
+    } catch (e: any) {
+        inlineError.value = e.response?.data?.message || 'Error al crear'
+    } finally { inlineProcessing.value = false }
+}
+
+onMounted(() => {
+    fetchCompatibleEngines()
+    fetchVehicleMakes()
+})
 </script>
 
 <template>
@@ -332,7 +525,7 @@ onMounted(() => {
                         <button
                             @click="activeTab = 'specs'"
                             :class="[
-                                ['specs','vins'].includes(activeTab)
+                                ['specs','vins','vehicles'].includes(activeTab)
                                     ? 'bg-white shadow text-blue-700 dark:bg-muted dark:text-blue-400'
                                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
                                 'flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all'
@@ -389,9 +582,9 @@ onMounted(() => {
                                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                                         SKU <span class="text-red-500">*</span>
                                     </label>
-                                    <input v-model="form.sku" type="text" required
+                                    <input v-model="form.sku_base" type="text" required
                                         class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" />
-                                    <p v-if="validationErrors.sku" class="mt-1 text-sm text-red-600">{{ validationErrors.sku[0] }}</p>
+                                    <p v-if="validationErrors.sku_base" class="mt-1 text-sm text-red-600">{{ validationErrors.sku_base[0] }}</p>
                                 </div>
 
                                 <div>
@@ -424,6 +617,18 @@ onMounted(() => {
                                         <option value="discontinued">Discontinuado</option>
                                         <option value="pending">Pendiente</option>
                                     </select>
+                                </div>
+
+                                <div class="col-span-1 md:col-span-2 mt-2">
+                                    <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-gray-50 dark:border-border dark:bg-muted/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-muted transition-colors">
+                                        <div class="flex items-center h-5 mt-0.5">
+                                            <input v-model="form.is_universal" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-border dark:bg-card dark:checked:bg-primary" />
+                                        </div>
+                                        <div class="flex-1">
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">Producto Universal (No requiere compatibilidad)</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400 mt-1">Marca esta opción si el producto aplica para cualquier vehículo (ej. ambientadores, herramientas).</span>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -556,7 +761,7 @@ onMounted(() => {
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <!--  GROUP 2: Datos Técnicos y Aplicación                    -->
                 <!-- ═══════════════════════════════════════════════════════════ -->
-                <div v-if="['specs','vins'].includes(activeTab)" class="space-y-6">
+                <div v-if="['specs','vins','vehicles'].includes(activeTab)" class="space-y-6">
                     <!-- Sub-tabs -->
                     <div class="flex gap-1 border-b border-gray-200 dark:border-border">
                         <button @click="activeTab = 'vins'"
@@ -564,6 +769,12 @@ onMounted(() => {
                             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2">
                             🔑 VINs
                             <span v-if="vins.length" class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{{ vins.length }}</span>
+                        </button>
+                        <button @click="activeTab = 'vehicles'"
+                            :class="[activeTab === 'vehicles' ? 'border-blue-500 text-blue-600 dark:text-primary dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400']"
+                            class="border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2">
+                            🚗 Compatibilidad Vehicular
+                            <span v-if="compatibleEngines.length" class="rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] font-bold text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">{{ compatibleEngines.length }}</span>
                         </button>
                     </div>
 
@@ -606,7 +817,136 @@ onMounted(() => {
                             <p class="text-xs mt-1">Agrega VINs para habilitar la búsqueda por VIN en el POS</p>
                         </div>
                     </div>
-                </div>
+
+                    <!-- Vehicle Compatibility Tab -->
+                    <div v-if="activeTab === 'vehicles'" class="rounded-lg bg-white p-6 shadow dark:bg-card">
+                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Compatibilidad Vehicular</h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Agrega los vehículos compatibles con este producto. Los motores agregados aquí se usarán para filtrar en el POS.</p>
+
+                        <!-- Universal Toggle -->
+                        <div class="mb-6 rounded-lg border-2 border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/30 dark:bg-indigo-900/10">
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <div class="relative flex items-center">
+                                    <input type="checkbox" v-model="form.is_universal" @change="toggleUniversalStatus" class="sr-only peer">
+                                    <div class="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-indigo-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 dark:bg-gray-700 dark:border-gray-600"></div>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
+                                        <span>🌐</span> Compatibilidad Universal
+                                    </p>
+                                    <p class="text-sm text-indigo-700/70 dark:text-indigo-400/70">Marcar si el producto es genérico y aplica a cualquier vehículo o marca.</p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Specific Vehicle Assignment (Hidden if Universal) -->
+                        <div v-show="!form.is_universal" class="space-y-6 transition-all duration-300">
+                            <!-- Dropdowns for Make/Model/Engine -->
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-4 items-end bg-gray-50 dark:bg-muted/30 p-4 rounded-lg border border-gray-100 dark:border-border/50">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Marca Vehículo</label>
+                                <div class="flex gap-1">
+                                    <SearchableSelect
+                                        :options="makeSelectOptions"
+                                        :model-value="selectedMakeId"
+                                        @update:model-value="v => selectedMakeId = v as number | null"
+                                        placeholder="-- Marca --"
+                                        :loading="loadingMakes"
+                                    />
+                                    <button type="button" @click="openInline('vehicleMake')"
+                                        class="flex-shrink-0 rounded-md border border-gray-300 dark:border-border bg-white dark:bg-muted p-2 text-gray-500 hover:text-blue-600 hover:border-blue-400 dark:hover:text-blue-400 transition"
+                                        title="Crear nueva marca">
+                                        <Plus class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Modelo</label>
+                                <div class="flex gap-1">
+                                    <SearchableSelect
+                                        :options="modelSelectOptions"
+                                        :model-value="selectedModelId"
+                                        @update:model-value="v => selectedModelId = v as number | null"
+                                        placeholder="-- Modelo --"
+                                        :disabled="!selectedMakeId"
+                                        :loading="loadingModelsV"
+                                    />
+                                    <button type="button" @click="openInline('vehicleModel')"
+                                        :disabled="!selectedMakeId"
+                                        class="flex-shrink-0 rounded-md border border-gray-300 dark:border-border bg-white dark:bg-muted p-2 text-gray-500 hover:text-blue-600 hover:border-blue-400 dark:hover:text-blue-400 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title="Crear nuevo modelo">
+                                        <Plus class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Motor</label>
+                                <div class="flex gap-1">
+                                    <SearchableSelect
+                                        :options="engineSelectOptions"
+                                        :model-value="selectedEngineId"
+                                        @update:model-value="v => selectedEngineId = v as number | null"
+                                        placeholder="-- Motor --"
+                                        :disabled="!selectedModelId"
+                                        :loading="loadingEnginesV"
+                                    />
+                                    <button type="button" @click="openInline('vehicleEngine')"
+                                        :disabled="!selectedModelId"
+                                        class="flex-shrink-0 rounded-md border border-gray-300 dark:border-border bg-white dark:bg-muted p-2 text-gray-500 hover:text-blue-600 hover:border-blue-400 dark:hover:text-blue-400 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title="Crear nuevo motor">
+                                        <Plus class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex items-end">
+                                <button type="button" @click="handleAddCompatibility" :disabled="!selectedEngineId || addingCompat"
+                                    class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
+                                    {{ addingCompat ? 'Agregando...' : '+ Agregar' }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Compatible Engines Table -->
+                        <div v-if="loadingCompat" class="text-center py-8">
+                            <div class="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-teal-600 border-r-transparent"></div>
+                            <p class="mt-2 text-sm text-gray-500">Cargando compatibilidades...</p>
+                        </div>
+
+                        <div v-else-if="compatibleEngines.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-50 dark:bg-background/50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Marca</th>
+                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Modelo</th>
+                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Años</th>
+                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Motor</th>
+                                        <th class="w-10 px-2 py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-border/50">
+                                    <tr v-for="eng in compatibleEngines" :key="eng.id" class="bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-muted/30 transition-colors">
+                                        <td class="px-4 py-2 text-gray-900 dark:text-white font-medium">{{ eng.model?.make?.name ?? 'N/A' }}</td>
+                                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ eng.model?.name ?? 'N/A' }}{{ eng.model?.generation ? ` - ${eng.model.generation}` : '' }}</td>
+                                        <td class="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs">{{ eng.model?.year_from ?? '' }}{{ eng.model?.year_to ? '–' + eng.model.year_to : '' }}</td>
+                                        <td class="px-4 py-2 font-mono text-gray-600 dark:text-gray-400">{{ eng.engine_code }}<span v-if="eng.displacement" class="ml-1 text-xs text-gray-400">({{ eng.displacement }})</span></td>
+                                        <td class="px-2 py-2 text-center">
+                                            <button type="button" @click="handleRemoveCompatibility(eng.compat_id)" class="text-red-400 hover:text-red-600 transition" title="Eliminar compatibilidad">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div v-else class="text-center py-10 text-gray-400">
+                            <p class="text-4xl mb-2">🚗</p>
+                            <p class="text-sm">No hay vehículos compatibles asignados</p>
+                            <p class="text-xs mt-1">Usa los selectores arriba para agregar compatibilidad</p>
+                        </div>
+                        </div> <!-- End wrapper for specific vehicles -->
+                    </div>
+                </div> <!-- END GROUP 2 -->
 
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <!--  GROUP 3: Relaciones y Referencias                        -->
@@ -645,4 +985,89 @@ onMounted(() => {
             </div>
         </div>
     </AppLayout>
+
+    <!-- ═══════ Inline Creation Modals ═══════ -->
+    <Dialog :open="inlineModal !== null" @update:open="v => { if (!v) closeInline() }">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>
+                    <span v-if="inlineModal === 'vehicleMake'">Nueva Marca de Vehículo</span>
+                    <span v-else-if="inlineModal === 'vehicleModel'">Nuevo Modelo de Vehículo</span>
+                    <span v-else-if="inlineModal === 'vehicleEngine'">Nuevo Motor</span>
+                </DialogTitle>
+            </DialogHeader>
+
+            <div class="space-y-4 pt-2">
+
+                <!-- Error -->
+                <p v-if="inlineError" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">{{ inlineError }}</p>
+
+                <!-- Make form -->
+                <template v-if="inlineModal === 'vehicleMake'">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre de la Marca <span class="text-red-500">*</span></label>
+                        <input v-model="inlineForm.name" type="text" @keyup.enter="submitInline"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Ej: Toyota, Ford, Kia..." />
+                    </div>
+                </template>
+
+                <!-- Model form -->
+                <template v-else-if="inlineModal === 'vehicleModel'">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del Modelo <span class="text-red-500">*</span></label>
+                        <input v-model="inlineForm.name" type="text"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Ej: Corolla, Civic, Tucson..." />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Año Desde <span class="text-red-500">*</span></label>
+                            <input v-model.number="inlineForm.year_from" type="number" min="1900" :max="new Date().getFullYear() + 2"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Año Hasta <span class="text-red-500">*</span></label>
+                            <input v-model.number="inlineForm.year_to" type="number" min="1900" :max="new Date().getFullYear() + 2"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Generación <span class="text-xs text-gray-400">(opcional)</span></label>
+                        <input v-model="inlineForm.generation" type="text"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Ej: E170, W204, MK4..." />
+                    </div>
+                </template>
+
+                <!-- Engine form -->
+                <template v-else-if="inlineModal === 'vehicleEngine'">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código de Motor <span class="text-red-500">*</span></label>
+                        <input v-model="inlineForm.engine_code" type="text"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Ej: 1NZ-FE, K24A, EJ257..." />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cilindrada <span class="text-xs text-gray-400">(opcional)</span></label>
+                        <input v-model="inlineForm.displacement" type="text"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Ej: 1.8L, 2.4L, 2000cc..." />
+                    </div>
+                </template>
+
+                <!-- Actions -->
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" @click="closeInline"
+                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-muted dark:text-gray-200 dark:hover:bg-background">
+                        Cancelar
+                    </button>
+                    <button type="button" @click="submitInline" :disabled="inlineProcessing"
+                        class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-50">
+                        {{ inlineProcessing ? 'Creando...' : 'Crear' }}
+                    </button>
+                </div>
+            </div>
+        </DialogContent>
+    </Dialog>
 </template>

@@ -208,7 +208,12 @@ const submitSelection = () => {
 
                   <!-- Product Name + Category/Brand -->
                   <td class="px-3 py-3 max-w-[250px]">
-                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ product.name }}</p>
+                    <div class="flex items-center gap-2">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ product.name }}</p>
+                        <span v-if="product.is_universal" class="flex-shrink-0 inline-flex items-center gap-0.5 rounded bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-inset ring-blue-500/10 dark:bg-blue-900/30 dark:text-blue-400 dark:ring-blue-500/30" title="Universal">
+                            🌐 Univ
+                        </span>
+                    </div>
                     <p v-if="product.category?.name || product.brand?.name" class="text-[11px] text-gray-400 truncate mt-0.5">
                       <span v-if="product.category?.name">{{ product.category.name }}</span>
                       <span v-if="product.category?.name && product.brand?.name"> · </span>

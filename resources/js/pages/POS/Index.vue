@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { Head } from '@inertiajs/vue3'
+import { Head, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { usePOS } from '@/composables/usePOS'
 import { useProducts } from '@/composables/useProducts'
@@ -105,11 +105,12 @@ const showCloseSessionModal = ref(false)
 const showCashMovementModal = ref(false)
 const forceShowOpenSessionModal = ref(false)
 const sessionActionLoading = ref(false)
-const seller_id = ref<number | undefined>(undefined)
+const seller_id = ref<number | undefined>((usePage().props.auth?.user as any)?.id)
 
-// Variant selection modal state
+// Variant selection modal state — queue-based to support multiple products needing variant selection
 const showVariantModal = ref(false)
-const pendingProduct = ref<any>(null)
+const variantQueue = ref<any[]>([])  // FIFO queue of products awaiting variant selection
+const pendingProduct = computed(() => variantQueue.value[0] ?? null)  // always the first in queue
 
 // Credit / partial-payment modal state
 const showAddPaymentModal = ref(false)
@@ -270,6 +271,7 @@ const handleVehicleSearch = async (data: { query: string; quantity: number }) =>
 }
 
 // Add a product to cart — opens VariantSelectModal if multiple variants exist
+// Products with multiple variants are enqueued — they are processed one by one via variantQueue
 const addProductToCart = (product: any, overrideQty?: number) => {
   const variants = product.variants ?? []
   const qtyToUse = overrideQty ?? quantity.value
@@ -280,10 +282,13 @@ const addProductToCart = (product: any, overrideQty?: number) => {
     searchQuery.value = ''
     nextTick(() => searchInput.value?.focus())
   } else if (variants.length > 1) {
-    // Multiple variants: show selection modal
-    pendingProduct.value = product
-    showVariantModal.value = true
+    // Multiple variants: enqueue product for variant selection
+    variantQueue.value.push(product)
     showProductsModal.value = false
+    // Open modal if it's the only/first item in queue
+    if (variantQueue.value.length === 1) {
+      showVariantModal.value = true
+    }
   } else {
     // Fallback: use default_variant if variants array not loaded
     const fallback = product.default_variant ?? null
@@ -293,25 +298,47 @@ const addProductToCart = (product: any, overrideQty?: number) => {
   }
 }
 
-// Handler when cashier selects a variant in the modal
-const onVariantSelected = (variant: any) => {
-  if (pendingProduct.value) {
-    addToCart(pendingProduct.value, variant, quantity.value, currentWarehouseId.value || undefined)
+// Handler when cashier confirms multi-selected variants for the current product in queue
+const onVariantsSelected = (selections: Array<{ variant: any; quantity: number }>) => {
+  const product = variantQueue.value[0]
+  if (product) {
+    selections.forEach(({ variant, quantity: qty }) => {
+      addToCart(product, variant, qty, currentWarehouseId.value || undefined)
+    })
   }
-  showVariantModal.value = false
-  pendingProduct.value = null
-  searchQuery.value = ''
-  nextTick(() => searchInput.value?.focus())
+  // Dequeue the current product
+  variantQueue.value.shift()
+  if (variantQueue.value.length > 0) {
+    // There are more products in queue — keep modal open with next product
+    // (pendingProduct computed will auto-update to queue[0])
+  } else {
+    // Queue exhausted — close modal
+    showVariantModal.value = false
+    searchQuery.value = ''
+    nextTick(() => searchInput.value?.focus())
+  }
 }
 
-// Add selected products from modal
+// Close variant modal and clear queue
+const closeVariantModal = () => {
+  showVariantModal.value = false
+  variantQueue.value = []
+}
+
+// Add selected products from modal — products with multiple variants are enqueued
 const addSelectedProducts = (ids: Set<number>) => {
   const selected = products.value.filter(p => ids.has(p.id))
-  selected.forEach(p => addProductToCart(p))
   showProductsModal.value = false
   searchQuery.value = ''
   quantity.value = 1
-  searchInput.value?.focus()
+  // Separate single-variant products (add directly) from multi-variant (enqueue)
+  selected.forEach(p => addProductToCart(p))
+  // If any multi-variant products were enqueued, open the modal
+  if (variantQueue.value.length > 0) {
+    showVariantModal.value = true
+  } else {
+    searchInput.value?.focus()
+  }
 }
 
 // Fetch categories and brands
@@ -819,10 +846,10 @@ onUnmounted(() => {
 
     <!-- ========== Variant Select Modal ========== -->
     <VariantSelectModal
-        :show="showVariantModal"
+        :show="showVariantModal && pendingProduct !== null"
         :product="pendingProduct"
-        @select="onVariantSelected"
-        @close="showVariantModal = false; pendingProduct = null"
+        @select-multiple="onVariantsSelected"
+        @close="closeVariantModal"
     />
 
     <!-- CloseSession + shortcuts remain at bottom as overlays -->

@@ -558,8 +558,13 @@ const getVariants = (product: any) => {
                                         {{ product.sku_base || product.default_variant?.sku }}
                                     </td>
                                     <td class="px-6 py-4">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">
-                                            {{ product.name }}
+                                        <div class="flex items-center gap-2">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                                {{ product.name }}
+                                            </div>
+                                            <span v-if="product.is_universal" class="flex-shrink-0 inline-flex items-center gap-0.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-inset ring-blue-500/10 dark:bg-blue-900/30 dark:text-blue-400 dark:ring-blue-500/30" title="Universal">
+                                                🌐 Universal
+                                            </span>
                                         </div>
                                         <div v-if="product.product_line"
                                             class="text-sm text-gray-500 dark:text-gray-400">

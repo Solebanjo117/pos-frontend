@@ -56,37 +56,36 @@ const differenceIcon = computed(() => {
     return 'equal'
 })
 
-// Denomination table rows
-const DENOM_BILLS = [
-    { id: '1000', label: '$1,000', value: 1000, packSize: 100 },
-    { id: '500',  label: '$500',   value: 500,  packSize: 100 },
-    { id: '200',  label: '$200',   value: 200,  packSize: 100 },
-    { id: '100',  label: '$100',   value: 100,  packSize: 100 },
-    { id: '50',   label: '$50',    value: 50,   packSize: 100 },
-    { id: '20',   label: '$20',    value: 20,   packSize: 100 },
+// Denomination table rows — must match the IDs used in CloseSessionModal / CashCountTable
+// CloseSessionModal stores: { unit_100: N, pack_100: N, unit_50: N, pack_50: N, ... }
+const DENOM_ROWS = [
+    { id: '100',  label: '$100',  unitValue: 100,  packValue: 10000 },
+    { id: '50',   label: '$50',   unitValue: 50,   packValue: 5000 },
+    { id: '20',   label: '$20',   unitValue: 20,   packValue: 2000 },
+    { id: '10',   label: '$10',   unitValue: 10,   packValue: 1000 },
+    { id: '5',    label: '$5',    unitValue: 5,     packValue: 500 },
+    { id: '1',    label: '$1',    unitValue: 1,     packValue: 100 },
+    { id: '1.00', label: '$1.00 (moneda)', unitValue: 1.00, packValue: 25.00 },
+    { id: '0.50', label: '$0.50', unitValue: 0.50, packValue: 10.00 },
+    { id: '0.25', label: '$0.25', unitValue: 0.25, packValue: 10.00 },
+    { id: '0.10', label: '$0.10', unitValue: 0.10, packValue: 5.00 },
+    { id: '0.05', label: '$0.05', unitValue: 0.05, packValue: 2.00 },
+    { id: '0.01', label: '$0.01', unitValue: 0.01, packValue: 0.50 },
 ]
-const DENOM_COINS = [
-    { id: '10',   label: '$10',    value: 10 },
-    { id: '5',    label: '$5',     value: 5 },
-    { id: '2',    label: '$2',     value: 2 },
-    { id: '1',    label: '$1',     value: 1 },
-    { id: '0.5',  label: '$0.50',  value: 0.5 },
-    { id: '0.2',  label: '$0.20',  value: 0.2 },
-    { id: '0.1',  label: '$0.10',  value: 0.1 },
-]
-
-const allDenoms = [...DENOM_BILLS, ...DENOM_COINS]
 
 const denomData = computed(() => {
     if (!denominations.value) return []
-    return allDenoms.map(d => {
-        const count = Number(denominations.value?.[d.id] || 0)
+    return DENOM_ROWS.map(d => {
+        const unitCount = Number(denominations.value?.[`unit_${d.id}`] || 0)
+        const packCount = Number(denominations.value?.[`pack_${d.id}`] || 0)
+        const subtotal = (unitCount * d.unitValue) + (packCount * d.packValue)
         return {
             ...d,
-            count,
-            subtotal: count * d.value,
+            unitCount,
+            packCount,
+            subtotal,
         }
-    }).filter(d => d.count > 0) // Only show denominations that were counted
+    }).filter(d => d.unitCount > 0 || d.packCount > 0) // Only show denominations that were counted
 })
 
 const totalDenominations = computed(() => denomData.value.reduce((sum, d) => sum + d.subtotal, 0))
@@ -247,7 +246,8 @@ const handlePrint = () => {
                                 <thead>
                                     <tr class="bg-gray-100/50 dark:bg-muted/40 print:bg-gray-100">
                                         <th class="py-1.5 px-3 text-left font-semibold text-gray-500 dark:text-gray-400">Denominación</th>
-                                        <th class="py-1.5 px-3 text-center font-semibold text-gray-500 dark:text-gray-400">Cantidad</th>
+                                        <th class="py-1.5 px-3 text-center font-semibold text-gray-500 dark:text-gray-400">Sueltas</th>
+                                        <th class="py-1.5 px-3 text-center font-semibold text-gray-500 dark:text-gray-400">Fajos</th>
                                         <th class="py-1.5 px-3 text-right font-semibold text-gray-500 dark:text-gray-400">Subtotal</th>
                                     </tr>
                                 </thead>
@@ -255,17 +255,24 @@ const handlePrint = () => {
                                     <tr v-for="d in denomData" :key="d.id" class="border-t border-gray-100 dark:border-border/50 print:border-gray-300">
                                         <td class="py-1.5 px-3 font-medium text-gray-700 dark:text-gray-300">
                                             <span class="inline-flex items-center gap-1">
-                                                <span class="w-2 h-2 rounded-full flex-shrink-0" :class="d.value >= 20 ? 'bg-green-400' : 'bg-amber-400'"></span>
+                                                <span class="w-2 h-2 rounded-full flex-shrink-0" :class="d.unitValue >= 20 ? 'bg-green-400' : 'bg-amber-400'"></span>
                                                 {{ d.label }}
                                             </span>
                                         </td>
-                                        <td class="py-1.5 px-3 text-center font-mono text-gray-600 dark:text-gray-400">× {{ d.count }}</td>
+                                        <td class="py-1.5 px-3 text-center font-mono text-gray-600 dark:text-gray-400">
+                                            <span v-if="d.unitCount > 0">× {{ d.unitCount }}</span>
+                                            <span v-else class="text-gray-300 dark:text-gray-600">—</span>
+                                        </td>
+                                        <td class="py-1.5 px-3 text-center font-mono text-gray-600 dark:text-gray-400">
+                                            <span v-if="d.packCount > 0">× {{ d.packCount }}</span>
+                                            <span v-else class="text-gray-300 dark:text-gray-600">—</span>
+                                        </td>
                                         <td class="py-1.5 px-3 text-right font-semibold text-gray-900 dark:text-white">{{ formatCurrency(d.subtotal) }}</td>
                                     </tr>
                                 </tbody>
                                 <tfoot>
                                     <tr class="border-t-2 border-gray-300 dark:border-border bg-gray-100/70 dark:bg-muted/50 print:bg-gray-100">
-                                        <td colspan="2" class="py-2 px-3 font-bold text-gray-700 dark:text-gray-300 text-right uppercase text-xs">Total Contado</td>
+                                        <td colspan="3" class="py-2 px-3 font-bold text-gray-700 dark:text-gray-300 text-right uppercase text-xs">Total Contado</td>
                                         <td class="py-2 px-3 text-right font-bold text-lg text-gray-900 dark:text-white print:text-sm">{{ formatCurrency(totalDenominations) }}</td>
                                     </tr>
                                 </tfoot>

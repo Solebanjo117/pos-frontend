@@ -95,7 +95,7 @@ const editingId      = ref<number | null>(null)
 
 // Forms
 const makeForm   = ref({ name: '' })
-const modelForm  = ref({ name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear() })
+const modelForm  = ref({ name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), generation: '' })
 const engineForm = ref({ engine_code: '', displacement: '' })
 
 const openMakeCreate = () => { editingId.value = null; makeForm.value = { name: '' }; modalType.value = 'make'; modalError.value = null }
@@ -103,12 +103,12 @@ const openMakeEdit   = (m: VehicleMake) => { editingId.value = m.id; makeForm.va
 
 const openModelCreate = (makeId: number) => {
     activeMakeId.value = makeId; editingId.value = null
-    modelForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear() }
+    modelForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), generation: '' }
     modalType.value = 'model'; modalError.value = null
 }
 const openModelEdit = (model: VehicleModel) => {
     activeMakeId.value = model.make_id; editingId.value = model.id
-    modelForm.value = { name: model.name, year_from: model.year_from ?? new Date().getFullYear(), year_to: model.year_to ?? new Date().getFullYear() }
+    modelForm.value = { name: model.name, year_from: model.year_from ?? new Date().getFullYear(), year_to: model.year_to ?? new Date().getFullYear(), generation: (model as any).generation ?? '' }
     modalType.value = 'model'; modalError.value = null
 }
 
@@ -139,8 +139,8 @@ const submitMake = async () => {
             const idx = makes.value.findIndex(m => m.id === editingId.value)
             if (idx !== -1) makes.value[idx] = updated
         } else {
-            const created = await createMake(makeForm.value)
-            makes.value.push(created)
+            await createMake(makeForm.value)
+            // makes array is automatically updated by the composable
         }
         closeModal()
     } catch (e: any) { modalError.value = e.response?.data?.message || 'Error' }
@@ -160,7 +160,10 @@ const submitModel = async () => {
         } else {
             const created = await createModel(payload)
             if (!modelsByMake.value[activeMakeId.value!]) modelsByMake.value[activeMakeId.value!] = []
-            modelsByMake.value[activeMakeId.value!].push(created)
+            // Prevent duplicate pushes if composable is also tracking it
+            if (!modelsByMake.value[activeMakeId.value!].find(m => m.id === created.id)) {
+                modelsByMake.value[activeMakeId.value!].push(created)
+            }
         }
         closeModal()
     } catch (e: any) { modalError.value = e.response?.data?.message || 'Error' }
@@ -180,7 +183,9 @@ const submitEngine = async () => {
         } else {
             const created = await createEngine(payload)
             if (!enginesByModel.value[activeModelId.value!]) enginesByModel.value[activeModelId.value!] = []
-            enginesByModel.value[activeModelId.value!].push(created)
+            if (!enginesByModel.value[activeModelId.value!].find(e => e.id === created.id)) {
+                enginesByModel.value[activeModelId.value!].push(created)
+            }
             // Immediately open VIN panel for new engine
             editingId.value = created.id
             await loadVins(created.id)
@@ -332,6 +337,7 @@ const handleRemoveVin = async (vinId: number) => {
                                 <span class="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200">
                                     {{ model.name }}
                                     <span v-if="model.year_from" class="ml-2 text-xs text-gray-400">({{ model.year_from }}–{{ model.year_to ?? 'Pres.' }})</span>
+                                    <span v-if="(model as any).generation" class="ml-1 text-xs font-mono text-indigo-500 dark:text-indigo-400">{{ (model as any).generation }}</span>
                                 </span>
                                 <div class="flex items-center gap-1" @click.stop>
                                     <Button variant="ghost" size="icon" class="h-7 w-7" @click="openEngineCreate(model.id)" title="Nuevo Motor">
@@ -407,7 +413,7 @@ const handleRemoveVin = async (vinId: number) => {
                         <Label>Nombre del Modelo</Label>
                         <Input v-model="modelForm.name" required placeholder="Ej: Corolla, Civic, Hilux" />
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-3 gap-4">
                         <div class="space-y-2">
                             <Label>Año Desde</Label>
                             <Input v-model.number="modelForm.year_from" type="number" placeholder="2005" />
@@ -415,6 +421,10 @@ const handleRemoveVin = async (vinId: number) => {
                         <div class="space-y-2">
                             <Label>Año Hasta</Label>
                             <Input v-model.number="modelForm.year_to" type="number" placeholder="2024" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label>Generación</Label>
+                            <Input v-model="modelForm.generation" placeholder="Ej: E170, W204" />
                         </div>
                     </div>
                     <div v-if="modalError" class="text-sm text-red-600">{{ modalError }}</div>

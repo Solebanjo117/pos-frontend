@@ -133,6 +133,7 @@ export interface Product {
     image_url?: string | null
     status: 'active' | 'discontinued' | 'pending'
     batch_tracking: boolean
+    is_universal?: boolean
     category_id?: number
     product_line?: ProductLine
     category?: {
@@ -231,13 +232,14 @@ export interface CreateProductRequest {
 }
 
 export interface UpdateProductRequest {
-    sku?: string
+    sku_base?: string
     upc?: string
     product_line_id?: number
     name?: string
     description?: string
     status?: 'active' | 'discontinued' | 'pending'
     batch_tracking?: boolean
+    is_universal?: boolean
     pricing?: {
         base_price?: number
         msrp?: number

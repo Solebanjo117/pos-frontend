@@ -28,20 +28,25 @@ defineProps<{
                 {{ name }}
             </Link>
         </div>
-        <div class="lg:p-8">
-            <div
-                class="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]"
-            >
-                <div class="flex flex-col space-y-2 text-center">
-                    <h1 class="text-xl font-medium tracking-tight" v-if="title">
-                        {{ title }}
-                    </h1>
-                    <p class="text-sm text-muted-foreground" v-if="description">
-                        {{ description }}
-                    </p>
+        <div class="lg:p-8 flex flex-col h-full">
+            <div class="flex-1 flex items-center justify-center">
+                <div
+                    class="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]"
+                >
+                    <div class="flex flex-col space-y-2 text-center">
+                        <h1 class="text-xl font-medium tracking-tight" v-if="title">
+                            {{ title }}
+                        </h1>
+                        <p class="text-sm text-muted-foreground" v-if="description">
+                            {{ description }}
+                        </p>
+                    </div>
+                    <slot />
                 </div>
-                <slot />
             </div>
+            <footer class="mt-auto py-4 text-center text-xs text-muted-foreground">
+                © {{ new Date().getFullYear() }} HermeX POS. Todos los derechos reservados.
+            </footer>
         </div>
     </div>
 </template>

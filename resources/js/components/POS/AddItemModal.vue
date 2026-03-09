@@ -228,6 +228,7 @@ const handleSubmit = async () => {
                                             <tr>
                                                 <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Producto</th>
                                                 <th class="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase text-right">Precio</th>
+                                                <th class="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase text-center w-28">ITBMS</th>
                                                 <th class="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase text-center">Cant.</th>
                                                 <th class="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
                                                 <th class="w-10 px-2 py-2.5"></th>
@@ -247,6 +248,20 @@ const handleSubmit = async () => {
                                                         min="0"
                                                         class="w-24 px-2 py-1 text-sm text-right rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white"
                                                     />
+                                                </td>
+                                                <td class="px-3 py-3 text-center">
+                                                    <div class="relative">
+                                                        <select
+                                                            v-model.number="item.tax_percent"
+                                                            class="w-full appearance-none text-sm pl-2 pr-6 py-1 rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white cursor-pointer"
+                                                        >
+                                                            <option :value="0">0%</option>
+                                                            <option :value="7">7%</option>
+                                                            <option :value="10">10%</option>
+                                                            <option :value="15">15%</option>
+                                                        </select>
+                                                        <ChevronDown class="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+                                                    </div>
                                                 </td>
                                                 <td class="px-3 py-3 text-center">
                                                     <input

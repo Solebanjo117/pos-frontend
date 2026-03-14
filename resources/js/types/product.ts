@@ -153,6 +153,11 @@ export interface Product {
     updated_at: string
     // Optional loaded relationships
     inventory?: ProductInventory[]
+    key_attributes?: Array<{
+        name: string
+        value: string
+        unit?: string
+    }>
     brand?: Brand
 }
 

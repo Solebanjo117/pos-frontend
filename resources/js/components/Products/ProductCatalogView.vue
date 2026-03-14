@@ -61,7 +61,10 @@ const filteredProducts = computed(() => {
             const matchesName = product.name.toLowerCase().includes(q)
             const matchesSku = product.sku_base?.toLowerCase().includes(q)
             const matchesVariantSku = product.variants?.some(v => v.sku?.toLowerCase().includes(q))
-            if (!matchesName && !matchesSku && !matchesVariantSku) return false
+            const matchesSpecs = product.key_attributes?.some(a =>
+                `${a.name} ${a.value} ${a.unit ?? ''}`.toLowerCase().includes(q)
+            ) ?? false
+            if (!matchesName && !matchesSku && !matchesVariantSku && !matchesSpecs) return false
         }
 
         // Category filter

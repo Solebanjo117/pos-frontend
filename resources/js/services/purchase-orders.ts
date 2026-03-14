@@ -36,6 +36,14 @@ export const purchaseOrdersService = {
     },
 
     /**
+     * Fast-track create, send and receive purchase order (Backorders)
+     */
+    async quickReceive(orderData: any): Promise<PurchaseOrder> {
+        const { data } = await apiClient.post(`${BASE_URL}/quick-receive`, orderData)
+        return data.data
+    },
+
+    /**
      * Update existing purchase order
      */
     async update(id: number, orderData: UpdatePurchaseOrderData): Promise<PurchaseOrder> {

@@ -330,6 +330,9 @@ onMounted(() => {
                 <td class="px-6 py-4">
                   <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.product_name }}</div>
                   <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.product_sku }}</div>
+                  <div v-if="item.notes" class="mt-1 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-muted p-1.5 rounded border border-gray-100 dark:border-border italic">
+                    <span class="font-medium not-italic text-gray-700 dark:text-gray-300">Nota:</span> {{ item.notes }}
+                  </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ item.warehouse_name }}</td>
                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">

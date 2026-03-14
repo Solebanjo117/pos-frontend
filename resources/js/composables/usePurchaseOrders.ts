@@ -68,6 +68,21 @@ export function usePurchaseOrders() {
         }
     }
 
+    // Quick receive (Backorder)
+    async function quickReceivePurchaseOrder(data: any) {
+        loading.value = true
+        error.value = null
+        try {
+            const created = await purchaseOrdersService.quickReceive(data)
+            return created
+        } catch (e: any) {
+            error.value = e.response?.data?.message || 'Error al procesar abastecimiento rápido'
+            throw e
+        } finally {
+            loading.value = false
+        }
+    }
+
     // Update purchase order
     async function updatePurchaseOrder(id: number, data: UpdatePurchaseOrderData) {
         loading.value = true
@@ -177,5 +192,6 @@ export function usePurchaseOrders() {
         receiveItems,
         cancelPurchaseOrder,
         fetchStatistics,
+        quickReceivePurchaseOrder,
     }
 }

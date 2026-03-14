@@ -725,6 +725,7 @@ onUnmounted(() => {
                 @update-item-seller="(id, sellerId) => updateItemSeller(id, sellerId)"
                 @update-item-notes="(id, noteText) => updateItemNotes(id, noteText)"
                 @update-item-price="(id, price) => updateItemPrice(id, price)"
+                @update-item-discount="(id, discount) => updateDiscount(id, discount)"
                 @view-details="(productId) => openProductDetail(productId)"
                 @reorder="reorderCart"
             />

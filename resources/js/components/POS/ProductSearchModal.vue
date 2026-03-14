@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { X, Package, Search } from 'lucide-vue-next'
+import { X, Package, Search, Truck } from 'lucide-vue-next'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
+import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue'
 import type { Product } from '@/types/product'
 
 const props = withDefaults(defineProps<{
@@ -36,6 +37,39 @@ watch(() => props.show, (isOpen) => {
     nextTick(() => modalRef.value?.focus())
   }
 })
+
+// Quick Purchase state
+const showQuickPurchase = ref(false)
+const productForPurchase = ref<Product | null>(null)
+
+const openQuickPurchase = (product: Product, event: Event) => {
+  event.stopPropagation()
+  productForPurchase.value = product
+  showQuickPurchase.value = true
+}
+
+const onQuickPurchaseSuccess = ({ productId, variantId, quantityAdded }: { productId: number, variantId?: number | '', quantityAdded: number }) => {
+  showQuickPurchase.value = false
+  // Optimistically update stock
+  const product = props.products.find(p => p.id === productId)
+  if (product) {
+      // Update overall total stock
+      if (product.total_stock !== undefined) {
+          product.total_stock += quantityAdded
+      }
+      
+      // Update specific variant stock
+      if (variantId && product.variants?.length) {
+          const variant = product.variants.find((v: any) => v.id === variantId)
+          if (variant) {
+              variant.total_stock = (variant.total_stock || 0) + quantityAdded
+          }
+      } else if (product.default_variant) {
+          // Fallback to default variant if no variant explicitly selected
+          product.default_variant.total_stock = (product.default_variant.total_stock || 0) + quantityAdded
+      }
+  }
+}
 
 // Keyboard: Esc to close
 const handleKeydown = (e: KeyboardEvent) => {
@@ -257,12 +291,24 @@ const submitSelection = () => {
 
                   <!-- Stock Badge -->
                   <td class="px-3 py-3 text-center">
-                    <span
-                      class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full"
-                      :class="stockClass(getStock(product))"
-                    >
-                      {{ getStock(product) }}
-                    </span>
+                    <div class="flex items-center justify-center gap-2">
+                        <span
+                          class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full shrink-0"
+                          :class="stockClass(getStock(product))"
+                        >
+                          {{ getStock(product) }}
+                        </span>
+                        
+                        <!-- Quick backorder button -->
+                        <button
+                          v-if="getStock(product) <= 0"
+                          @click="(e) => openQuickPurchase(product, e)"
+                          class="p-1 rounded text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 transition-colors"
+                          title="Abastecer Rápido (Backorder)"
+                        >
+                          <Truck class="w-4 h-4" />
+                        </button>
+                    </div>
                   </td>
 
                   <!-- Price -->
@@ -319,4 +365,12 @@ const submitSelection = () => {
       </Transition>
     </div>
   </Transition>
+
+  <!-- Quick Purchase Modal (Backorder) -->
+  <QuickPurchaseModal
+    :is-open="showQuickPurchase"
+    :product="productForPurchase"
+    @close="showQuickPurchase = false"
+    @success="onQuickPurchaseSuccess"
+  />
 </template>

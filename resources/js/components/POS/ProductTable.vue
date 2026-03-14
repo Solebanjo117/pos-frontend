@@ -22,6 +22,7 @@ const emit = defineEmits([
   'update-item-seller',
   'update-item-notes',
   'update-item-price',
+  'update-item-discount',
   'view-details',
   'reorder'
 ])
@@ -277,6 +278,23 @@ const canEditPrice = computed(() => {
                       <div class="text-xs text-gray-400 mt-1">
                         Monto: <span class="font-medium text-gray-600 dark:text-gray-300">{{ formatCurrency(item.tax_amount) }}</span>
                       </div>
+                    </div>
+
+                    <!-- Discount percent -->
+                    <div class="space-y-2">
+                      <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Descuento (%)</label>
+                      <div class="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="100"
+                          :value="item.discount_percent"
+                          @change.stop="emit('update-item-discount', item.id, parseFloat(($event.target as HTMLInputElement).value))"
+                          class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-card text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        />
+                      </div>
+                      <p class="text-xs text-gray-400">Porcentaje de descuento para esta fila</p>
                     </div>
 
                     <!-- Seller selector -->

@@ -21,6 +21,7 @@ export interface SalesOrderItem {
     subtotal: number
     total: number
     formatted_total: string
+    notes?: string
     created_at: string
     updated_at: string
 }

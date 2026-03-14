@@ -13,14 +13,17 @@ export interface PosSession {
 }
 
 export interface PosSessionSummary {
-    opening_amount: number
-    cash_sales: number
-    electronic_sales: number
-    expected_cash: number
-    total_billed: number
-    electronic_breakdown: {
-        card: number
-        transfer: number
-        credit: number
-    }
+    opening_amount: number;
+    cash_sales: number;
+    electronic_sales: number;
+    total_sales: number;
+    total_discounts?: number;
+    shipping_revenue?: number;
+    cash_movements_in?: number;
+    cash_movements_out?: number;
+    expected_cash: number;
+    total_billed?: number;
+    declared_cash?: number;
+    difference?: number;
+    electronic_breakdown?: Record<string, number>;
 }

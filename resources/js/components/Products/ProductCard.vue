@@ -13,7 +13,13 @@ const formatCurrency = (value: number) =>
     new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value)
 
 const getMinPrice = (product: Product): number => {
-    return product.pricing?.base_price ?? 0
+    // Si tiene variantes, buscar el precio mínimo calculado
+    if (product.variants?.length) {
+        const prices = product.variants.map(v => Number(v.pricing?.calculated_price ?? v.pricing?.base_price ?? 0));
+        const min = Math.min(...prices.filter(p => p > 0));
+        if (min !== Infinity) return min;
+    }
+    return Number(product.pricing?.calculated_price ?? product.pricing?.base_price ?? 0);
 }
 
 const getTotalStock = (product: Product): number => {
@@ -25,6 +31,25 @@ const getBrandNames = (product: Product): string => {
         return product.variants.map(v => v.brand?.name).filter(Boolean).join(', ')
     }
     return product.default_variant?.brand?.name ?? ''
+}
+
+const getTechnicalSpecsPreview = (product: Product): string => {
+    if (!product.variants?.length) return '';
+    
+    // Recopilar todos los atributos únicos de todas las variantes
+    const allAttrNames = new Set<string>();
+    const attributesHtml: string[] = [];
+
+    product.variants.forEach(v => {
+        v.attributes?.forEach(attr => {
+            if (!allAttrNames.has(attr.name)) {
+                allAttrNames.add(attr.name);
+                attributesHtml.push(`${attr.name}: ${attr.value}${attr.unit ? attr.unit : ''}`);
+            }
+        });
+    });
+
+    return attributesHtml.slice(0, 3).join(' • ') + (attributesHtml.length > 3 ? '...' : '');
 }
 </script>
 
@@ -86,6 +111,9 @@ const getBrandNames = (product: Product): string => {
                                     d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                             Marcas: {{ getBrandNames(product) }}
+                        </p>
+                        <p v-if="getTechnicalSpecsPreview(product)" class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 max-w-[280px] truncate" :title="getTechnicalSpecsPreview(product)">
+                            📋 {{ getTechnicalSpecsPreview(product) }}
                         </p>
                     </div>
                     <div class="flex items-center gap-3">
@@ -158,6 +186,9 @@ const getBrandNames = (product: Product): string => {
                             d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                     {{ getBrandNames(product) }}
+                </p>
+                <p v-if="getTechnicalSpecsPreview(product)" class="text-[11px] text-gray-400 dark:text-gray-500 mt-1 truncate" :title="getTechnicalSpecsPreview(product)">
+                    📋 {{ getTechnicalSpecsPreview(product) }}
                 </p>
             </div>
 

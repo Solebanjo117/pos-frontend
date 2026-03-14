@@ -26,6 +26,7 @@ import PaymentMethods from '@/components/POS/PaymentMethods.vue'
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue'
 import ProductSearchModal from '@/components/POS/ProductSearchModal.vue'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
+import ProductDetailModal from '@/components/Products/ProductDetailModal.vue'
 import { SalesOrderPaymentApiService } from '@/services/payments'
 
 defineOptions({ layout: AppLayout })
@@ -51,6 +52,8 @@ const {
   toggleItemTaxExempt,
   updateItemSeller,
   updateItemNotes,
+  updateItemPrice,
+  reorderCart,
   clearCart,
   processSale,
   saveDraft,
@@ -75,7 +78,7 @@ const {
   isClientMode 
 } = usePosSettings()
 
-const { products, fetchProducts } = useProducts()
+const { products, fetchProducts, fetchMoreProducts, total: totalProducts, hasNextPage, loading: productsLoading } = useProducts()
 const { customers, fetchCustomers } = useCustomers()
 const { warehouses, fetchWarehouses } = useWarehouses()
 
@@ -117,6 +120,15 @@ const showAddPaymentModal = ref(false)
 const addPaymentLoading = ref(false)
 const addPaymentError = ref<string | null>(null)
 const pendingOrderId = ref<number | null>(null)
+
+// Product Detail Modal (from right-click in cart)
+const selectedProductForModal = ref<any>(null)
+const openProductDetail = async (productId: number) => {
+  try {
+    const { data } = await apiClient.get(`/products/${productId}`)
+    selectedProductForModal.value = data.data ?? data
+  } catch { /* silent */ }
+}
 const pendingOrderTotal = ref(0)
 const pendingOrderAmountPaid = ref(0)
 // Electronic Payments for Multi-Tender Flow
@@ -186,7 +198,7 @@ const buildFilters = () => ({
   category_id: selectedCategoryId.value,
   brand_id: selectedBrandId.value,
   warehouse_id: currentWarehouseId.value || undefined,
-  per_page: 50,
+  per_page: 20,
 })
 
 // Current customer computed property
@@ -205,7 +217,7 @@ const performSearch = async (overrideQuery?: string, overrideQty?: number) => {
   try {
     const filters = {
       ...buildFilters(),
-      search: finalQuery.trim(),
+      search: finalQuery.trim() || undefined,
     }
     await fetchProducts(filters)
 
@@ -230,6 +242,21 @@ const performSearch = async (overrideQuery?: string, overrideQty?: number) => {
   }
 }
 
+const loadMoreProducts = async () => {
+  if (!hasNextPage.value || productsLoading.value) return
+  
+  logAction('search_load_more', { query: searchQuery.value })
+  try {
+    const filters = {
+      ...buildFilters(),
+      search: searchQuery.value || undefined,
+    }
+    await fetchMoreProducts(filters)
+  } catch (err) {
+    console.error('POS load more error:', err)
+  }
+}
+
 const handleControlsSearch = (data: { query: string; quantity: number; category_id?: number; brand_id?: number }) => {
   searchQuery.value = data.query
   quantity.value = data.quantity
@@ -238,37 +265,7 @@ const handleControlsSearch = (data: { query: string; quantity: number; category_
   performSearch(data.query, data.quantity)
 }
 
-// Vehicle search handler — uses the standard product search since product names now include vehicle info
-const handleVehicleSearch = async (data: { query: string; quantity: number }) => {
-  const trimmed = data.query
-  if (!trimmed) return
 
-  isSearching.value = true
-  logAction('vehicle-search', { query: trimmed })
-  try {
-    const filters = {
-      search: trimmed,
-      warehouse_id: currentWarehouseId.value || undefined,
-      per_page: 50,
-    }
-    await fetchProducts(filters)
-
-    if (products.value.length === 1) {
-      addProductToCart(products.value[0], data.quantity)
-      searchQuery.value = ''
-      posControlsRef.value?.focus()
-    } else if (products.value.length > 1) {
-      selectedProductIds.value = new Set()
-      showProductsModal.value = true
-    } else {
-      console.warn('No products found for vehicle', trimmed)
-    }
-  } catch (err) {
-    console.error('POS vehicle search error:', err)
-  } finally {
-    isSearching.value = false
-  }
-}
 
 // Add a product to cart — opens VariantSelectModal if multiple variants exist
 // Products with multiple variants are enqueued — they are processed one by one via variantQueue
@@ -469,6 +466,86 @@ const handleSaveDraft = async () => {
   }
 }
 
+// Detect if the active session was loaded from a SalesQuote
+const isQuoteSession = computed(() => !!activeSession.value?.source_quote_id)
+
+// Save changes back to the originating SalesQuote (update it in place)
+const saveQuoteChangesLoading = ref(false)
+
+const handleSaveQuoteChanges = async () => {
+  const quoteId = activeSession.value?.source_quote_id
+  if (!quoteId) return
+  if (cart.value.length === 0) {
+    alert('El carrito está vacío, agrega productos antes de guardar.')
+    return
+  }
+  saveQuoteChangesLoading.value = true
+  try {
+    const items = cart.value.map((item: any) => ({
+      product_id:       item.product_id,
+      variant_id:       item.variant_id ?? null,
+      warehouse_id:     item.warehouse_id ?? currentWarehouseId.value,
+      quantity:         item.quantity,
+      unit_price:       item.product_price,
+      discount_percent: item.discount_percent ?? 0,
+      tax_percent:      item.tax_percent ?? 0,
+    }))
+
+    await apiClient.put(`/sales-quotes/${quoteId}`, {
+      customer_id:  customer_id.value ?? null,
+      warehouse_id: currentWarehouseId.value ?? null,
+      items,
+    })
+
+    alert('✅ Cotización actualizada exitosamente.')
+    searchInput.value?.focus()
+  } catch (e: any) {
+    alert(e.response?.data?.message || 'Error al actualizar la cotización')
+  } finally {
+    saveQuoteChangesLoading.value = false
+  }
+}
+
+// Save current cart as a Sales Quote (draft)
+const saveQuoteLoading = ref(false)
+
+const handleSaveQuote = async () => {
+  if (cart.value.length === 0) {
+    alert('Agrega productos al carrito antes de guardar una cotización.')
+    return
+  }
+  saveQuoteLoading.value = true
+  try {
+    const items = cart.value.map((item: any) => ({
+      product_id:       item.product_id,
+      variant_id:       item.variant_id ?? null,
+      warehouse_id:     item.warehouse_id ?? currentWarehouseId.value,
+      quantity:         item.quantity,
+      unit_price:       item.product_price,
+      discount_percent: item.discount_percent ?? 0,
+      tax_percent:      item.tax_percent ?? 0,
+    }))
+
+    const res = await apiClient.post('/sales-quotes/from-pos', {
+      customer_id:  customer_id.value ?? null,
+      warehouse_id: currentWarehouseId.value ?? null,
+      items,
+    })
+
+    const quoteNumber = res.data.data?.quote_number ?? ''
+    clearCart()
+
+    const msg = `📄 Cotización ${quoteNumber} guardada exitosamente.\n\n¿Deseas ir a Cotizaciones?`
+    if (confirm(msg)) {
+      window.location.href = '/sales-quotes'
+    }
+  } catch (e: any) {
+    alert(e.response?.data?.message || 'Error al guardar la cotización')
+  } finally {
+    saveQuoteLoading.value = false
+  }
+}
+
 // Handle credit/partial payment submission
 const handleCreditPaymentSubmit = async (payload: { amount: number; method: string; notes?: string }) => {
     addPaymentLoading.value = true
@@ -601,7 +678,6 @@ onUnmounted(() => {
                 :categories="categories"
                 :brands="brands"
                 @search="handleControlsSearch"
-                @search-vehicle="handleVehicleSearch"
             />
           </div>
 
@@ -648,6 +724,9 @@ onUnmounted(() => {
                 @toggle-item-tax-exempt="(id) => toggleItemTaxExempt(id)"
                 @update-item-seller="(id, sellerId) => updateItemSeller(id, sellerId)"
                 @update-item-notes="(id, noteText) => updateItemNotes(id, noteText)"
+                @update-item-price="(id, price) => updateItemPrice(id, price)"
+                @view-details="(productId) => openProductDetail(productId)"
+                @reorder="reorderCart"
             />
           </div>
         </div>
@@ -673,8 +752,11 @@ onUnmounted(() => {
                 :canPay="cart.length > 0 && !loading && !error"
                 :hasCustomer="!!selectedCustomer"
                 :creditAvailable="(selectedCustomer?.credit_limit ?? 0) - (selectedCustomer?.current_balance ?? 0)"
+                :isQuoteSession="isQuoteSession"
                 @clear="clearCart"
                 @save-draft="handleSaveDraft"
+                @save-quote="handleSaveQuote"
+                @save-quote-changes="handleSaveQuoteChanges"
                 @open-cash-register="forceShowOpenSessionModal = true"
                 @pay-cash="openPaymentModal('cash')"
                 @pay-card="openPaymentModal('card')"
@@ -692,8 +774,12 @@ onUnmounted(() => {
       :products="products"
       :search-query="searchQuery"
       :client-mode="isClientMode()"
+      :total-count="totalProducts"
+      :has-more="hasNextPage"
+      :loading-more="productsLoading"
       @close="showProductsModal = false"
       @add-products="addSelectedProducts"
+      @load-more="loadMoreProducts"
     />
 
     <!-- ========== Payment Modal ========== -->
@@ -892,6 +978,14 @@ onUnmounted(() => {
         :error="cashMovementError"
         @submit="handleCashMovement"
         @close="showCashMovementModal = false; cashMovementError = null"
+    />
+
+    <!-- ========== Product Detail Modal (right-click on cart item) ========== -->
+    <ProductDetailModal
+        v-if="selectedProductForModal"
+        :product="selectedProductForModal"
+        @close="selectedProductForModal = null"
+        @view-alternative="(p: any) => selectedProductForModal = p"
     />
 
   </div>

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import apiClient from '@/services/api/client'
+import { usePOS } from '@/composables/usePOS'
 import {
     FileText, ArrowLeft, Edit, ArrowRightLeft, Download,
     Clock, CheckCircle, XCircle, Send, FileCheck, EyeOff,
-    User, MapPin, Calendar, Package, Hash
+    User, MapPin, Calendar, Package, Hash, ShoppingCart
 } from 'lucide-vue-next'
 
 defineOptions({ layout: AppLayout })
@@ -30,6 +31,7 @@ interface QuoteItem {
     tax_amount: number
     subtotal: number
     total: number
+    notes?: string | null
 }
 
 interface SalesQuote {
@@ -102,20 +104,60 @@ const openPdf = (format: 'ticket' | 'proforma', mode: 'standard' | 'blind' = 'st
 
 const showPrintModal = ref(false)
 const canEdit = () => quote.value && ['draft', 'sent'].includes(quote.value.status)
-const canConvert = () => quote.value && ['draft', 'sent', 'accepted'].includes(quote.value.status) && !quote.value.converted_order_id
 
-const handleConvert = async () => {
-    if (!confirm('¿Convertir esta cotización a una Orden de Venta? Esto descontará el inventario.')) return
-    try {
-        const res = await apiClient.post(`/sales-quotes/${props.id}/convert`, {
-            payment_method: 'cash',
-            payment_status: 'pending',
-        })
-        alert(res.data.message || 'Cotización convertida exitosamente')
-        await fetchQuote()
-    } catch (e: any) {
-        alert(e.response?.data?.message || 'Error al convertir')
+const handleTransition = async (action: 'send-to-deposit' | 'send-to-cashier' | 'mark-collected') => {
+    const labels: Record<string, string> = {
+        'send-to-deposit': 'enviar a Depósito',
+        'send-to-cashier': 'enviar a Caja',
+        'mark-collected':  'marcar como Cobrada',
     }
+    if (!confirm(`¿Deseas ${labels[action]} esta cotización?`)) return
+    try {
+        await apiClient.post(`/sales-quotes/${props.id}/${action}`)
+        
+        if (action === 'send-to-cashier') {
+            handleOpenInPOS()
+        } else {
+            await fetchQuote()
+        }
+    } catch (e: any) {
+        alert(e.response?.data?.message || 'Error al cambiar el estado')
+    }
+}
+
+const { loadQuoteAsSession } = usePOS()
+
+const openingInPOS = ref(false)
+const canOpenInPOS = () => quote.value && !['converted', 'rejected', 'expired', 'collected'].includes(quote.value.status)
+
+const handleOpenInPOS = () => {
+    if (!quote.value) return
+    openingInPOS.value = true
+
+    // Build a minimal quote object that matches loadQuoteAsSession's expected shape
+    const quoteForSession = {
+        id: quote.value.id,
+        quote_number: quote.value.quote_number,
+        customer_id: quote.value.customer?.id ?? null,
+        items: quote.value.items.map(item => ({
+            product_id: item.product_id,
+            product_name: item.product_name,
+            product_sku: item.product_sku,
+            variant_id: item.variant_id ?? null,
+            warehouse_id: item.warehouse_id ?? null,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount_percent: item.discount_percent,
+            tax_percent: item.tax_percent,
+            subtotal: item.subtotal,
+            tax_amount: item.tax_amount,
+            total: item.total,
+            variant: item.variant ?? null,
+        }))
+    }
+
+    loadQuoteAsSession(quoteForSession)
+    router.visit('/pos')
 }
 
 onMounted(fetchQuote)
@@ -168,11 +210,17 @@ onMounted(fetchQuote)
                     >
                         <Download :size="16" /> Imprimir Documento
                     </button>
-                    <Link v-if="canEdit()" :href="`/sales-quotes/${quote.id}/edit`" class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition font-medium">
-                        <Edit :size="16" /> Editar
-                    </Link>
-                    <button v-if="canConvert()" @click="handleConvert" class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-medium">
-                        <ArrowRightLeft :size="16" /> Convertir a OV
+
+                    <!-- Editar en POS -->
+                    <button
+                        v-if="canOpenInPOS()"
+                        @click="handleOpenInPOS"
+                        :disabled="openingInPOS"
+                        class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-medium disabled:opacity-50"
+                        title="Carga esta cotización como una nueva pestaña en el POS para editar"
+                    >
+                        <ShoppingCart :size="16" />
+                        {{ openingInPOS ? 'Abriendo...' : 'Editar en POS' }}
                     </button>
                 </div>
             </div>
@@ -249,7 +297,13 @@ onMounted(fetchQuote)
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.product_name }}</div>
                                     <div class="text-xs text-gray-500">
                                         {{ item.variant?.sku || item.product_sku || '' }}
-                                        <span v-if="item.variant?.brand?.name" class="ml-1 text-indigo-500">• {{ item.variant.brand.name }}</span>
+                                        <span v-if="item.variant?.brand?.name" class="ml-1 text-indigo-500">&bull; {{ item.variant.brand.name }}</span>
+                                    </div>
+                                    <!-- Nota interna (no aparece en ticket) -->
+                                    <div v-if="item.notes" class="mt-1 flex items-center gap-1">
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-700/40">
+                                            📋 {{ item.notes }}
+                                        </span>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">{{ item.quantity }}</td>

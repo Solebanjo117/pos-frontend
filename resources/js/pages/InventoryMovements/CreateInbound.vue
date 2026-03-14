@@ -16,7 +16,6 @@ interface InboundItem {
     variant_id: number | null // Added
     batch_number: string
     cost: number | null
-    tax_type: 'standard' | 'exempt' | 'custom'
     tax_rate: number
     final_cost: number | null // Computed for display/logic
     quantity: number
@@ -46,7 +45,6 @@ const headerForm = ref({
 const batchDefaults = ref({
     batch_number: '',
     cost: null as number | null,
-    tax_type: 'standard' as 'standard' | 'exempt' | 'custom',
     tax_rate: 7, // Default 7% ITBMS
 })
 
@@ -100,7 +98,6 @@ const addItem = () => {
         variant_id: null, // Added
         batch_number: batchDefaults.value.batch_number,
         cost: batchDefaults.value.cost,
-        tax_type: batchDefaults.value.tax_type as any,
         tax_rate: batchDefaults.value.tax_rate,
         final_cost: batchDefaults.value.cost ? batchDefaults.value.cost * (1 + (batchDefaults.value.tax_rate / 100)) : null,
         quantity: 1,
@@ -125,24 +122,20 @@ const handleProductSelect = (index: number, productId: number | null, variantId?
     // Auto-fill cost from variant or product default
     if (product) {
         let baseCost = null;
-        let taxType = product.pricing?.tax_type || 'standard';
         let taxRate = product.pricing?.tax_rate || 7;
 
         if (variantId) {
             const variant = product.variants?.find(v => v.id === variantId)
             if (variant && variant.pricing?.cost) {
                 baseCost = variant.pricing.cost
-                taxType = variant.pricing.tax_type || taxType;
                 taxRate = variant.pricing.tax_rate ?? taxRate;
             }
         } else if (product.default_variant?.pricing?.cost) {
             baseCost = product.default_variant.pricing.cost
-            taxType = product.default_variant.pricing.tax_type || taxType;
             taxRate = product.default_variant.pricing.tax_rate ?? taxRate;
         }
 
         item.cost = baseCost;
-        item.tax_type = taxType as any;
         item.tax_rate = taxRate;
         if (item.cost !== null) {
             item.final_cost = Number((item.cost * (1 + (item.tax_rate / 100))).toFixed(2))
@@ -163,22 +156,16 @@ const applyDefaultsToAll = () => {
     items.value.forEach(item => {
         if (batchDefaults.value.batch_number) item.batch_number = batchDefaults.value.batch_number
         if (batchDefaults.value.cost !== null) item.cost = batchDefaults.value.cost
-        item.tax_type = batchDefaults.value.tax_type as any
         item.tax_rate = batchDefaults.value.tax_rate
         handlePriceChange(item, 'cost')
     })
 }
 
 // 3-way calculator logic (Price + Tax + Quantity)
-const handlePriceChange = (item: InboundItem, field: 'cost' | 'tax_type' | 'tax_rate' | 'final_cost' | 'quantity') => {
-    if (field === 'tax_type') {
-        if (item.tax_type === 'exempt') item.tax_rate = 0
-        else if (item.tax_type === 'standard') item.tax_rate = 7
-    }
-
+const handlePriceChange = (item: InboundItem, field: 'cost' | 'tax_rate' | 'final_cost' | 'quantity') => {
     const qty = item.quantity || 1
 
-    if (field === 'cost' || field === 'tax_type' || field === 'tax_rate' || field === 'quantity') {
+    if (field === 'cost' || field === 'tax_rate' || field === 'quantity') {
         if (item.cost !== null && item.cost !== undefined) {
             // final_cost = (cost * (1 + tax_rate / 100)) * quantity
             const unitCostWithTax = item.cost * (1 + (item.tax_rate / 100))
@@ -406,27 +393,14 @@ const cancel = () => {
                                         placeholder="Ej: LOTE-ABC"
                                     />
                                 </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="block text-xs font-medium text-blue-900 dark:text-blue-200">Impuesto</label>
-                                        <select
-                                            v-model="batchDefaults.tax_type"
-                                            class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                        >
-                                            <option value="standard">ITBMS (7%)</option>
-                                            <option value="exempt">Exento (0%)</option>
-                                            <option value="custom">Otro (%)</option>
-                                        </select>
-                                    </div>
-                                    <div v-if="batchDefaults.tax_type === 'custom'">
-                                        <label class="block text-xs font-medium text-blue-900 dark:text-blue-200">% Tasa</label>
-                                        <input
-                                            v-model.number="batchDefaults.tax_rate"
-                                            type="number"
-                                            step="0.1"
-                                            class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                        />
-                                    </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-blue-900 dark:text-blue-200">% ITBM</label>
+                                    <input
+                                        v-model.number="batchDefaults.tax_rate"
+                                        type="number"
+                                        step="0.01"
+                                        class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
+                                    />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-blue-900 dark:text-blue-200">Costo Base</label>
@@ -540,24 +514,15 @@ const cancel = () => {
                                                             placeholder="Neto"
                                                         />
                                                     </div>
-                                                    <div class="flex flex-col gap-1 w-24">
-                                                        <select
-                                                            v-model="item.tax_type"
-                                                            @change="handlePriceChange(item, 'tax_type')"
-                                                            class="w-full text-xs rounded-md border-gray-300 py-1.5 shadow-sm dark:border-border dark:bg-muted"
-                                                        >
-                                                            <option value="standard">7%</option>
-                                                            <option value="exempt">0%</option>
-                                                            <option value="custom">Otro</option>
-                                                        </select>
+                                                    <div class="w-16">
+                                                        <label class="sr-only">ITBM</label>
                                                         <input
-                                                            v-if="item.tax_type === 'custom'"
                                                             v-model.number="item.tax_rate"
                                                             @input="handlePriceChange(item, 'tax_rate')"
                                                             type="number"
-                                                            step="0.1"
+                                                            step="0.01"
                                                             placeholder="%"
-                                                            class="w-full text-xs rounded-md border-gray-300 shadow-sm py-1"
+                                                            class="w-full text-xs rounded-md border-gray-300 shadow-sm py-1 dark:bg-muted dark:border-border"
                                                         />
                                                     </div>
                                                     <div class="flex-1 border-l pl-2 dark:border-border">

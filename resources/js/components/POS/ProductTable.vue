@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Trash2, Plus, Minus, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import { usePage } from '@inertiajs/vue3'
+import { Trash2, Plus, Minus, ChevronDown, ChevronUp, DollarSign, Lock, GripVertical } from 'lucide-vue-next'
 import { formatCurrency } from '@/utils/formatters'
-import ProductContextMenu from './ProductContextMenu.vue'
+import PricingFormula from '@/components/Products/PricingFormula.vue'
+import draggable from 'vuedraggable'
 
 const props = defineProps<{
   items: any[]
@@ -19,7 +21,15 @@ const emit = defineEmits([
   'toggle-item-tax-exempt',
   'update-item-seller',
   'update-item-notes',
+  'update-item-price',
+  'view-details',
+  'reorder'
 ])
+
+const localItems = computed({
+  get: () => props.items,
+  set: (val) => emit('reorder', val)
+})
 
 // Track which row is expanded (only one at a time)
 const expandedItemId = ref<string | null>(null)
@@ -28,35 +38,21 @@ const toggleExpand = (itemId: string) => {
   expandedItemId.value = expandedItemId.value === itemId ? null : itemId
 }
 
-// ====== Context Menu State ======
-const ctxMenuVisible = ref(false)
-const ctxMenuX = ref(0)
-const ctxMenuY = ref(0)
-const ctxMenuItem = ref<any>(null)
-const ctxMenuProduct = ref<any>(null)
+// ====== Right-click / Long-press → open full detail modal ======
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 
-const getProductForItem = (item: any) => {
-  if (!props.products) return null
-  return props.products.find(p => p.id === item.product_id) || null
+const openDetails = (productId: number) => {
+  emit('view-details', productId)
 }
 
-const showContextMenu = (e: MouseEvent, item: any) => {
-  ctxMenuX.value = e.clientX
-  ctxMenuY.value = e.clientY
-  ctxMenuItem.value = item
-  ctxMenuProduct.value = getProductForItem(item)
-  ctxMenuVisible.value = true
+const onContextMenu = (e: MouseEvent, item: any) => {
+  e.preventDefault()
+  openDetails(item.product_id)
 }
 
 const startLongPress = (item: any, e: TouchEvent) => {
-  const touch = e.touches[0]
   longPressTimer = setTimeout(() => {
-    ctxMenuX.value = touch.clientX
-    ctxMenuY.value = touch.clientY
-    ctxMenuItem.value = item
-    ctxMenuProduct.value = getProductForItem(item)
-    ctxMenuVisible.value = true
+    openDetails(item.product_id)
   }, 500)
 }
 
@@ -68,42 +64,73 @@ const displaySku = (item: any) => {
   if (props.clientMode) return `#${item.product_id}`
   return item.variant_sku || item.product_sku || item.variant_name || 'General'
 }
+
+// Get cost for a cart item from the products catalog
+const getItemCost = (item: any): number => {
+  if (!props.products) return 0
+  const product = props.products.find((p: any) => p.id === item.product_id)
+  if (!product) return 0
+  if (item.variant_id && product.variants) {
+    const variant = product.variants.find((v: any) => v.id === item.variant_id)
+    if (variant?.pricing?.cost) return Number(variant.pricing.cost)
+  }
+  return Number(product.pricing?.cost ?? 0)
+}
+
+// ── Role-based access control ──────────────────────────────────────────────────
+const page = usePage()
+const canEditPrice = computed(() => {
+  const role = (page.props.auth?.user as any)?.role
+  return role === 'admin' || role === 'manager'
+})
 </script>
 
 <template>
   <div class="bg-white dark:bg-card rounded-xl shadow-sm border border-gray-100 dark:border-border flex flex-col h-full overflow-hidden">
     <div class="flex-1 overflow-auto relative">
-      <table class="w-full text-left border-collapse min-w-[500px]">
-        <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-muted shadow-sm">
-          <tr class="border-b border-gray-100 dark:border-border text-xs uppercase text-gray-500 dark:text-gray-400 font-semibold tracking-wider">
-            <th class="px-2 py-3 text-center w-10 bg-gray-50 dark:bg-muted">#</th>
-            <th class="px-4 py-3 bg-gray-50 dark:bg-muted">Producto</th>
-            <th class="px-4 py-3 text-right bg-gray-50 dark:bg-muted">Precio</th>
-            <th class="px-4 py-3 text-center bg-gray-50 dark:bg-muted w-32">Cant.</th>
-            <th class="px-4 py-3 text-right bg-gray-50 dark:bg-muted">Total</th>
-            <th class="px-2 py-3 text-center w-12 bg-gray-50 dark:bg-muted"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-50">
-          <tr v-if="items.length === 0">
-            <td colspan="6" class="px-4 py-12 text-center text-gray-400">
-              El carrito está vacío
-            </td>
-          </tr>
-          
-          <template v-for="(item, index) in items" :key="item.id">
+      <draggable
+        v-model="localItems"
+        tag="table"
+        item-key="id"
+        handle=".drag-handle"
+        class="w-full text-left border-collapse min-w-[500px]"
+      >
+        <template #header>
+          <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-muted shadow-sm">
+            <tr class="border-b border-gray-100 dark:border-border text-xs uppercase text-gray-500 dark:text-gray-400 font-semibold tracking-wider">
+              <th class="px-2 py-3 text-center w-10 bg-gray-50 dark:bg-muted">#</th>
+              <th class="px-3 py-3 bg-gray-50 dark:bg-muted">SKU</th>
+              <th class="px-4 py-3 bg-gray-50 dark:bg-muted">Producto</th>
+              <th class="px-4 py-3 text-right bg-gray-50 dark:bg-muted">Precio</th>
+              <th class="px-4 py-3 text-center bg-gray-50 dark:bg-muted w-32">Cant.</th>
+              <th class="px-4 py-3 text-right bg-gray-50 dark:bg-muted">Total</th>
+              <th class="px-2 py-3 text-center w-12 bg-gray-50 dark:bg-muted"></th>
+            </tr>
+          </thead>
+        </template>
+
+        <template #item="{ element: item, index }">
+          <tbody class="divide-y divide-gray-50 group">
             <!-- Main row -->
             <tr
               class="hover:bg-gray-50/50 dark:hover:bg-muted/30 transition-colors group cursor-pointer border-b border-gray-50 dark:border-border/40"
               :class="{ 'bg-indigo-50/40 dark:bg-indigo-900/20': expandedItemId === item.id }"
               @click="toggleExpand(item.id)"
-              @contextmenu.prevent="showContextMenu($event, item)"
+              @contextmenu="onContextMenu($event, item)"
               @touchstart="startLongPress(item, $event)"
               @touchend="cancelLongPress"
               @touchmove="cancelLongPress"
             >
               <td class="text-center px-2 py-3 text-xs text-gray-400 font-mono">
-                {{ index + 1 }}
+                <div class="flex items-center justify-center gap-1">
+                  <GripVertical class="w-4 h-4 cursor-grab hover:text-gray-600 transition-colors drag-handle" title="Arrastrar para reordenar" />
+                  <span>{{ index + 1 }}</span>
+                </div>
+              </td>
+              <td class="px-3 py-3">
+                <span class="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                  {{ displaySku(item) }}
+                </span>
               </td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2">
@@ -113,9 +140,6 @@ const displaySku = (item: any) => {
                   />
                   <div class="flex flex-col">
                     <span class="font-medium text-gray-900 dark:text-white text-sm">{{ item.product_name }}</span>
-                    <span class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ displaySku(item) }}
-                    </span>
                     <div class="flex flex-wrap gap-1 mt-0.5">
                       <span v-if="item.discount_percent > 0" class="text-xs text-green-600 bg-green-100 px-1 py-0.5 rounded inline-block w-max">
                         -{{ item.discount_percent }}% OFF
@@ -184,7 +208,40 @@ const displaySku = (item: any) => {
             <tr v-if="expandedItemId === item.id">
               <td colspan="6" class="px-0 py-0">
                 <div class="bg-gradient-to-b from-indigo-50/60 dark:from-indigo-900/20 to-white dark:to-card border-t border-indigo-100 dark:border-indigo-900/50 px-6 py-4 animate-slide-down">
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <!-- Price Override con Fórmula — solo Admin/Manager -->
+                    <div class="space-y-2 lg:col-span-1">
+                      <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                        <DollarSign class="w-3 h-3" /> Precio Unitario
+                      </label>
+
+                      <!-- Editable: admin / manager -->
+                      <template v-if="canEditPrice">
+                        <PricingFormula
+                          :cost="getItemCost(item)"
+                          :tax-rate="item.tax_percent"
+                          :model-value="''"
+                          :price="item.product_price"
+                          @update:price="(p) => emit('update-item-price', item.id, p)"
+                          @update:model-value="() => {}"
+                        />
+                        <p class="text-xs text-gray-400">Override de precio para esta línea</p>
+                      </template>
+
+                      <!-- Read-only: otros roles -->
+                      <template v-else>
+                        <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-muted rounded-lg border border-gray-200 dark:border-border">
+                          <Lock class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                            {{ formatCurrency(item.product_price) }}
+                          </span>
+                        </div>
+                        <p class="text-xs text-gray-400 flex items-center gap-1">
+                          <Lock class="w-3 h-3" /> Solo administradores pueden modificar el precio
+                        </p>
+                      </template>
+                    </div>
 
                     <!-- Tax exempt toggle -->
                     <div class="space-y-2">
@@ -274,25 +331,24 @@ const displaySku = (item: any) => {
                 </div>
               </td>
             </tr>
-          </template>
-        </tbody>
-      </table>
+          </tbody>
+        </template>
+        <template #footer>
+          <tbody v-if="items.length === 0">
+            <tr>
+              <td colspan="7" class="px-4 py-12 text-center text-gray-400">
+                El carrito está vacío
+              </td>
+            </tr>
+          </tbody>
+        </template>
+      </draggable>
     </div>
     
     <div class="bg-gray-50 dark:bg-muted px-4 py-2 border-t border-gray-100 dark:border-border text-xs text-gray-400 text-center uppercase tracking-widest shrink-0">
       {{ items.length }} {{ items.length === 1 ? 'producto' : 'productos' }} en lista
     </div>
 
-    <!-- Context Menu -->
-    <ProductContextMenu
-      :show="ctxMenuVisible"
-      :x="ctxMenuX"
-      :y="ctxMenuY"
-      :item="ctxMenuItem"
-      :product-details="ctxMenuProduct"
-      :warehouse-id="warehouseId ?? null"
-      @close="ctxMenuVisible = false"
-    />
   </div>
 </template>
 

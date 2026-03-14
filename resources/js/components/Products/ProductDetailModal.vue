@@ -15,6 +15,12 @@ const toggleBlindMode = () => {
     blindMode.value = !blindMode.value
     localStorage.setItem('product_blind_mode', String(blindMode.value))
 }
+// Whether to apply ITBM on top of base_price in client view
+const includeITBM = ref(localStorage.getItem('product_include_itbm') !== 'false') // default true
+const toggleIncludeITBM = () => {
+    includeITBM.value = !includeITBM.value
+    localStorage.setItem('product_include_itbm', String(includeITBM.value))
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ProductImage   { id: number; url: string; original_filename: string; display_order: number }
@@ -31,8 +37,16 @@ const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 
 const priceWithTax = (basePrice: number, taxRate?: number) => {
-    const rate = taxRate ?? 7
-    return basePrice * (1 + rate / 100)
+    const rate = (taxRate != null && !isNaN(taxRate)) ? taxRate : 7
+    const safeBase = isNaN(basePrice) ? 0 : basePrice
+    return safeBase * (1 + rate / 100)
+}
+
+// Returns the best pricing object for a variant (variant-level first, then product-level fallback)
+const getVariantPricing = (variant: any) => {
+    const vp = variant?.pricing
+    if (vp && (Number(vp.base_price) > 0 || Number(vp.cost) > 0)) return vp
+    return props.product.pricing ?? null
 }
 
 const relationshipLabel = (type: string): string => ({
@@ -72,9 +86,9 @@ const { addToCart } = usePOS()
 const { currentWarehouseId } = usePosSettings()
 const handleAddToCart = (variant: any) => {
     const qty = quantities.value[variant.id] ?? 1
-    addToCart(props.product, qty, currentWarehouseId.value || undefined)
+    addToCart(props.product, variant, qty, currentWarehouseId.value || undefined)
     quantities.value[variant.id] = 1
-    alert(`✅ ${qty} x ${props.product.name} agregado al carrito POS`)
+    alert(`✅ ${qty} x ${props.product.name} (${variant.brand?.name ?? variant.sku}) agregado al carrito POS`)
 }
 
 // ── Images ────────────────────────────────────────────────────────────────────
@@ -149,8 +163,7 @@ const fetchVariantAttrs = async (variantId: number) => {
     finally { loadingVariantAttrs.value = false }
 }
 
-watch(() => attributesData.value.length, () => { if (activeVariantId.value) fetchVariantAttrs(activeVariantId.value) }, { once: true })
-watch(activeVariantId, (id) => { if (id !== null) fetchVariantAttrs(id) })
+watch(activeVariantId, (id) => { if (id !== null) fetchVariantAttrs(id) }, { immediate: true })
 
 const mergedSpecs = computed(() => {
     const productLevel = attributesData.value.filter((a: any) => !a.variant_id)
@@ -159,6 +172,18 @@ const mergedSpecs = computed(() => {
     const map = new Map<string, any>()
     productLevel.forEach(a => map.set(a.name, { ...a, isInherited: true }))
     variantLevel.forEach(a => map.set(a.name, { ...a, isInherited: false }))
+
+    // Fallback: if neither productLevel nor this variant's own attrs exist,
+    // inherit from any other variant that has attributes (Henry: specs are "product-level")
+    if (map.size === 0) {
+        const fallbackVariant = variants.value.find(
+            (v: any) => v.id !== activeVariantId.value && v.attributes && v.attributes.length > 0
+        )
+        if (fallbackVariant) {
+            fallbackVariant.attributes?.forEach((a: any) => map.set(a.name, { ...a, isInherited: true }))
+        }
+    }
+
     return Array.from(map.values())
 })
 
@@ -253,6 +278,7 @@ const handleViewAlternative = async (altId: number) => {
                         <span v-if="product.is_universal" class="flex-shrink-0 inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/20" title="Universal">🌐 Universal</span>
                     </div>
                     <p v-if="product.sku_base && !blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ product.sku_base }}</p>
+                    <p v-else-if="blindMode" class="text-xs text-gray-400 font-mono mt-0.5">#{{ product.id }}</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <!-- Blind Mode Toggle -->
@@ -276,6 +302,23 @@ const handleViewAlternative = async (altId: number) => {
                         </span>
                     </button>
                     <span class="text-[10px] font-medium uppercase tracking-wider" :class="blindMode ? 'text-amber-500' : 'text-gray-400'">{{ blindMode ? 'Cliente' : 'Normal' }}</span>
+
+                    <!-- ITBM toggle (only in client mode) -->
+                    <template v-if="blindMode">
+                        <div class="flex items-center gap-1.5 ml-1">
+                            <button
+                                @click="toggleIncludeITBM"
+                                :class="[
+                                    'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none shrink-0',
+                                    includeITBM ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                                ]"
+                                :title="includeITBM ? 'ITBM incluido en precio — clic para excluirlo' : 'ITBM NO incluido — clic para incluirlo'"
+                            >
+                                <span :class="['inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-200', includeITBM ? 'translate-x-4' : 'translate-x-0.5']" />
+                            </button>
+                            <span class="text-[10px] font-medium" :class="includeITBM ? 'text-green-500' : 'text-gray-400'">ITBM</span>
+                        </div>
+                    </template>
 
                     <!-- Close -->
                     <button @click="emit('close')"
@@ -319,6 +362,10 @@ const handleViewAlternative = async (altId: number) => {
                                 <template v-if="!blindMode">
                                     <small class="text-gray-500 uppercase tracking-wide text-xs">Código Base / SKU</small>
                                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ product.sku_base || product.default_variant?.sku || 'N/A' }}</h1>
+                                </template>
+                                <template v-else>
+                                    <small class="text-gray-500 uppercase tracking-wide text-xs">Código</small>
+                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">#{{ product.id }}</h1>
                                 </template>
                                 <p class="text-gray-600 dark:text-gray-400" :class="blindMode ? '' : 'mt-2'">{{ product.description || 'Sin descripción' }}</p>
                             </div>
@@ -364,10 +411,15 @@ const handleViewAlternative = async (altId: number) => {
                                         <!-- Info Marca -->
                                         <div class="flex flex-col flex-1">
                                             <div class="flex items-center gap-2">
-                                                <span class="font-bold text-gray-900 dark:text-white text-base">{{ variant.brand?.name ?? 'Sin marca' }}</span>
-                                                <span v-if="variant.is_default" class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded">DEFAULT</span>
+                                                <span v-if="!blindMode" class="font-bold text-gray-900 dark:text-white font-mono text-base">{{ variant.sku }}</span>
+                                                <span v-else class="font-bold text-gray-900 dark:text-white text-base">{{ variant.brand?.name ?? 'Sin marca' }}</span>
                                             </div>
-                                            <span v-if="!blindMode" class="text-xs text-gray-500 font-mono mt-1">SKU: {{ variant.sku }}</span>
+                                            <span v-if="!blindMode" class="text-xs text-gray-500 mt-1">
+                                                <span class="font-semibold text-gray-700 dark:text-gray-300">Marca:</span> {{ variant.brand?.name ?? 'Sin marca' }}
+                                                <span v-if="variant.attributes?.length" class="ml-2">
+                                                    | <span class="font-semibold text-gray-700 dark:text-gray-300">Atributos:</span> {{ variant.attributes.map(a => `${a.name}: ${a.value}${a.unit ? ' ' + a.unit : ''}`).join(', ') }}
+                                                </span>
+                                            </span>
                                         </div>
 
                                         <!-- Precio y Action -->
@@ -381,14 +433,27 @@ const handleViewAlternative = async (altId: number) => {
 
                                             <div class="text-right min-w-[90px] shrink-0">
                                                 <div class="text-lg font-bold text-green-600 dark:text-green-400">
-                                                    <template v-if="blindMode">
-                                                        {{ product.pricing ? formatCurrency(priceWithTax(product.pricing.base_price, product.pricing.tax_rate) * (quantities[variant.id] ?? 1)) : 'N/A' }}
+                                                    <template v-if="getVariantPricing(variant)">
+                                                        <template v-if="blindMode">
+                                                            {{ formatCurrency((includeITBM ? priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), Number(getVariantPricing(variant).tax_rate)) : Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
+                                                        </template>
+                                                        <template v-else>
+                                                            {{ formatCurrency(Number(getVariantPricing(variant).base_price) * (quantities[variant.id] ?? 1)) }}
+                                                        </template>
+                                                    </template>
+                                                    <template v-else>N/A</template>
+                                                </div>
+                                                <div v-if="blindMode" class="text-[10px] text-gray-400">
+                                                    <template v-if="includeITBM">
+                                                         Base {{ formatCurrency(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price) * (quantities[variant.id] ?? 1)) }} + ITBMS {{ formatCurrency((priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), Number(getVariantPricing(variant).tax_rate)) - Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
                                                     </template>
                                                     <template v-else>
-                                                        {{ product.pricing ? formatCurrency(product.pricing.base_price * (quantities[variant.id] ?? 1)) : 'N/A' }}
+                                                        Sin ITBM
                                                     </template>
                                                 </div>
-                                                <div v-if="blindMode" class="text-[10px] text-gray-400">ITBM incluido</div>
+                                                <div v-if="!blindMode && getVariantPricing(variant)?.cost > 0" class="text-[10px] text-gray-400">
+                                                    Costo: {{ formatCurrency(Number(getVariantPricing(variant).cost)) }}
+                                                </div>
                                                 <div :class="[
                                                     'text-xs font-medium', 
                                                     (variant.total_stock ?? 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-orange-500 dark:text-orange-400'

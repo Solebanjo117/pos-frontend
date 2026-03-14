@@ -12,6 +12,8 @@ export interface StoreSettings {
     store_tax_id: string
     store_currency: string
     store_ticket_footer: string
+    pricing_formula: string   // NEW: global Excel-like pricing formula
+    quote_expiration_days: number // 0 = disabled, 15/30/60/90 days
 }
 
 const settings = ref<StoreSettings>({
@@ -25,6 +27,8 @@ const settings = ref<StoreSettings>({
     store_tax_id: '',
     store_currency: 'USD',
     store_ticket_footer: '¡Gracias por su compra!',
+    pricing_formula: '',
+    quote_expiration_days: 0,
 })
 
 const loading = ref(false)

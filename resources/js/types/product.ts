@@ -14,6 +14,7 @@ export interface ProductLine {
 
 export interface ProductPricing {
     base_price: number
+    calculated_price?: number
     msrp: number
     cost: number
     margin_percentage: number
@@ -199,17 +200,19 @@ export interface ProductDetail extends Product {
 
 // API Request Types
 export interface CreateProductRequest {
-    sku_base: string  // Base SKU for the product (e.g., "ALT-12V-90A")
+    sku_base: string
     name: string
     description?: string
     product_line_id?: number
-    category_id?: number  // Product category
+    category_id?: number
     status?: 'active' | 'discontinued' | 'pending'
     batch_tracking?: boolean
+    alternate_code?: string      // alternate identifier
+    pricing_formula?: string     // Excel-like pricing formula
     // Default variant fields
-    brand_id: number  // Brand for the default variant
-    sku: string  // SKU for the default variant (e.g., "ALT-12V-90A-BOSCH")
-    upc?: string  // UPC for the default variant
+    brand_id: number
+    sku: string
+    upc?: string
     pricing: {
         base_price: number
         msrp: number
@@ -234,6 +237,8 @@ export interface CreateProductRequest {
 export interface UpdateProductRequest {
     sku_base?: string
     upc?: string
+    alternate_code?: string      // alternate identifier
+    pricing_formula?: string     // Excel-like pricing formula
     product_line_id?: number
     name?: string
     description?: string

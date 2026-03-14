@@ -57,6 +57,37 @@ export function useProducts() {
     }
 
     /**
+     * Fetch more products (append) for infinite scroll / load-more
+     */
+    async function fetchMoreProducts(filters?: ProductFilters) {
+        if (!hasNextPage.value || loading.value) return
+
+        loading.value = true
+        error.value = null
+
+        try {
+            const response: PaginatedResponse<Product> =
+                await productsApi.getProducts({
+                    ...filters,
+                    page: currentPage.value + 1,
+                    per_page: perPage.value,
+                })
+
+            products.value = [...products.value, ...response.data]
+            currentPage.value = response.meta.current_page
+            lastPage.value = response.meta.last_page
+            total.value = response.meta.total
+
+            return response
+        } catch (err: any) {
+            error.value = err.response?.data?.message || 'Error al cargar más productos'
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    /**
      * Fetch single product with details
      */
     async function fetchProduct(
@@ -340,6 +371,7 @@ export function useProducts() {
 
         // Methods
         fetchProducts,
+        fetchMoreProducts,
         fetchProduct,
         createProduct,
         updateProduct,

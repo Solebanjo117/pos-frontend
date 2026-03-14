@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import apiClient from '@/services/api/client'
+import { usePOS } from '@/composables/usePOS'
 import {
   FileText, Plus, Search, Eye, Trash2, ArrowRightLeft, Download,
-  Clock, CheckCircle, XCircle, Send, FileCheck, EyeOff, Edit
+  Clock, CheckCircle, XCircle, Send, FileCheck, EyeOff, ShoppingCart
 } from 'lucide-vue-next'
 
 defineOptions({ layout: AppLayout })
@@ -37,7 +38,10 @@ const statusOptions = [
     { value: '', label: 'Todos' },
     { value: 'draft', label: 'Borrador' },
     { value: 'sent', label: 'Enviada' },
+    { value: 'sent_to_deposit', label: 'En Depósito' },
+    { value: 'sent_to_cashier', label: 'En Caja' },
     { value: 'accepted', label: 'Aceptada' },
+    { value: 'collected', label: 'Cobrada' },
     { value: 'rejected', label: 'Rechazada' },
     { value: 'expired', label: 'Expirada' },
     { value: 'converted', label: 'Convertida' },
@@ -45,24 +49,32 @@ const statusOptions = [
 
 const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-        draft:     'bg-gray-100 text-gray-800 dark:bg-card dark:text-gray-300',
-        sent:      'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-        accepted:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-        rejected:  'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-        expired:   'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-        converted: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+        draft:            'bg-gray-100 text-gray-800 dark:bg-card dark:text-gray-300',
+        sent:             'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+        sent_to_deposit:  'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+        sent_to_cashier:  'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400',
+        accepted:         'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+        collected:        'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+        rejected:         'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+        expired:          'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+        converted:        'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
     }
     return colors[status] || colors.draft
 }
 
+import { Banknote } from 'lucide-vue-next'
+
 const getStatusIcon = (status: string) => {
     const icons: Record<string, any> = {
-        draft: Clock,
-        sent: Send,
-        accepted: CheckCircle,
-        rejected: XCircle,
-        expired: Clock,
-        converted: FileCheck,
+        draft:           Clock,
+        sent:            Send,
+        sent_to_deposit: Banknote,
+        sent_to_cashier: ArrowRightLeft,
+        accepted:        CheckCircle,
+        collected:       CheckCircle,
+        rejected:        XCircle,
+        expired:         Clock,
+        converted:       FileCheck,
     }
     return icons[status] || Clock
 }
@@ -95,6 +107,62 @@ const handleDelete = async (id: number) => {
         await fetchQuotes(currentPage.value)
     } catch (e: any) {
         alert(e.response?.data?.message || 'Error al eliminar')
+    }
+}
+
+const { loadQuoteAsSession } = usePOS()
+const openingPOS = ref<number | null>(null)
+
+const openQuoteInPOS = async (id: number) => {
+    openingPOS.value = id
+    try {
+        const res = await apiClient.get(`/sales-quotes/${id}`)
+        const q = res.data
+        loadQuoteAsSession({
+            id: q.id,
+            quote_number: q.quote_number,
+            customer_id: q.customer?.id ?? null,
+            items: (q.items ?? []).map((item: any) => ({
+                product_id: item.product_id,
+                product_name: item.product_name,
+                product_sku: item.product_sku,
+                variant_id: item.variant_id ?? null,
+                warehouse_id: item.warehouse_id ?? null,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                discount_percent: item.discount_percent,
+                tax_percent: item.tax_percent,
+                subtotal: item.subtotal,
+                tax_amount: item.tax_amount,
+                total: item.total,
+                variant: item.variant ?? null,
+            }))
+        })
+        router.visit('/pos')
+    } catch (e: any) {
+        alert(e.response?.data?.message || 'Error al cargar la cotización en POS')
+    } finally {
+        openingPOS.value = null
+    }
+}
+
+const handleTransition = async (id: number, action: 'send-to-deposit' | 'send-to-cashier' | 'mark-collected') => {
+    const labels: Record<string, string> = {
+        'send-to-deposit': 'enviar a Depósito',
+        'send-to-cashier': 'enviar a Caja',
+        'mark-collected':  'marcar como Cobrada',
+    }
+    if (!confirm(`¿Deseas ${labels[action]} esta cotización?`)) return
+    try {
+        await apiClient.post(`/sales-quotes/${id}/${action}`)
+        
+        if (action === 'send-to-cashier') {
+            await openQuoteInPOS(id)
+        } else {
+            await fetchQuotes(currentPage.value)
+        }
+    } catch (e: any) {
+        alert(e.response?.data?.message || 'Error al cambiar el estado')
     }
 }
 
@@ -152,7 +220,7 @@ onMounted(() => fetchQuotes())
                 </p>
             </div>
             <Link
-                href="/sales-quotes/create"
+                href="/pos"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition font-medium shadow-sm"
             >
                 <Plus :size="20" />
@@ -275,7 +343,28 @@ onMounted(() => fetchQuotes())
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">
-                                <div class="flex items-center justify-end gap-1.5">
+                                <div class="flex items-center justify-end gap-1">
+                                    <!-- Workflow quick actions -->
+                                    <button
+                                        v-if="['draft','sent'].includes(q.status)"
+                                        @click="handleTransition(q.id, 'send-to-deposit')"
+                                        class="px-2 py-1 text-xs font-medium rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 transition border border-amber-200 dark:border-amber-500/30"
+                                        title="Enviar a Depósito"
+                                    >→ Depósito</button>
+                                    <button
+                                        v-if="['draft','sent','sent_to_deposit'].includes(q.status)"
+                                        @click="handleTransition(q.id, 'send-to-cashier')"
+                                        class="px-2 py-1 text-xs font-medium rounded-md bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 hover:bg-sky-100 transition border border-sky-200 dark:border-sky-500/30"
+                                        title="Enviar a Caja"
+                                    >→ Caja</button>
+                                    <button
+                                        v-if="['sent_to_cashier','accepted'].includes(q.status)"
+                                        @click="handleTransition(q.id, 'mark-collected')"
+                                        class="px-2 py-1 text-xs font-medium rounded-md bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition border border-emerald-200 dark:border-emerald-500/30"
+                                        title="Marcar como Cobrada"
+                                    >✓ Cobrar</button>
+
+                                    <!-- Standard actions -->
                                     <Link
                                         :href="`/sales-quotes/${q.id}`"
                                         class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 dark:text-primary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
@@ -283,28 +372,22 @@ onMounted(() => fetchQuotes())
                                     >
                                         <Eye :size="16" />
                                     </Link>
-                                    <Link
-                                        v-if="q.status !== 'converted' && q.status !== 'rejected' && q.status !== 'expired'"
-                                        :href="`/sales-quotes/${q.id}/edit`"
-                                        class="p-1.5 rounded-lg text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition"
-                                        title="Editar"
+                                    <!-- Abrir/Editar en POS -->
+                                    <button
+                                        v-if="q.status !== 'converted' && q.status !== 'rejected' && q.status !== 'expired' && q.status !== 'collected'"
+                                        @click="openQuoteInPOS(q.id)"
+                                        :disabled="openingPOS === q.id"
+                                        class="p-1.5 rounded-lg text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition disabled:opacity-40"
+                                        title="Editar en POS"
                                     >
-                                        <Edit :size="16" />
-                                    </Link>
+                                        <ShoppingCart :size="16" />
+                                    </button>
                                     <button 
                                         @click="openPrintModal(q)"
                                         class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 dark:text-primary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition" 
                                         title="Imprimir Ticket / Documento"
                                     >
                                         <Download :size="16" />
-                                    </button>
-                                    <button
-                                        v-if="q.status !== 'converted' && q.status !== 'rejected' && q.status !== 'expired'"
-                                        @click="handleConvert(q.id)"
-                                        class="p-1.5 rounded-lg text-gray-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition"
-                                        title="Convertir a Orden de Venta"
-                                    >
-                                        <ArrowRightLeft :size="16" />
                                     </button>
                                     <button
                                         v-if="q.status !== 'converted'"

@@ -4,7 +4,8 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useStoreSettings } from '@/composables/useStoreSettings'
 import { type BreadcrumbItem } from '@/types'
-import { Store, Upload, Save, Building2, Phone, Mail, MapPin, CreditCard, FileText, Image } from 'lucide-vue-next'
+import PricingFormula from '@/components/Products/PricingFormula.vue'
+import { Store, Upload, Save, Building2, Phone, Mail, MapPin, CreditCard, FileText, Image, Calculator, Clock } from 'lucide-vue-next'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -179,6 +180,42 @@ const handleSave = async () => {
                             </select>
                         </div>
                     </div>
+                </section>
+
+                <!-- === QUOTES === -->
+                <section class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-6">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <Clock :size="18" class="text-primary" /> Cotizaciones
+                    </h2>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expiración de Cotizaciones</label>
+                        <select v-model.number="settings.quote_expiration_days"
+                                class="w-48 px-4 py-2 rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition">
+                            <option :value="0">Deshabilitado</option>
+                            <option :value="15">15 días</option>
+                            <option :value="30">30 días</option>
+                            <option :value="60">60 días</option>
+                            <option :value="90">90 días</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fecha "válido hasta" auto-calculada al crear cotizaciones. 0 = sin expiración.</p>
+                    </div>
+                </section>
+
+                <!-- === PRICING FORMULA === -->
+                <section class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-6">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                        <Calculator :size="18" class="text-primary" /> Fórmula de Precio Global
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Fórmula por defecto para calcular el precio de venta a partir del costo.
+                        Se puede sobreescribir por producto.
+                    </p>
+                    <PricingFormula
+                        :cost="10"
+                        :tax-rate="7"
+                        :model-value="settings.pricing_formula"
+                        @update:model-value="v => settings.pricing_formula = v"
+                    />
                 </section>
 
                 <!-- Save button -->

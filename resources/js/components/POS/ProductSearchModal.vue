@@ -9,13 +9,20 @@ const props = withDefaults(defineProps<{
   products: Product[]
   searchQuery: string
   clientMode?: boolean
+  totalCount?: number
+  hasMore?: boolean
+  loadingMore?: boolean
 }>(), {
   clientMode: false,
+  totalCount: 0,
+  hasMore: false,
+  loadingMore: false,
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'add-products', ids: Set<number>): void
+  (e: 'load-more'): void
 }>()
 
 // --- Internal selection state ---
@@ -53,6 +60,10 @@ const getStock = (p: Product): number =>
 const getSKU = (p: Product): string => {
   if (props.clientMode) return `#${p.id}`
   return p.sku_base ?? p.default_variant?.sku ?? '—'
+}
+
+const getSpecs = (p: any): { name: string; value: string; unit?: string }[] => {
+  return p.key_attributes ?? []
 }
 
 const stockClass = (stock: number) => {
@@ -127,7 +138,7 @@ const submitSelection = () => {
                 Seleccionar Productos
               </h2>
               <p class="text-xs text-gray-500 mt-0.5">
-                {{ products.length }} resultado{{ products.length !== 1 ? 's' : '' }} para
+                {{ products.length }}<span v-if="totalCount > products.length"> de {{ totalCount }}</span> resultado{{ totalCount !== 1 ? 's' : '' }} para
                 <span class="font-medium text-gray-700 dark:text-gray-300">"{{ searchQuery }}"</span>
               </p>
             </div>
@@ -164,6 +175,7 @@ const submitSelection = () => {
                   <th class="w-14 px-2 py-3"></th>
                   <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Producto</th>
                   <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">SKU</th>
+                  <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Specs</th>
                   <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">Stock</th>
                   <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Precio</th>
                 </tr>
@@ -228,6 +240,21 @@ const submitSelection = () => {
                     </span>
                   </td>
 
+                  <!-- Specs -->
+                  <td class="px-3 py-3">
+                    <div v-if="getSpecs(product).length" class="flex flex-wrap gap-1 max-w-[180px]">
+                      <span
+                        v-for="attr in getSpecs(product)"
+                        :key="attr.name"
+                        class="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-muted text-gray-600 dark:text-gray-400 whitespace-nowrap"
+                        :title="attr.name"
+                      >
+                        {{ attr.value }}{{ attr.unit ? ' ' + attr.unit : '' }}
+                      </span>
+                    </div>
+                    <span v-else class="text-[10px] text-gray-300">—</span>
+                  </td>
+
                   <!-- Stock Badge -->
                   <td class="px-3 py-3 text-center">
                     <span
@@ -249,6 +276,18 @@ const submitSelection = () => {
                 </tr>
               </tbody>
             </table>
+
+            <!-- Load More Button -->
+            <div v-if="hasMore" class="flex justify-center py-4 border-t border-gray-100 dark:border-border/50">
+              <button
+                @click="emit('load-more')"
+                :disabled="loadingMore"
+                class="px-6 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-lg transition-colors border border-indigo-200 dark:border-indigo-800/50 disabled:opacity-50"
+              >
+                <span v-if="loadingMore">Cargando...</span>
+                <span v-else>Cargar más resultados</span>
+              </button>
+            </div>
           </div>
 
           <!-- ═══════════ FOOTER (sticky) ═══════════ -->

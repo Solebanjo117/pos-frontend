@@ -9,7 +9,7 @@ import type { Product, ProductFilters } from '@/types/product'
 import ProductCatalogView from '@/components/Products/ProductCatalogView.vue'
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
-import { ShoppingCart, Check, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { ShoppingCart, Check, ChevronDown, ChevronUp, Info } from 'lucide-vue-next'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { useCategories } from '@/composables/useCategories'
 
@@ -227,6 +227,35 @@ const getVariants = (product: any) => {
     if (product.variants?.length) return product.variants
     if (product.default_variant) return [product.default_variant]
     return []
+}
+
+const getTechnicalSpecsPreview = (product: any): string => {
+    const variants = getVariants(product);
+    if (!variants.length) return '';
+    
+    // Recopilar todos los atributos únicos de todas las variantes
+    const allAttrNames = new Set<string>();
+    const attributesHtml: string[] = [];
+
+    variants.forEach((v: any) => {
+        v.attributes?.forEach((attr: any) => {
+            if (!allAttrNames.has(attr.name)) {
+                allAttrNames.add(attr.name);
+                attributesHtml.push(`${attr.name}: ${attr.value}${attr.unit ? attr.unit : ''}`);
+            }
+        });
+    });
+
+    return attributesHtml.slice(0, 3).join(' • ') + (attributesHtml.length > 3 ? '...' : '');
+}
+
+// Helper to get variant attributes, falling back to any sibling variant's attrs
+// (Henry: all variants share the same "base-level" specs)
+const getVariantAttrs = (variant: any, product: any): any[] => {
+    if (variant.attributes?.length) return variant.attributes
+    const variants = getVariants(product)
+    const sibling = variants.find((v: any) => v.id !== variant.id && v.attributes?.length > 0)
+    return sibling ? sibling.attributes : []
 }
 </script>
 
@@ -570,6 +599,9 @@ const getVariants = (product: any) => {
                                             class="text-sm text-gray-500 dark:text-gray-400">
                                             {{ product.product_line.name }}
                                         </div>
+                                        <div v-if="getTechnicalSpecsPreview(product)" class="text-[11px] text-gray-400 dark:text-gray-500 mt-1" :title="getTechnicalSpecsPreview(product)">
+                                            📋 {{ getTechnicalSpecsPreview(product) }}
+                                        </div>
                                     </td>
                                     <td
                                         class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
@@ -633,13 +665,16 @@ const getVariants = (product: any) => {
                                                         <tr>
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                                                                Marca</th>
-                                                            <th
-                                                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
                                                                 SKU</th>
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
                                                                 Custom SKU</th>
+                                                            <th
+                                                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                                                                Atributos</th>
+                                                            <th
+                                                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                                                                Marca</th>
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
                                                                 Precio</th>
@@ -656,27 +691,28 @@ const getVariants = (product: any) => {
                                                         <tr v-for="variant in getVariants(product)"
                                                             :key="variant.id"
                                                             class="hover:bg-gray-50 dark:hover:bg-muted/50">
-                                                            <td class="px-4 py-3">
-                                                                <div class="flex items-center">
-                                                                    <div
-                                                                        class="text-sm font-medium text-gray-900 dark:text-white">
-                                                                        {{ variant.brand?.name }}
-                                                                    </div>
-                                                                    <span v-if="variant.is_default"
-                                                                        class="ml-2 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
-                                                                        Default
-                                                                    </span>
-                                                                </div>
-                                                            </td>
                                                             <td
                                                                 class="px-4 py-3 text-sm text-gray-900 dark:text-white">
                                                                 <code
-                                                                    class="rounded bg-gray-100 px-2 py-1 text-xs dark:bg-muted">{{
+                                                                    class="rounded bg-gray-100 px-2 py-1 text-xs dark:bg-muted font-mono">{{
                                                                         variant.sku }}</code>
                                                             </td>
                                                             <td
                                                                 class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                                                                 {{ variant.upc || 'N/A' }}
+                                                            </td>
+                                                            <td class="px-4 py-3">
+                                                                <div v-if="getVariantAttrs(variant, product).length > 0" class="flex flex-wrap gap-1">
+                                                                    <span v-for="attr in getVariantAttrs(variant, product)" :key="attr.id ?? attr.name"
+                                                                        class="inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 text-[10px] text-indigo-700 dark:text-indigo-300"
+                                                                        :class="!variant.attributes?.length ? 'opacity-60 italic' : ''">
+                                                                        {{ attr.name }}: {{ attr.value }}{{ attr.unit ? ` ${attr.unit}` : '' }}
+                                                                    </span>
+                                                                </div>
+                                                                <span v-else class="text-gray-400 text-xs">—</span>
+                                                            </td>
+                                                            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                                                                {{ variant.brand?.name || '—' }}
                                                             </td>
                                                             <td
                                                                 class="px-4 py-3 text-sm text-gray-900 dark:text-white">
@@ -709,6 +745,13 @@ const getVariants = (product: any) => {
                                                                     <template v-else>
                                                                         <ShoppingCart class="w-3 h-3" /> Agregar
                                                                     </template>
+                                                                </button>
+                                                                <button
+                                                                    @click="openDetail(product)"
+                                                                    class="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-600 dark:hover:text-primary hover:bg-indigo-50 dark:hover:bg-muted transition-colors mr-1"
+                                                                    title="Ver detalles del producto"
+                                                                >
+                                                                    <Info class="w-3.5 h-3.5" />
                                                                 </button>
                                                                 <a :href="`/products/${product.id}/edit?variant=${variant.id}`"
                                                                     class="text-indigo-600 dark:text-primary hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">

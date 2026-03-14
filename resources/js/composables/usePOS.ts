@@ -35,6 +35,7 @@ interface PosCartSession {
     cart: CartItem[]
     customer_id?: number
     notes: string
+    source_quote_id?: number   // set when session was loaded from a SalesQuote
     sessionLogs: { action: string; metadata: Record<string, any>; timestamp: string }[]
     createdAt: string
 }
@@ -240,7 +241,8 @@ export function usePOS() {
             // Resolve price: variant pricing first, then product pricing, then 0
             const variantPricing = variant?.pricing
             const productPricing = product.pricing
-            const resolvedPrice = variantPricing?.base_price ?? productPricing?.base_price ?? 0
+            const resolvedPrice = variantPricing?.calculated_price ?? variantPricing?.base_price
+                ?? productPricing?.calculated_price ?? productPricing?.base_price ?? 0
             const resolvedTaxRate = variantPricing?.tax_rate ?? productPricing?.tax_rate ?? 7
 
             const newItem: CartItem = {
@@ -363,6 +365,11 @@ export function usePOS() {
             item.notes = noteText || undefined
             logAction('item_note', { product_id: item.product_id, has_note: !!noteText })
         }
+    }
+
+    // Reorder cart items (e.g. from Drag and Drop)
+    const reorderCart = (newCartArray: CartItem[]) => {
+        activeSession.value.cart = [...newCartArray]
     }
 
     // Clear entire cart (clears the ACTIVE session only)
@@ -638,7 +645,71 @@ export function usePOS() {
         }
     }
 
+    // ============================================
+    // LOAD QUOTE AS A NEW POS SESSION
+    // ============================================
+
+    /**
+     * Opens a SalesQuote as a new cart tab in the POS.
+     * Items, prices, discounts and taxes are taken directly from the quote.
+     */
+    const loadQuoteAsSession = (quote: {
+        id: number
+        quote_number: string
+        customer_id?: number | null
+        items: Array<{
+            product_id: number
+            product_name: string
+            product_sku: string
+            variant_id?: number | null
+            warehouse_id?: number | null
+            quantity: number
+            unit_price: number
+            discount_percent: number
+            tax_percent: number
+            subtotal: number
+            tax_amount: number
+            total: number
+            variant?: { id: number; sku: string; brand?: { name: string } | null } | null
+        }>
+    }): string => {
+        createNewCart(`COT-${quote.quote_number}`)
+
+        const newSession = activeSession.value
+        newSession.customer_id = quote.customer_id ?? undefined
+        newSession.source_quote_id = quote.id   // ← persisted so POS can update it later
+
+        newSession.cart = quote.items.map((item, idx): CartItem => {
+            const cartItem: CartItem = {
+                id: `q${quote.id}-${item.product_id}-${item.variant_id ?? 'nv'}-${idx}`,
+                product_id: item.product_id,
+                variant_id: item.variant_id ?? undefined,
+                variant_brand: item.variant?.brand?.name ?? undefined,
+                product_name: item.product_name,
+                product_sku: item.variant?.sku || item.product_sku || '',
+                product_price: Number(item.unit_price) || 0,
+                quantity: Number(item.quantity) || 1,
+                discount_percent: Number(item.discount_percent) || 0,
+                tax_percent: Number(item.tax_percent) || 0,
+                default_tax_percent: Number(item.tax_percent) || 0,
+                is_tax_overridden: false,
+                warehouse_id: item.warehouse_id ?? undefined,
+                subtotal: 0,
+                tax_amount: 0,
+                total: 0,
+            }
+            // Let the POS recalculate so its own computed totals are always correct
+            recalculateItem(cartItem)
+            return cartItem
+        })
+
+        logAction('quote_loaded', { quote_id: quote.id, quote_number: quote.quote_number, items: quote.items.length })
+
+        return newSession.id
+    }
+
     return {
+
         // State
         cart,
         customer_id,
@@ -668,9 +739,11 @@ export function usePOS() {
         toggleItemTaxExempt,
         updateItemSeller,
         updateItemNotes,
+        reorderCart,
         clearCart,
         processSale,
         saveDraft,
+        loadQuoteAsSession,
 
         // Multi-cart
         allSessions,

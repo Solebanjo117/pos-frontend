@@ -11,14 +11,27 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
+import PricingFormula from '@/components/Products/PricingFormula.vue'
+import { Wrench, CircleDollarSign, Package } from 'lucide-vue-next'
+
 
 const props = defineProps<{
-    productId: number
+    productId?: number
     categoryId?: number
     skuBase?: string
+    productName?: string
+    defaultVariantAttributes?: { name: string; value: string; unit: string }[]
+}>()
+
+const emit = defineEmits<{
+    'draft-variants-changed': [variants: any[]]
 }>()
 
 const { fetchVariants, createVariant, updateVariant, deleteVariant, loading, error } = useProducts()
+
+// Draft mode (when no productId)
+const draftVariants = ref<any[]>([])
+const isDraftMode = computed(() => !props.productId)
 
 const variants = ref<any[]>([])
 const showModal = ref(false)
@@ -37,10 +50,14 @@ const form = ref({
     sku: '',
     upc: '',
     status: 'active',
+    pricing_formula: '' as string,
     pricing: {
         base_price: 0,
+        msrp: 0,
+        cost: 0,
         tax_rate: 7,
-        tax_type: 'standard' as 'standard' | 'exempt' | 'custom',
+        tax_type: 'custom' as 'standard' | 'exempt' | 'custom',
+        pricing_formula: '' as string,
     },
     initial_inventory: [
         {
@@ -91,38 +108,28 @@ const fetchCategoryDefaults = async (categoryId: number | undefined) => {
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 
-// === 3-Way Tax Calculator ===
-const isCalculating = ref(false)
-const computed_total = ref(0)
+// === Total Evaluado ===
+// Por defecto, el total es Base Price + ITBM. Si se usa la fórmula, asume el valor devuelto sin tocar Base Price.
+const custom_total = ref<number | null>(null)
 
-watch(
-    () => [form.value.pricing.base_price, form.value.pricing.tax_rate],
-    ([newPrice, newTax]) => {
-        if (isCalculating.value) return
-        isCalculating.value = true
-        const price = Number(newPrice) || 0
-        const tax = Number(newTax) || 0
-        computed_total.value = Math.round((price * (1 + tax / 100)) * 100) / 100
-        isCalculating.value = false
-    },
-    { immediate: true }
-)
+const computed_total = computed(() => {
+    if (custom_total.value !== null && custom_total.value !== undefined) {
+        return custom_total.value
+    }
+    const p = form.value.pricing
+    const base = Number(p.base_price) || 0
+    const rate = Number(p.tax_rate) || 0
+    return Number((base * (1 + rate / 100)).toFixed(2))
+})
 
-const onTotalChange = (newTotal: number) => {
-    if (isCalculating.value) return
-    isCalculating.value = true
-    const tax = Number(form.value.pricing.tax_rate) || 0
-    const total = Number(newTotal) || 0
-    form.value.pricing.base_price = Math.round((total / (1 + tax / 100)) * 100) / 100
-    computed_total.value = total
-    isCalculating.value = false
+const onFormulaTotalChange = (newTotal: number) => {
+    custom_total.value = newTotal
 }
 
-const onTaxTypeChange = (type: 'standard' | 'exempt' | 'custom') => {
-    form.value.pricing.tax_type = type
-    if (type === 'standard') form.value.pricing.tax_rate = 7
-    else if (type === 'exempt') form.value.pricing.tax_rate = 0
-}
+// Limpiamos el custom_total al cambiar manualmente bases o impuestos
+watch(() => form.value.pricing.base_price, () => { custom_total.value = null })
+watch(() => form.value.pricing.tax_rate, () => { custom_total.value = null })
+watch(() => form.value.pricing_formula, (v) => { if(!v) custom_total.value = null })
 
 // === Auto Variant SKU ===
 const autoVariantSku = computed(() => {
@@ -155,13 +162,17 @@ watch(
 )
 
 const loadVariants = async () => {
+    if (isDraftMode.value) return // draft mode: no API call
     try {
-        const data = await fetchVariants(props.productId)
+        const data = await fetchVariants(props.productId!)
         variants.value = data
     } catch (e) {
         console.error('Error loading variants', e)
     }
 }
+
+// In draft mode, variants displayed are draftVariants; in normal mode, fetched from API
+const displayVariants = computed(() => isDraftMode.value ? draftVariants.value : variants.value)
 
 const addAttribute = () => {
     if (!newAttrName.value.trim() || !newAttrValue.value.trim()) return
@@ -177,22 +188,50 @@ const removeAttribute = (idx: number) => variantAttributes.value.splice(idx, 1)
 
 const openCreateModal = () => {
     editingVariant.value = null
-    // Pre-populate attributes from category defaults
-    variantAttributes.value = categoryDefaults.value.map(d => ({
-        name: d.name,
-        value: '',
-        unit: d.unit,
-        required: d.required,
-    }))
+
+    // Inherit attributes: try existing variants first, then default variant attrs from parent form, then category defaults
+    // (Henry's request: specs behave as product-level — same for all variants)
+    const existingWithAttrs = displayVariants.value.find((v: any) => v.attributes && v.attributes.length > 0)
+    if (existingWithAttrs) {
+        variantAttributes.value = existingWithAttrs.attributes.map((a: any) => ({
+            name: a.name,
+            value: a.value,
+            unit: a.unit || '',
+            required: false,
+        }))
+    } else if (props.defaultVariantAttributes && props.defaultVariantAttributes.length > 0) {
+        // Fallback: inherit from the default variant's attributes (passed from parent form)
+        variantAttributes.value = props.defaultVariantAttributes
+            .filter(a => a.name && a.name.trim())
+            .map(a => ({
+                name: a.name,
+                value: a.value || '',
+                unit: a.unit || '',
+                required: false,
+            }))
+    } else {
+        // Last fallback: pre-populate from category defaults
+        variantAttributes.value = categoryDefaults.value.map(d => ({
+            name: d.name,
+            value: '',
+            unit: d.unit,
+            required: d.required,
+        }))
+    }
+
     form.value = {
         brand_id: brands.value[0]?.id ?? 1,
         sku: '',
         upc: '',
         status: 'active',
+        pricing_formula: '',
         pricing: {
             base_price: 0,
+            msrp: 0,
+            cost: 0,
             tax_rate: 7,
-            tax_type: 'standard',
+            tax_type: 'custom',
+            pricing_formula: '',
         },
         initial_inventory: [
             {
@@ -232,16 +271,20 @@ const openEditModal = (variant: any) => {
         sku: variant.sku,
         upc: variant.upc || '',
         status: variant.status,
+        pricing_formula: p?.pricing_formula || '',
         pricing: {
             base_price: p?.base_price ?? 0,
+            msrp: p?.msrp ?? 0,
+            cost: p?.cost ?? 0,
             tax_rate: p?.tax_rate ?? 7,
             tax_type: (p as any)?.tax_type || 'standard',
+            pricing_formula: p?.pricing_formula || '',
         },
         initial_inventory: []
     }
 
-    // Trigger tax calc
-    computed_total.value = Math.round(((p?.base_price ?? 0) * (1 + (p?.tax_rate ?? 7) / 100)) * 100) / 100
+    // Si tiene formula, inicializar custom_total con el base_price que viene del backend
+    custom_total.value = p?.pricing_formula ? (p?.base_price ?? null) : null
 
     previousAutoSku.value = variant.sku
     showModal.value = true
@@ -262,18 +305,41 @@ watch(
 const handleSubmit = async () => {
     processing.value = true
     try {
+        const pricingPayload = {
+            ...form.value.pricing,
+            pricing_formula: form.value.pricing_formula || null,
+        }
+
         const payload = {
             ...form.value,
+            pricing: pricingPayload,
             sku: form.value.sku || autoVariantSku.value,
             attributes: variantAttributes.value.filter(a => a.name.trim() && a.value.trim()),
         }
-        if (editingVariant.value) {
-            await updateVariant(props.productId, editingVariant.value.id, payload)
+
+        if (isDraftMode.value) {
+            // Draft mode: store locally, do not call API
+            if (editingVariant.value !== null) {
+                const idx = draftVariants.value.findIndex(v => v._draftId === editingVariant.value._draftId)
+                if (idx >= 0) {
+                    const brand = brands.value.find(b => b.id === payload.brand_id)
+                    draftVariants.value[idx] = { ...payload, _draftId: editingVariant.value._draftId, brand }
+                }
+            } else {
+                const brand = brands.value.find(b => b.id === payload.brand_id)
+                draftVariants.value.push({ ...payload, _draftId: Date.now(), brand })
+            }
+            emit('draft-variants-changed', draftVariants.value)
+            showModal.value = false
         } else {
-            await createVariant(props.productId, payload)
+            if (editingVariant.value) {
+                await updateVariant(props.productId!, editingVariant.value.id, payload)
+            } else {
+                await createVariant(props.productId!, payload)
+            }
+            await loadVariants()
+            showModal.value = false
         }
-        await loadVariants()
-        showModal.value = false
     } catch (e) {
         console.error(e)
     } finally {
@@ -282,14 +348,19 @@ const handleSubmit = async () => {
 }
 
 const handleDelete = async (variant: any) => {
+    if (isDraftMode.value) {
+        const idx = draftVariants.value.findIndex(v => v._draftId === variant._draftId)
+        if (idx >= 0) draftVariants.value.splice(idx, 1)
+        emit('draft-variants-changed', draftVariants.value)
+        return
+    }
     if (!confirm(`¿Estás seguro de eliminar la variante ${variant.brand?.name}?`)) return
-
     try {
-        await deleteVariant(props.productId, variant.id)
+        await deleteVariant(props.productId!, variant.id)
         await loadVariants()
     } catch (e) {
         console.error(e)
-        alert('No se pudo eliminar la variante. Puede que sea la variante por defecto o tenga historial.')
+        alert('No se pudo eliminar la variante.')
     }
 }
 
@@ -333,39 +404,39 @@ onMounted(async () => {
     <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
         <div class="mb-6 flex items-center justify-between">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Variantes (Marcas)</h2>
-            <Button @click="openCreateModal">
+            <Button type="button" @click="openCreateModal">
                 Agregar Variante
             </Button>
         </div>
 
-        <div v-if="loading && !variants.length" class="flex justify-center py-8">
+        <div v-if="loading && !displayVariants.length" class="flex justify-center py-8">
             <div class="h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
         </div>
 
-        <div v-else-if="variants.length === 0" class="text-center py-8 text-gray-500">
-            No hay variantes registradas.
+        <div v-else-if="displayVariants.length === 0" class="text-center py-8 text-gray-500">
+            {{ isDraftMode ? 'Agrega variantes con el botón de arriba. Se crearán al guardar el producto.' : 'No hay variantes registradas.' }}
         </div>
 
         <div v-else class="overflow-x-auto">
             <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-muted dark:text-gray-400">
                     <tr>
-                        <th class="px-6 py-3">Marca</th>
                         <th class="px-6 py-3">SKU</th>
+                        <th class="px-6 py-3">Nombre</th>
                         <th class="px-6 py-3">Atributos</th>
-                        <th class="px-6 py-3">Precio</th>
+                        <th class="px-6 py-3">Marca</th>
+                        <th class="px-6 py-3">Precio Base</th>
+                        <th class="px-6 py-3">Precio Total</th>
                         <th class="px-6 py-3">Stock Total</th>
-                        <th class="px-6 py-3">Estado</th>
                         <th class="px-6 py-3 text-right">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="variant in variants" :key="variant.id" class="border-b bg-white hover:bg-gray-50 dark:border-border dark:bg-card dark:hover:bg-muted">
-                        <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                            {{ variant.brand?.name }}
-                            <span v-if="variant.is_default" class="ml-2 rounded bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300">Default</span>
-                        </td>
+                    <tr v-for="variant in displayVariants" :key="variant.id ?? variant._draftId" class="border-b bg-white hover:bg-gray-50 dark:border-border dark:bg-card dark:hover:bg-muted">
                         <td class="px-6 py-4 font-mono text-xs">{{ variant.sku }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                            {{ productName || 'Producto Base' }}
+                        </td>
                         <td class="px-6 py-4">
                             <div v-if="variant.attributes?.length" class="flex flex-wrap gap-1">
                                 <span v-for="attr in variant.attributes" :key="attr.id"
@@ -376,27 +447,27 @@ onMounted(async () => {
                             <span v-else class="text-gray-400 text-xs">—</span>
                         </td>
                         <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                            {{ variant.brand?.name }}
+                            <span v-if="isDraftMode" class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">Pendiente</span>
+                        </td>
+                        <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
                             {{ variant.pricing ? formatCurrency(variant.pricing.base_price) : '—' }}
+                        </td>
+                        <td class="px-6 py-4 font-bold" :class="variant.pricing?.calculated_price !== undefined ? 'text-green-600 dark:text-green-500' : 'text-gray-900 dark:text-white'">
+                            {{ variant.pricing 
+                                ? formatCurrency(
+                                    variant.pricing.calculated_price ?? 
+                                    (Number(variant.pricing.base_price) * (1 + ((Number(variant.pricing.tax_rate) || 0) / 100)))
+                                  ) 
+                                : '—' }}
                         </td>
                         <td class="px-6 py-4">
                             {{ variant.inventory?.reduce((sum: number, i: any) => sum + i.quantity_available, 0) || 0 }}
                         </td>
-                        <td class="px-6 py-4">
-                             <span
-                                :class="{
-                                    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300': variant.status === 'active',
-                                    'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300': variant.status === 'discontinued',
-                                    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300': variant.status === 'pending',
-                                }"
-                                class="rounded px-2.5 py-0.5 text-xs font-medium"
-                            >
-                                {{ variant.status }}
-                            </span>
-                        </td>
                         <td class="px-6 py-4 text-right">
-                            <button @click="openEditModal(variant)" class="font-medium text-blue-600 dark:text-primary hover:underline dark:text-blue-500 mr-3">Editar</button>
+                            <button type="button" @click="openEditModal(variant)" class="font-medium text-blue-600 dark:text-primary hover:underline dark:text-blue-500 mr-3">Editar</button>
                             <button
-                                v-if="!variant.is_default"
+                                type="button"
                                 @click="handleDelete(variant)"
                                 class="font-medium text-red-600 hover:underline dark:text-red-500"
                             >
@@ -417,8 +488,8 @@ onMounted(async () => {
                         Marca, atributos técnicos, SKU y precios de esta variante.
                     </DialogDescription>
                 </DialogHeader>
-
-                <form @submit.prevent="handleSubmit" class="space-y-4 py-4">
+                <!-- Formulario Modal con .stop para evitar burbujeo al padre Create.vue -->
+                <form @submit.prevent.stop="handleSubmit" class="space-y-4 py-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- SKU (Auto-generated) - NOW FIRST -->
                         <div>
@@ -483,7 +554,7 @@ onMounted(async () => {
                     <!-- ═══ Attributes Section ═══ -->
                     <div class="border-t border-gray-200 dark:border-border pt-4">
                         <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-                            🔧 Especificaciones Técnicas
+                            <Wrench class="w-4 h-4 text-gray-500" /> Especificaciones Técnicas
                             <span v-if="loadingCategoryDefaults" class="text-xs text-gray-400 animate-pulse">cargando guías...</span>
                         </h4>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
@@ -545,65 +616,52 @@ onMounted(async () => {
                         <p v-if="variantAttributes.length === 0" class="text-xs text-gray-400 italic mt-2">Sin atributos. Agrega especificaciones si aplica.</p>
                     </div>
 
-                    <!-- ═══ Pricing Section (3-way calculator) ═══ -->
+                    <!-- ═══ Pricing Section ═══ -->
                     <div class="border-t border-gray-200 dark:border-border pt-4">
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">💰 Precios de esta Variante</h4>
+                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                            <CircleDollarSign class="w-4 h-4 text-gray-500" /> Precios de esta Variante
+                        </h4>
 
-                        <!-- Tax type toggle -->
-                        <div class="flex gap-2 mb-4">
-                            <button type="button" @click="onTaxTypeChange('standard')"
-                                :class="form.pricing.tax_type === 'standard' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 ring-1 ring-blue-500' : 'bg-gray-100 text-gray-600 dark:bg-muted dark:text-gray-400'"
-                                class="rounded-lg px-3 py-1.5 text-xs font-medium transition-all">
-                                ITBM 7%
-                            </button>
-                            <button type="button" @click="onTaxTypeChange('exempt')"
-                                :class="form.pricing.tax_type === 'exempt' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 ring-1 ring-green-500' : 'bg-gray-100 text-gray-600 dark:bg-muted dark:text-gray-400'"
-                                class="rounded-lg px-3 py-1.5 text-xs font-medium transition-all">
-                                Exento
-                            </button>
-                            <button type="button" @click="onTaxTypeChange('custom')"
-                                :class="form.pricing.tax_type === 'custom' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 ring-1 ring-amber-500' : 'bg-gray-100 text-gray-600 dark:bg-muted dark:text-gray-400'"
-                                class="rounded-lg px-3 py-1.5 text-xs font-medium transition-all">
-                                Custom
-                            </button>
-                        </div>
+                        <!-- Tax type toggle fue removido: ahora ITBM siempre es numérico y modificable con 7% default -->
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Precio Base <span class="text-xs text-gray-400">(sin ITBM)</span></label>
+                        <!-- 3-way calculator: Precio | ITBM | Total -->
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 p-3 rounded-lg bg-gray-50 dark:bg-muted/50 border border-dashed border-gray-200 dark:border-border items-start">
+                            <div class="md:col-span-3">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Precio de Venta <span class="text-xs text-gray-400"></span>
+                                </label>
                                 <div class="relative mt-1">
                                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
                                     <input v-model.number="form.pricing.base_price" type="number" step="0.01" min="0"
                                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white pl-7" />
                                 </div>
                             </div>
-
-                            <!-- Precio Total (con ITBM) -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Precio Total <span class="text-xs text-green-500 font-semibold">(con ITBM)</span></label>
-                                <div class="relative mt-1">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-green-500 text-sm font-semibold">$</span>
-                                    <input :value="computed_total" @input="onTotalChange(Number(($event.target as HTMLInputElement).value))"
-                                        type="number" step="0.01" min="0"
-                                        class="block w-full rounded-md border-green-300 dark:border-green-700 shadow-sm focus:border-green-500 focus:ring-green-500 dark:bg-muted dark:text-green-300 pl-7 font-semibold" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                            <!-- Tax Rate -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">% ITBM</label>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">% ITBM</label>
                                 <input v-model.number="form.pricing.tax_rate" type="number" step="0.01" min="0" max="100"
-                                    :disabled="form.pricing.tax_type !== 'custom'"
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white disabled:opacity-50" />
+                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white" />
+                            </div>
+                            <div class="md:col-span-7">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Precio Total <span class="text-xs text-green-500 font-semibold">(número o fórmula — <code class="bg-gray-100 dark:bg-muted px-1 rounded">costo</code> = Precio de Venta)</span>
+                                </label>
+                                <PricingFormula
+                                    :cost="Number(form.pricing.base_price) || 0"
+                                    :tax-rate="Number(form.pricing.tax_rate) || 7"
+                                    :model-value="form.pricing_formula"
+                                    :price="computed_total"
+                                    @update:model-value="v => form.pricing_formula = v"
+                                    @update:price="onFormulaTotalChange"
+                                />
                             </div>
                         </div>
                     </div>
 
                     <!-- Initial Inventory (Only for create) -->
                     <div v-if="!editingVariant" class="border-t border-gray-200 dark:border-border pt-4">
-                        <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-2">📦 Inventario Inicial</h4>
+                        <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                            <Package class="w-4 h-4 text-gray-500" /> Inventario Inicial
+                        </h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stock Disponible</label>

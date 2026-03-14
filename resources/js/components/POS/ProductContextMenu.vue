@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Info, X } from 'lucide-vue-next'
+import { Info, X, ExternalLink } from 'lucide-vue-next'
 
 const props = defineProps<{
   show: boolean
@@ -13,6 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  'view-details': []
 }>()
 
 const menuRef = ref<HTMLElement | null>(null)
@@ -49,6 +50,17 @@ const vehicles = computed(() => {
 
 const notes = computed(() => {
   return props.productDetails?.description || null
+})
+
+// Specs: get attributes for the active variant, fallback to product attributes
+const variantSpecs = computed(() => {
+  if (!props.productDetails) return []
+  if (props.item?.variant_id && props.productDetails.variants) {
+    const v = props.productDetails.variants.find((v: any) => v.id === props.item.variant_id)
+    if (v?.attributes?.length) return v.attributes.slice(0, 4)
+  }
+  if (props.productDetails.attributes?.length) return props.productDetails.attributes.slice(0, 4)
+  return []
 })
 
 // Position adjustment to keep menu in viewport
@@ -159,10 +171,32 @@ onUnmounted(() => {
             </p>
           </div>
 
+          <!-- Specs -->  
+          <div v-if="variantSpecs.length > 0">
+            <span class="text-gray-500 text-xs font-medium uppercase tracking-wider block mb-1">Especificaciones</span>
+            <div class="grid grid-cols-2 gap-1">
+              <div v-for="spec in variantSpecs" :key="spec.name" class="text-xs bg-gray-50 dark:bg-muted rounded px-2 py-1">
+                <span class="text-gray-400">{{ spec.name }}:</span>
+                <span class="font-medium text-gray-800 dark:text-gray-200 ml-1">{{ spec.value }}{{ spec.unit ? ' ' + spec.unit : '' }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Empty state -->
           <div v-if="!productDetails" class="text-center py-4 text-gray-400 text-xs">
             Cargando información...
           </div>
+        </div>
+
+        <!-- Footer action button -->
+        <div class="border-t border-gray-100 dark:border-border p-2">
+          <button
+            @click="emit('view-details'); emit('close')"
+            class="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-medium text-indigo-600 dark:text-primary hover:bg-indigo-50 dark:hover:bg-muted rounded-lg transition-colors"
+          >
+            <ExternalLink class="w-3.5 h-3.5" />
+            Ver Detalles Completos
+          </button>
         </div>
       </div>
     </transition>

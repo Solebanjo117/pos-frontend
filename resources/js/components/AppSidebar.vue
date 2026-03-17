@@ -21,18 +21,37 @@ import AppLogo from './AppLogo.vue';
 import { ref, onMounted, computed } from 'vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useAuth } from '@/composables/useAuth';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 
 const { fetchSettings, isSingleWarehouseMode } = usePosSettings();
 const { fetchCurrentUser, isAdmin } = useAuth();
+const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings();
 
 // Load settings
 onMounted(async () => {
     try {
-        await Promise.all([fetchSettings(), fetchCurrentUser()]);
+        await Promise.all([fetchSettings(), fetchCurrentUser(), fetchStoreSettings()]);
     } catch (e) {
         console.error('Failed to load settings', e);
     }
 });
+
+const filterWorkOrders = (items: NavItem[]): NavItem[] => {
+    const enabled = storeSettings.value.modules_work_orders_enabled;
+
+    if (enabled) return items;
+
+    return items
+        .filter((item) => {
+            const title = item.title.toLowerCase();
+            const href = typeof item.href === 'string' ? item.href.toLowerCase() : '';
+            return title !== 'órdenes de trabajo' && title !== 'ordenes de trabajo' && !href.includes('/work-orders');
+        })
+        .map((item) => ({
+            ...item,
+            items: item.items ? filterWorkOrders(item.items) : item.items,
+        }));
+};
 
 
 const mainNavItems = computed<NavItem[]>(() => {
@@ -221,7 +240,7 @@ const mainNavItems = computed<NavItem[]>(() => {
         });
     }
 
-    return items;
+    return filterWorkOrders(items);
 });
 
 

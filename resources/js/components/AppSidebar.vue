@@ -79,6 +79,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                 href: '/pos-sessions',
                 icon: Receipt,
             },
+            {
+                title: 'Órdenes de Trabajo',
+                href: '/work-orders',
+                icon: Wrench,
+            },
         ],
     },
     {

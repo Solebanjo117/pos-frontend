@@ -165,6 +165,13 @@ Route::middleware(['auth'])->group(function () {
     })->name('vehicles.index');
 });
 
+// Work Orders
+Route::middleware(['auth'])->prefix('work-orders')->name('work-orders.')->group(function () {
+    Route::get('/', function () {
+        return Inertia::render('WorkOrders/Index');
+    })->name('index');
+});
+
 require __DIR__.'/settings.php';
 
 // ==================== SUPPLIERS ====================

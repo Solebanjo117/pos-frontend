@@ -2,6 +2,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { salesOrdersService } from '@/services/sales-orders'
 import { usePosSettings } from './usePosSettings'
+import { useStoreSettings } from './useStoreSettings'
 import type { Product } from '@/types/product'
 import type { CreateSalesOrderData } from '@/types/sales-order'
 
@@ -14,6 +15,7 @@ interface CartItem {
     product_sku: string
     product_price: number
     quantity: number
+    available_stock?: number
     discount_percent: number
     tax_percent: number
     default_tax_percent: number // original tax so we can restore it
@@ -199,6 +201,7 @@ export function usePOS() {
 
     // POS settings
     const { fetchSettings, isSingleWarehouseMode, getDefaultWarehouse, getDefaultWarehouseId, currentWarehouseId } = usePosSettings()
+    const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings()
 
     // ====== Audit Logging ======
     const logAction = (action: string, metadata: Record<string, any> = {}) => {
@@ -208,7 +211,7 @@ export function usePOS() {
     // Load settings on initialization
     onMounted(async () => {
         try {
-            await fetchSettings()
+            await Promise.all([fetchSettings(), fetchStoreSettings()])
         } catch (err) {
             console.error('Error loading POS settings:', err)
         }
@@ -243,7 +246,7 @@ export function usePOS() {
             const productPricing = product.pricing
             const resolvedPrice = variantPricing?.calculated_price ?? variantPricing?.base_price
                 ?? productPricing?.calculated_price ?? productPricing?.base_price ?? 0
-            const resolvedTaxRate = variantPricing?.tax_rate ?? productPricing?.tax_rate ?? 7
+            const resolvedTaxRate = variantPricing?.tax_rate ?? productPricing?.tax_rate ?? (storeSettings.value.store_tax_rate ?? 7)
 
             const newItem: CartItem = {
                 id: `${product.id}-${variant?.id ?? 'nv'}-${Date.now()}`,
@@ -254,6 +257,7 @@ export function usePOS() {
                 product_sku: variant?.sku || (product as any).sku_base || '',
                 product_price: resolvedPrice,
                 quantity,
+                available_stock: variant?.total_stock ?? product.total_stock ?? undefined,
                 discount_percent: 0,
                 tax_percent: resolvedTaxRate,
                 default_tax_percent: resolvedTaxRate,
@@ -326,7 +330,7 @@ export function usePOS() {
             item.product_price = Math.max(0, newPrice)
             // Auto-reset: deactivate tax override when price is manually changed
             if (item.is_tax_overridden) {
-                item.tax_percent = item.default_tax_percent || 7
+                item.tax_percent = item.default_tax_percent || (storeSettings.value.store_tax_rate ?? 7)
                 item.is_tax_overridden = false
             }
             recalculateItem(item)
@@ -344,7 +348,7 @@ export function usePOS() {
                 item.tax_percent = 0
             } else {
                 // Restore: fallback to 7 if default was never set (legacy localStorage items)
-                item.tax_percent = item.default_tax_percent || 7
+                item.tax_percent = item.default_tax_percent || (storeSettings.value.store_tax_rate ?? 7)
             }
             recalculateItem(item)
         }

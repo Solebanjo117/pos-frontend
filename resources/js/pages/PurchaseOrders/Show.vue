@@ -175,7 +175,7 @@ onMounted(async () => {
                         </tr></thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-border">
                             <tr v-for="item in purchaseOrder.items" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/50">
-                                <td class="px-6 py-3"><Link v-if="item.product" :href="`/products/${item.product.id}`" class="text-sm text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">{{ item.product.name }}</Link><p v-if="item.product" class="text-xs text-gray-500 font-mono">{{ item.product.sku }}</p></td>
+                                <td class="px-6 py-3"><Link v-if="item.product" :href="`/products/${item.product.id}`" class="text-sm text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">{{ item.product.name }}</Link><p v-if="item.product" class="text-xs text-gray-500 font-mono">{{ item.product.sku_base }}</p></td>
                                 <td class="px-6 py-3 text-right text-sm">{{ item.quantity_ordered }}</td>
                                 <td class="px-6 py-3 text-right text-sm" :class="item.is_fully_received ? 'text-green-600 font-semibold' : ''">{{ item.quantity_received }}</td>
                                 <td class="px-6 py-3 text-right text-sm text-gray-500">${{ Number(item.unit_cost).toFixed(2) }}</td>

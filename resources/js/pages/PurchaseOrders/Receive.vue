@@ -61,7 +61,7 @@ async function handleSubmit() {
                             <td class="px-6 py-3">
                                 <template v-if="purchaseOrder.items.find(i => i.id === rd.item_id)?.product">
                                     <p class="text-sm font-medium text-gray-900 dark:text-white">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.product?.name }}</p>
-                                    <p class="text-xs text-gray-500 font-mono">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.product?.sku }}</p>
+                                    <p class="text-xs text-gray-500 font-mono">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.product?.sku_base }}</p>
                                 </template>
                             </td>
                             <td class="px-6 py-3 text-right text-sm">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.quantity_ordered }}</td>

@@ -174,53 +174,55 @@ Route::middleware(['auth'])->prefix('work-orders')->name('work-orders.')->group(
 
 require __DIR__.'/settings.php';
 
-// ==================== SUPPLIERS ====================
-Route::get('/suppliers', function () {
-    return Inertia::render('Suppliers/Index');
-})->name('suppliers.index');
+Route::middleware(['auth'])->group(function () {
+    // ==================== SUPPLIERS ====================
+    Route::get('/suppliers', function () {
+        return Inertia::render('Suppliers/Index');
+    })->name('suppliers.index');
 
-Route::get('/suppliers/create', function () {
-    return Inertia::render('Suppliers/Create');
-})->name('suppliers.create');
+    Route::get('/suppliers/create', function () {
+        return Inertia::render('Suppliers/Create');
+    })->name('suppliers.create');
 
-Route::get('/suppliers/{id}', function ($id) {
-    return Inertia::render('Suppliers/Show', ['supplierId' => (int) $id]);
-})->name('suppliers.show');
+    Route::get('/suppliers/{id}', function ($id) {
+        return Inertia::render('Suppliers/Show', ['supplierId' => (int) $id]);
+    })->name('suppliers.show');
 
-Route::get('/suppliers/{id}/edit', function ($id) {
-    return Inertia::render('Suppliers/Edit', ['supplierId' => (int) $id]);
-})->name('suppliers.edit');
+    Route::get('/suppliers/{id}/edit', function ($id) {
+        return Inertia::render('Suppliers/Edit', ['supplierId' => (int) $id]);
+    })->name('suppliers.edit');
 
-// ==================== PURCHASE ORDERS ====================
-Route::get('/purchase-orders', function () {
-    return Inertia::render('PurchaseOrders/Index');
-})->name('purchase-orders.index');
+    // ==================== PURCHASE ORDERS ====================
+    Route::get('/purchase-orders', function () {
+        return Inertia::render('PurchaseOrders/Index');
+    })->name('purchase-orders.index');
 
-Route::get('/purchase-orders/create', function () {
-    return Inertia::render('PurchaseOrders/Create');
-})->name('purchase-orders.create')->middleware('role:admin,manager,buyer,assistant');
+    Route::get('/purchase-orders/create', function () {
+        return Inertia::render('PurchaseOrders/Create');
+    })->name('purchase-orders.create')->middleware('role:admin,manager,buyer,assistant');
 
-// IMPORTANT: Specific routes MUST come before dynamic {id} routes
-Route::get('/purchase-orders/smart-reorder', function () {
-    return Inertia::render('PurchaseOrders/SmartReorder');
-})->name('purchase-orders.smart-reorder')->middleware('role:admin,manager,buyer,assistant');
+    // IMPORTANT: Specific routes MUST come before dynamic {id} routes
+    Route::get('/purchase-orders/smart-reorder', function () {
+        return Inertia::render('PurchaseOrders/SmartReorder');
+    })->name('purchase-orders.smart-reorder')->middleware('role:admin,manager,buyer,assistant');
 
-Route::get('/purchase-orders/{id}', function ($id) {
-    return Inertia::render('PurchaseOrders/Show', ['purchaseOrderId' => (int) $id]);
-})->name('purchase-orders.show');
+    Route::get('/purchase-orders/{id}', function ($id) {
+        return Inertia::render('PurchaseOrders/Show', ['purchaseOrderId' => (int) $id]);
+    })->name('purchase-orders.show');
 
-Route::get('/purchase-orders/{id}/edit', function ($id) {
-    return Inertia::render('PurchaseOrders/Create', ['purchaseOrderId' => (int) $id]);
-})->name('purchase-orders.edit');
+    Route::get('/purchase-orders/{id}/edit', function ($id) {
+        return Inertia::render('PurchaseOrders/Create', ['purchaseOrderId' => (int) $id]);
+    })->name('purchase-orders.edit');
 
-Route::get('/purchase-orders/{id}/receive', function ($id) {
-    return Inertia::render('PurchaseOrders/Receive', ['purchaseOrderId' => (int) $id]);
-})->name('purchase-orders.receive');
+    Route::get('/purchase-orders/{id}/receive', function ($id) {
+        return Inertia::render('PurchaseOrders/Receive', ['purchaseOrderId' => (int) $id]);
+    })->name('purchase-orders.receive');
 
-// ==================== ACCOUNTS PAYABLE ====================
-Route::get('/accounts-payable', function () {
-    return Inertia::render('AccountsPayable/Index');
-})->name('accounts-payable.index');
+    // ==================== ACCOUNTS PAYABLE ====================
+    Route::get('/accounts-payable', function () {
+        return Inertia::render('AccountsPayable/Index');
+    })->name('accounts-payable.index');
+});
 
 
 // ==================== BRANDS ====================

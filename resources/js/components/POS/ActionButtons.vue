@@ -9,6 +9,7 @@ const props = defineProps<{
   hasCustomer?: boolean
   creditAvailable?: number
   isQuoteSession?: boolean
+  quoteMode?: boolean
 }>()
 
 const emit = defineEmits([
@@ -59,9 +60,9 @@ const canManageCashRegister = computed(() => hasRole(['admin', 'manager', 'cashi
         Guardar Cambios
       </button>
 
-      <!-- Cotizar: hidden when in a quote session -->
+      <!-- Cotizar: hidden when in a quote session (but always shown in quoteMode) -->
       <button 
-        v-if="!props.isQuoteSession"
+        v-if="!props.isQuoteSession || props.quoteMode"
         @click="emit('save-quote')"
         class="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 border border-amber-200 dark:border-amber-500/30"
       >
@@ -70,9 +71,9 @@ const canManageCashRegister = computed(() => hasRole(['admin', 'manager', 'cashi
       </button>
     </div>
 
-    <!-- Warning / Abre Caja Button -->
+    <!-- Warning / Abre Caja Button (hidden in quoteMode) -->
     <button 
-      v-if="!hasOpenSession && canManageCashRegister"
+      v-if="!props.quoteMode && !hasOpenSession && canManageCashRegister"
       @click="emit('open-cash-register')"
       class="w-full px-3 py-2 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 text-orange-500 border border-orange-200 dark:border-orange-500/30 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2"
     >
@@ -80,8 +81,8 @@ const canManageCashRegister = computed(() => hasRole(['admin', 'manager', 'cashi
       Abre caja para cobrar
     </button>
 
-    <!-- Payment Buttons -->
-    <div class="space-y-2 mt-2">
+    <!-- Payment Buttons (hidden in quoteMode) -->
+    <div v-if="!props.quoteMode" class="space-y-2 mt-2">
       <button 
         :disabled="!hasOpenSession || !canPay"
         @click="emit('pay-cash')"

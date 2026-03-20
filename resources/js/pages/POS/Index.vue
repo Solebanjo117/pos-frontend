@@ -31,6 +31,14 @@ import { SalesOrderPaymentApiService } from '@/services/payments'
 
 defineOptions({ layout: AppLayout })
 
+const props = withDefaults(defineProps<{
+  quoteMode?: boolean
+  quoteId?: number
+}>(), {
+  quoteMode: false,
+  quoteId: undefined,
+})
+
 const {
   cart,
   customer_id,
@@ -68,6 +76,7 @@ const {
   switchCart,
   removeCart,
   renameCart,
+  loadQuoteAsSession,
 } = usePOS()
 
 const { 
@@ -206,6 +215,12 @@ const selectedCustomer = computed(() => {
   if (!customer_id.value) return null
   return customers.value.find(c => c.id === customer_id.value)
 })
+
+const canCheckout = computed(() =>
+  cart.value.length > 0 &&
+  !loading.value
+)
+
 
 // Smart Search: auto-add single result or show modal for multiple
 const performSearch = async (overrideQuery?: string, overrideQty?: number) => {
@@ -383,7 +398,7 @@ const handleKeyboard = (e: KeyboardEvent) => {
       break
     case 'F10':
       e.preventDefault()
-      if (isSessionOpen.value && cart.value.length > 0) openPaymentModal('cash')
+      if (!props.quoteMode && isSessionOpen.value && cart.value.length > 0) openPaymentModal('cash')
       break
     case 'F12':
       e.preventDefault()
@@ -397,8 +412,9 @@ const openPaymentModal = (method: 'cash' | 'card' | 'transfer' = 'cash') => {
   if (cart.value.length > 0) {
     paymentMethod.value = method
     
-    // Reset all amounts
+    // Reset all amounts and clear previous errors
     amountReceived.value = 0
+    error.value = null
     Object.keys(electronicPayments).forEach(k => delete electronicPayments[k])
     
     if (method === 'cash') {
@@ -418,13 +434,35 @@ const openCreditSale = () => {
     if (cart.value.length > 0 && selectedCustomer.value) {
         pendingOrderTotal.value = cartTotal.value
         pendingOrderAmountPaid.value = 0
+        error.value = null
         showAddPaymentModal.value = true
     }
 }
 
-const closePaymentModal = () => { showPaymentModal.value = false }
+const closePaymentModal = () => { 
+    showPaymentModal.value = false
+    error.value = null
+}
 
 const handlePayment = async () => {
+  // Clear any previous payment errors before attempting new payment
+  error.value = null
+  
+  // Validate cart items before processing
+  const invalidItems = cart.value.filter(item => !item.product_id || item.product_id <= 0)
+  if (invalidItems.length > 0) {
+    console.error('Invalid items in cart:', invalidItems)
+    error.value = `⚠️ Carrito inválido: ${invalidItems.length} producto(s) con ID inválido. Revisa tu carrito y vuelve a agregar los productos.`
+    return
+  }
+  
+  // Log items being sent to backend for debugging
+  console.log('Payment attempt - Cart items to be processed:', cart.value.map(item => ({ 
+    product_id: item.product_id, 
+    product_name: item.product_name,
+    quantity: item.quantity 
+  })))
+  
   const paymentsArray: Array<{method: string, amount: number, notes?: string}> = []
     
   if (amountReceived.value > 0) {
@@ -582,6 +620,7 @@ const handleOpenSession = async (amount: number) => {
     sessionActionLoading.value = false
     if (success) {
         forceShowOpenSessionModal.value = false
+        error.value = null
         searchInput.value?.focus()
     }
 }
@@ -592,6 +631,7 @@ const handleCloseSession = async (amount: number, notes?: string, closingDetails
     sessionActionLoading.value = false
     if (success) {
         showCloseSessionModal.value = false
+        error.value = null
         // Will trigger the OpenSessionModal on the next reactive loop since isOpen becomes false
     }
 }
@@ -616,16 +656,23 @@ const handleCashMovement = async (payload: { type: 'in' | 'out'; amount: number;
 onMounted(async () => {
   window.addEventListener('keydown', handleKeyboard)
   
-  // Checking session is a priority — pass warehouse after init so we scope correctly
-  await checkCurrentSession(currentWarehouseId.value ?? undefined)
-  await checkCurrentSession(currentWarehouseId.value ?? undefined)
+  // Clear any previous errors from past sessions
+  error.value = null
+
+  await initWarehouse()
+
+  // Skip session check in quote mode — no cash register needed
+  if (!props.quoteMode) {
+    // Session source of truth comes from backend before showing open-session flow
+    await checkCurrentSession(currentWarehouseId.value ?? undefined)
+  }
+
   await Promise.all([
     fetchCategories(),
     fetchBrands(),
     fetchCustomers({ per_page: 50 } as any),
     fetchUsers(),
     fetchWarehouses({} as any),
-    initWarehouse() // Load last selected warehouse
   ])
   
   // Initial product load with warehouse context
@@ -637,6 +684,37 @@ onMounted(async () => {
         setWarehouse(settings.value.default_warehouse_id)
     }
   }
+
+  // In quote mode with an existing quote, auto-load it into the cart
+  if (props.quoteMode && props.quoteId) {
+    try {
+      const res = await apiClient.get(`/sales-quotes/${props.quoteId}`)
+      const q = res.data
+      loadQuoteAsSession({
+        id: q.id,
+        quote_number: q.quote_number,
+        customer_id: q.customer?.id ?? null,
+        items: (q.items ?? []).map((item: any) => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_sku: item.product_sku,
+          variant_id: item.variant_id ?? null,
+          warehouse_id: item.warehouse_id ?? null,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          discount_percent: item.discount_percent,
+          tax_percent: item.tax_percent,
+          subtotal: item.subtotal,
+          tax_amount: item.tax_amount,
+          total: item.total,
+          variant: item.variant ?? null,
+        }))
+      })
+    } catch (e: any) {
+      console.error('Error loading quote:', e)
+      error.value = e.response?.data?.message || 'Error al cargar la cotización'
+    }
+  }
 })
 
 onUnmounted(() => {
@@ -645,12 +723,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Head title="Punto de Venta" />
+  <Head :title="props.quoteMode ? 'Editor de Cotización' : 'Punto de Venta'" />
 
   <div class="h-[calc(100vh-4rem)] flex flex-col bg-[#F8F9FB] dark:bg-background text-gray-900 dark:text-foreground overflow-hidden" style="font-family: 'Inter', sans-serif">
 
-    <!-- Header - Fixed Height -->
-    <div class="shrink-0 z-20 shadow-sm relative">
+    <!-- Header - Fixed Height (hidden in quoteMode — no cash register needed) -->
+    <div v-if="!props.quoteMode" class="shrink-0 z-20 shadow-sm relative">
         <CashRegisterStatus 
             :hasOpenSession="isSessionOpen"
             @request-open="forceShowOpenSessionModal = true"
@@ -750,10 +828,11 @@ onUnmounted(() => {
           <div class="mt-auto shrink-0 pt-4">
             <ActionButtons 
                 :hasOpenSession="isSessionOpen"
-                :canPay="cart.length > 0 && !loading && !error"
+              :canPay="canCheckout"
                 :hasCustomer="!!selectedCustomer"
                 :creditAvailable="(selectedCustomer?.credit_limit ?? 0) - (selectedCustomer?.current_balance ?? 0)"
                 :isQuoteSession="isQuoteSession"
+                :quoteMode="props.quoteMode"
                 @clear="clearCart"
                 @save-draft="handleSaveDraft"
                 @save-quote="handleSaveQuote"
@@ -783,9 +862,9 @@ onUnmounted(() => {
       @load-more="loadMoreProducts"
     />
 
-    <!-- ========== Payment Modal ========== -->
+    <!-- ========== Payment Modal (hidden in quoteMode) ========== -->
     <div
-      v-if="showPaymentModal"
+      v-if="!props.quoteMode && showPaymentModal"
       class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
     >
       <div class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
@@ -902,7 +981,7 @@ onUnmounted(() => {
           </button>
           <button
             @click="handlePayment"
-            :disabled="loading || totalPaid < cartTotal || !!error"
+            :disabled="loading || totalPaid < cartTotal"
             class="flex-1 py-2.5 text-sm font-bold text-white rounded-xl disabled:opacity-40 shadow-sm bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90"
           >
             {{ loading ? 'Procesando...' : '✓ Confirmar Venta' }}

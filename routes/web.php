@@ -372,4 +372,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/sales-quotes/{id}/edit', function ($id) {
         return Inertia::render('SalesQuotes/Edit', ['id' => (int) $id]);
     })->name('sales-quotes.edit');
+
+    // Quote Editor (POS in quote-only mode)
+    Route::get('/quotes/create', fn() =>
+        Inertia::render('SalesQuotes/Editor')
+    )->name('quotes.create');
+
+    Route::get('/quotes/{id}/edit', fn($id) =>
+        Inertia::render('SalesQuotes/Editor', [
+            'quoteId' => (int) $id
+        ])
+    )->name('quotes.edit');
 });

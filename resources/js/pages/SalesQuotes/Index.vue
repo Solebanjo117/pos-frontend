@@ -220,7 +220,7 @@ onMounted(() => fetchQuotes())
                 </p>
             </div>
             <Link
-                href="/pos"
+                href="/quotes/create"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition font-medium shadow-sm"
             >
                 <Plus :size="20" />
@@ -372,16 +372,15 @@ onMounted(() => fetchQuotes())
                                     >
                                         <Eye :size="16" />
                                     </Link>
-                                    <!-- Abrir/Editar en POS -->
-                                    <button
+                                    <!-- Abrir/Editar en Quote Editor -->
+                                    <Link
                                         v-if="q.status !== 'converted' && q.status !== 'rejected' && q.status !== 'expired' && q.status !== 'collected'"
-                                        @click="openQuoteInPOS(q.id)"
-                                        :disabled="openingPOS === q.id"
-                                        class="p-1.5 rounded-lg text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition disabled:opacity-40"
-                                        title="Editar en POS"
+                                        :href="`/quotes/${q.id}/edit`"
+                                        class="p-1.5 rounded-lg text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition"
+                                        title="Editar Cotización"
                                     >
                                         <ShoppingCart :size="16" />
-                                    </button>
+                                    </Link>
                                     <button 
                                         @click="openPrintModal(q)"
                                         class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 dark:text-primary hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition" 

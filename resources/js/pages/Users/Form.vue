@@ -16,11 +16,11 @@ const props = defineProps<{
 const toast = useToast()
 
 const VALID_ROLES = [
-    { value: 'admin',   label: 'Administrador' },
-    { value: 'manager', label: 'Gerente' },
-    { value: 'buyer',   label: 'Comprador' },
-    { value: 'seller',  label: 'Vendedor' },
-    { value: 'cashier', label: 'Cajero' },
+    { value: 'admin',     label: 'Administrador' },
+    { value: 'manager',   label: 'Gerente' },
+    { value: 'seller',    label: 'Vendedor' },
+    { value: 'cashier',   label: 'Cajero' },
+    { value: 'buyer',     label: 'Comprador' },
     { value: 'assistant', label: 'Secretari@' },
 ]
 

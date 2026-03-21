@@ -13,7 +13,7 @@ Route::get('/', function () {
 })->name('home');
 
 // POS (Point of Sale) - Main page
-Route::middleware(['auth'])->get('/pos', function () {
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/pos', function () {
     return Inertia::render('POS/Index');
 })->name('pos');
 
@@ -376,11 +376,11 @@ Route::middleware(['auth'])->group(function () {
     // Quote Editor (POS in quote-only mode)
     Route::get('/quotes/create', fn() =>
         Inertia::render('SalesQuotes/Editor')
-    )->name('quotes.create');
+    )->name('quotes.create')->middleware('role:admin,manager,seller');
 
     Route::get('/quotes/{id}/edit', fn($id) =>
         Inertia::render('SalesQuotes/Editor', [
             'quoteId' => (int) $id
         ])
-    )->name('quotes.edit');
+    )->name('quotes.edit')->middleware('role:admin,manager,seller');
 });

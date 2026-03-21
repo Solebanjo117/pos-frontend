@@ -24,7 +24,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 
 const { fetchSettings, isSingleWarehouseMode } = usePosSettings();
-const { fetchCurrentUser, isAdmin } = useAuth();
+const { fetchCurrentUser, isAdmin, role: userRole, hasRole } = useAuth();
 const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings();
 
 // Load settings
@@ -53,114 +53,156 @@ const filterWorkOrders = (items: NavItem[]): NavItem[] => {
         }));
 };
 
+// Role-based access helpers
+const canAccessPOS = computed(() => hasRole(['admin', 'manager', 'cashier']))
+const canAccessQuoteEditor = computed(() => hasRole(['admin', 'manager', 'seller']))
+const canAccessInventory = computed(() => hasRole(['admin', 'manager', 'buyer']))
+const canAccessPurchaseOrders = computed(() => hasRole(['admin', 'manager', 'buyer']))
+const canAccessReports = computed(() => hasRole(['admin', 'manager']))
+const canAccessCatalog = computed(() => hasRole(['admin', 'manager']))
+const canAccessVehicles = computed(() => hasRole(['admin', 'manager', 'seller']))
 
 const mainNavItems = computed<NavItem[]>(() => {
-    const items: NavItem[] = [
-    {
-        title: 'Ventas',
-        icon: ShoppingCart,
-        items: [
-            {
-                title: 'Punto de Venta',
-                href: '/pos',
-                icon: ShoppingCart,
-            },
-            {
-                title: 'Órdenes de Venta',
-                href: '/sales-orders',
-            },
-            {
-                title: 'Cotizaciones',
-                href: '/sales-quotes',
-                icon: FileText,
-            },
-            {
-                title: 'Cierres de Caja',
-                href: '/pos-sessions',
-                icon: Receipt,
-            },
-            {
-                title: 'Órdenes de Trabajo',
-                href: '/work-orders',
-                icon: Wrench,
-            },
-        ],
-    },
-    {
-        title: 'Compras',
-        icon: ClipboardList,
-        items: [
-            {
-                title: 'Órdenes de Compra',
-                href: '/purchase-orders',
-                icon: ClipboardList,
-            },
-            {
-                title: 'Cuentas por Pagar',
-                href: '/accounts-payable',
-                icon: Factory,
-            },
-            {
-                title: 'Proveedores',
-                href: '/suppliers',
-                icon: Factory,
-            },
-        ],
-    },
-    {
+    const items: NavItem[] = [];
+
+    // --- Ventas section (role-filtered sub-items) ---
+    const ventasSubItems: NavItem[] = [];
+    if (canAccessPOS.value) {
+        ventasSubItems.push({
+            title: 'Punto de Venta',
+            href: '/pos',
+            icon: ShoppingCart,
+        });
+    }
+    ventasSubItems.push({
+        title: 'Órdenes de Venta',
+        href: '/sales-orders',
+    });
+    ventasSubItems.push({
+        title: 'Cotizaciones',
+        href: '/sales-quotes',
+        icon: FileText,
+    });
+    if (canAccessPOS.value) {
+        ventasSubItems.push({
+            title: 'Cierres de Caja',
+            href: '/pos-sessions',
+            icon: Receipt,
+        });
+    }
+    ventasSubItems.push({
+        title: 'Órdenes de Trabajo',
+        href: '/work-orders',
+        icon: Wrench,
+    });
+
+    if (ventasSubItems.length > 0) {
+        items.push({
+            title: 'Ventas',
+            icon: ShoppingCart,
+            items: ventasSubItems,
+        });
+    }
+
+    // --- Compras section ---
+    if (canAccessPurchaseOrders.value) {
+        items.push({
+            title: 'Compras',
+            icon: ClipboardList,
+            items: [
+                {
+                    title: 'Órdenes de Compra',
+                    href: '/purchase-orders',
+                    icon: ClipboardList,
+                },
+                {
+                    title: 'Cuentas por Pagar',
+                    href: '/accounts-payable',
+                    icon: Factory,
+                },
+                {
+                    title: 'Proveedores',
+                    href: '/suppliers',
+                    icon: Factory,
+                },
+            ],
+        });
+    }
+
+    // --- Dashboard (visible to all) ---
+    items.push({
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
-    },
-    {
-        title: 'Inventario',
-        href: '/inventory',
-        icon: Warehouse,
-        items: [
-             {
-                title: 'Ver Inventario',
-                href: '/inventory',
-                icon: List,
-            },
-            {
-                title: 'Movimientos',
-                href: '/inventory-movements',
-                icon: ArrowLeftRight,
-            },
-            {
-                title: 'Transferencias',
-                href: '/inventory-transfers',
-                icon: ArrowLeftRight,
-            },
-             {
+    });
+
+    // --- Inventario section ---
+    if (canAccessInventory.value) {
+        items.push({
+            title: 'Inventario',
+            href: '/inventory',
+            icon: Warehouse,
+            items: [
+                 {
+                    title: 'Ver Inventario',
+                    href: '/inventory',
+                    icon: List,
+                },
+                {
+                    title: 'Movimientos',
+                    href: '/inventory-movements',
+                    icon: ArrowLeftRight,
+                },
+                {
+                    title: 'Transferencias',
+                    href: '/inventory-transfers',
+                    icon: ArrowLeftRight,
+                },
+                 {
+                    title: 'Productos',
+                    href: '/products',
+                    icon: Package,
+                },
+                // Warehouses Management
+                {
+                    title: 'Almacenes',
+                    href: '/warehouses',
+                    icon: Warehouse,
+                },
+                {
+                    title: 'Stock por Almacén',
+                    href: '/inventory',
+                    icon: List,
+                },
+                {
+                    title: 'Mermas',
+                    href: '/inventory/waste',
+                    icon: Wrench,
+                },
+            ],
+        });
+    } else {
+        // Seller gets read-only Products link (outside Inventario)
+        if (canAccessQuoteEditor.value) {
+            items.push({
                 title: 'Productos',
                 href: '/products',
                 icon: Package,
-            },
-            // Warehouses Management
-            {
-                title: 'Almacenes',
-                href: '/warehouses',
-                icon: Warehouse,
-            },
-            {
-                title: 'Stock por Almacén',
-                href: '/inventory',
-                icon: List,
-            },
-            {
-                title: 'Mermas',
-                href: '/inventory/waste',
-                icon: Wrench,
-            },
-        ],
-    },
-    {
-        title: 'Vehículos',
-        href: '/vehicles',
-        icon: Truck,
-    },
-    {
+            });
+        }
+    }
+
+    // --- Vehículos ---
+    if (canAccessVehicles.value) {
+        items.push({
+            title: 'Vehículos',
+            href: '/vehicles',
+            icon: Truck,
+        });
+    }
+
+    // --- Clientes (visible to all authenticated roles) ---
+    items.push({
         title: 'Clientes',
         icon: Users,
         items: [
@@ -175,47 +217,55 @@ const mainNavItems = computed<NavItem[]>(() => {
                 icon: Banknote,
             },
         ],
-    },
-    {
-        title: 'Catálogo',
-        icon: Tag,
-        items: [
-            {
-                title: 'Marcas',
-                href: '/brands',
-                icon: Tag,
-            },
-            {
-                title: 'Categorías',
-                href: '/categories',
-                icon: Folder,
-            },
-        ],
-    },
-    {
-        title: 'Reportes',
-        icon: BarChart3,
-        items: [
-            {
-                title: 'Niveles de Stock',
-                href: '/reports/stock-levels',
-            },
-            {
-                title: 'Histórico de Movimientos',
-                href: '/reports/movement-history',
-            },
-            {
-                title: 'Finanzas y Rentabilidad',
-                href: '/reports/financial',
-            },
-            {
-                title: 'Cierre de Caja (Z-Report)',
-                href: '/reports/z-report',
-            },
-        ],
-    },
-    ];
-    // Administración: visible only for admins
+    });
+
+    // --- Catálogo ---
+    if (canAccessCatalog.value) {
+        items.push({
+            title: 'Catálogo',
+            icon: Tag,
+            items: [
+                {
+                    title: 'Marcas',
+                    href: '/brands',
+                    icon: Tag,
+                },
+                {
+                    title: 'Categorías',
+                    href: '/categories',
+                    icon: Folder,
+                },
+            ],
+        });
+    }
+
+    // --- Reportes ---
+    if (canAccessReports.value) {
+        items.push({
+            title: 'Reportes',
+            icon: BarChart3,
+            items: [
+                {
+                    title: 'Niveles de Stock',
+                    href: '/reports/stock-levels',
+                },
+                {
+                    title: 'Histórico de Movimientos',
+                    href: '/reports/movement-history',
+                },
+                {
+                    title: 'Finanzas y Rentabilidad',
+                    href: '/reports/financial',
+                },
+                {
+                    title: 'Cierre de Caja (Z-Report)',
+                    href: '/reports/z-report',
+                },
+            ],
+        });
+    }
+
+    // --- Administración: visible only for admins ---
     if (isAdmin.value) {
         items.push({
             title: 'Administración',

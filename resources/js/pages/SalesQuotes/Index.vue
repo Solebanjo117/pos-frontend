@@ -155,12 +155,7 @@ const handleTransition = async (id: number, action: 'send-to-deposit' | 'send-to
     if (!confirm(`¿Deseas ${labels[action]} esta cotización?`)) return
     try {
         await apiClient.post(`/sales-quotes/${id}/${action}`)
-        
-        if (action === 'send-to-cashier') {
-            await openQuoteInPOS(id)
-        } else {
-            await fetchQuotes(currentPage.value)
-        }
+        await fetchQuotes(currentPage.value)
     } catch (e: any) {
         alert(e.response?.data?.message || 'Error al cambiar el estado')
     }

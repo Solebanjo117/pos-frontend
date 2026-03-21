@@ -1,10 +1,11 @@
 <?php
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    if (auth()->check()) {
+    if (Auth::check()) {
         return redirect('/pos');
     }
     return Inertia::render('Welcome', [
@@ -28,9 +29,13 @@ Route::get('dashboard', function () {
 // Product Routes
 Route::middleware(['auth'])->prefix('products')->name('products.')->group(function () {
     Route::get('/', [App\Http\Controllers\ProductController::class, 'index'])->name('index');
-    Route::get('/create', [App\Http\Controllers\ProductController::class, 'create'])->name('create');
+    Route::get('/create', [App\Http\Controllers\ProductController::class, 'create'])
+        ->name('create')
+        ->middleware('role:admin,manager,buyer');
     Route::get('/{product}', [App\Http\Controllers\ProductController::class, 'show'])->name('show');
-    Route::get('/{product}/edit', [App\Http\Controllers\ProductController::class, 'edit'])->name('edit');
+    Route::get('/{product}/edit', [App\Http\Controllers\ProductController::class, 'edit'])
+        ->name('edit')
+        ->middleware('role:admin,manager,buyer');
 });
 
 // Inventory Routes

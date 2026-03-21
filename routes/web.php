@@ -30,7 +30,7 @@ Route::middleware(['auth'])->prefix('products')->name('products.')->group(functi
 });
 
 // Inventory Routes
-Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(function () {
+Route::middleware(['auth', 'role:admin,manager,buyer,assistant'])->prefix('inventory')->name('inventory.')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Inventory/Inventory');
     })->name('index');
@@ -89,7 +89,7 @@ Route::middleware(['auth'])->prefix('inventory-transfers')->name('inventory-tran
 });
 
 // Reports routes
-Route::middleware(['auth'])->prefix('reports')->name('reports.')->group(function () {
+Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('reports.')->group(function () {
     Route::get('/stock-levels', function () {
         return Inertia::render('Reports/StockLevels');
     })->name('stock-levels');
@@ -104,7 +104,7 @@ Route::middleware(['auth'])->prefix('reports')->name('reports.')->group(function
     
     Route::get('/z-report', function () {
         return Inertia::render('Reports/ZReport');
-    })->name('z-report')->middleware('role:admin,manager');
+    })->name('z-report');
 });
 
 // POS Sessions (Cierres de Caja)
@@ -174,7 +174,7 @@ Route::middleware(['auth'])->prefix('work-orders')->name('work-orders.')->group(
 
 require __DIR__.'/settings.php';
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
     // ==================== SUPPLIERS ====================
     Route::get('/suppliers', function () {
         return Inertia::render('Suppliers/Index');
@@ -199,12 +199,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/purchase-orders/create', function () {
         return Inertia::render('PurchaseOrders/Create');
-    })->name('purchase-orders.create')->middleware('role:admin,manager,buyer,assistant');
+    })->name('purchase-orders.create');
 
     // IMPORTANT: Specific routes MUST come before dynamic {id} routes
     Route::get('/purchase-orders/smart-reorder', function () {
         return Inertia::render('PurchaseOrders/SmartReorder');
-    })->name('purchase-orders.smart-reorder')->middleware('role:admin,manager,buyer,assistant');
+    })->name('purchase-orders.smart-reorder');
 
     Route::get('/purchase-orders/{id}', function ($id) {
         return Inertia::render('PurchaseOrders/Show', ['purchaseOrderId' => (int) $id]);
@@ -226,7 +226,7 @@ Route::middleware(['auth'])->group(function () {
 
 
 // ==================== BRANDS ====================
-Route::middleware(['auth'])->prefix('brands')->name('brands.')->group(function () {
+Route::middleware(['auth', 'role:admin,manager'])->prefix('brands')->name('brands.')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Brands/Index');
     })->name('index');
@@ -241,8 +241,7 @@ Route::middleware(['auth'])->prefix('brands')->name('brands.')->group(function (
 });
 
 // ==================== CATEGORIES ====================
-// TODO: Implement Categories CRUD pages
-Route::middleware(['auth'])->prefix('categories')->name('categories.')->group(function () {
+Route::middleware(['auth', 'role:admin,manager'])->prefix('categories')->name('categories.')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Categories/Index');
     })->name('index');

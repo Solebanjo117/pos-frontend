@@ -189,11 +189,11 @@ const removeAttribute = (idx: number) => variantAttributes.value.splice(idx, 1)
 const openCreateModal = () => {
     editingVariant.value = null
 
-    // Inherit attributes: try existing variants first, then default variant attrs from parent form, then category defaults
-    // (Henry's request: specs behave as product-level — same for all variants)
-    const existingWithAttrs = displayVariants.value.find((v: any) => v.attributes && v.attributes.length > 0)
-    if (existingWithAttrs) {
-        variantAttributes.value = existingWithAttrs.attributes.map((a: any) => ({
+    // Inherit attributes from the LAST variant that has attributes (most recently created = most relevant template)
+    // Use structuredClone for a true deep copy so edits here never mutate the source variant's attributes
+    const lastWithAttrs = [...displayVariants.value].reverse().find((v: any) => v.attributes && v.attributes.length > 0)
+    if (lastWithAttrs) {
+        variantAttributes.value = structuredClone(lastWithAttrs.attributes).map((a: any) => ({
             name: a.name,
             value: a.value,
             unit: a.unit || '',

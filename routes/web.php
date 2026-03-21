@@ -17,6 +17,10 @@ Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/pos', function 
     return Inertia::render('POS/Index');
 })->name('pos');
 
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/pos/cashier', function () {
+    return Inertia::render('POS/CashierQueue');
+})->name('pos.cashier');
+
 Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');

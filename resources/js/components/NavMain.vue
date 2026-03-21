@@ -57,6 +57,10 @@ const isGroupActive = (item: NavItem): boolean => {
                                         <Link :href="subItem.href">
                                             <component :is="subItem.icon" v-if="subItem.icon" />
                                             <span>{{ subItem.title }}</span>
+                                            <span
+                                                v-if="subItem.badge"
+                                                class="ml-auto inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                                            >{{ subItem.badge }}</span>
                                         </Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Package, Warehouse, List, BarChart3, Users, ShoppingCart, Truck, ClipboardList, Factory, ArrowLeftRight, Tag, Car, Wrench, Banknote, Settings, Shield, FileText, Receipt, Store } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Package, Warehouse, List, BarChart3, Users, ShoppingCart, Truck, ClipboardList, Factory, ArrowLeftRight, Tag, Car, Wrench, Banknote, Settings, Shield, FileText, Receipt, Store, Inbox } from 'lucide-vue-next';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -22,15 +22,21 @@ import { ref, onMounted, computed } from 'vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useAuth } from '@/composables/useAuth';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { useCashierQueue } from '@/composables/useCashierQueue';
 
 const { fetchSettings, isSingleWarehouseMode } = usePosSettings();
 const { fetchCurrentUser, isAdmin, role: userRole, hasRole } = useAuth();
 const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings();
+const { count: cashierQueueCount, startPolling: startQueuePolling, stopPolling: stopQueuePolling } = useCashierQueue();
 
 // Load settings
 onMounted(async () => {
     try {
         await Promise.all([fetchSettings(), fetchCurrentUser(), fetchStoreSettings()]);
+        // Start queue polling only for roles that access the cashier queue
+        if (hasRole(['admin', 'manager', 'cashier'])) {
+            startQueuePolling(30000) // sidebar polling: 30 seconds
+        }
     } catch (e) {
         console.error('Failed to load settings', e);
     }
@@ -84,6 +90,12 @@ const mainNavItems = computed<NavItem[]>(() => {
         icon: FileText,
     });
     if (canAccessPOS.value) {
+        ventasSubItems.push({
+            title: 'Cola de Caja',
+            href: '/pos/cashier',
+            icon: Inbox,
+            badge: cashierQueueCount.value > 0 ? String(cashierQueueCount.value) : undefined,
+        });
         ventasSubItems.push({
             title: 'Cierres de Caja',
             href: '/pos-sessions',

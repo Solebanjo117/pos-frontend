@@ -80,16 +80,18 @@ const resetForm = () => {
 watch(() => props.isOpen, async (newVal) => {
   if (newVal) {
     resetForm()
-    if (suppliers.value.length === 0) {
-      await loadSuppliers()
-    } else {
-        // Just redefine default supplier
-        if (suppliers.value.length > 0 && props.product) {
-            const hasMainSupplier = props.product?.suppliers?.length > 0 
-            if (hasMainSupplier) {
-                selectedSupplierId.value = props.product.suppliers[0].id
-            }
-        }
+    // Always reload suppliers when modal opens to ensure fresh data
+    await loadSuppliers()
+  }
+}, { immediate: true })
+
+// Also watch for initialVariantId changes (for when modal is already mounted)
+watch(() => props.initialVariantId, (newVal) => {
+  if (props.isOpen && newVal) {
+    selectedVariantId.value = newVal
+    const variant = props.product?.variants?.find((v: any) => v.id === newVal)
+    if (variant?.pricing?.cost) {
+      unitCost.value = variant.pricing.cost
     }
   }
 })
@@ -145,12 +147,13 @@ const totalCost = computed(() => quantity.value * unitCost.value)
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 overflow-y-auto">
-    <!-- Backdrop -->
-    <div 
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
-      @click="handleClose"
-    ></div>
+  <Teleport to="body">
+    <div v-if="isOpen" class="fixed inset-0 z-[70] overflow-y-auto">
+      <!-- Backdrop -->
+      <div
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        @click="handleClose"
+      ></div>
 
     <div class="flex min-h-screen items-center justify-center p-4">
       <!-- Modal Content -->
@@ -287,4 +290,5 @@ const totalCost = computed(() => quantity.value * unitCost.value)
       </div>
     </div>
   </div>
+  </Teleport>
 </template>

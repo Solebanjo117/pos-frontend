@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { X, Package, Layers, ShoppingCart } from 'lucide-vue-next'
+import { X, Package, Layers, ShoppingCart, Truck } from 'lucide-vue-next'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
+import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue'
 import type { Product, ProductVariant } from '@/types/product'
 
 const props = defineProps<{
@@ -90,6 +91,29 @@ const brandColor = (name: string): string => {
     let hash = 0
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
     return colors[Math.abs(hash) % colors.length]
+}
+
+// ── Quick Purchase Modal state ─────────────────────────────────────────────────
+const showQuickPurchase = ref(false)
+const variantForPurchase = ref<ProductVariant | null>(null)
+
+const openQuickPurchase = (variant: ProductVariant, e: Event) => {
+    e.stopPropagation()
+    if (!props.product) return
+    variantForPurchase.value = variant
+    showQuickPurchase.value = true
+}
+
+const handlePurchaseSuccess = (result: { productId: number; variantId: number | null; quantityAdded: number }) => {
+    // Update the variant's stock in place
+    if (result.variantId && props.product) {
+        const variant = props.product.variants?.find(v => v.id === result.variantId)
+        if (variant && variant.total_stock !== undefined) {
+            variant.total_stock += result.quantityAdded
+        }
+    }
+    showQuickPurchase.value = false
+    variantForPurchase.value = null
 }
 </script>
 
@@ -219,12 +243,22 @@ const brandColor = (name: string): string => {
 
                                         <!-- Stock -->
                                         <td class="px-3 py-4 text-center">
-                                            <span
-                                                class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full"
-                                                :class="stockClass(getStock(variant))"
-                                            >
-                                                {{ getStock(variant) }}
-                                            </span>
+                                            <div class="flex items-center justify-center gap-2">
+                                                <span
+                                                    class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full"
+                                                    :class="stockClass(getStock(variant))"
+                                                >
+                                                    {{ getStock(variant) }}
+                                                </span>
+                                                <button
+                                                    v-if="getStock(variant) <= 0"
+                                                    @click="openQuickPurchase(variant, $event)"
+                                                    class="p-1.5 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:text-amber-300 dark:hover:bg-amber-900/30 transition-colors"
+                                                    title="Reabastecer variante"
+                                                >
+                                                    <Truck class="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </td>
 
                                         <!-- Price -->
@@ -282,5 +316,15 @@ const brandColor = (name: string): string => {
                 </Transition>
             </div>
         </Transition>
+
+        <!-- Quick Purchase Modal -->
+        <QuickPurchaseModal
+            v-if="variantForPurchase && product"
+            :is-open="showQuickPurchase"
+            :product="product"
+            :initial-variant-id="variantForPurchase.id"
+            @close="showQuickPurchase = false; variantForPurchase = null"
+            @success="handlePurchaseSuccess"
+        />
     </Teleport>
 </template>

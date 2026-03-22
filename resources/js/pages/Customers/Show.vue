@@ -18,6 +18,7 @@ import {
   TrendingUp,
   TrendingDown,
   AlertCircle,
+  Gift,
 } from 'lucide-vue-next'
 import { useCustomers } from '@/composables/useCustomers'
 import { CustomersApiService } from '@/services/customers'
@@ -109,6 +110,7 @@ const getTransactionTypeLabel = (type: string) => {
     payment: 'Pago',
     credit_note: 'Nota de Crédito',
     adjustment: 'Ajuste',
+    store_credit_used: 'Saldo a Favor',
   }
   return labels[type] || type
 }
@@ -119,6 +121,7 @@ const getTransactionTypeBadge = (type: string) => {
     payment: 'bg-green-100 text-green-800 border-green-200',
     credit_note: 'bg-blue-100 text-blue-800 border-blue-200',
     adjustment: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    store_credit_used: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   }
   return badges[type] || 'bg-gray-100 text-gray-800 border-gray-200'
 }
@@ -376,13 +379,26 @@ const goBack = () => {
                   :size="18"
                   :class="currentCustomer.current_balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'"
                 />
-                />
               </div>
               <p
                 class="text-2xl font-bold"
                 :class="currentCustomer.current_balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'"
               >
                 {{ formatCurrency(currentCustomer.current_balance) }}
+              </p>
+            </div>
+
+            <!-- Store Credit (Saldo a Favor) -->
+            <div v-if="currentCustomer.has_store_credit" class="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <div class="flex items-center gap-2 mb-1">
+                <Gift :size="18" class="text-emerald-600 dark:text-emerald-400" />
+                <span class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Saldo a Favor</span>
+              </div>
+              <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                {{ formatCurrency(currentCustomer.store_credit) }}
+              </p>
+              <p class="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">
+                Disponible para aplicar en compras
               </p>
             </div>
 

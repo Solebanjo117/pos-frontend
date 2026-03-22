@@ -23,6 +23,7 @@ interface CartItem {
     seller_id?: number
     warehouse_id?: number
     notes?: string // Phase 2: per-line internal notes
+    order_item_id?: number // Reference to original order item (for returns)
     subtotal: number
     tax_amount: number
     total: number

@@ -15,6 +15,8 @@ export interface Customer {
     credit_limit: number
     credit_days: number
     current_balance: number
+    store_credit: number
+    has_store_credit: boolean
     contact_person: string | null
     contact_phone: string | null
     notes: string | null
@@ -26,7 +28,7 @@ export interface Customer {
 export interface CustomerTransaction {
     id: number
     customer_id: number
-    type: 'sale' | 'payment' | 'credit_note' | 'adjustment'
+    type: 'sale' | 'payment' | 'credit_note' | 'adjustment' | 'store_credit_used'
     reference_type: string | null
     reference_id: number | null
     amount: number

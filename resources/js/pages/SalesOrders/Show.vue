@@ -221,7 +221,7 @@ onMounted(() => {
           </button>
           <button
             v-if="currentSalesOrder.status === 'confirmed' || currentSalesOrder.status === 'completed'"
-            @click="showReturnModal = true"
+            @click="router.visit(`/returns/${props.id}`)"
             class="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg"
           >
             <RotateCcw :size="18" />

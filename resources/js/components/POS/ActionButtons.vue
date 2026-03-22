@@ -1,27 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Trash2, Save, Lock, Banknote, CreditCard, ArrowLeftRight, Landmark, FileText } from 'lucide-vue-next'
+import { Trash2, Save, Lock, CreditCard, FileText } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 
 const props = defineProps<{
   hasOpenSession: boolean
   canPay: boolean
-  hasCustomer?: boolean
-  creditAvailable?: number
   isQuoteSession?: boolean
   quoteMode?: boolean
 }>()
 
 const emit = defineEmits([
-  'clear', 
-  'save-draft', 
+  'clear',
+  'save-draft',
   'save-quote',
   'save-quote-changes',
-  'open-cash-register', 
-  'pay-cash', 
-  'pay-card', 
-  'pay-transfer',
-  'pay-credit'
+  'open-cash-register',
+  'open-payment-modal',
 ])
 
 const { hasRole } = useAuth()
@@ -81,54 +76,18 @@ const canManageCashRegister = computed(() => hasRole(['admin', 'manager', 'cashi
       Abre caja para cobrar
     </button>
 
-    <!-- Payment Buttons (hidden in quoteMode) -->
-    <div v-if="!props.quoteMode" class="space-y-2 mt-2">
-      <button 
+    <!-- Payment Button (hidden in quoteMode) -->
+    <div v-if="!props.quoteMode" class="mt-2">
+      <button
         :disabled="!hasOpenSession || !canPay"
-        @click="emit('pay-cash')"
-        class="w-full h-12 flex items-center justify-center gap-3 bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-500 disabled:bg-gray-300 dark:disabled:bg-muted text-white rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.98] group relative overflow-hidden"
+        @click="emit('open-payment-modal')"
+        class="w-full h-14 flex items-center justify-center gap-3 bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-500 disabled:bg-gray-300 dark:disabled:bg-muted text-white rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.98] group relative overflow-hidden"
         :class="{ 'opacity-50 cursor-not-allowed': !hasOpenSession || !canPay }"
       >
         <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <Banknote class="w-5 h-5 group-hover:scale-110 transition-transform" />
-        <span class="text-base font-bold tracking-wide">Efectivo</span>
+        <CreditCard class="w-6 h-6 group-hover:scale-110 transition-transform" />
+        <span class="text-lg font-bold tracking-wide">Cobrar</span>
       </button>
-      
-      <div class="grid grid-cols-3 gap-2">
-        <button 
-          :disabled="!hasOpenSession || !canPay"
-          @click="emit('pay-card')"
-          class="h-12 flex items-center justify-center gap-2 bg-blue-500 dark:bg-blue-600 dark:bg-primary dark:text-primary-foreground hover:bg-blue-600 dark:bg-primary dark:text-primary-foreground dark:hover:bg-blue-500 disabled:bg-gray-300 dark:disabled:bg-muted text-white rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.98] group relative overflow-hidden"
-          :class="{ 'opacity-50 cursor-not-allowed': !hasOpenSession || !canPay }"
-        >
-          <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <CreditCard class="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span class="text-sm font-bold tracking-wide">Tarjeta</span>
-        </button>
-        
-        <button 
-          :disabled="!hasOpenSession || !canPay"
-          @click="emit('pay-transfer')"
-          class="h-12 flex items-center justify-center gap-2 bg-purple-500 dark:bg-purple-600 hover:bg-purple-600 dark:hover:bg-purple-500 disabled:bg-gray-300 dark:disabled:bg-muted text-white rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.98] group relative overflow-hidden"
-          :class="{ 'opacity-50 cursor-not-allowed': !hasOpenSession || !canPay }"
-        >
-          <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <ArrowLeftRight class="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span class="text-sm font-bold tracking-wide">Transf.</span>
-        </button>
-
-        <button 
-          :disabled="!hasOpenSession || !canPay || !hasCustomer || (creditAvailable ?? 0) <= 0"
-          @click="emit('pay-credit')"
-          class="h-12 flex items-center justify-center gap-2 bg-orange-500 dark:bg-orange-600 hover:bg-orange-600 dark:hover:bg-orange-500 disabled:bg-gray-300 dark:disabled:bg-muted text-white rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.98] group relative overflow-hidden"
-          :class="{ 'opacity-50 cursor-not-allowed': !hasOpenSession || !canPay || !hasCustomer || (creditAvailable ?? 0) <= 0 }"
-          :title="!hasCustomer ? 'Selecciona un cliente primero' : (creditAvailable ?? 0) <= 0 ? 'Cliente sin crédito disponible' : `Crédito disponible: $${(creditAvailable ?? 0).toFixed(2)}`"
-        >
-          <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <Landmark class="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span class="text-sm font-bold tracking-wide">Crédito</span>
-        </button>
-      </div>
     </div>
   </div>
 </template>

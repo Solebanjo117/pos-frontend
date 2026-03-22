@@ -7,7 +7,7 @@ import { useProducts } from '@/composables/useProducts'
 import { useCustomers } from '@/composables/useCustomers'
 import { useWarehouses } from '@/composables/useWarehouses'
 import apiClient from '@/services/api/client'
-import { Search, Trash2, Save, Banknote, CreditCard, Landmark, AlertTriangle, Keyboard, LogOut, Car } from 'lucide-vue-next'
+import { Search, Trash2, Save, Banknote, CreditCard, Landmark, AlertTriangle, Keyboard, LogOut, Car, Gift } from 'lucide-vue-next'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { usePosSession } from '@/composables/usePosSession'
 
@@ -28,15 +28,20 @@ import ProductSearchModal from '@/components/POS/ProductSearchModal.vue'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue'
 import { SalesOrderPaymentApiService } from '@/services/payments'
+import { router } from '@inertiajs/vue3'
 
 defineOptions({ layout: AppLayout })
 
 const props = withDefaults(defineProps<{
   quoteMode?: boolean
   quoteId?: number
+  returnMode?: boolean
+  orderId?: number
 }>(), {
   quoteMode: false,
   quoteId: undefined,
+  returnMode: false,
+  orderId: undefined,
 })
 
 const {
@@ -153,7 +158,8 @@ const pendingOrderTotal = ref(0)
 const pendingOrderAmountPaid = ref(0)
 // Electronic Payments for Multi-Tender Flow
 const electronicPayments = reactive<Record<string, number>>({})
-
+// Store credit (saldo a favor) to apply to this sale
+const storeCreditToApply = ref(0)
 const handlePaymentChange = (id: string, value: number) => {
     electronicPayments[id] = value
 }
@@ -163,7 +169,7 @@ const totalElectronicPayments = computed(() => {
 })
 
 const totalPaid = computed(() => {
-    return amountReceived.value + totalElectronicPayments.value
+    return amountReceived.value + totalElectronicPayments.value + storeCreditToApply.value
 })
 
 const localChange = computed(() => {
@@ -173,6 +179,101 @@ const localChange = computed(() => {
 const totalRemaining = computed(() => {
     return Math.max(0, cartTotal.value - totalPaid.value)
 })
+
+// Return mode state
+const returnOrderData = ref<any>(null)
+const returnLoading = ref(false)
+const returnError = ref<string | null>(null)
+
+// Load order for return
+async function loadOrderForReturn(orderId: number) {
+  try {
+    const res = await apiClient.get(`/sales-orders/${orderId}`)
+    const order = res.data.data ?? res.data
+    returnOrderData.value = order
+
+    // Set customer
+    if (order.customer_id) {
+      customer_id.value = order.customer_id
+    }
+
+    // Clear cart and load items as negative quantities
+    clearCart()
+    for (const item of (order.items ?? [])) {
+      const quantity = -Math.abs(item.quantity) // Negative for returns
+      const unitPrice = Number(item.unit_price)
+      const discountPercent = Number(item.discount_percent ?? 0)
+      const taxPercent = Number(item.tax_percent ?? 0)
+      const subtotal = quantity * unitPrice * (1 - discountPercent / 100)
+      const taxAmount = subtotal * (taxPercent / 100)
+      const total = subtotal + taxAmount
+
+      cart.value.push({
+        id: `return-${item.id}`,
+        product_id: item.product_id,
+        variant_id: item.variant_id ?? undefined,
+        product_name: item.product_name || item.product?.name || 'Producto',
+        product_sku: item.product_sku || item.product?.sku_base || '',
+        product_price: unitPrice,
+        quantity,
+        discount_percent: discountPercent,
+        tax_percent: taxPercent,
+        default_tax_percent: taxPercent,
+        is_tax_overridden: false,
+        warehouse_id: item.warehouse_id,
+        order_item_id: item.id, // Keep reference to original order item
+        subtotal,
+        tax_amount: taxAmount,
+        total,
+      })
+    }
+  } catch (e: any) {
+    console.error('Error loading order for return:', e)
+    returnError.value = e.response?.data?.message || 'Error al cargar la orden para devolución'
+  }
+}
+
+// Confirm return
+async function confirmReturn() {
+  if (!props.orderId || cart.value.length === 0) return
+
+  returnLoading.value = true
+  returnError.value = null
+
+  try {
+    // Build return items from cart
+    const items = cart.value.map((item: any) => ({
+      sales_order_item_id: item.order_item_id,
+      quantity: Math.abs(item.quantity),
+    }))
+
+    // Create the return
+    const returnRes = await apiClient.post(`/sales-orders/${props.orderId}/returns`, {
+      refund_method: 'balance', // Always use balance for store credit
+      reason: 'Devolución desde POS',
+      items,
+    })
+
+    const returnId = returnRes.data.data?.id
+    if (returnId) {
+      // Approve immediately
+      await apiClient.post(`/sales-returns/${returnId}/approve`)
+    }
+
+    // Redirect to the original order
+    router.visit(`/sales-orders/${props.orderId}`)
+  } catch (e: any) {
+    console.error('Error processing return:', e)
+    const errData = e.response?.data
+    if (Array.isArray(errData?.errors)) {
+      returnError.value = errData.errors.join('\n')
+    } else {
+      returnError.value = errData?.message || 'Error al procesar la devolución'
+    }
+  } finally {
+    returnLoading.value = false
+  }
+}
 
 // Print ticket modal state
 const showPrintTicketModal = ref(false)
@@ -422,12 +523,13 @@ const handleKeyboard = (e: KeyboardEvent) => {
 const openPaymentModal = (method: 'cash' | 'card' | 'transfer' = 'cash') => {
   if (cart.value.length > 0) {
     paymentMethod.value = method
-    
+
     // Reset all amounts and clear previous errors
     amountReceived.value = 0
     error.value = null
+    storeCreditToApply.value = 0
     Object.keys(electronicPayments).forEach(k => delete electronicPayments[k])
-    
+
     if (method === 'cash') {
         amountReceived.value = Math.ceil(cartTotal.value)
     } else if (method === 'card') {
@@ -435,7 +537,7 @@ const openPaymentModal = (method: 'cash' | 'card' | 'transfer' = 'cash') => {
     } else if (method === 'transfer') {
         electronicPayments['transferencia'] = cartTotal.value
     }
-    
+
     showPaymentModal.value = true
   }
 }
@@ -495,6 +597,15 @@ const handlePayment = async () => {
               amount: amount
           })
       }
+  }
+
+  // Add store credit payment if used
+  if (storeCreditToApply.value > 0) {
+      paymentsArray.push({
+          method: 'store_credit',
+          amount: storeCreditToApply.value,
+          notes: 'Aplicado de saldo a favor del cliente'
+      })
   }
 
   const result = await processSale(paymentsArray)
@@ -666,14 +777,14 @@ const handleCashMovement = async (payload: { type: 'in' | 'out'; amount: number;
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeyboard)
-  
+
   // Clear any previous errors from past sessions
   error.value = null
 
   await initWarehouse()
 
-  // Skip session check in quote mode — no cash register needed
-  if (!props.quoteMode) {
+  // Skip session check in quote mode and return mode — no cash register needed
+  if (!props.quoteMode && !props.returnMode) {
     // Session source of truth comes from backend before showing open-session flow
     await checkCurrentSession(currentWarehouseId.value ?? undefined)
   }
@@ -685,15 +796,20 @@ onMounted(async () => {
     fetchUsers(),
     fetchWarehouses({} as any),
   ])
-  
+
   // Initial product load with warehouse context
-  if (currentWarehouseId.value) {
+  if (currentWarehouseId.value && !props.returnMode) {
     performSearch()
   } else {
     // If no warehouse selected/persisted, default to first available or wait for user
     if (settings.value?.default_warehouse_id) {
         setWarehouse(settings.value.default_warehouse_id)
     }
+  }
+
+  // In return mode, load the order for return
+  if (props.returnMode && props.orderId) {
+    await loadOrderForReturn(props.orderId)
   }
 
   // In quote mode with an existing quote, auto-load it into the cart
@@ -738,8 +854,32 @@ onUnmounted(() => {
 
   <div class="h-[calc(100vh-4rem)] flex flex-col bg-[#F8F9FB] dark:bg-background text-gray-900 dark:text-foreground overflow-hidden" style="font-family: 'Inter', sans-serif">
 
-    <!-- Header - Fixed Height (hidden in quoteMode — no cash register needed) -->
-    <div v-if="!props.quoteMode" class="shrink-0 z-20 shadow-sm relative">
+    <!-- Return Mode Header -->
+    <div v-if="props.returnMode" class="shrink-0 z-20 shadow-sm bg-orange-500 text-white px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <button
+            @click="router.visit(`/sales-orders/${props.orderId}`)"
+            class="p-2 hover:bg-orange-600 rounded-lg transition"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h1 class="text-xl font-bold">Devolución</h1>
+            <p class="text-orange-100 text-sm">Orden #{{ returnOrderData?.order_number || props.orderId }}</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-sm text-orange-100">Total a devolver</p>
+          <p class="text-2xl font-bold">{{ formatCurrency(Math.abs(cartTotal)) }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Header - Fixed Height (hidden in quoteMode and returnMode — no cash register needed) -->
+    <div v-if="!props.quoteMode && !props.returnMode" class="shrink-0 z-20 shadow-sm relative">
         <CashRegisterStatus 
             :hasOpenSession="isSessionOpen"
             @request-open="forceShowOpenSessionModal = true"
@@ -758,10 +898,11 @@ onUnmounted(() => {
 
     <!-- Main Content - Flex to fill remaining height -->
     <main class="flex-1 min-h-0 flex flex-col xl:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
-        
+
         <!-- Left Column: Controls & Product List (Grows to fill space) -->
         <div class="flex-[3] flex flex-col gap-4 min-w-0 h-full overflow-hidden">
-          <div class="shrink-0">
+          <!-- Hide search controls in return mode -->
+          <div v-if="!props.returnMode" class="shrink-0">
             <POSControls
                 ref="posControlsRef"
                 :categories="categories"
@@ -770,8 +911,8 @@ onUnmounted(() => {
             />
           </div>
 
-          <!-- Multi-Cart Tabs -->
-          <div v-if="allSessions.length > 0" class="shrink-0 flex items-center gap-1.5 px-1 py-1.5 bg-gray-100 dark:bg-muted/50 rounded-xl overflow-x-auto">
+          <!-- Multi-Cart Tabs (hide in return mode) -->
+          <div v-if="allSessions.length > 0 && !props.returnMode" class="shrink-0 flex items-center gap-1.5 px-1 py-1.5 bg-gray-100 dark:bg-muted/50 rounded-xl overflow-x-auto">
             <button
               v-for="s in allSessions"
               :key="s.id"
@@ -838,11 +979,35 @@ onUnmounted(() => {
             />
           </div>
           <div class="mt-auto shrink-0 pt-4">
-            <ActionButtons 
+            <!-- Return Mode: Show Confirm Return button -->
+            <div v-if="props.returnMode" class="space-y-3">
+              <div v-if="returnError" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 text-sm text-red-600 dark:text-red-400">
+                {{ returnError }}
+              </div>
+              <button
+                @click="confirmReturn"
+                :disabled="returnLoading || cart.length === 0"
+                class="w-full h-14 flex items-center justify-center gap-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 dark:disabled:bg-muted text-white rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.98] font-bold text-lg"
+              >
+                <svg v-if="returnLoading" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span v-else>Confirmar Devolución</span>
+              </button>
+              <button
+                @click="router.visit(`/sales-orders/${props.orderId}`)"
+                class="w-full py-3 text-sm font-medium text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-border rounded-xl hover:bg-gray-50 dark:hover:bg-muted transition"
+              >
+                Cancelar
+              </button>
+            </div>
+
+            <!-- Normal Mode: ActionButtons -->
+            <ActionButtons
+                v-else
                 :hasOpenSession="isSessionOpen"
               :canPay="canCheckout"
-                :hasCustomer="!!selectedCustomer"
-                :creditAvailable="(selectedCustomer?.credit_limit ?? 0) - (selectedCustomer?.current_balance ?? 0)"
                 :isQuoteSession="isQuoteSession"
                 :quoteMode="props.quoteMode"
                 @clear="clearCart"
@@ -850,10 +1015,7 @@ onUnmounted(() => {
                 @save-quote="handleSaveQuote"
                 @save-quote-changes="handleSaveQuoteChanges"
                 @open-cash-register="forceShowOpenSessionModal = true"
-                @pay-cash="openPaymentModal('cash')"
-                @pay-card="openPaymentModal('card')"
-                @pay-transfer="openPaymentModal('transfer')"
-                @pay-credit="openCreditSale"
+                @open-payment-modal="openPaymentModal('cash')"
             />
           </div>
         </div>
@@ -935,6 +1097,37 @@ onUnmounted(() => {
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total a cobrar</p>
             <p class="text-3xl font-bold text-indigo-600 dark:text-primary dark:text-indigo-400">{{ formatCurrency(cartTotal) }}</p>
             <p v-if="shippingCost > 0" class="text-xs text-gray-500 dark:text-gray-400 mt-1">(incl. Envío: {{ formatCurrency(shippingCost) }})</p>
+          </div>
+
+          <!-- Store Credit (Saldo a Favor) -->
+          <div v-if="selectedCustomer?.has_store_credit && (selectedCustomer?.store_credit ?? 0) > 0" class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
+            <div class="flex items-center gap-2 mb-2">
+              <Gift class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Saldo a Favor Disponible</span>
+              <span class="ml-auto text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                {{ formatCurrency(selectedCustomer.store_credit) }}
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="text-sm text-emerald-700 dark:text-emerald-300">Aplicar:</label>
+              <div class="relative flex-1">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-500 text-sm">$</span>
+                <input
+                  v-model.number="storeCreditToApply"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  :max="Math.min(selectedCustomer.store_credit ?? 0, cartTotal)"
+                  class="w-full pl-7 pr-3 py-2 text-right border border-emerald-300 dark:border-emerald-700 rounded-lg bg-white dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <button
+                @click="storeCreditToApply = Math.min(selectedCustomer?.store_credit ?? 0, cartTotal)"
+                class="px-3 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+              >
+                Usar todo
+              </button>
+            </div>
           </div>
 
           <!-- Payment Fields -->

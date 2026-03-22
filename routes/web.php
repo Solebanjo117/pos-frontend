@@ -152,19 +152,26 @@ Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->grou
     Route::get('/', function () {
         return Inertia::render('SalesOrders/Index');
     })->name('index');
-    
+
     Route::get('/create', function () {
         return Inertia::render('SalesOrders/Create');
     })->name('create');
-    
+
     Route::get('/{id}', function ($id) {
         return Inertia::render('SalesOrders/Show', ['id' => (int)$id]);
     })->name('show');
-    
+
     Route::get('/{id}/edit', function ($id) {
         return Inertia::render('SalesOrders/Edit', ['id' => (int)$id]);
     })->name('edit');
 });
+
+// Returns (POS in return mode)
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/{orderId}', fn($orderId) =>
+    Inertia::render('SalesOrders/ReturnEditor', [
+        'orderId' => (int) $orderId
+    ])
+)->name('returns.create');
 
 // Vehicle Management Routes
 // Vehicle Management Routes

@@ -501,7 +501,7 @@ onMounted(async () => {
 
         <!-- Create/Edit Modal -->
         <Dialog :open="showModal" @update:open="showModal = $event">
-            <DialogContent class="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{{ editingVariant ? 'Editar Variante' : 'Nueva Variante' }}</DialogTitle>
                     <DialogDescription>

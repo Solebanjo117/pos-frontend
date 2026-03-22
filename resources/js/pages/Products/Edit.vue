@@ -6,13 +6,12 @@ import { type BreadcrumbItem } from '@/types'
 import { useProducts } from '@/composables/useProducts'
 import type { UpdateProductRequest } from '@/types/product'
 import apiClient from '@/services/api/client'
-import AttributeManager from '@/components/Products/AttributeManager.vue'
 import VariantManager from '@/components/Products/VariantManager.vue'
 import OemReferenceManager from '@/components/Products/OemReferenceManager.vue'
 import AlternativeManager from '@/components/Products/AlternativeManager.vue'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
-import { Plus, Key, Car, Wrench, Globe } from 'lucide-vue-next'
+import { Plus, Key, Car, Globe } from 'lucide-vue-next'
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -520,17 +519,6 @@ onMounted(() => {
                             </label>
                         </div>
                     </div>
-                </div>
-
-                <!-- ═══════════════════════════════════════════════════════════ -->
-                <!--  SECTION 2: Especificaciones Técnicas (always visible)     -->
-                <!-- ═══════════════════════════════════════════════════════════ -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-card border-l-4 border-amber-500">
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-                        <Wrench class="w-5 h-5 text-amber-600" /> Especificaciones Técnicas
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Atributos técnicos del producto base. Los atributos por variante se gestionan dentro de cada variante.</p>
-                    <AttributeManager :product-id="productId" />
                 </div>
 
                 <!-- Actions (Guardar) -->

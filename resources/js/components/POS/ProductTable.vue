@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
-import { Trash2, Plus, Minus, ChevronDown, ChevronUp, DollarSign, Lock, GripVertical } from 'lucide-vue-next'
+import { Trash2, Plus, Minus, ChevronDown, ChevronUp, DollarSign, Lock, GripVertical, Truck } from 'lucide-vue-next'
 import { formatCurrency } from '@/utils/formatters'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
+import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue'
 import draggable from 'vuedraggable'
 
 const props = defineProps<{
@@ -24,7 +25,8 @@ const emit = defineEmits([
   'update-item-price',
   'update-item-discount',
   'view-details',
-  'reorder'
+  'reorder',
+  'reorder-success'
 ])
 
 const localItems = computed({
@@ -84,6 +86,27 @@ const canEditPrice = computed(() => {
   const role = (page.props.auth?.user as any)?.role
   return role === 'admin' || role === 'manager'
 })
+
+// ── Quick Purchase Modal state ─────────────────────────────────────────────────
+const showQuickPurchase = ref(false)
+const productForPurchase = ref<any>(null)
+
+const openQuickPurchase = (item: any) => {
+  const fullProduct = props.products?.find((p: any) => p.id === item.product_id)
+  if (!fullProduct) return
+  productForPurchase.value = fullProduct
+  showQuickPurchase.value = true
+}
+
+const handlePurchaseSuccess = (result: {
+  productId: number
+  variantId: number | null
+  quantityAdded: number
+}) => {
+  emit('reorder-success', result)
+  showQuickPurchase.value = false
+  productForPurchase.value = null
+}
 </script>
 
 <template>
@@ -326,6 +349,27 @@ const canEditPrice = computed(() => {
                       <p class="text-xs text-gray-400">Solo visible internamente</p>
                     </div>
 
+                    <!-- Quick Reorder — only when stock = 0 -->
+                    <div
+                      v-if="item.available_stock !== undefined && item.available_stock <= 0"
+                      class="space-y-2"
+                    >
+                      <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                        <Truck class="w-3 h-3" />
+                        Reabasto rápido
+                      </label>
+                      <button
+                        @click.stop="openQuickPurchase(item)"
+                        class="w-full px-3 py-2 text-sm flex items-center justify-center gap-2 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 rounded-lg transition-colors"
+                      >
+                        <Truck class="w-4 h-4" />
+                        Abastecer desde aquí
+                      </button>
+                      <p class="text-xs text-gray-400">
+                        Stock actual: <span class="font-medium text-red-500">0</span>
+                      </p>
+                    </div>
+
                     <!-- Summary mini-card -->
                     <div class="space-y-2">
                       <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Resumen</label>
@@ -366,6 +410,15 @@ const canEditPrice = computed(() => {
     <div class="bg-gray-50 dark:bg-muted px-4 py-2 border-t border-gray-100 dark:border-border text-xs text-gray-400 text-center uppercase tracking-widest shrink-0">
       {{ items.length }} {{ items.length === 1 ? 'producto' : 'productos' }} en lista
     </div>
+
+    <!-- Quick Purchase Modal -->
+    <QuickPurchaseModal
+      v-if="productForPurchase"
+      :is-open="showQuickPurchase"
+      :product="productForPurchase"
+      @close="showQuickPurchase = false; productForPurchase = null"
+      @success="handlePurchaseSuccess"
+    />
 
   </div>
 </template>

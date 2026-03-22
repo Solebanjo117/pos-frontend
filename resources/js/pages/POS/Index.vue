@@ -138,6 +138,17 @@ const openProductDetail = async (productId: number) => {
     selectedProductForModal.value = data.data ?? data
   } catch { /* silent */ }
 }
+
+// Handle reorder success from ProductTable QuickPurchaseModal
+const handleReorderSuccess = (result: { productId: number, variantId: number | null, quantityAdded: number }) => {
+  const item = cart.value.find((i: any) =>
+    i.product_id === result.productId &&
+    (result.variantId ? i.variant_id === result.variantId : true)
+  )
+  if (item && item.available_stock !== undefined) {
+    item.available_stock += result.quantityAdded
+  }
+}
 const pendingOrderTotal = ref(0)
 const pendingOrderAmountPaid = ref(0)
 // Electronic Payments for Multi-Tender Flow
@@ -806,6 +817,7 @@ onUnmounted(() => {
                 @update-item-discount="(id, discount) => updateDiscount(id, discount)"
                 @view-details="(productId) => openProductDetail(productId)"
                 @reorder="reorderCart"
+                @reorder-success="handleReorderSuccess"
             />
           </div>
         </div>

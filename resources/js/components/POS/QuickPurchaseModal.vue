@@ -56,8 +56,8 @@ const loadSuppliers = async () => {
 // Reset form
 const resetForm = () => {
     quantity.value = 1
-    unitCost.value = props.product?.pricing?.cost || props.product?.cost || 0
-    
+    unitCost.value = props.product?.pricing?.cost || props.product?.cost || props.product?.variants?.[0]?.pricing?.cost || 0
+
     // Auto-select variant if there's only 1, or use default
     if (props.product?.variants?.length === 1) {
         selectedVariantId.value = props.product.variants[0].id

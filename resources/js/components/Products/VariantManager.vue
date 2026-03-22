@@ -69,7 +69,6 @@ const form = ref({
     ]
 })
 
-// Brand options — fetched from API
 const brands = ref<{ id: number; name: string }[]>([])
 const loadingBrands = ref(false)
 
@@ -83,6 +82,15 @@ const fetchBrands = async () => {
 }
 
 const brandOptions = computed(() => brands.value.map(b => ({ value: b.id, label: b.name })))
+
+// Warehouses options — fetched from API
+const warehouses = ref<{ id: number; name: string }[]>([])
+const fetchWarehouses = async () => {
+    try {
+        const { data } = await apiClient.get('/warehouses/all')
+        warehouses.value = data.data ?? data
+    } catch { warehouses.value = [] }
+}
 
 // Category default attributes
 const categoryDefaults = ref<{ name: string; unit: string; required: boolean }[]>([])
@@ -236,7 +244,7 @@ const openCreateModal = () => {
         },
         initial_inventory: [
             {
-                warehouse_id: 1,
+                warehouse_id: warehouses.value[0]?.id ?? 1,
                 stock_available: 0,
                 reorder_point: 5,
                 reorder_quantity: 10,
@@ -406,6 +414,7 @@ onMounted(async () => {
     await Promise.all([
         loadVariants(),
         fetchBrands(),
+        fetchWarehouses(),
         fetchCategoryDefaults(props.categoryId),
     ])
 })

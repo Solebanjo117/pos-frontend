@@ -90,11 +90,13 @@ const canEditPrice = computed(() => {
 // ── Quick Purchase Modal state ─────────────────────────────────────────────────
 const showQuickPurchase = ref(false)
 const productForPurchase = ref<any>(null)
+const variantIdForPurchase = ref<number | null>(null)
 
 const openQuickPurchase = (item: any) => {
   const fullProduct = props.products?.find((p: any) => p.id === item.product_id)
   if (!fullProduct) return
   productForPurchase.value = fullProduct
+  variantIdForPurchase.value = item.variant_id ?? null
   showQuickPurchase.value = true
 }
 
@@ -106,6 +108,7 @@ const handlePurchaseSuccess = (result: {
   emit('reorder-success', result)
   showQuickPurchase.value = false
   productForPurchase.value = null
+  variantIdForPurchase.value = null
 }
 </script>
 
@@ -416,7 +419,8 @@ const handlePurchaseSuccess = (result: {
       v-if="productForPurchase"
       :is-open="showQuickPurchase"
       :product="productForPurchase"
-      @close="showQuickPurchase = false; productForPurchase = null"
+      :initial-variant-id="variantIdForPurchase"
+      @close="showQuickPurchase = false; productForPurchase = null; variantIdForPurchase = null"
       @success="handlePurchaseSuccess"
     />
 

@@ -18,6 +18,7 @@ import { usePosSettings } from '@/composables/usePosSettings'
 const props = defineProps<{
   isOpen: boolean
   product: any // We pass the selected product from the modal/table
+  initialVariantId?: number | null // Pre-select variant from cart item
 }>()
 
 const emit = defineEmits(['close', 'success'])
@@ -56,15 +57,23 @@ const loadSuppliers = async () => {
 // Reset form
 const resetForm = () => {
     quantity.value = 1
-    unitCost.value = props.product?.pricing?.cost || props.product?.cost || props.product?.variants?.[0]?.pricing?.cost || 0
 
-    // Auto-select variant if there's only 1, or use default
-    if (props.product?.variants?.length === 1) {
+    // Pre-select variant: from prop > single variant > default variant
+    if (props.initialVariantId) {
+        selectedVariantId.value = props.initialVariantId
+        // Get cost from the specific variant
+        const variant = props.product?.variants?.find((v: any) => v.id === props.initialVariantId)
+        unitCost.value = variant?.pricing?.cost || props.product?.pricing?.cost || props.product?.cost || 0
+    } else if (props.product?.variants?.length === 1) {
         selectedVariantId.value = props.product.variants[0].id
+        unitCost.value = props.product.variants[0]?.pricing?.cost || props.product?.pricing?.cost || props.product?.cost || 0
     } else if (props.product?.default_variant_id) {
         selectedVariantId.value = props.product.default_variant_id
+        const variant = props.product?.variants?.find((v: any) => v.id === props.product.default_variant_id)
+        unitCost.value = variant?.pricing?.cost || props.product?.pricing?.cost || props.product?.cost || 0
     } else {
         selectedVariantId.value = ''
+        unitCost.value = props.product?.pricing?.cost || props.product?.cost || props.product?.variants?.[0]?.pricing?.cost || 0
     }
 }
 

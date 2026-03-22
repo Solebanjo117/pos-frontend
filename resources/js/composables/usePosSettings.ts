@@ -5,6 +5,10 @@ const settings = ref<PosSettings | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+// Shared warehouse state (singleton)
+const CURRENT_WAREHOUSE_KEY = 'pos_current_warehouse_id'
+const currentWarehouseId = ref<number | null>(null)
+
 export function usePosSettings() {
     const fetchSettings = async () => {
         // Return cached settings if already loaded
@@ -41,9 +45,6 @@ export function usePosSettings() {
     // ==========================================
     // Multi-Warehouse State (Backend + Local Persistence)
     // ==========================================
-    const CURRENT_WAREHOUSE_KEY = 'pos_current_warehouse_id'
-
-    const currentWarehouseId = ref<number | null>(null)
 
     // Load warehouse state on init
     const initWarehouse = async () => {

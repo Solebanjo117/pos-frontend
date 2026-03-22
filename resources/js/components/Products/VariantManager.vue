@@ -310,11 +310,21 @@ const handleSubmit = async () => {
             pricing_formula: form.value.pricing_formula || null,
         }
 
+        const validAttributes = variantAttributes.value.filter(
+            (a) => a.name.trim() && a.value.trim(),
+        )
+
         const payload = {
             ...form.value,
             pricing: pricingPayload,
             sku: form.value.sku || autoVariantSku.value,
-            attributes: variantAttributes.value.filter(a => a.name.trim() && a.value.trim()),
+            // For UPDATE: only include attributes when there is at least one valid entry
+            // so that saving without touching attributes does NOT send attributes:[]
+            // which would silently delete all existing attribute records on the backend.
+            // For CREATE: always include (backend guards assignVariantAttributes with !empty()).
+            ...(editingVariant.value
+                ? validAttributes.length > 0 ? { attributes: validAttributes } : {}
+                : { attributes: validAttributes }),
         }
 
         if (isDraftMode.value) {

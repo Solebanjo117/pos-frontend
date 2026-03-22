@@ -26,7 +26,7 @@ const emit = defineEmits(['close', 'success'])
 const { fetchActiveSuppliers } = useSuppliers()
 const { quickReceivePurchaseOrder, loading: isSubmitting } = usePurchaseOrders()
 const toast = useToast()
-const { settings } = usePosSettings()
+const { currentWarehouseId } = usePosSettings()
 
 const suppliers = ref<Supplier[]>([])
 const loadingSuppliers = ref(false)
@@ -107,11 +107,13 @@ const handleSubmit = async () => {
   }
 
   try {
-    const warehouseId = settings.value?.default_warehouse_id || 1 // fallback to 1 if not defined
+    if (!currentWarehouseId.value) {
+      return toast.error('No hay sucursal seleccionada. Verifica tu configuración.')
+    }
 
     await quickReceivePurchaseOrder({
       supplier_id: selectedSupplierId.value,
-      warehouse_id: warehouseId,
+      warehouse_id: currentWarehouseId.value,
       items: [
         {
           product_id: props.product.id,

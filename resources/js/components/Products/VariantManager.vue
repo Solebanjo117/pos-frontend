@@ -190,10 +190,11 @@ const openCreateModal = () => {
     editingVariant.value = null
 
     // Inherit attributes from the LAST variant that has attributes (most recently created = most relevant template)
-    // Use structuredClone for a true deep copy so edits here never mutate the source variant's attributes
+    // Use JSON.parse/stringify to safely deep-clone and unwrap Vue proxies (structuredClone fails on some Proxies)
     const lastWithAttrs = [...displayVariants.value].reverse().find((v: any) => v.attributes && v.attributes.length > 0)
     if (lastWithAttrs) {
-        variantAttributes.value = structuredClone(lastWithAttrs.attributes).map((a: any) => ({
+        const rawAttributes = JSON.parse(JSON.stringify(lastWithAttrs.attributes));
+        variantAttributes.value = rawAttributes.map((a: any) => ({
             name: a.name,
             value: a.value,
             unit: a.unit || '',

@@ -81,6 +81,7 @@ export interface CreateSalesOrderData {
     date?: string
     status?: 'draft' | 'pending' | 'confirmed'
     warehouse_id?: number
+    source_quote_id?: number
     discount_amount?: number
     shipping_cost?: number
     payment_method?: PaymentMethod

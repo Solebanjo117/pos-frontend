@@ -59,6 +59,7 @@ const saving = ref(false)
 const selectedCustomerId = ref<number | null>(null)
 const validUntil = ref('')
 const notes = ref('')
+const internalNotes = ref('')
 const productSearch = ref('')
 const searchResults = ref<Product[]>([])
 const searchTimeout = ref<any>(null)
@@ -166,6 +167,7 @@ const handleSave = async () => {
             warehouse_id: warehouseId.value,
             valid_until: validUntil.value || null,
             notes: notes.value || null,
+            internal_notes: internalNotes.value || null,
             items: cart.value.map(item => ({
                 product_id: item.product_id,
                 variant_id: item.variant_id,
@@ -355,6 +357,19 @@ onMounted(async () => {
                             placeholder="Comentarios para el cliente..."
                             class="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm resize-none"
                         ></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Nota Interna</label>
+                        <textarea
+                            v-model="internalNotes"
+                            rows="2"
+                            placeholder="Nota interna — solo visible para el equipo"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm resize-none"
+                        ></textarea>
+                        <p class="text-xs text-muted-foreground mt-1">
+                            Esta nota no aparece en documentos impresos ni en el ticket del cliente.
+                        </p>
                     </div>
                 </div>
 

@@ -50,6 +50,7 @@ const error = ref('')
 const selectedCustomerId = ref<number | null>(null)
 const validUntil = ref('')
 const notes = ref('')
+const internalNotes = ref('')
 const status = ref('draft')
 const quoteNumber = ref('')
 const productSearch = ref('')
@@ -136,6 +137,7 @@ const fetchQuote = async () => {
         selectedCustomerId.value = q.customer_id ?? null
         validUntil.value = q.valid_until ? q.valid_until.slice(0, 10) : ''
         notes.value = q.notes ?? ''
+        internalNotes.value = q.internal_notes ?? ''
         status.value = q.status
         warehouseId.value = q.warehouse_id ?? 1
 
@@ -173,6 +175,7 @@ const handleSave = async () => {
             warehouse_id: warehouseId.value,
             valid_until: validUntil.value || null,
             notes: notes.value || null,
+            internal_notes: internalNotes.value || null,
             status: status.value,
             items: cart.value.map(item => ({
                 product_id: item.product_id,
@@ -360,6 +363,14 @@ onMounted(async () => {
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Notas</label>
                             <textarea v-model="notes" rows="3" placeholder="Comentarios..." class="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm resize-none"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Nota Interna</label>
+                            <textarea v-model="internalNotes" rows="2" placeholder="Nota interna — solo visible para el equipo" class="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm resize-none"></textarea>
+                            <p class="text-xs text-muted-foreground mt-1">
+                                Esta nota no aparece en documentos impresos ni en el ticket del cliente.
+                            </p>
                         </div>
                     </div>
 

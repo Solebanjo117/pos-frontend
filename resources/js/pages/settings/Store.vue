@@ -5,7 +5,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { useStoreSettings } from '@/composables/useStoreSettings'
 import { type BreadcrumbItem } from '@/types'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
-import { Store, Upload, Save, Building2, Phone, Mail, MapPin, CreditCard, FileText, Image, Calculator, Clock } from 'lucide-vue-next'
+import { Store, Upload, Save, Building2, Phone, Mail, MapPin, CreditCard, FileText, Image, Calculator, Clock, Wrench, Percent } from 'lucide-vue-next'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -212,10 +212,48 @@ const handleSave = async () => {
                     </p>
                     <PricingFormula
                         :cost="10"
-                        :tax-rate="7"
+                        :tax-rate="settings.store_tax_rate ?? 7"
                         :model-value="settings.pricing_formula"
                         @update:model-value="v => settings.pricing_formula = v"
                     />
+                </section>
+
+                <!-- === FISCAL === -->
+                <section class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-6">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <Percent :size="18" class="text-primary" /> Fiscal
+                    </h2>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de impuesto por defecto (%)</label>
+                        <input
+                            v-model.number="settings.store_tax_rate"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            class="w-40 px-4 py-2 rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition"
+                        />
+                    </div>
+                </section>
+
+                <!-- === MÓDULOS === -->
+                <section class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-6">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <Wrench :size="18" class="text-primary" /> Módulos
+                    </h2>
+                    <div class="space-y-2">
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input
+                                v-model="settings.modules_work_orders_enabled"
+                                type="checkbox"
+                                class="mt-1 h-4 w-4 rounded border-gray-300 dark:border-border text-primary focus:ring-primary/50"
+                            />
+                            <div>
+                                <p class="text-sm font-medium text-gray-900 dark:text-white">Órdenes de trabajo (taller)</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Activa el módulo de gestión de órdenes de trabajo para técnicos.</p>
+                            </div>
+                        </label>
+                    </div>
                 </section>
 
                 <!-- Save button -->

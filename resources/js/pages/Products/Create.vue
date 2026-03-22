@@ -38,7 +38,7 @@ const form = ref<CreateProductRequest>({
     status: 'active',
     alternate_code: '',
     pricing_formula: '',
-    brand_id: 1,
+    brand_id: undefined,
     sku: '',
     upc: '',
     pricing: {
@@ -51,7 +51,7 @@ const form = ref<CreateProductRequest>({
     },
     initial_inventory: [
         {
-            warehouse_id: 1,
+            warehouse_id: undefined,
             stock_available: 0,
             reorder_point: 5,
             reorder_quantity: 20,
@@ -363,11 +363,20 @@ onMounted(async () => {
     try {
         const response = await apiClient.get('/brands/all')
         brands.value = response.data.data
-        if (brands.value.length > 0 && !form.value.brand_id) {
+        if (brands.value.length > 0) {
             form.value.brand_id = brands.value[0].id
         }
     } catch (e) { console.error('Error loading brands:', e) }
     finally { loadingBrands.value = false }
+
+    // Load warehouses and set first one as default
+    try {
+        const response = await apiClient.get('/warehouses')
+        const warehouses = response.data.data || response.data
+        if (Array.isArray(warehouses) && warehouses.length > 0 && form.value.initial_inventory && form.value.initial_inventory.length > 0) {
+            form.value.initial_inventory[0].warehouse_id = warehouses[0].id
+        }
+    } catch (e) { console.error('Error loading warehouses:', e) }
 
     fetchMakes()
 })
@@ -381,6 +390,17 @@ const onDraftVariantsChanged = (variants: any[]) => {
 const handleSubmit = async () => {
     validationErrors.value = {}
     successMessage.value = ''
+    
+    // Validate required fields
+    if (!form.value.brand_id) {
+        toast.error('Debes seleccionar una marca')
+        return
+    }
+    if (!form.value.initial_inventory?.[0]?.warehouse_id) {
+        toast.error('Debes seleccionar un almacén')
+        return
+    }
+    
     try {
         const payload = {
             ...form.value,

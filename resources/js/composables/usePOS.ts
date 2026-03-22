@@ -174,28 +174,32 @@ const sessionLogs = computed({
     set: (val) => { activeSession.value.sessionLogs = val },
 })
 
-// Non-session state (these reset per checkout, not per tab)
-const paymentMethod = ref<'cash' | 'card' | 'transfer' | 'multiple'>('cash')
-const amountReceived = ref(0)
-const shippingCost = ref(0)
-const shippingMethod = ref<'pickup' | 'delivery'>('pickup')
-const loading = ref(false)
-const error = ref<string | null>(null)
-const connectionStatus = ref<'online' | 'offline' | 'error'>('online')
-
 // Persist to localStorage on ANY change to sessions
 watch(allSessions, () => {
     persistSessions(allSessions.value, activeSessionId.value)
 }, { deep: true })
 
-watch(activeSessionId, (val) => {
-    persistSessions(allSessions.value, val)
-})
-
 // ============================================
 // COMPOSABLE FUNCTION
 // ============================================
 export function usePOS() {
+    // Non-session state — initialized fresh for each composable call
+    // These reset when the component mounts/remounts
+    const paymentMethod = ref<'cash' | 'card' | 'transfer' | 'multiple'>('cash')
+    const amountReceived = ref(0)
+    const shippingCost = ref(0)
+    const shippingMethod = ref<'pickup' | 'delivery'>('pickup')
+    const loading = ref(false)
+    const error = ref<string | null>(null)
+    const connectionStatus = ref<'online' | 'offline' | 'error'>('online')
+    
+    // Watch activeSessionId to clear errors when switching sessions
+    watch(activeSessionId, (val) => {
+        persistSessions(allSessions.value, val)
+        // Clear any previous errors when switching sessions
+        error.value = null
+        loading.value = false
+    })
     // Get authenticated user from Inertia
     const page = usePage()
 
@@ -525,6 +529,7 @@ export function usePOS() {
 
                 discount_amount: 0,
                 shipping_cost: shippingCost.value,
+                source_quote_id: activeSession.value.source_quote_id,
                 audit_logs: sessionLogs.value.length > 0 ? sessionLogs.value : undefined,
                 items: cart.value.map(item => ({
                     product_id: item.product_id,

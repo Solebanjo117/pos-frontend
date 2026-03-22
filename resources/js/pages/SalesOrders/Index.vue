@@ -147,13 +147,6 @@ watch(currentWarehouseId, async () => {
           Gestiona las órdenes de venta y pedidos de clientes
         </p>
       </div>
-      <Link
-        href="/sales-orders/create"
-        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition"
-      >
-        <Plus :size="20" />
-        Nueva Orden
-      </Link>
     </div>
 
     <!-- Statistics Cards -->

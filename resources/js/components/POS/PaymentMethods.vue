@@ -14,7 +14,6 @@ const PAYMENT_TYPES: PaymentType[] = [
     { id: 'yappy', label: 'Yappy' },
     { id: 'transferencia', label: 'Transferencia' },
     { id: 'notaCredito', label: 'Nota de Crédito' },
-    { id: 'creditoCliente', label: 'Crédito Cliente' },
 ]
 
 const props = defineProps<{

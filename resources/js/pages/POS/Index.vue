@@ -160,16 +160,29 @@ const pendingOrderAmountPaid = ref(0)
 const electronicPayments = reactive<Record<string, number>>({})
 // Store credit (saldo a favor) to apply to this sale
 const storeCreditToApply = ref(0)
+// Credit (crédito a plazo) to charge to this sale
+const creditToCharge = ref(0)
 const handlePaymentChange = (id: string, value: number) => {
     electronicPayments[id] = value
 }
+
+// Available credit for the selected customer
+const creditAvailable = computed(() => {
+  if (!selectedCustomer.value) return 0
+  return Math.max(0, (selectedCustomer.value.credit_limit ?? 0) - Math.max(0, selectedCustomer.value.current_balance ?? 0))
+})
+
+// Remaining to pay after cash and electronic payments
+const remainingToPay = computed(() => {
+  return Math.max(0, cartTotal.value - amountReceived.value - totalElectronicPayments.value - storeCreditToApply.value)
+})
 
 const totalElectronicPayments = computed(() => {
     return Object.values(electronicPayments).reduce((sum, val) => sum + val, 0)
 })
 
 const totalPaid = computed(() => {
-    return amountReceived.value + totalElectronicPayments.value + storeCreditToApply.value
+  return amountReceived.value + totalElectronicPayments.value + storeCreditToApply.value + creditToCharge.value
 })
 
 const localChange = computed(() => {
@@ -555,6 +568,7 @@ const openCreditSale = () => {
 const closePaymentModal = () => { 
     showPaymentModal.value = false
     error.value = null
+  creditToCharge.value = 0
 }
 
 const handlePayment = async () => {
@@ -607,6 +621,15 @@ const handlePayment = async () => {
           notes: 'Aplicado de saldo a favor del cliente'
       })
   }
+
+    // Add credit charge payment if used
+    if (creditToCharge.value > 0) {
+      paymentsArray.push({
+        method: 'credit',
+        amount: creditToCharge.value,
+        notes: 'Cobrado a crédito del cliente'
+      })
+    }
 
   const result = await processSale(paymentsArray)
   if (result) {
@@ -846,6 +869,14 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyboard)
+})
+
+watch(() => customer_id.value, () => {
+  creditToCharge.value = 0
+})
+
+watch(selectedCustomer, () => {
+  creditToCharge.value = 0
 })
 </script>
 
@@ -1126,6 +1157,57 @@ onUnmounted(() => {
                 class="px-3 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
               >
                 Usar todo
+              </button>
+            </div>
+          </div>
+
+          <!-- Credit (Crédito a Plazo) -->
+          <div v-if="selectedCustomer" class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
+            <div class="flex items-center gap-2 mb-2">
+              <CreditCard class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Crédito Disponible</span>
+              <span class="ml-auto text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                {{ formatCurrency(creditAvailable) }}
+              </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mb-3 text-xs text-emerald-700 dark:text-emerald-300">
+              <div>
+                <span class="font-medium">Límite:</span>
+                <span class="ml-1">{{ formatCurrency(selectedCustomer.credit_limit ?? 0) }}</span>
+              </div>
+              <div>
+                <span class="font-medium">Días crédito:</span>
+                <span class="ml-1">{{ selectedCustomer.credit_days ?? 0 }}</span>
+              </div>
+              <div>
+                <span class="font-medium">Balance actual:</span>
+                <span class="ml-1">{{ formatCurrency(Math.max(0, selectedCustomer.current_balance ?? 0)) }}</span>
+              </div>
+              <div>
+                <span class="font-medium">Saldo a favor:</span>
+                <span class="ml-1">{{ formatCurrency(Math.max(0, selectedCustomer.store_credit ?? 0)) }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <label class="text-sm text-emerald-700 dark:text-emerald-300">Cobrar a crédito:</label>
+              <div class="relative flex-1">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-500 text-sm">$</span>
+                <input
+                  v-model.number="creditToCharge"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  :max="Math.min(creditAvailable, remainingToPay)"
+                  class="w-full pl-7 pr-3 py-2 text-right border border-emerald-300 dark:border-emerald-700 rounded-lg bg-white dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <button
+                @click="creditToCharge = Math.min(creditAvailable, remainingToPay)"
+                class="px-3 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+              >
+                Máximo
               </button>
             </div>
           </div>

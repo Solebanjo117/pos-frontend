@@ -360,11 +360,6 @@ async function loadOrderForEdit(orderId: number) {
       customer_id.value = order.customer_id
     }
 
-    // Set warehouse context to match the order's origin
-    if (order.items && order.items.length > 0 && order.items[0].warehouse_id) {
-      setWarehouse(order.items[0].warehouse_id)
-    }
-
     // Load existing items with POSITIVE quantities and snapshot original state
     for (const item of (order.items ?? [])) {
       const quantity = Math.abs(item.quantity)
@@ -1146,13 +1141,13 @@ onMounted(async () => {
   ])
 
   // Initial product load with warehouse context
-  if (currentWarehouseId.value && !props.returnMode && !props.editMode) {
-    performSearch()
-  } else {
+  if (!currentWarehouseId.value) {
     // If no warehouse selected/persisted, default to first available or wait for user
     if (settings.value?.default_warehouse_id) {
         setWarehouse(settings.value.default_warehouse_id)
     }
+  } else if (!props.returnMode && !props.editMode) {
+    performSearch()
   }
 
   // In return mode, load the order for return

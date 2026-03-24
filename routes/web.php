@@ -170,7 +170,12 @@ Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->grou
     })->middleware(['role:admin,manager,cashier'])->name('edit-pos');
 });
 
-// Vehicle Management Routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/returns/{orderId}', function ($orderId) {
+        return Inertia::render('SalesOrders/ReturnEditor', ['orderId' => (int)$orderId]);
+    })->name('returns.create');
+});
+
 // Vehicle Management Routes
 Route::middleware(['auth'])->group(function () {
     Route::get('/vehicles', function () {

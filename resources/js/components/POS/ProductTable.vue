@@ -5,6 +5,7 @@ import { Trash2, Plus, Minus, ChevronDown, ChevronUp, DollarSign, Lock, GripVert
 import { formatCurrency } from '@/utils/formatters'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import draggable from 'vuedraggable'
 
 const props = defineProps<{
@@ -13,6 +14,7 @@ const props = defineProps<{
   products?: any[] // Full product catalog for context menu details
   clientMode?: boolean // Code protection: show DB IDs instead of SKUs
   warehouseId?: number | null
+  returnMode?: boolean
 }>()
 
 const emit = defineEmits([
@@ -165,8 +167,19 @@ const handlePurchaseSuccess = (result: {
                     :is="expandedItemId === item.id ? ChevronUp : ChevronDown"
                     class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform"
                   />
-                  <div class="flex flex-col">
+                  <div class="flex flex-col w-full">
                     <span class="font-medium text-gray-900 dark:text-white text-sm">{{ item.product_name }}</span>
+                    
+                    <!-- Seller fallback dropdown directly visible in returnMode -->
+                    <div v-if="returnMode" class="mt-2 max-w-[240px]" @click.stop>
+                      <SearchableSelect
+                        :model-value="item.seller_id ?? null"
+                        :options="users.map(u => ({ value: u.id, label: u.name }))"
+                        placeholder="Vendedor / Operador..."
+                        @update:model-value="(val) => emit('update-item-seller', item.id, val ? Number(val) : undefined)"
+                      />
+                    </div>
+
                     <div class="flex flex-wrap gap-1 mt-0.5">
                       <span v-if="item.discount_percent > 0" class="text-xs text-green-600 bg-green-100 px-1 py-0.5 rounded inline-block w-max">
                         -{{ item.discount_percent }}% OFF

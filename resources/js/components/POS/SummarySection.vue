@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { User, IdCard, CheckCircle2, ChevronDown } from 'lucide-vue-next'
+import { User, IdCard, CheckCircle2, Plus } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { formatCurrency } from '@/utils/formatters'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 
 const props = defineProps<{
   subtotal: number
@@ -13,7 +14,7 @@ const props = defineProps<{
   users: Array<{ id: number; name: string }>
 }>()
 
-const emit = defineEmits(['update:customerId', 'update:sellerId'])
+const emit = defineEmits(['update:customerId', 'update:sellerId', 'open-quick-customer'])
 
 const selectedCustomer = computed(() => {
   if (!props.customerId) return null
@@ -25,15 +26,38 @@ const selectedSeller = computed(() => {
   return props.users.find(u => u.id === props.sellerId)
 })
 
-const internalCustomerId = ref(props.customerId || '')
-const internalSellerId = ref(props.sellerId || '')
+const customerOptions = computed(() => {
+  const opts = [{ value: null as number | null, label: 'Público General' }]
+  if (props.customers) {
+    opts.push(...props.customers.map(c => ({
+      value: c.id,
+      label: c.name,
+      sublabel: c.document_number || c.phone || undefined
+    })))
+  }
+  return opts
+})
+
+const sellerOptions = computed(() => {
+  const opts = [{ value: null as number | null, label: 'Seleccionar Vendedor' }]
+  if (props.users) {
+    opts.push(...props.users.map(u => ({
+      value: u.id,
+      label: u.name
+    })))
+  }
+  return opts
+})
+
+const internalCustomerId = ref<number | string | null>(props.customerId || null)
+const internalSellerId = ref<number | string | null>(props.sellerId || null)
 
 watch(() => props.customerId, (val) => {
-  internalCustomerId.value = val || ''
+  internalCustomerId.value = val || null
 })
 
 watch(() => props.sellerId, (val) => {
-  internalSellerId.value = val || ''
+  internalSellerId.value = val || null
 })
 
 </script>
@@ -48,27 +72,22 @@ watch(() => props.sellerId, (val) => {
         <label class="text-xs text-gray-500 dark:text-gray-400 font-bold mb-1 block uppercase tracking-wide">
           Cliente
         </label>
-        <div class="flex gap-2 relative">
-          
-          <div class="relative w-full">
-            <User class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <select 
-              v-model="internalCustomerId"
-              @change="emit('update:customerId', internalCustomerId ? Number(internalCustomerId) : null)"
-              class="w-full pl-9 pr-8 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-sm font-medium text-gray-700 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm hover:border-gray-300 dark:hover:border-gray-500 appearance-none"
-              :class="selectedCustomer ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700/50 text-blue-700 dark:text-blue-400' : ''"
-            >
-              <option value="">Público General</option>
-              <option v-for="c in customers" :key="c.id" :value="c.id">
-                {{ c.name }} {{ c.document_number ? `(${c.document_number})` : '' }}
-              </option>
-            </select>
-            <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <ChevronDown class="w-4 h-4 text-gray-400" />
-            </div>
-            <CheckCircle2 v-if="selectedCustomer" class="absolute right-8 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-in fade-in zoom-in duration-300" />
-          </div>
-
+        <div class="flex items-center gap-2">
+          <SearchableSelect
+            v-model="internalCustomerId"
+            :options="customerOptions"
+            placeholder="Público General"
+            @update:modelValue="val => emit('update:customerId', val)"
+            class="flex-1"
+            :class="selectedCustomer ? 'border-blue-400 ring-1 ring-blue-400 dark:border-blue-600 dark:ring-blue-600' : ''"
+          />
+          <button
+            @click="emit('open-quick-customer')"
+            title="Crear cliente rápido"
+            class="flex items-center justify-center shrink-0 w-[42px] h-[42px] bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 transition border border-indigo-200 dark:border-indigo-800"
+          >
+            <Plus :size="20" />
+          </button>
         </div>
       </div>
       
@@ -77,32 +96,16 @@ watch(() => props.sellerId, (val) => {
         <label class="text-xs text-gray-500 dark:text-gray-400 font-bold mb-1 block uppercase tracking-wide">
           Vendedor
         </label>
-        <div class="flex gap-2">
-          
-          <div class="relative w-full">
-            <IdCard class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <select 
-              v-model="internalSellerId"
-              @change="emit('update:sellerId', internalSellerId ? Number(internalSellerId) : null)"
-              class="w-full pl-9 pr-8 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-sm font-medium text-gray-700 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm hover:border-gray-300 dark:hover:border-gray-500 appearance-none"
-              :class="selectedSeller ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700/50 text-blue-700 dark:text-blue-400' : ''"
-            >
-              <option value="">Seleccionar Vendedor</option>
-              <option v-for="u in users" :key="u.id" :value="u.id">
-                {{ u.name }}
-              </option>
-            </select>
-            <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <ChevronDown class="w-4 h-4 text-gray-400" />
-            </div>
-            <CheckCircle2 v-if="selectedSeller" class="absolute right-8 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-in fade-in zoom-in duration-300" />
-          </div>
-
-        </div>
+        <SearchableSelect
+          v-model="internalSellerId"
+          :options="sellerOptions"
+          placeholder="Seleccionar Vendedor"
+          @update:modelValue="val => emit('update:sellerId', val)"
+          :class="selectedSeller ? 'border-blue-400 ring-1 ring-blue-400 dark:border-blue-600 dark:ring-blue-600' : ''"
+        />
       </div>
     </div>
     
-    <!-- Divider -->
     <!-- Divider -->
     <div class="h-px bg-gray-100 dark:bg-border my-1"></div>
 

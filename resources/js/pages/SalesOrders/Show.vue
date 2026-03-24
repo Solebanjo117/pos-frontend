@@ -6,7 +6,6 @@ import { useSalesOrders } from '@/composables/useSalesOrders'
 import { ArrowLeft, Edit, CheckCircle, XCircle, Package, User, Calendar, DollarSign, Printer, RotateCcw, Search, Plus, X, Calculator, Edit2, CircleDollarSign, AlertTriangle, ClipboardList } from 'lucide-vue-next'
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue'
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue'
-import AddItemModal from '@/components/POS/AddItemModal.vue'
 import { useUsers } from '@/composables/useUsers'
 import apiClient from '@/services/api/client'
 
@@ -30,7 +29,6 @@ const returnLoading = ref(false)
 const returnError = ref<string | null>(null)
 const orderReturns = ref<any[]>([])
 const showAuditLogs = ref(false)
-const showAddItemModal = ref(false)
 
 const { users, fetchUsers } = useUsers()
 
@@ -38,7 +36,8 @@ const auditActionIcon = (action: string) => {
   const icons: Record<string, any> = {
     search: Search, cart_add: Plus, cart_remove: X,
     qty_change: Calculator, price_override: Edit2, tax_override: CircleDollarSign,
-    checkout_success: CheckCircle, checkout_error: AlertTriangle
+    checkout_success: CheckCircle, checkout_error: AlertTriangle,
+    order_modified: Edit
   }
   return icons[action] || ClipboardList
 }
@@ -48,7 +47,8 @@ const auditActionLabel = (action: string) => {
     search: 'Búsqueda', cart_add: 'Añadido', cart_remove: 'Eliminado',
     qty_change: 'Cant. cambiada', price_override: 'Precio override',
     tax_override: 'Impuesto override', checkout_success: 'Checkout',
-    checkout_error: 'Error checkout'
+    checkout_error: 'Error checkout',
+    order_modified: 'Modificación Posterior'
   }
   return labels[action] || action
 }
@@ -68,6 +68,7 @@ const formatLogDetail = (log: any) => {
     case 'price_override': return `$${m.old_price} → $${m.new_price}`
     case 'tax_override': return `${m.old_tax}% → ${m.new_tax}%`
     case 'checkout_success': return `Orden #${m.order_id} — $${m.total}`
+    case 'order_modified': return `Ítems: ${m.items_count} | Dif: $${m.total_diff.toFixed(2)} (Por ${m.user_name})`
     default: return JSON.stringify(m)
   }
 }
@@ -229,11 +230,11 @@ onMounted(() => {
           </button>
           <button
             v-if="currentSalesOrder.status === 'confirmed' || currentSalesOrder.status === 'completed'"
-            @click="showAddItemModal = true"
+            @click="router.visit(`/sales-orders/${props.id}/edit-pos`)"
             class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
           >
             <Plus :size="18" />
-            Agregar Artículo
+            Modificar Orden
           </button>
           <button
             v-if="currentSalesOrder.status !== 'completed' && currentSalesOrder.status !== 'cancelled'"
@@ -256,7 +257,7 @@ onMounted(() => {
             <div>
               <p class="text-sm text-gray-600 dark:text-gray-400">Cliente</p>
               <p class="font-medium text-gray-900 dark:text-white">
-                {{ currentSalesOrder.customer_name || 'Sin cliente' }}
+                {{ currentSalesOrder.customer?.name || 'Sin cliente' }}
               </p>
             </div>
           </div>
@@ -387,33 +388,56 @@ onMounted(() => {
         <p class="text-gray-700 dark:text-gray-300">{{ currentSalesOrder.notes }}</p>
       </div>
       <!-- Returns History -->
-      <div v-if="orderReturns.length > 0" class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-6">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Devoluciones</h3>
-        <div class="space-y-3">
-          <div
-            v-for="ret in orderReturns"
-            :key="ret.id"
-            class="border border-gray-200 dark:border-border rounded-lg p-4"
-          >
-            <div class="flex items-center justify-between mb-2">
-              <div>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ ret.return_number }}</span>
-                <span
-                  class="ml-2 px-2 py-0.5 rounded-full text-xs font-medium"
-                  :class="ret.status === 'approved' ? 'bg-green-100 text-green-800' : ret.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'"
-                >
-                  {{ ret.status === 'approved' ? 'Aprobada' : ret.status === 'rejected' ? 'Rechazada' : 'Pendiente' }}
-                </span>
-              </div>
-              <span class="text-sm font-bold text-red-600">${{ Number(ret.total_amount).toFixed(2) }}</span>
-            </div>
-            <p v-if="ret.reason" class="text-xs text-gray-500 mb-2">Motivo: {{ ret.reason }}</p>
-            <div class="text-xs text-gray-400 space-y-1">
-              <p v-for="item in ret.items" :key="item.id">
-                • {{ item.product?.name || 'Producto' }} × {{ item.quantity }} = ${{ Number(item.subtotal).toFixed(2) }}
-              </p>
-            </div>
-          </div>
+      <div v-if="orderReturns.length > 0" class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-border flex justify-between items-center">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Devoluciones</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+            <thead class="bg-gray-50 dark:bg-background">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Producto</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cantidad</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vendedor Devolución</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Procesado por</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Fecha</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
+              <template v-for="ret in orderReturns" :key="ret.id">
+                <template v-if="ret.items?.length">
+                  <tr v-for="(item, idx) in ret.items" :key="item.id" class="hover:bg-gray-50/50 dark:hover:bg-muted/10 transition-colors">
+                    <td class="px-6 py-4">
+                      <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.product?.name || 'Producto' }}</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                        <span>{{ ret.return_number }}</span>
+                        <span
+                          class="px-1.5 py-0.5 rounded-sm text-[10px] font-medium"
+                          :class="ret.status === 'approved' ? 'bg-green-100 text-green-800' : ret.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'"
+                        >
+                          {{ ret.status === 'approved' ? 'Aprobada' : ret.status === 'rejected' ? 'Rechazada' : 'Pendiente' }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white font-medium">{{ Math.abs(item.quantity) }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                      <span v-if="item.seller_name" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-medium">
+                        {{ item.seller_name }}
+                      </span>
+                      <span v-else class="text-gray-400 text-xs">—</span>
+                    </td>
+                    <td v-if="idx === 0" :rowspan="ret.items.length" class="px-6 py-4 align-top border-l border-gray-100 dark:border-border/50 bg-gray-50/30 dark:bg-background/20">
+                      <div class="text-sm text-gray-900 dark:text-white font-medium">{{ ret.processed_by_name || 'Sistema' }}</div>
+                      <div v-if="ret.reason" class="text-xs text-gray-500 mt-1 italic">{{ ret.reason }}</div>
+                    </td>
+                    <td v-if="idx === 0" :rowspan="ret.items.length" class="px-6 py-4 text-sm text-gray-900 dark:text-white align-top border-l border-gray-100 dark:border-border/50 bg-gray-50/30 dark:bg-background/20">
+                      {{ ret.processed_at ? new Date(ret.processed_at).toLocaleString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(ret.created_at).toLocaleString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                    </td>
+                  </tr>
+                </template>
+              </template>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -502,16 +526,5 @@ onMounted(() => {
       @close="showReturnModal = false; returnError = null"
     />
 
-    <!-- Add Item Modal -->
-    <AddItemModal
-      v-if="currentSalesOrder"
-      :show="showAddItemModal"
-      :order-id="currentSalesOrder.id"
-      :warehouse-id="(currentSalesOrder.items?.[0] as any)?.warehouse_id ?? 1"
-      :users="users"
-      :current-user-id="(currentSalesOrder as any).user_id"
-      @close="showAddItemModal = false"
-      @added="fetchSalesOrderById(props.id)"
-    />
   </AppLayout>
 </template>

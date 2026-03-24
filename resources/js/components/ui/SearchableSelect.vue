@@ -118,9 +118,9 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
             type="button"
             @click="open"
             :disabled="disabled || loading"
-            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 flex items-center justify-between gap-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
+            class="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 flex items-center justify-between gap-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
         >
-            <span :class="selectedLabel ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'">
+            <span class="truncate block" :class="selectedLabel ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'">
                 {{ loading ? loadingText : (selectedLabel || placeholder) }}
             </span>
             <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

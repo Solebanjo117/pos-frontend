@@ -28,9 +28,11 @@ const fetchDebtors = async () => {
     loading.value = true
     try {
         const res = await AccountsReceivableApiService.getDebtors({ search: searchQuery.value || undefined })
-        debtors.value = res.data ?? res
+        // API returns paginated data: { data: [...], current_page, ... }
+        debtors.value = res.data?.data ?? res.data ?? []
     } catch (e: any) {
         error.value = 'Error al cargar clientes con deuda'
+        console.error(e)
     } finally {
         loading.value = false
     }
@@ -41,9 +43,11 @@ const selectCustomer = async (customer: any) => {
     loadingDetails.value = true
     try {
         const res = await AccountsReceivableApiService.getCustomerOrders(customer.id)
-        customerOrders.value = res.data ?? res
+        // Laravel paginator returns { data: [...], current_page, etc }
+        customerOrders.value = res.data?.data ?? res.data ?? []
     } catch (e: any) {
-        // Error handling
+        console.error('Error loading customer orders:', e)
+        customerOrders.value = []
     } finally {
         loadingDetails.value = false
     }

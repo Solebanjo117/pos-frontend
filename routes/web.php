@@ -14,7 +14,7 @@ Route::get('/', function () {
 })->name('home');
 
 // POS (Point of Sale) - Main page
-Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/pos', function () {
+Route::middleware(['auth'])->get('/pos', function () {
     return Inertia::render('POS/Index');
 })->name('pos');
 
@@ -39,7 +39,7 @@ Route::middleware(['auth'])->prefix('products')->name('products.')->group(functi
 });
 
 // Inventory Routes
-Route::middleware(['auth', 'role:admin,manager,buyer,assistant'])->prefix('inventory')->name('inventory.')->group(function () {
+Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Inventory/Inventory');
     })->name('index');
@@ -98,7 +98,7 @@ Route::middleware(['auth'])->prefix('inventory-transfers')->name('inventory-tran
 });
 
 // Reports routes
-Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('reports.')->group(function () {
+Route::middleware(['auth'])->prefix('reports')->name('reports.')->group(function () {
     Route::get('/stock-levels', function () {
         return Inertia::render('Reports/StockLevels');
     })->name('stock-levels');
@@ -113,7 +113,7 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
     
     Route::get('/z-report', function () {
         return Inertia::render('Reports/ZReport');
-    })->name('z-report');
+    })->name('z-report')->middleware('role:admin,manager');
 });
 
 // POS Sessions (Cierres de Caja)
@@ -152,26 +152,23 @@ Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->grou
     Route::get('/', function () {
         return Inertia::render('SalesOrders/Index');
     })->name('index');
-
+    
     Route::get('/create', function () {
         return Inertia::render('SalesOrders/Create');
     })->name('create');
-
+    
     Route::get('/{id}', function ($id) {
         return Inertia::render('SalesOrders/Show', ['id' => (int)$id]);
     })->name('show');
-
+    
     Route::get('/{id}/edit', function ($id) {
         return Inertia::render('SalesOrders/Edit', ['id' => (int)$id]);
     })->name('edit');
+    
+    Route::get('/{id}/edit-pos', function ($id) {
+        return Inertia::render('SalesOrders/EditOrderEditor', ['orderId' => (int)$id]);
+    })->middleware(['role:admin,manager,cashier'])->name('edit-pos');
 });
-
-// Returns (POS in return mode)
-Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/{orderId}', fn($orderId) =>
-    Inertia::render('SalesOrders/ReturnEditor', [
-        'orderId' => (int) $orderId
-    ])
-)->name('returns.create');
 
 // Vehicle Management Routes
 // Vehicle Management Routes
@@ -190,59 +187,57 @@ Route::middleware(['auth'])->prefix('work-orders')->name('work-orders.')->group(
 
 require __DIR__.'/settings.php';
 
-Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
-    // ==================== SUPPLIERS ====================
-    Route::get('/suppliers', function () {
-        return Inertia::render('Suppliers/Index');
-    })->name('suppliers.index');
+// ==================== SUPPLIERS ====================
+Route::get('/suppliers', function () {
+    return Inertia::render('Suppliers/Index');
+})->name('suppliers.index');
 
-    Route::get('/suppliers/create', function () {
-        return Inertia::render('Suppliers/Create');
-    })->name('suppliers.create');
+Route::get('/suppliers/create', function () {
+    return Inertia::render('Suppliers/Create');
+})->name('suppliers.create');
 
-    Route::get('/suppliers/{id}', function ($id) {
-        return Inertia::render('Suppliers/Show', ['supplierId' => (int) $id]);
-    })->name('suppliers.show');
+Route::get('/suppliers/{id}', function ($id) {
+    return Inertia::render('Suppliers/Show', ['supplierId' => (int) $id]);
+})->name('suppliers.show');
 
-    Route::get('/suppliers/{id}/edit', function ($id) {
-        return Inertia::render('Suppliers/Edit', ['supplierId' => (int) $id]);
-    })->name('suppliers.edit');
+Route::get('/suppliers/{id}/edit', function ($id) {
+    return Inertia::render('Suppliers/Edit', ['supplierId' => (int) $id]);
+})->name('suppliers.edit');
 
-    // ==================== PURCHASE ORDERS ====================
-    Route::get('/purchase-orders', function () {
-        return Inertia::render('PurchaseOrders/Index');
-    })->name('purchase-orders.index');
+// ==================== PURCHASE ORDERS ====================
+Route::get('/purchase-orders', function () {
+    return Inertia::render('PurchaseOrders/Index');
+})->name('purchase-orders.index');
 
-    Route::get('/purchase-orders/create', function () {
-        return Inertia::render('PurchaseOrders/Create');
-    })->name('purchase-orders.create');
+Route::get('/purchase-orders/create', function () {
+    return Inertia::render('PurchaseOrders/Create');
+})->name('purchase-orders.create')->middleware('role:admin,manager,buyer,assistant');
 
-    // IMPORTANT: Specific routes MUST come before dynamic {id} routes
-    Route::get('/purchase-orders/smart-reorder', function () {
-        return Inertia::render('PurchaseOrders/SmartReorder');
-    })->name('purchase-orders.smart-reorder');
+// IMPORTANT: Specific routes MUST come before dynamic {id} routes
+Route::get('/purchase-orders/smart-reorder', function () {
+    return Inertia::render('PurchaseOrders/SmartReorder');
+})->name('purchase-orders.smart-reorder')->middleware('role:admin,manager,buyer,assistant');
 
-    Route::get('/purchase-orders/{id}', function ($id) {
-        return Inertia::render('PurchaseOrders/Show', ['purchaseOrderId' => (int) $id]);
-    })->name('purchase-orders.show');
+Route::get('/purchase-orders/{id}', function ($id) {
+    return Inertia::render('PurchaseOrders/Show', ['purchaseOrderId' => (int) $id]);
+})->name('purchase-orders.show');
 
-    Route::get('/purchase-orders/{id}/edit', function ($id) {
-        return Inertia::render('PurchaseOrders/Create', ['purchaseOrderId' => (int) $id]);
-    })->name('purchase-orders.edit');
+Route::get('/purchase-orders/{id}/edit', function ($id) {
+    return Inertia::render('PurchaseOrders/Create', ['purchaseOrderId' => (int) $id]);
+})->name('purchase-orders.edit');
 
-    Route::get('/purchase-orders/{id}/receive', function ($id) {
-        return Inertia::render('PurchaseOrders/Receive', ['purchaseOrderId' => (int) $id]);
-    })->name('purchase-orders.receive');
+Route::get('/purchase-orders/{id}/receive', function ($id) {
+    return Inertia::render('PurchaseOrders/Receive', ['purchaseOrderId' => (int) $id]);
+})->name('purchase-orders.receive');
 
-    // ==================== ACCOUNTS PAYABLE ====================
-    Route::get('/accounts-payable', function () {
-        return Inertia::render('AccountsPayable/Index');
-    })->name('accounts-payable.index');
-});
+// ==================== ACCOUNTS PAYABLE ====================
+Route::get('/accounts-payable', function () {
+    return Inertia::render('AccountsPayable/Index');
+})->name('accounts-payable.index');
 
 
 // ==================== BRANDS ====================
-Route::middleware(['auth', 'role:admin,manager'])->prefix('brands')->name('brands.')->group(function () {
+Route::middleware(['auth'])->prefix('brands')->name('brands.')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Brands/Index');
     })->name('index');
@@ -257,7 +252,8 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('brands')->name('brand
 });
 
 // ==================== CATEGORIES ====================
-Route::middleware(['auth', 'role:admin,manager'])->prefix('categories')->name('categories.')->group(function () {
+// TODO: Implement Categories CRUD pages
+Route::middleware(['auth'])->prefix('categories')->name('categories.')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Categories/Index');
     })->name('index');
@@ -391,11 +387,11 @@ Route::middleware(['auth'])->group(function () {
     // Quote Editor (POS in quote-only mode)
     Route::get('/quotes/create', fn() =>
         Inertia::render('SalesQuotes/Editor')
-    )->name('quotes.create')->middleware('role:admin,manager,seller');
+    )->name('quotes.create');
 
     Route::get('/quotes/{id}/edit', fn($id) =>
         Inertia::render('SalesQuotes/Editor', [
             'quoteId' => (int) $id
         ])
-    )->name('quotes.edit')->middleware('role:admin,manager,seller');
+    )->name('quotes.edit');
 });

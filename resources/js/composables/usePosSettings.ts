@@ -81,22 +81,28 @@ export function usePosSettings() {
 
         // Fallback to localStorage (backend was unreachable)
         const stored = localStorage.getItem(CURRENT_WAREHOUSE_KEY)
-        if (stored) {
-            currentWarehouseId.value = Number(stored)
-            // Try to sync — if 403 the stored warehouse is not allowed, clear it
-            try {
-                await posService.setWarehouseContext(Number(stored))
-            } catch (err: any) {
-                if (err.response?.status === 403) {
-                    localStorage.removeItem(CURRENT_WAREHOUSE_KEY)
-                    currentWarehouseId.value = null
+        if (stored && stored !== 'null' && stored !== 'undefined') {
+            const parsedId = Number(stored)
+            if (!isNaN(parsedId) && parsedId > 0) {
+                currentWarehouseId.value = parsedId
+                // Try to sync — if 403 the stored warehouse is not allowed, clear it
+                try {
+                    await posService.setWarehouseContext(parsedId)
+                } catch (err: any) {
+                    if (err.response?.status === 403 || err.response?.status === 422) {
+                        localStorage.removeItem(CURRENT_WAREHOUSE_KEY)
+                        currentWarehouseId.value = null
+                    }
                 }
+            } else {
+                localStorage.removeItem(CURRENT_WAREHOUSE_KEY)
             }
         }
         // Do NOT default to warehouse 1 — the user may not have access to it
     }
 
     const setWarehouse = async (id: number) => {
+        if (!id) return;
         currentWarehouseId.value = id
         localStorage.setItem(CURRENT_WAREHOUSE_KEY, String(id))
 

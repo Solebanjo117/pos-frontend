@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { Search } from 'lucide-vue-next'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 
 interface Category { id: number; name: string }
 interface Brand { id: number; name: string }
@@ -18,8 +19,25 @@ const emit = defineEmits([
 
 const query = ref('')
 const quantity = ref(1)
-const selectedCategory = ref<number | ''>('')
-const selectedBrand = ref<number | ''>('')
+const selectedCategory = ref<number | null>(null)
+const selectedBrand = ref<number | null>(null)
+
+// Computed options for SearchableSelect
+const categoryOptions = computed(() => {
+  const opts = [{ value: null as number | null, label: 'Todas las Categorías' }]
+  if (props.categories) {
+    opts.push(...props.categories.map(c => ({ value: c.id, label: c.name })))
+  }
+  return opts
+})
+
+const brandOptions = computed(() => {
+  const opts = [{ value: null as number | null, label: 'Todas las Marcas' }]
+  if (props.brands) {
+    opts.push(...props.brands.map(b => ({ value: b.id, label: b.name })))
+  }
+  return opts
+})
 
 // Ref for the search input element — used for persistent auto-focus
 const searchInputRef = ref<HTMLInputElement>()
@@ -67,7 +85,7 @@ defineExpose({ focus })
 <template>
   <div class="bg-white dark:bg-card p-4 rounded-xl shadow-sm border border-gray-100 dark:border-border">
     <!-- Single Row: Search Bar + Category/Brand Dropdowns + Qty + Buscar -->
-    <div class="flex flex-col md:flex-row items-stretch gap-3">
+    <div class="flex flex-col md:flex-row items-center gap-3">
       <!-- Search Bar -->
       <div class="relative flex-1 w-full">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -83,35 +101,24 @@ defineExpose({ focus })
 
       <!-- Category / Brand Dropdowns -->
       <div class="flex gap-2 w-full md:w-auto">
-        <select
+        <SearchableSelect
           v-model="selectedCategory"
-          @change="handleCategoryChange"
-          class="flex-1 px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-xs text-gray-600 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer h-10"
-        >
-          <option value="">Todas las Categorías</option>
-          <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-        </select>
-        <select
+          :options="categoryOptions"
+          placeholder="Todas las Categorías"
+          @update:modelValue="handleCategoryChange"
+          class="flex-1 min-w-[160px]"
+        />
+        <SearchableSelect
           v-model="selectedBrand"
-          @change="handleBrandChange"
-          class="flex-1 px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-xs text-gray-600 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer h-10"
-        >
-          <option value="">Todas las Marcas</option>
-          <option v-for="b in brands" :key="b.id" :value="b.id">{{ b.name }}</option>
-        </select>
+          :options="brandOptions"
+          placeholder="Todas las Marcas"
+          @update:modelValue="handleBrandChange"
+          class="flex-1 min-w-[160px]"
+        />
       </div>
 
-      <!-- Quantity Input + Buscar Button -->
-      <div class="flex items-end gap-2 shrink-0">
-        <div class="w-16">
-          <input
-            v-model.number="quantity"
-            type="number"
-            min="1"
-            class="w-full px-2 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-center font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 h-10 text-sm dark:text-foreground"
-            placeholder="Qty"
-          />
-        </div>
+      <!-- Buscar Button -->
+      <div class="flex shrink-0">
         <button
           @click="handleSearch"
           class="h-10 px-4 bg-gray-100 dark:bg-muted hover:bg-gray-200 dark:hover:bg-muted/80 text-gray-700 dark:text-foreground font-medium rounded-lg transition-colors border border-gray-200 dark:border-border text-sm whitespace-nowrap"

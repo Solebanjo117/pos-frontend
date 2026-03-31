@@ -314,14 +314,13 @@ export function usePOS() {
         const item = cart.value.find(i => i.id === itemId)
         if (item) {
             const oldTax = item.tax_percent
-            // Phase 1: Cap at 15% to prevent accidental misconfig
+            // Cap at 15% to prevent accidental misconfig
             const safeTax = isNaN(taxPercent) ? 0 : Math.max(0, Math.min(15, taxPercent))
             item.tax_percent = safeTax
             item.is_tax_overridden = true
-            // Keep default in sync so restore works after manual edits
-            if (safeTax > 0) {
-                item.default_tax_percent = safeTax
-            }
+            // NOTE: default_tax_percent is intentionally NOT updated here.
+            // It always holds the original tax from the product so the toggle
+            // can always restore the correct original value.
             recalculateItem(item)
             logAction('tax_override', { product_id: item.product_id, old_tax: oldTax, new_tax: safeTax })
         }
@@ -343,16 +342,17 @@ export function usePOS() {
         }
     }
 
-    // Toggle item tax exempt
+    // Toggle item tax exempt (true toggle: 0% ↔ original tax rate)
     const toggleItemTaxExempt = (itemId: string) => {
         const item = cart.value.find(i => i.id === itemId)
         if (item) {
             if (item.tax_percent > 0) {
-                // Save current rate before zeroing so we can restore it
-                item.default_tax_percent = item.tax_percent
+                // Going exempt: zero out the tax. default_tax_percent is untouched — it always
+                // holds the original product tax so we can restore it on the next click.
                 item.tax_percent = 0
             } else {
-                // Restore: fallback to 7 if default was never set (legacy localStorage items)
+                // Restoring: always use the stored original (fallback to store tax rate for
+                // legacy localStorage items that predate this field)
                 item.tax_percent = item.default_tax_percent || (storeSettings.value.store_tax_rate ?? 7)
             }
             recalculateItem(item)

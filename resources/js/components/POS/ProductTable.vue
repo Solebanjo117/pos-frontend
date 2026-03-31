@@ -247,7 +247,7 @@ const handlePurchaseSuccess = (result: {
                       <template v-if="canEditPrice">
                         <PricingFormula
                           :cost="getItemCost(item)"
-                          :tax-rate="item.tax_percent"
+                          :tax-rate="0"
                           :model-value="''"
                           :price="item.product_price"
                           @update:price="(p) => emit('update-item-price', item.id, p)"

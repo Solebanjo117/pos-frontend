@@ -36,11 +36,35 @@ export const purchaseOrdersService = {
     },
 
     /**
-     * Fast-track create, send and receive purchase order (Backorders)
+     * Fast-track create, send and receive purchase order (Backorders) - Legacy
      */
     async quickReceive(orderData: any): Promise<PurchaseOrder> {
         const { data } = await apiClient.post(`${BASE_URL}/quick-receive`, orderData)
         return data.data
+    },
+
+    /**
+     * Quick Purchase v2 - Uses daily global PO system
+     */
+    async quickPurchase(orderData: any): Promise<PurchaseOrder> {
+        const { data } = await apiClient.post(`${BASE_URL}/quick-purchase`, orderData)
+        return data.data
+    },
+
+    /**
+     * Reception batch - For POS reception mode
+     */
+    async receptionBatch(payload: { warehouse_id: number; items: any[] }): Promise<PurchaseOrder> {
+        const { data } = await apiClient.post(`${BASE_URL}/reception-batch`, payload)
+        return data.data
+    },
+
+    /**
+     * Get or create daily PO for a warehouse
+     */
+    async getDailyPO(warehouseId: number): Promise<{ data: PurchaseOrder }> {
+        const { data } = await apiClient.get(`${BASE_URL}/daily`, { params: { warehouse_id: warehouseId } })
+        return data
     },
 
     /**

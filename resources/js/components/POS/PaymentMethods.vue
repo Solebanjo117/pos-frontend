@@ -1,40 +1,39 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
+import { usePaymentMethods } from '@/composables/usePaymentMethods'
 
-interface PaymentType {
-    id: string
-    label: string
-}
+const { methods, fetchMethods, isSpecialMethod } = usePaymentMethods()
 
-const PAYMENT_TYPES: PaymentType[] = [
-    { id: 'visa', label: 'Visa' },
-    { id: 'mastercard', label: 'Mastercard' },
-    { id: 'clave', label: 'Clave' },
-    { id: 'amex', label: 'AMEX' },
-    { id: 'yappy', label: 'Yappy' },
-    { id: 'transferencia', label: 'Transferencia' },
-    { id: 'notaCredito', label: 'Nota de Crédito' },
-]
+// Fetch methods on mount
+onMounted(fetchMethods)
 
 const props = defineProps<{
     payments: Record<string, number>
 }>()
 
 const emit = defineEmits<{
-    (e: 'paymentChange', id: string, value: number): void
+    (e: 'paymentChange', code: string, value: number): void
 }>()
 
+// Filter: show only non-main methods (custom methods added by admin)
+// Main methods (cash, card, transfer, credit, store_credit) have separate buttons
+const otherMethods = computed(() =>
+    methods.value.filter(m =>
+        !['cash', 'card', 'transfer'].includes(m.code) && !isSpecialMethod(m.code)
+    )
+)
+
 const total = computed(() =>
-    PAYMENT_TYPES.reduce((acc, { id }) => acc + (props.payments[id] || 0), 0)
+    otherMethods.value.reduce((acc, m) => acc + (props.payments[m.code] || 0), 0)
 )
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
 }
 
-const handleChange = (id: string, rawValue: string) => {
+const handleChange = (code: string, rawValue: string) => {
     const val = parseFloat(rawValue)
-    emit('paymentChange', id, isNaN(val) ? 0 : val)
+    emit('paymentChange', code, isNaN(val) ? 0 : val)
 }
 
 defineExpose({ total })
@@ -47,22 +46,25 @@ defineExpose({ total })
         </h3>
 
         <div class="overflow-auto flex-1">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div v-for="type in PAYMENT_TYPES" :key="type.id" class="flex flex-col">
-                    <label :for="`payment-${type.id}`" class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                        {{ type.label }}
+            <div v-if="otherMethods.length === 0" class="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
+                No hay métodos adicionales configurados
+            </div>
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div v-for="method in otherMethods" :key="method.code" class="flex flex-col">
+                    <label :for="`payment-${method.code}`" class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        {{ method.name }}
                     </label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-sm">
                             $
                         </span>
                         <input
-                            :id="`payment-${type.id}`"
+                            :id="`payment-${method.code}`"
                             type="number"
                             min="0"
                             step="0.01"
-                            :value="(payments[type.id] || 0) === 0 ? '' : payments[type.id]"
-                            @input="handleChange(type.id, ($event.target as HTMLInputElement).value)"
+                            :value="(payments[method.code] || 0) === 0 ? '' : payments[method.code]"
+                            @input="handleChange(method.code, ($event.target as HTMLInputElement).value)"
                             class="w-full border border-gray-200 dark:border-border dark:bg-card rounded px-3 py-2 pl-7 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-white transition-shadow text-sm"
                             placeholder="0.00"
                         />

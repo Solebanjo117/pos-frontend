@@ -44,6 +44,13 @@ const validationErrors = ref<Record<string, string[]>>({})
 const successMessage = ref('')
 const activeTab = ref('general')
 
+// Category pricing info for variants
+const categoryFormula = ref<string | null>(null)
+const categoryAppliesItbm = ref<boolean>(false)
+const categoryItbmPercent = ref<number | null>(null)
+const categoryMargin = ref<number | null>(null)
+const categoryDefaultCost = ref<number | null>(null)
+
 // Read ?variant= query param (e.g. /products/1/edit?variant=11)
 const variantId = computed(() => {
     const param = new URLSearchParams(window.location.search).get('variant')
@@ -65,6 +72,22 @@ onMounted(async () => {
                 is_universal: currentProduct.value.is_universal ?? false,
                 batch_tracking: currentProduct.value.batch_tracking,
             }
+        
+        // Load category pricing info for new variants
+        const categoryId = currentProduct.value.category_id ?? (currentProduct.value.category as any)?.id
+        if (categoryId) {
+            try {
+                const resp = await apiClient.get(`/categories/${categoryId}`)
+                const cat = resp.data
+                categoryFormula.value = cat.pricing_formula ?? null
+                categoryAppliesItbm.value = cat.applies_itbm ?? false
+                categoryItbmPercent.value = cat.itbm_percent ?? 7
+                categoryMargin.value = cat.default_margin_percent ?? null
+                categoryDefaultCost.value = cat.default_cost ?? null
+            } catch {
+                // Silently fail - variants will work without auto-pricing
+            }
+        }
     }
 })
 
@@ -256,7 +279,8 @@ const vehicleEnginesList = ref<VehicleEngineItem[]>([])
 
 const selectedMakeId = ref<number | null>(null)
 const selectedModelId = ref<number | null>(null)
-const selectedEngineId = ref<number | null>(null)
+// R39: Multi-select de motores
+const selectedEngineIds = ref<number[]>([])
 
 const loadingMakes = ref(false)
 const loadingModelsV = ref(false)
@@ -299,7 +323,7 @@ const fetchVehicleMakes = async () => {
 
 watch(selectedMakeId, async (makeId) => {
     vehicleModels.value = []; vehicleEnginesList.value = []
-    selectedModelId.value = null; selectedEngineId.value = null
+    selectedModelId.value = null; selectedEngineIds.value = []
     if (!makeId) return
     loadingModelsV.value = true
     try {
@@ -310,7 +334,7 @@ watch(selectedMakeId, async (makeId) => {
 })
 
 watch(selectedModelId, async (modelId) => {
-    vehicleEnginesList.value = []; selectedEngineId.value = null
+    vehicleEnginesList.value = []; selectedEngineIds.value = []
     if (!modelId) return
     loadingEnginesV.value = true
     try {
@@ -331,17 +355,21 @@ const engineSelectOptions = computed(() => vehicleEnginesList.value.map(e => ({
     value: e.id, label: e.engine_code, sublabel: e.displacement || '',
 })))
 
-const handleAddCompatibility = async () => {
-    if (!selectedEngineId.value) return
-    if (compatibleEngines.value.some(e => e.id === selectedEngineId.value)) return
+// R39: Agregar múltiples compatibilidades de una vez
+const handleAddCompatibilities = async () => {
+    if (selectedEngineIds.value.length === 0) return
     addingCompat.value = true
     try {
-        await apiClient.post('/products/compatibility', {
-            product_id: props.productId,
-            engine_id: selectedEngineId.value,
-        })
+        // Agregar cada motor seleccionado que no esté ya en compatibilidad
+        for (const engineId of selectedEngineIds.value) {
+            if (compatibleEngines.value.some(e => e.id === engineId)) continue
+            await apiClient.post('/products/compatibility', {
+                product_id: props.productId,
+                engine_id: engineId,
+            })
+        }
         await fetchCompatibleEngines()
-        selectedEngineId.value = null
+        selectedEngineIds.value = []
     } catch (e: any) {
         console.error('Error adding compatibility', e)
     } finally {
@@ -406,7 +434,8 @@ const submitInline = async () => {
             const { data } = await apiClient.post('/vehicle-engines', { ...inlineForm.value, model_id: selectedModelId.value, fuel_type: 'N/A', aspiration: 'N/A' })
             const newEngine = data.data ?? data
             vehicleEnginesList.value.push(newEngine)
-            selectedEngineId.value = newEngine.id
+            // R39: Agregar el nuevo motor a la selección múltiple
+            selectedEngineIds.value.push(newEngine.id)
         }
         closeInline()
     } catch (e: any) {
@@ -599,7 +628,8 @@ onMounted(() => {
 
                     <!-- Specific Vehicle Assignment -->
                     <div v-show="!form.is_universal" class="space-y-6">
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4 items-end bg-gray-50 dark:bg-muted/30 p-4 rounded-lg border border-gray-100 dark:border-border/50">
+                        <!-- Fila 1: Marca y Modelo -->
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 bg-gray-50 dark:bg-muted/30 p-4 rounded-lg border border-gray-100 dark:border-border/50">
                             <div>
                                 <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Marca Vehículo</label>
                                 <div class="flex gap-1">
@@ -636,29 +666,55 @@ onMounted(() => {
                                     </button>
                                 </div>
                             </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Motor</label>
-                                <div class="flex gap-1">
-                                    <SearchableSelect
-                                        :options="engineSelectOptions"
-                                        :model-value="selectedEngineId"
-                                        @update:model-value="v => selectedEngineId = v as number | null"
-                                        placeholder="-- Motor --"
-                                        :disabled="!selectedModelId"
-                                        :loading="loadingEnginesV"
-                                    />
+                        </div>
+                        <!-- R39: Fila 2: Multi-select de motores con checkboxes -->
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4 items-end bg-gray-50 dark:bg-muted/30 p-4 rounded-lg border border-gray-100 dark:border-border/50">
+                            <div class="md:col-span-3">
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                        Motores
+                                        <span v-if="selectedEngineIds.length > 0" class="ml-1 text-teal-600">({{ selectedEngineIds.length }} seleccionados)</span>
+                                    </label>
                                     <button type="button" @click="openInline('vehicleEngine')"
                                         :disabled="!selectedModelId"
-                                        class="flex-shrink-0 rounded-md border border-gray-300 dark:border-border bg-white dark:bg-muted p-2 text-gray-500 hover:text-blue-600 hover:border-blue-400 dark:hover:text-blue-400 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                                        class="text-xs text-blue-500 hover:underline flex items-center gap-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
                                         title="Crear nuevo motor">
-                                        <Plus class="h-4 w-4" />
+                                        <Plus class="h-3 w-3" />
                                     </button>
+                                </div>
+                                <div v-if="loadingEnginesV" class="text-center py-4 text-gray-400 text-sm">
+                                    Cargando motores...
+                                </div>
+                                <div v-else-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">
+                                    Selecciona un modelo primero
+                                </div>
+                                <div v-else-if="vehicleEnginesList.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">
+                                    No hay motores disponibles
+                                </div>
+                                <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
+                                    <label
+                                        v-for="engine in vehicleEnginesList"
+                                        :key="engine.id"
+                                        class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border"
+                                        :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedEngineIds.includes(engine.id), 'opacity-50': compatibleEngines.some(e => e.id === engine.id) }"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            :value="engine.id"
+                                            v-model="selectedEngineIds"
+                                            :disabled="compatibleEngines.some(e => e.id === engine.id)"
+                                            class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                                        />
+                                        <span class="font-mono text-sm text-gray-900 dark:text-white">{{ engine.engine_code }}</span>
+                                        <span v-if="engine.displacement" class="text-xs text-gray-500">{{ engine.displacement }}</span>
+                                        <span v-if="compatibleEngines.some(e => e.id === engine.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
+                                    </label>
                                 </div>
                             </div>
                             <div class="flex items-end">
-                                <button type="button" @click="handleAddCompatibility" :disabled="!selectedEngineId || addingCompat"
+                                <button type="button" @click="handleAddCompatibilities" :disabled="selectedEngineIds.length === 0 || addingCompat"
                                     class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
-                                    {{ addingCompat ? 'Agregando...' : '+ Agregar' }}
+                                    {{ addingCompat ? 'Agregando...' : `+ Agregar ${selectedEngineIds.length > 0 ? `(${selectedEngineIds.length})` : ''}` }}
                                 </button>
                             </div>
                         </div>
@@ -703,7 +759,17 @@ onMounted(() => {
                 <!--  SECTION 5: Variantes (always visible)                    -->
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <div>
-                    <VariantManager :product-id="props.productId" :category-id="currentProduct?.category_id ?? currentProduct?.category?.id" :sku-base="currentProduct?.sku_base || ''" :product-name="currentProduct?.name || ''" />
+                    <VariantManager 
+                        :product-id="props.productId" 
+                        :category-id="currentProduct?.category_id ?? currentProduct?.category?.id" 
+                        :sku-base="currentProduct?.sku_base || ''" 
+                        :product-name="currentProduct?.name || ''"
+                        :category-formula="categoryFormula"
+                        :category-applies-itbm="categoryAppliesItbm"
+                        :category-itbm-percent="categoryItbmPercent"
+                        :category-margin="categoryMargin"
+                        :category-default-cost="categoryDefaultCost"
+                    />
                 </div>
 
                 <!-- ═══════════════════════════════════════════════════════════ -->

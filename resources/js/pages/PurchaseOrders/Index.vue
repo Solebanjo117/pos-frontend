@@ -42,6 +42,7 @@ function formatAmount(val: number | string | null | undefined): string {
 const statusOptions: { value: string; label: string; color: string }[] = [
     { value: '', label: 'Todos', color: '' },
     { value: 'draft', label: 'Borrador', color: 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-300' },
+    { value: 'open', label: 'Abierta (Diaria)', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
     { value: 'sent', label: 'Enviado', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
     { value: 'partial', label: 'Parcial', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
     { value: 'received', label: 'Recibido', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
@@ -54,6 +55,19 @@ function getStatusColor(status: string) {
 
 function getStatusLabel(status: string) {
     return statusOptions.find(s => s.value === status)?.label || status
+}
+
+function getDisplayName(po: any): string {
+    // Daily global PO: no supplier in header
+    if (!po.supplier) {
+        const date = new Date(po.order_date)
+        return `OC del ${date.toLocaleDateString('es-PA', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    }
+    return po.supplier.name
+}
+
+function isDailyPO(po: any): boolean {
+    return !po.supplier
 }
 
 async function loadOrders() {
@@ -107,15 +121,12 @@ onMounted(async () => {
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Gestiona pedidos a proveedores y recepción de mercancía</p>
                 </div>
             <div class="flex items-center gap-3">
-                <Link v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])" href="/purchase-orders/smart-reorder" class="inline-flex items-center gap-2 px-4 py-2 border border-indigo-600 dark:border-primary text-indigo-600 dark:text-primary dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition">
-                    <TrendingDown :size="20" />
-                    Smart Reorder
-                </Link>
-                <Link v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])" href="/purchase-orders/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition">
+                <Link v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])" href="/supply-list" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-lg transition">
                     <Plus :size="20" />
-                    Nueva Orden
+                    Nueva O/C
                 </Link>
             </div>
+
         </div>
 
             <!-- Stats -->
@@ -241,7 +252,15 @@ onMounted(async () => {
                                     </Link>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <Link v-if="po.supplier" :href="`/suppliers/${po.supplier.id}`" class="text-sm text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">
+                                    <template v-if="isDailyPO(po)">
+                                        <span class="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                                            {{ getDisplayName(po) }}
+                                        </span>
+                                        <span class="ml-2 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded">
+                                            Global
+                                        </span>
+                                    </template>
+                                    <Link v-else-if="po.supplier" :href="`/suppliers/${po.supplier.id}`" class="text-sm text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">
                                         {{ po.supplier.name }}
                                     </Link>
                                 </td>

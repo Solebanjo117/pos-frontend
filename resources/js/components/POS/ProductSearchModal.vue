@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { X, Package, Search, Truck } from 'lucide-vue-next'
+import { X, Package, Search, Truck, Eye, ListPlus } from 'lucide-vue-next'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue'
+import ProductDetailModal from '@/components/Products/ProductDetailModal.vue'
+import apiClient from '@/services/api/client'
 import type { Product } from '@/types/product'
 
 const props = withDefaults(defineProps<{
@@ -13,34 +15,127 @@ const props = withDefaults(defineProps<{
   totalCount?: number
   hasMore?: boolean
   loadingMore?: boolean
+  // Context mode: 'pos' = add to cart with checkboxes, 'supply-list' = single-click to add
+  context?: 'pos' | 'supply-list'
+  // Whether to show quick purchase action (backorder button)
+  showQuickPurchaseAction?: boolean
 }>(), {
   clientMode: false,
   totalCount: 0,
   hasMore: false,
   loadingMore: false,
+  context: 'pos',
+  showQuickPurchaseAction: true,
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'add-products', ids: Set<number>): void
   (e: 'load-more'): void
+  (e: 'product-selected', product: Product): void // Emitted in supply-list context
+  (e: 'search-in-modal', filters: { query: string; category_id?: number; brand_id?: number }): void // R43: Search from within modal
 }>()
 
 // --- Internal selection state ---
 const selectedIds = ref<Set<number>>(new Set())
 const modalRef = ref<HTMLDivElement | null>(null)
+const searchInputRef = ref<HTMLInputElement | null>(null)
 
-// Reset selections when modal opens
+// R43: Internal search state
+const internalSearchQuery = ref('')
+const isSearching = ref(false)
+
+// Reset selections and search query when modal opens
 watch(() => props.show, (isOpen) => {
   if (isOpen) {
     selectedIds.value = new Set()
-    nextTick(() => modalRef.value?.focus())
+    internalSearchQuery.value = props.searchQuery || ''
+    nextTick(() => searchInputRef.value?.focus())
   }
 })
+
+// R43: Handle internal search
+const handleInternalSearch = () => {
+  if (isSearching.value) return
+  isSearching.value = true
+  emit('search-in-modal', {
+    query: internalSearchQuery.value.trim(),
+  })
+  // Reset after a brief delay
+  setTimeout(() => {
+    isSearching.value = false
+  }, 500)
+}
 
 // Quick Purchase state
 const showQuickPurchase = ref(false)
 const productForPurchase = ref<Product | null>(null)
+
+// Product Detail Modal state
+const selectedProductForDetail = ref<any>(null)
+const loadingProductDetail = ref(false)
+
+const openProductDetail = async (product: Product, event: Event) => {
+  event.stopPropagation()
+  loadingProductDetail.value = true
+  try {
+    const { data } = await apiClient.get(`/products/${product.id}`)
+    selectedProductForDetail.value = data.data ?? data
+  } catch {
+    // Silent fail - product modal won't open
+  } finally {
+    loadingProductDetail.value = false
+  }
+}
+
+// Context menu state
+const contextMenu = ref<{ show: boolean; x: number; y: number; product: Product | null }>({
+  show: false,
+  x: 0,
+  y: 0,
+  product: null,
+})
+
+const openContextMenu = (event: MouseEvent, product: Product) => {
+  event.preventDefault()
+  event.stopPropagation()
+  contextMenu.value = {
+    show: true,
+    x: event.clientX,
+    y: event.clientY,
+    product,
+  }
+}
+
+const closeContextMenu = () => {
+  contextMenu.value.show = false
+}
+
+const handleContextMenuAction = async (action: string) => {
+  const product = contextMenu.value.product
+  closeContextMenu()
+  
+  if (!product) return
+  
+  if (action === 'view-details') {
+    loadingProductDetail.value = true
+    try {
+      const { data } = await apiClient.get(`/products/${product.id}`)
+      selectedProductForDetail.value = data.data ?? data
+    } catch {
+      // Silent fail
+    } finally {
+      loadingProductDetail.value = false
+    }
+  } else if (action === 'quick-purchase') {
+    productForPurchase.value = product
+    showQuickPurchase.value = true
+  } else if (action === 'add-to-supply-list') {
+    // Open QuickPurchaseModal for adding to supply list
+    productForPurchase.value = product
+    showQuickPurchase.value = true
+  }
+}
 
 const openQuickPurchase = (product: Product, event: Event) => {
   event.stopPropagation()
@@ -74,12 +169,29 @@ const onQuickPurchaseSuccess = ({ productId, variantId, quantityAdded }: { produ
 // Keyboard: Esc to close
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape' && props.show) {
-    emit('close')
+    if (contextMenu.value.show) {
+      closeContextMenu()
+    } else {
+      emit('close')
+    }
   }
 }
 
-onMounted(() => window.addEventListener('keydown', handleKeydown))
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
+// Close context menu on click outside
+const handleClickOutside = () => {
+  if (contextMenu.value.show) {
+    closeContextMenu()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('click', handleClickOutside)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('click', handleClickOutside)
+})
 
 // --- Helpers ---
 const getPrice = (p: Product): number =>
@@ -106,16 +218,30 @@ const stockClass = (stock: number) => {
   return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
 }
 
-// --- Selection logic ---
+// --- Selection logic (for POS context) ---
 const toggleProduct = (id: number) => {
   const next = new Set(selectedIds.value)
   next.has(id) ? next.delete(id) : next.add(id)
   selectedIds.value = next
 }
 
+// Handle product click based on context
+const handleProductClick = (product: Product) => {
+  if (props.context === 'supply-list') {
+    // In supply-list context, emit product for direct handling
+    emit('product-selected', product)
+  } else {
+    // In POS context, toggle selection
+    toggleProduct(product.id)
+  }
+}
+
 const isSelected = (id: number) => selectedIds.value.has(id)
 
 const selectedCount = computed(() => selectedIds.value.size)
+
+// Check if we're in selection mode (POS)
+const isSelectionMode = computed(() => props.context === 'pos')
 
 const allSelected = computed(() =>
   props.products.length > 0 && selectedIds.value.size === props.products.length,
@@ -165,23 +291,47 @@ const submitSelection = () => {
           class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden outline-none ring-1 ring-gray-200 dark:ring-gray-700"
         >
           <!-- ═══════════ HEADER (sticky) ═══════════ -->
-          <div class="shrink-0 px-6 py-4 border-b border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card">
-            <div>
-              <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <Search class="w-5 h-5 text-indigo-500" />
-                Seleccionar Productos
-              </h2>
-              <p class="text-xs text-gray-500 mt-0.5">
-                {{ products.length }}<span v-if="totalCount > products.length"> de {{ totalCount }}</span> resultado{{ totalCount !== 1 ? 's' : '' }} para
-                <span class="font-medium text-gray-700 dark:text-gray-300">"{{ searchQuery }}"</span>
-              </p>
+          <div class="shrink-0 px-6 py-4 border-b border-gray-200 dark:border-border bg-white dark:bg-card">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Search class="w-5 h-5 text-indigo-500" />
+                  Seleccionar Productos
+                </h2>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  {{ products.length }}<span v-if="totalCount > products.length"> de {{ totalCount }}</span> resultado{{ totalCount !== 1 ? 's' : '' }}
+                </p>
+              </div>
+              <button
+                @click="emit('close')"
+                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors"
+              >
+                <X class="h-5 w-5" />
+              </button>
             </div>
-            <button
-              @click="emit('close')"
-              class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors"
-            >
-              <X class="h-5 w-5" />
-            </button>
+            
+            <!-- R43: Editable Search Bar inside Modal -->
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  ref="searchInputRef"
+                  v-model="internalSearchQuery"
+                  @keyup.enter="handleInternalSearch"
+                  type="text"
+                  placeholder="Buscar productos..."
+                  class="w-full pl-10 pr-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-700 dark:text-foreground placeholder:text-gray-400 transition-shadow"
+                />
+              </div>
+              <button
+                @click="handleInternalSearch"
+                :disabled="isSearching"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium rounded-lg transition-colors flex items-center gap-2 text-sm"
+              >
+                <Search class="w-4 h-4" />
+                {{ isSearching ? 'Buscando...' : 'Buscar' }}
+              </button>
+            </div>
           </div>
 
           <!-- ═══════════ TABLE BODY (scrollable) ═══════════ -->
@@ -197,7 +347,7 @@ const submitSelection = () => {
               <!-- Table Header -->
               <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-border">
                 <tr>
-                  <th class="w-12 px-4 py-3 text-center">
+                  <th v-if="isSelectionMode" class="w-12 px-4 py-3 text-center">
                     <input
                       type="checkbox"
                       :checked="allSelected"
@@ -212,6 +362,7 @@ const submitSelection = () => {
                   <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Specs</th>
                   <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">Stock</th>
                   <th class="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Precio</th>
+                  <th class="w-16 px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">Acciones</th>
                 </tr>
               </thead>
 
@@ -220,14 +371,15 @@ const submitSelection = () => {
                 <tr
                   v-for="product in products"
                   :key="product.id"
-                  @click="toggleProduct(product.id)"
+                  @click="handleProductClick(product)"
+                  @contextmenu="(e) => openContextMenu(e, product)"
                   class="group cursor-pointer transition-colors"
-                  :class="isSelected(product.id)
+                  :class="isSelectionMode && isSelected(product.id)
                     ? 'bg-indigo-50/70 dark:bg-indigo-900/15 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/25'
                     : 'hover:bg-gray-50 dark:hover:bg-muted/50/30'"
                 >
-                  <!-- Checkbox -->
-                  <td class="px-4 py-3 text-center">
+                  <!-- Checkbox (only in selection mode) -->
+                  <td v-if="isSelectionMode" class="px-4 py-3 text-center">
                     <input
                       type="checkbox"
                       :checked="isSelected(product.id)"
@@ -299,9 +451,9 @@ const submitSelection = () => {
                           {{ getStock(product) }}
                         </span>
                         
-                        <!-- Quick backorder button -->
+                        <!-- Quick backorder button (only in POS context with prop enabled) -->
                         <button
-                          v-if="getStock(product) <= 0"
+                          v-if="showQuickPurchaseAction && getStock(product) <= 0"
                           @click="(e) => openQuickPurchase(product, e)"
                           class="p-1 rounded text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 transition-colors"
                           title="Abastecer Rápido (Backorder)"
@@ -318,6 +470,18 @@ const submitSelection = () => {
                       :tax-rate="getTaxRate(product)"
                       size="sm"
                     />
+                  </td>
+
+                  <!-- Actions -->
+                  <td class="px-3 py-3 text-center">
+                    <button
+                      @click="(e) => openProductDetail(product, e)"
+                      class="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:text-indigo-400 dark:hover:bg-indigo-900/30 transition-colors"
+                      title="Ver detalle del producto"
+                      :disabled="loadingProductDetail"
+                    >
+                      <Eye class="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -336,8 +500,8 @@ const submitSelection = () => {
             </div>
           </div>
 
-          <!-- ═══════════ FOOTER (sticky) ═══════════ -->
-          <div class="shrink-0 px-6 py-4 border-t border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card">
+          <!-- ═══════════ FOOTER (sticky, only in POS selection mode) ═══════════ -->
+          <div v-if="isSelectionMode" class="shrink-0 px-6 py-4 border-t border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card">
             <span class="text-sm text-gray-500">
               <span class="font-semibold text-indigo-600 dark:text-primary">{{ selectedCount }}</span>
               seleccionado{{ selectedCount !== 1 ? 's' : '' }}
@@ -361,6 +525,18 @@ const submitSelection = () => {
               </button>
             </div>
           </div>
+          <!-- Footer for supply-list mode: just a close button -->
+          <div v-else class="shrink-0 px-6 py-3 border-t border-gray-200 dark:border-border flex items-center justify-between bg-gray-50 dark:bg-muted/20">
+            <span class="text-xs text-gray-500">
+              Haz clic en un producto para agregarlo a la lista
+            </span>
+            <button
+              @click="emit('close')"
+              class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       </Transition>
     </div>
@@ -373,4 +549,55 @@ const submitSelection = () => {
     @close="showQuickPurchase = false"
     @success="onQuickPurchaseSuccess"
   />
+
+  <!-- Product Detail Modal -->
+  <ProductDetailModal
+    v-if="selectedProductForDetail"
+    :product="selectedProductForDetail"
+    @close="selectedProductForDetail = null"
+  />
+
+  <!-- Context Menu -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition duration-100 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-75 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="contextMenu.show"
+        class="fixed z-[100] bg-white dark:bg-card rounded-lg shadow-xl border border-gray-200 dark:border-border py-1 min-w-[180px]"
+        :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+        @click.stop
+      >
+        <button
+          @click="handleContextMenuAction('view-details')"
+          class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted flex items-center gap-2"
+        >
+          <Eye class="w-4 h-4 text-indigo-500" />
+          Ver detalle
+        </button>
+        <!-- Add to Supply List option (only in POS context) -->
+        <button
+          v-if="context === 'pos' && contextMenu.product"
+          @click="handleContextMenuAction('add-to-supply-list')"
+          class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted flex items-center gap-2"
+        >
+          <ListPlus class="w-4 h-4 text-emerald-500" />
+          Agregar a Lista de Abastecimiento
+        </button>
+        <button
+          v-if="showQuickPurchaseAction && contextMenu.product && getStock(contextMenu.product) <= 0"
+          @click="handleContextMenuAction('quick-purchase')"
+          class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted flex items-center gap-2"
+        >
+          <Truck class="w-4 h-4 text-orange-500" />
+          Abastecer rápido
+        </button>
+      </div>
+    </Transition>
+  </Teleport>
 </template>

@@ -12,7 +12,6 @@ const props = defineProps<{
 
 const emit = defineEmits([
   'clear',
-  'save-draft',
   'save-quote',
   'save-quote-changes',
   'open-cash-register',
@@ -26,23 +25,13 @@ const canManageCashRegister = computed(() => hasRole(['admin', 'manager', 'cashi
 <template>
   <div class="flex flex-col gap-3 flex-1 justify-end">
     <!-- Top Actions -->
-    <div :class="props.isQuoteSession ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-3 gap-2'">
-      <button 
+    <div class="grid grid-cols-2 gap-2">
+      <button
         @click="emit('clear')"
         class="px-3 py-2 bg-gray-100 dark:bg-muted/80 hover:bg-gray-200 dark:hover:bg-muted text-gray-600 dark:text-gray-300 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 border border-gray-200 dark:border-border"
       >
         <Trash2 class="w-3.5 h-3.5" />
         Limpiar
-      </button>
-
-      <!-- Normal session: save-draft button -->
-      <button 
-        v-if="!props.isQuoteSession"
-        @click="emit('save-draft')"
-        class="px-3 py-2 bg-gray-100 dark:bg-muted/80 hover:bg-gray-200 dark:hover:bg-muted text-gray-600 dark:text-gray-300 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 border border-gray-200 dark:border-border"
-      >
-        <Save class="w-3.5 h-3.5" />
-        Guardar
       </button>
 
       <!-- Quote session: save changes -->

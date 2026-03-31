@@ -2,6 +2,9 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { X, RotateCcw, AlertCircle, Package, Banknote, CreditCard, Landmark, User, ChevronDown } from 'lucide-vue-next'
 import type { User as UserType } from '@/types'
+import { usePaymentMethods } from '@/composables/usePaymentMethods'
+
+const { methods, fetchMethods } = usePaymentMethods()
 
 interface OrderItem {
     id: number
@@ -47,6 +50,7 @@ const returnUsers = ref<Record<number, number | null>>({})
 // Reset state when modal opens
 watch(() => props.show, (val) => {
     if (val) {
+        fetchMethods() // Fetch fresh methods
         reason.value = ''
         refundMethod.value = 'cash'
         refundNotes.value = ''
@@ -106,16 +110,46 @@ const handleSubmit = () => {
 const formatCurrency = (v: number) =>
     v.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
+// Icon mapping for refund methods
+const methodIcons: Record<string, any> = {
+    cash: Banknote,
+    card: CreditCard,
+    transfer: Landmark,
+    balance: User,
+    store_credit: User,
+}
+
+// Color mapping for refund methods
+const methodColors: Record<string, string> = {
+    cash: 'green',
+    card: 'blue',
+    transfer: 'purple',
+    balance: 'amber',
+    store_credit: 'amber',
+}
+
+// Refund methods: cash, card, transfer + balance (if customer)
 const refundMethods = computed(() => {
-    const methods = [
-        { value: 'cash', label: 'Efectivo', icon: Banknote, color: 'green' },
-        { value: 'card', label: 'Tarjeta', icon: CreditCard, color: 'blue' },
-        { value: 'transfer', label: 'Transferencia', icon: Landmark, color: 'purple' },
-    ]
+    const standardCodes = ['cash', 'card', 'transfer']
+    const result = methods.value
+        .filter(m => standardCodes.includes(m.code))
+        .map(m => ({
+            value: m.code,
+            label: m.name,
+            icon: methodIcons[m.code] || Banknote,
+            color: methodColors[m.code] || 'gray',
+        }))
+
+    // Add balance option if customer exists
     if (props.hasCustomer) {
-        methods.push({ value: 'balance', label: 'Saldo a Favor', icon: User, color: 'amber' })
+        result.push({
+            value: 'balance',
+            label: 'Saldo a Favor',
+            icon: User,
+            color: 'amber',
+        })
     }
-    return methods
+    return result
 })
 
 const refundMethodColor = (method: string, color: string) => {

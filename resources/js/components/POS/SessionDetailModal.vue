@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import {
     X, Printer, Banknote, CreditCard, Receipt,
     TrendingUp, TrendingDown, Minus, User, Warehouse, Clock
 } from 'lucide-vue-next'
 import type { PosSessionRecord, SessionSalesOrder } from '@/services/posSessions'
+import { usePaymentMethods } from '@/composables/usePaymentMethods'
+
+const { methods, fetchMethods, getMethodName } = usePaymentMethods()
+
+// Fetch methods on mount
+onMounted(fetchMethods)
 
 interface Props {
     session: PosSessionRecord | null
@@ -90,51 +96,33 @@ const denomData = computed(() => {
 
 const totalDenominations = computed(() => denomData.value.reduce((sum, d) => sum + d.subtotal, 0))
 
-// Labels for electronic payment methods stored in closing_details.electronic_payments
-const ELECTRONIC_PAYMENT_LABELS: Record<string, string> = {
-    visa: 'Visa',
-    mastercard: 'Mastercard',
-    amex: 'AMEX',
-    clave: 'Clave',
-    yappy: 'Yappy',
-    transferencia: 'Transferencia',
-    notaCredito: 'Nota de Crédito',
-    creditoCliente: 'Crédito Cliente',
-}
-
-// All known payment type keys in display order
-const ELECTRONIC_PAYMENT_KEYS = ['visa', 'mastercard', 'amex', 'clave', 'yappy', 'transferencia', 'notaCredito', 'creditoCliente']
-
-// Build rows from electronic_payments — show ALL types when present (even if 0)
+// Build rows from electronic_payments — show all methods with amounts > 0
 const electronicPaymentRows = computed(() => {
     if (electronicPayments.value) {
-        // Show every known type so the breakdown is always complete
-        return ELECTRONIC_PAYMENT_KEYS.map(key => ({
-            key,
-            label: ELECTRONIC_PAYMENT_LABELS[key] ?? key,
-            amount: Number(electronicPayments.value?.[key] ?? 0),
-        }))
+        // Get all codes from stored data
+        return Object.entries(electronicPayments.value)
+            .filter(([_, amount]) => Number(amount) > 0)
+            .map(([code, amount]) => ({
+                key: code,
+                label: getMethodName(code),
+                amount: Number(amount),
+            }))
     }
     // Fallback: build from summary totals when electronic_payments was not recorded
     if (!summary.value) return []
     const rows = []
     if ((summary.value.card_sales ?? 0) > 0)
-        rows.push({ key: 'card', label: 'Tarjeta / Electrónico', amount: Number(summary.value.card_sales) })
+        rows.push({ key: 'card', label: getMethodName('card'), amount: Number(summary.value.card_sales) })
     if ((summary.value.transfer_sales ?? 0) > 0)
-        rows.push({ key: 'transfer', label: 'Transferencia', amount: Number(summary.value.transfer_sales) })
+        rows.push({ key: 'transfer', label: getMethodName('transfer'), amount: Number(summary.value.transfer_sales) })
     if ((summary.value.credit_sales ?? 0) > 0)
-        rows.push({ key: 'credit', label: 'Crédito Cliente', amount: Number(summary.value.credit_sales) })
+        rows.push({ key: 'credit', label: getMethodName('credit'), amount: Number(summary.value.credit_sales) })
     return rows
 })
 
+// Get method label dynamically
 const paymentMethodLabel = (method: string): string => {
-    const map: Record<string, string> = {
-        cash: 'Efectivo',
-        card: 'Tarjeta',
-        transfer: 'Transferencia',
-        credit: 'Crédito',
-    }
-    return map[method] || method
+    return getMethodName(method)
 }
 
 const statusLabel = (status: string): string => {

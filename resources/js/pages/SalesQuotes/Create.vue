@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import apiClient from '@/services/api/client'
 import {
-    FileText, Search, Plus, Minus, Trash2, Save, User, Calendar, Package
+    FileText, Search, Plus, Minus, Trash2, Save, User, Calendar, Package, Hash, AlertTriangle
 } from 'lucide-vue-next'
 
 defineOptions({ layout: AppLayout })
@@ -66,6 +66,65 @@ const searchTimeout = ref<any>(null)
 
 // Warehouse
 const warehouseId = ref<number>(1)
+
+// R41: Quote number display (shown after first save or preview)
+const savedQuoteNumber = ref<string | null>(null)
+
+// UX-001: Track unsaved changes
+const isDirty = ref(false)
+const showExitModal = ref(false)
+const pendingNavigation = ref<string | null>(null)
+
+// Watch for changes to mark as dirty
+watch([cart, selectedCustomerId, notes, internalNotes, validUntil], () => {
+    if (cart.value.length > 0 || selectedCustomerId.value || notes.value || internalNotes.value) {
+        isDirty.value = true
+    }
+}, { deep: true })
+
+// Intercept browser close/refresh
+const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (isDirty.value && cart.value.length > 0) {
+        e.preventDefault()
+        e.returnValue = '¿Está seguro de salir? Los cambios no guardados se perderán.'
+        return e.returnValue
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+})
+
+// Navigation guard helper
+const navigateWithCheck = (url: string) => {
+    if (isDirty.value && cart.value.length > 0) {
+        pendingNavigation.value = url
+        showExitModal.value = true
+    } else {
+        router.visit(url)
+    }
+}
+
+const handleConfirmExit = () => {
+    showExitModal.value = false
+    isDirty.value = false
+    if (pendingNavigation.value) {
+        router.visit(pendingNavigation.value)
+    }
+}
+
+const handleSaveAndExit = async () => {
+    await handleSave()
+}
+
+const handleCancelExit = () => {
+    showExitModal.value = false
+    pendingNavigation.value = null
+}
 
 const cartTotal = computed(() => cart.value.reduce((sum, item) => sum + item.total, 0))
 const cartSubtotal = computed(() => cart.value.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0))
@@ -179,7 +238,12 @@ const handleSave = async () => {
             })),
         }
 
-        await apiClient.post('/sales-quotes', payload)
+        const response = await apiClient.post('/sales-quotes', payload)
+        // R41: Store the quote number after saving
+        if (response.data?.quote_number) {
+            savedQuoteNumber.value = response.data.quote_number
+        }
+        isDirty.value = false // Clear dirty flag before navigation
         router.visit('/sales-quotes')
     } catch (e: any) {
         alert(e.response?.data?.message || 'Error al guardar la cotización')
@@ -201,16 +265,33 @@ onMounted(async () => {
     <Head title="Nueva Cotización" />
 
     <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                    <FileText class="w-7 h-7 text-indigo-600 dark:text-primary" />
-                    Nueva Cotización
-                </h1>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    Crea un presupuesto sin afectar el inventario
-                </p>
+        <!-- R41: Enhanced Header with Quote Number -->
+        <div class="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border border-indigo-100 dark:border-indigo-900/50 px-6 py-4 rounded-xl mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
+                        <FileText class="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900 dark:text-white">
+                            Nueva Cotización
+                        </h1>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            Crea un presupuesto sin afectar el inventario
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Quote Number Badge -->
+                <div class="flex items-center gap-2 bg-white dark:bg-card px-4 py-3 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-800">
+                    <Hash class="w-5 h-5 text-indigo-500" />
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cotización</p>
+                        <p class="text-lg font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+                            {{ savedQuoteNumber || 'NUEVA' }}
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -399,4 +480,54 @@ onMounted(async () => {
             </div>
         </div>
     </div>
+
+    <!-- UX-001: Exit Confirmation Modal -->
+    <Teleport to="body">
+        <div v-if="showExitModal" class="fixed inset-0 z-50 flex items-center justify-center">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-black/50" @click="handleCancelExit"></div>
+            
+            <!-- Modal -->
+            <div class="relative bg-white dark:bg-card rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 z-10">
+                <div class="flex items-start gap-4">
+                    <div class="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                        <AlertTriangle class="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                            ¿Salir sin guardar?
+                        </h3>
+                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                            Tiene cambios sin guardar en esta cotización. ¿Qué desea hacer?
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="mt-6 space-y-3">
+                    <button
+                        @click="handleSaveAndExit"
+                        :disabled="saving"
+                        class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition"
+                    >
+                        <Save :size="18" />
+                        {{ saving ? 'Guardando...' : 'Guardar y salir' }}
+                    </button>
+                    
+                    <button
+                        @click="handleConfirmExit"
+                        class="w-full px-4 py-2.5 bg-gray-100 dark:bg-muted hover:bg-gray-200 dark:hover:bg-muted/80 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition"
+                    >
+                        Salir sin guardar
+                    </button>
+                    
+                    <button
+                        @click="handleCancelExit"
+                        class="w-full px-4 py-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition"
+                    >
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>

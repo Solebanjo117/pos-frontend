@@ -3,7 +3,7 @@ import apiClient from '@/services/api/client'
 
 export interface VehicleEngine {
     id: number
-    model_id: number
+    model_id: number | null // R21: Engines can be independent (no model)
     engine_code: string
     displacement: string // e.g., "2.0L"
     fuel_type: string
@@ -56,12 +56,12 @@ export function useVehicleEngines() {
         }
     }
 
-    // Create a new engine
+    // Create a new engine (R21: model_id is now optional)
     const createEngine = async (data: {
-        model_id: number;
+        model_id?: number | null;
         engine_code: string;
-        displacement: string;
-        fuel_type: string;
+        displacement?: string;
+        fuel_type?: string;
         aspiration?: string;
     }) => {
         loading.value = true
@@ -78,12 +78,12 @@ export function useVehicleEngines() {
         }
     }
 
-    // Update an existing engine
+    // Update an existing engine (R21: model_id is optional for updates)
     const updateEngine = async (id: number, data: {
-        model_id: number;
-        engine_code: string;
-        displacement: string;
-        fuel_type: string;
+        model_id?: number | null;
+        engine_code?: string;
+        displacement?: string;
+        fuel_type?: string;
         aspiration?: string;
     }) => {
         loading.value = true

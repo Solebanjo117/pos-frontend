@@ -33,6 +33,7 @@ export interface LowStockStats {
     total_items: number
     critical_stock: number
     low_stock: number
+    without_supplier: number
 }
 
 export interface BatchCreateOrder {
@@ -45,6 +46,24 @@ export interface BatchCreateOrder {
         quantity: number
         unit_cost: number
         notes?: string
+    }[]
+}
+
+export interface CreatedPurchaseOrder {
+    id: number
+    po_number: string
+    supplier: { id: number; name: string }
+    warehouse: { id: number; name: string }
+    status: string
+    subtotal: number
+    tax_amount: number
+    total: number
+    items: {
+        id: number
+        product_id: number
+        quantity_ordered: number
+        unit_cost: number
+        product: { id: number; name: string; sku_base: string }
     }[]
 }
 
@@ -63,7 +82,7 @@ export const smartReorderService = {
         return data.data
     },
 
-    async batchCreate(orders: BatchCreateOrder[]): Promise<any[]> {
+    async batchCreate(orders: BatchCreateOrder[]): Promise<CreatedPurchaseOrder[]> {
         const { data } = await apiClient.post(`${BASE_URL}/batch-create`, { orders })
         return data.data
     },

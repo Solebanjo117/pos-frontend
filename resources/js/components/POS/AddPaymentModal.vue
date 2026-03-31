@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Banknote, X, AlertCircle, CreditCard } from 'lucide-vue-next'
+import { usePaymentMethods } from '@/composables/usePaymentMethods'
+
+const { methods, fetchMethods, isCreditMethod, isStoreCreditMethod, isSpecialMethod } = usePaymentMethods()
 
 const props = defineProps<{
     show: boolean
@@ -9,6 +12,7 @@ const props = defineProps<{
     amountPaid: number
     customerName?: string
     creditAvailable?: number
+    storeCreditAvailable?: number
     loading?: boolean
     error?: string | null
 }>()
@@ -18,22 +22,43 @@ const emit = defineEmits<{
     (e: 'close'): void
 }>()
 
-const paymentMethod = ref<'cash' | 'card' | 'transfer' | 'credit'>('cash')
+const paymentMethod = ref<string>('cash')
 const paymentAmount = ref<number>(0)
 const notes = ref('')
+
+// Fetch methods when modal opens
+watch(() => props.show, (show) => {
+    if (show) {
+        fetchMethods()
+    }
+})
 
 const amountDue = computed(() => Math.max(0, props.orderTotal - props.amountPaid))
 const remainingAfterPayment = computed(() => Math.max(0, amountDue.value - paymentAmount.value))
 
-const hasCreditAvailable = computed(() =>
-    (props.creditAvailable ?? 0) > 0 && paymentMethod.value === 'credit'
+// Standard methods (cash, card, transfer) - always shown
+const standardMethods = computed(() =>
+    methods.value.filter(m => ['cash', 'card', 'transfer'].includes(m.code))
 )
 
-const canSubmit = computed(() =>
-    paymentAmount.value >= 0 &&
-    paymentAmount.value <= amountDue.value &&
-    !(paymentMethod.value === 'credit' && paymentAmount.value > (props.creditAvailable ?? 0))
-)
+// Credit method - only if customer has credit available
+const creditMethodAvailable = computed(() => {
+    const creditMethod = methods.value.find(m => m.code === 'credit')
+    return creditMethod && (props.creditAvailable ?? 0) > 0
+})
+
+// Store credit method - only if customer has store credit available
+const storeCreditMethodAvailable = computed(() => {
+    const storeCreditMethod = methods.value.find(m => m.code === 'store_credit')
+    return storeCreditMethod && (props.storeCreditAvailable ?? 0) > 0
+})
+
+const canSubmit = computed(() => {
+    if (paymentAmount.value <= 0 || paymentAmount.value > amountDue.value) return false
+    if (isCreditMethod(paymentMethod.value) && paymentAmount.value > (props.creditAvailable ?? 0)) return false
+    if (isStoreCreditMethod(paymentMethod.value) && paymentAmount.value > (props.storeCreditAvailable ?? 0)) return false
+    return true
+})
 
 const handleOpen = () => {
     paymentAmount.value = amountDue.value
@@ -51,6 +76,16 @@ const handleSubmit = () => {
 
 const formatCurrency = (v: number) =>
     v.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+
+// Color mappings for method buttons
+const methodColors: Record<string, string> = {
+    cash: 'green',
+    card: 'blue',
+    transfer: 'purple',
+    credit: 'orange',
+    store_credit: 'amber',
+}
+const getMethodColor = (code: string) => methodColors[code] || 'gray'
 </script>
 
 <template>
@@ -97,29 +132,53 @@ const formatCurrency = (v: number) =>
                     <!-- Method -->
                     <div>
                         <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Método de pago</label>
-                        <div class="grid grid-cols-4 gap-2">
+                        <div class="flex flex-wrap gap-2">
+                            <!-- Standard methods (cash, card, transfer) -->
                             <button
-                                v-for="m in [
-                                    { key: 'cash',     label: 'Efectivo',  color: 'green' },
-                                    { key: 'card',     label: 'Tarjeta',   color: 'blue'  },
-                                    { key: 'transfer', label: 'Transfer.', color: 'purple' },
-                                    { key: 'credit',   label: 'Crédito',   color: 'orange', disabled: !creditAvailable },
-                                ]"
-                                :key="m.key"
-                                :disabled="m.disabled"
-                                @click="paymentMethod = m.key as any"
+                                v-for="m in standardMethods"
+                                :key="m.code"
+                                @click="paymentMethod = m.code"
                                 :class="[
-                                    'py-2 px-1 rounded-lg text-xs font-semibold border-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed',
-                                    paymentMethod === m.key
-                                        ? `border-${m.color}-500 bg-${m.color}-50 dark:bg-${m.color}-900/20 text-${m.color}-700 dark:text-${m.color}-400`
+                                    'py-2 px-3 rounded-lg text-xs font-semibold border-2 transition-all',
+                                    paymentMethod === m.code
+                                        ? `border-${getMethodColor(m.code)}-500 bg-${getMethodColor(m.code)}-50 dark:bg-${getMethodColor(m.code)}-900/20 text-${getMethodColor(m.code)}-700 dark:text-${getMethodColor(m.code)}-400`
                                         : 'border-gray-200 dark:border-border text-gray-500 dark:text-gray-400 hover:border-gray-300'
                                 ]"
                             >
-                                {{ m.label }}
+                                {{ m.name }}
+                            </button>
+                            <!-- Credit method (if available) -->
+                            <button
+                                v-if="creditMethodAvailable"
+                                @click="paymentMethod = 'credit'"
+                                :class="[
+                                    'py-2 px-3 rounded-lg text-xs font-semibold border-2 transition-all',
+                                    paymentMethod === 'credit'
+                                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400'
+                                        : 'border-gray-200 dark:border-border text-gray-500 dark:text-gray-400 hover:border-gray-300'
+                                ]"
+                            >
+                                Crédito
+                            </button>
+                            <!-- Store credit method (if available) -->
+                            <button
+                                v-if="storeCreditMethodAvailable"
+                                @click="paymentMethod = 'store_credit'"
+                                :class="[
+                                    'py-2 px-3 rounded-lg text-xs font-semibold border-2 transition-all',
+                                    paymentMethod === 'store_credit'
+                                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                                        : 'border-gray-200 dark:border-border text-gray-500 dark:text-gray-400 hover:border-gray-300'
+                                ]"
+                            >
+                                Saldo a Favor
                             </button>
                         </div>
                         <p v-if="paymentMethod === 'credit' && creditAvailable" class="text-xs text-orange-500 mt-1">
                             Crédito disponible: {{ formatCurrency(creditAvailable) }}
+                        </p>
+                        <p v-if="paymentMethod === 'store_credit' && storeCreditAvailable" class="text-xs text-amber-500 mt-1">
+                            Saldo disponible: {{ formatCurrency(storeCreditAvailable) }}
                         </p>
                     </div>
 

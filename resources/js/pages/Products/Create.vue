@@ -5,6 +5,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useProducts } from '@/composables/useProducts'
 import { useToast } from '@/composables/useToast'
+import { useVehicleEngines } from '@/composables/useVehicleEngines'
 import type { CreateProductRequest } from '@/types/product'
 import type { Category } from '@/types/category'
 import type { Brand } from '@/types/brand'
@@ -35,10 +36,12 @@ const form = ref<CreateProductRequest>({
     name: '',
     description: '',
     product_line_id: undefined,
+    category_id: undefined,
+    engine_id: undefined, // R21: motor as reusable entity
     status: 'active',
     alternate_code: '',
     pricing_formula: '',
-    brand_id: undefined,
+    brand_id: 0,
     sku: '',
     upc: '',
     pricing: {
@@ -51,7 +54,7 @@ const form = ref<CreateProductRequest>({
     },
     initial_inventory: [
         {
-            warehouse_id: undefined,
+            warehouse_id: 0,
             stock_available: 0,
             reorder_point: 5,
             reorder_quantity: 20,
@@ -88,8 +91,55 @@ const loadingBrands = ref(false)
 
 const variantAttributes = ref<{ name: string; value: string; unit: string; required: boolean }[]>([])
 
+// Category pricing — formula takes priority over margin (LL-013 compatibility)
+const categoryFormula = ref<string | null>(null)
+const categoryAppliesItbm = ref<boolean>(false)
+const categoryItbmPercent = ref<number | null>(null)
+const categoryMargin = ref<number | null>(null)
+const categoryDefaultCost = ref<number | null>(null)
+const priceManuallyEdited = ref(false)
+const onBasePriceInput = () => { priceManuallyEdited.value = true }
+
 const skuPreview = ref('')
 const loadingSkuPreview = ref(false)
+
+// R20: Duplicate checking
+const duplicates = ref<{ id: number; name: string; sku_base: string }[]>([])
+const checkingDuplicates = ref(false)
+let duplicateCheckTimeout: ReturnType<typeof setTimeout> | null = null
+
+const checkDuplicates = async () => {
+    const name = form.value.name?.trim()
+    const sku = form.value.sku_base?.trim()
+
+    if (!name && !sku) {
+        duplicates.value = []
+        return
+    }
+
+    checkingDuplicates.value = true
+    try {
+        const response = await apiClient.get('/products/check-duplicate', {
+            params: { name, sku }
+        })
+        duplicates.value = response.data.data || []
+    } catch (e) {
+        console.error('Error checking duplicates:', e)
+        duplicates.value = []
+    } finally {
+        checkingDuplicates.value = false
+    }
+}
+
+// Debounced watcher for duplicate checking (600ms)
+watch([() => form.value.name, () => form.value.sku_base], () => {
+    if (duplicateCheckTimeout) {
+        clearTimeout(duplicateCheckTimeout)
+    }
+    duplicateCheckTimeout = setTimeout(() => {
+        checkDuplicates()
+    }, 600)
+})
 
 const fetchSkuPreview = async (categoryId: number | undefined) => {
     if (!categoryId) { skuPreview.value = ''; return }
@@ -169,7 +219,14 @@ watch(
     () => (form.value as any).category_id,
     async (newCategoryId: number | undefined) => {
         fetchSkuPreview(newCategoryId)
-        if (!newCategoryId) { variantAttributes.value = []; return }
+        if (!newCategoryId) {
+            variantAttributes.value = []
+            categoryFormula.value = null
+            categoryAppliesItbm.value = false
+            categoryItbmPercent.value = null
+            categoryMargin.value = null
+            return
+        }
         try {
             const resp = await apiClient.get(`/categories/${newCategoryId}`)
             const cat = resp.data
@@ -178,7 +235,48 @@ watch(
                     name: attr.name, value: '', unit: attr.unit || '', required: attr.required || false,
                 }))
             } else { variantAttributes.value = [] }
-        } catch { variantAttributes.value = [] }
+            // R23: capture formula and ITBM flag + percent (LL-013 fallback: margin)
+            categoryFormula.value = cat.pricing_formula ?? null
+            categoryAppliesItbm.value = cat.applies_itbm ?? false
+            categoryItbmPercent.value = cat.itbm_percent ?? 7
+            categoryMargin.value = cat.default_margin_percent ?? null
+            categoryDefaultCost.value = cat.default_cost ?? null
+        } catch {
+            variantAttributes.value = []
+            categoryFormula.value = null
+            categoryAppliesItbm.value = false
+            categoryItbmPercent.value = null
+            categoryMargin.value = null
+            categoryDefaultCost.value = null
+        }
+    }
+)
+
+// Auto-calculate base_price from category formula (priority) or margin (fallback)
+watch(
+    () => form.value.pricing.cost,
+    async (newCost) => {
+        if (priceManuallyEdited.value) return
+        const cost = Number(newCost) || 0
+        if (cost <= 0) return
+
+        if (categoryFormula.value) {
+            // Formula takes priority
+            try {
+                const { data } = await apiClient.post('/categories/preview-price', {
+                    formula: categoryFormula.value,
+                    costo: cost,
+                    applies_itbm: categoryAppliesItbm.value,
+                    itbm_percent: categoryItbmPercent.value ?? 7,
+                })
+                if (data.price !== null) {
+                    form.value.pricing.base_price = data.price
+                }
+            } catch { /* silencioso */ }
+        } else if (categoryMargin.value != null && categoryMargin.value > 0) {
+            // Fallback: simple margin (LL-013)
+            form.value.pricing.base_price = Number((cost * (1 + categoryMargin.value / 100)).toFixed(2))
+        }
     }
 )
 
@@ -203,7 +301,8 @@ const vehicleEngines = ref<VehicleEngineItem[]>([])
 
 const selectedMakeId = ref<number | null>(null)
 const selectedModelId = ref<number | null>(null)
-const selectedEngineId = ref<number | null>(null)
+// R39: Multi-select de motores
+const selectedEngineIds = ref<number[]>([])
 const isUniversal = ref(false)
 
 const loadingMakes = ref(false)
@@ -221,7 +320,7 @@ const fetchMakes = async () => {
 
 watch(selectedMakeId, async (makeId) => {
     vehicleModels.value = []; vehicleEngines.value = []
-    selectedModelId.value = null; selectedEngineId.value = null
+    selectedModelId.value = null; selectedEngineIds.value = []
     if (!makeId) return
     loadingModelsV.value = true
     try {
@@ -232,7 +331,7 @@ watch(selectedMakeId, async (makeId) => {
 })
 
 watch(selectedModelId, async (modelId) => {
-    vehicleEngines.value = []; selectedEngineId.value = null
+    vehicleEngines.value = []; selectedEngineIds.value = []
     if (!modelId) return
     loadingEnginesV.value = true
     try {
@@ -250,18 +349,22 @@ const toggleUniversal = () => {
     }
 }
 
-const addEngine = () => {
-    if (!selectedEngineId.value) return
-    if (addedEngines.value.some(e => e.engine_id === selectedEngineId.value)) return
+// R39: Agregar múltiples motores de una vez
+const addEngines = () => {
+    if (selectedEngineIds.value.length === 0) return
     const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
     const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
-    const engine = vehicleEngines.value.find(e => e.id === selectedEngineId.value)
     const modelNameFull = model ? `${model.name}${model.generation ? ` - ${model.generation}` : ''}` : ''
-    addedEngines.value.push({
-        engine_id: selectedEngineId.value,
-        make: make?.name || '', model: modelNameFull, engine: engine?.engine_code || '',
+    
+    selectedEngineIds.value.forEach(engineId => {
+        if (addedEngines.value.some(e => e.engine_id === engineId)) return
+        const engine = vehicleEngines.value.find(e => e.id === engineId)
+        addedEngines.value.push({
+            engine_id: engineId,
+            make: make?.name || '', model: modelNameFull, engine: engine?.engine_code || '',
+        })
     })
-    selectedEngineId.value = null
+    selectedEngineIds.value = []
 }
 const removeEngine = (idx: number) => addedEngines.value.splice(idx, 1)
 
@@ -325,7 +428,8 @@ const submitInline = async () => {
             const { data } = await apiClient.post('/vehicle-engines', { ...inlineForm.value, model_id: selectedModelId.value, fuel_type: 'N/A', aspiration: 'N/A' })
             const newEngine = data.data ?? data
             vehicleEngines.value.push(newEngine)
-            selectedEngineId.value = newEngine.id
+            // R39: Agregar el nuevo motor a la selección múltiple
+            selectedEngineIds.value.push(newEngine.id)
         }
         closeInline()
     } catch (e: any) {
@@ -333,12 +437,10 @@ const submitInline = async () => {
     } finally { inlineProcessing.value = false }
 }
 
-const categoryOptions = computed(() => categories.value.filter(c => !c.parent_id).flatMap(parent => [
-    { value: parent.id, label: parent.name, sublabel: '' },
-    ...categories.value.filter(c => c.parent_id === parent.id).map(child => ({
-        value: child.id, label: `↳ ${child.name}`, sublabel: parent.name,
-    })),
-]))
+const categoryOptions = computed(() => categories.value.flatMap(c => ({
+    value: c.id, 
+    label: c.name
+})))
 const brandOptions = computed(() => brands.value.map(b => ({ value: b.id, label: b.name })))
 const makeOptions = computed(() => vehicleMakes.value.map(m => ({ value: m.id, label: m.name })))
 const modelOptions = computed(() => vehicleModels.value.map(m => {
@@ -481,6 +583,29 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
 
             <div v-if="error" class="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{{ error }}</div>
 
+            <!-- R20: Duplicate warning banner -->
+            <div v-if="duplicates.length > 0" class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 p-4">
+                <div class="flex items-start gap-3">
+                    <svg class="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div class="flex-1">
+                        <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300">Productos similares encontrados</h3>
+                        <p class="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                            Existen productos con nombre o código similar. Verifica que no estés duplicando:
+                        </p>
+                        <ul class="mt-2 space-y-1">
+                            <li v-for="dup in duplicates" :key="dup.id" class="text-sm text-amber-700 dark:text-amber-400">
+                                • <strong>{{ dup.name }}</strong> <span class="text-xs text-amber-600 dark:text-amber-500">(SKU: {{ dup.sku_base }})</span>
+                            </li>
+                        </ul>
+                        <p class="text-xs text-amber-600 dark:text-amber-500 mt-2">
+                            Puedes continuar y guardar si confirmas que es un producto diferente.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
         <form @submit.prevent="handleSubmit" class="space-y-4">
 
             <!-- ══ Datos del Producto ══ -->
@@ -547,7 +672,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                     <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1">
                         <Wrench class="w-3 h-3" /> Especificaciones Técnicas
                     </label>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-3">
                         <div v-for="(attr, index) in variantAttributes" :key="index">
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
                                 {{ attr.name }} <span v-if="attr.unit" class="text-gray-400">({{ attr.unit }})</span>
@@ -584,7 +709,8 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                     </button>
 
                     <div v-if="!isUniversal">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        <!-- Fila 1: Marca y Modelo -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                             <div>
                                 <div class="flex items-center justify-between mb-1">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">Marca Vehículo</label>
@@ -607,21 +733,52 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                     @update:model-value="v => selectedModelId = v as number | null"
                                     placeholder="Modelo" :disabled="!selectedMakeId" :loading="loadingModelsV" />
                             </div>
-                            <div>
+                        </div>
+                        <!-- R39: Fila 2: Multi-select de motores con checkboxes -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                            <div class="md:col-span-3">
                                 <div class="flex items-center justify-between mb-1">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">Motor</label>
+                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                        Motores
+                                        <span v-if="selectedEngineIds.length > 0" class="ml-1 text-teal-600">({{ selectedEngineIds.length }} seleccionados)</span>
+                                    </label>
                                     <button v-if="selectedModelId" type="button" @click="openInline('vehicleEngine')" class="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
                                         <Plus class="h-3 w-3" />
                                     </button>
                                 </div>
-                                <SearchableSelect :options="engineOptions" :model-value="selectedEngineId"
-                                    @update:model-value="v => selectedEngineId = v as number | null"
-                                    placeholder="Motor" :disabled="!selectedModelId" :loading="loadingEnginesV" />
+                                <div v-if="loadingEnginesV" class="text-center py-4 text-gray-400 text-sm">
+                                    Cargando motores...
+                                </div>
+                                <div v-else-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">
+                                    Selecciona un modelo primero
+                                </div>
+                                <div v-else-if="vehicleEngines.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">
+                                    No hay motores disponibles
+                                </div>
+                                <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
+                                    <label
+                                        v-for="engine in vehicleEngines"
+                                        :key="engine.id"
+                                        class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border"
+                                        :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedEngineIds.includes(engine.id), 'opacity-50': addedEngines.some(e => e.engine_id === engine.id) }"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            :value="engine.id"
+                                            v-model="selectedEngineIds"
+                                            :disabled="addedEngines.some(e => e.engine_id === engine.id)"
+                                            class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                                        />
+                                        <span class="font-mono text-sm text-gray-900 dark:text-white">{{ engine.engine_code }}</span>
+                                        <span v-if="engine.displacement" class="text-xs text-gray-500">{{ engine.displacement }}</span>
+                                        <span v-if="addedEngines.some(e => e.engine_id === engine.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
+                                    </label>
+                                </div>
                             </div>
                             <div class="flex items-end">
-                                <button type="button" @click="addEngine" :disabled="!selectedEngineId"
+                                <button type="button" @click="addEngines" :disabled="selectedEngineIds.length === 0"
                                     class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40">
-                                    + Agregar
+                                    + Agregar {{ selectedEngineIds.length > 0 ? `(${selectedEngineIds.length})` : '' }}
                                 </button>
                             </div>
                         </div>
@@ -717,6 +874,10 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         :sku-base="form.sku_base || undefined"
                         :product-name="form.name"
                         :default-variant-attributes="variantAttributes"
+                        :category-formula="categoryFormula"
+                        :category-applies-itbm="categoryAppliesItbm"
+                        :category-itbm-percent="categoryItbmPercent"
+                        :category-default-cost="categoryDefaultCost"
                         @draft-variants-changed="onDraftVariantsChanged"
                     />
                 </div>

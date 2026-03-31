@@ -167,6 +167,26 @@ watch(() => props.cost, () => {
   if (isFormula.value) debouncedFetch()
 })
 
+// Re-evalúa precio cuando cambia la tasa ITBM
+watch(() => props.taxRate, async (newRate) => {
+  if (isFormula.value) {
+    // En modo fórmula: re-fetch (la API ya usa taxRate para calcular ITBM)
+    await fetchPreview()
+    if (preview.value?.success && preview.value.result !== undefined) {
+      emit('update:price', preview.value.result)
+    }
+  } else {
+    // En modo número plano: aplicar ITBM al valor base
+    const base = parseFloat(rawInput.value)
+    if (!isNaN(base) && base > 0) {
+      const rate = Number(newRate) || 0
+      const withTax = Number((base * (1 + rate / 100)).toFixed(2))
+      emit('update:modelValue', '')
+      emit('update:price', withTax)
+    }
+  }
+})
+
 // Sync if parent changes modelValue externally (e.g. on load)
 watch(() => props.modelValue, (newFormula) => {
   if (newFormula && rawInput.value !== newFormula) {

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useCategories } from '@/composables/useCategories'
 import { ArrowLeft, Save } from 'lucide-vue-next'
+import apiClient from '@/services/api/client'
 import type { CreateCategoryData, Category } from '@/types/category'
 
 const { loading, error, createCategory, fetchCategoriesWithParent } = useCategories()
@@ -16,8 +17,45 @@ const form = ref<CreateCategoryData & { default_attributes: { name: string; requ
     description: '',
     default_attributes: [],
     icon: '',
-    priority: 0,
+    priority: 0, // kept for compatibility but hidden
+    default_margin_percent: null,
+    default_cost: null as number | null,
+    pricing_formula: null,
+    applies_itbm: false,
+    itbm_percent: 7, // default ITBM 7%
 })
+
+// — Real-time formula preview — synced from form.default_cost
+const previewCost = computed(() => form.value.default_cost ?? 100)
+const previewPrice = ref<number | null>(null)
+const previewLoading = ref(false)
+
+let previewDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function schedulePreview() {
+    if (previewDebounceTimer) clearTimeout(previewDebounceTimer)
+    previewDebounceTimer = setTimeout(runPreview, 400)
+}
+
+async function runPreview() {
+    if (!form.value.pricing_formula) { previewPrice.value = null; return }
+    previewLoading.value = true
+    try {
+        const { data } = await apiClient.post('/categories/preview-price', {
+            formula: form.value.pricing_formula,
+            costo: previewCost.value,
+            applies_itbm: form.value.applies_itbm,
+            itbm_percent: form.value.itbm_percent,
+        })
+        previewPrice.value = data.price
+    } catch {
+        previewPrice.value = null
+    } finally {
+        previewLoading.value = false
+    }
+}
+
+watch([() => form.value.pricing_formula, () => form.value.applies_itbm, () => form.value.itbm_percent, previewCost], schedulePreview)
 
 function addAttribute() {
     form.value.default_attributes.push({ name: '', required: false })
@@ -33,7 +71,10 @@ onMounted(async () => {
 
 async function handleSubmit() {
     try {
-        await createCategory(form.value)
+        await createCategory({
+            ...form.value,
+            name: form.value.name?.toString().trim(),
+        })
         router.visit('/categories')
     } catch (e) {
         // Error handled in composable
@@ -81,6 +122,7 @@ function goBack() {
                         v-model="form.name"
                         type="text"
                         required
+                        @keydown.enter.prevent
                         class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         placeholder="Ej: Motor, Suspensión, Frenos..."
                     />
@@ -129,6 +171,7 @@ function goBack() {
                         <input
                             v-model="attr.name"
                             type="text"
+                            @keydown.enter.prevent
                             class="flex-1 px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
                             placeholder="Ej: Largo, Ancho, Material..."
                         />
@@ -147,33 +190,88 @@ function goBack() {
                     </button>
                 </div>
 
-                <!-- Icon -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Icono
-                    </label>
-                    <input
-                        v-model="form.icon"
-                        type="text"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
-                        placeholder="Ej: engine, brake, suspension..."
-                    />
-                    <p class="mt-1 text-xs text-gray-500">Nombre del icono (opcional)</p>
-                </div>
+                <!-- Pricing Section -->
+                <div class="border-t border-gray-200 dark:border-border pt-5 space-y-5">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Configuración de Precios</h3>
+                    
+                    <div class="p-4 bg-gray-50 dark:bg-muted/30 rounded-lg space-y-4">
+                        <!-- Costo por Defecto -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Costo por Defecto
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">$</span>
+                                <input
+                                    v-model.number="form.default_cost"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    class="w-32 px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Se heredará automáticamente al crear variantes de esta categoría. También se usa para previsualizar la fórmula.</p>
+                        </div>
 
-                <!-- Priority -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Prioridad
-                    </label>
-                    <input
-                        v-model.number="form.priority"
-                        type="number"
-                        min="0"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
-                        placeholder="0"
-                    />
-                    <p class="mt-1 text-xs text-gray-500">Mayor prioridad aparece primero</p>
+                        <!-- ITBM Checkbox + Porcentaje -->
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" v-model="form.applies_itbm" class="rounded" />
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Aplicar ITBM a productos de esta categoría</span>
+                            </label>
+                            
+                            <div v-if="form.applies_itbm" class="flex items-center gap-3 pl-6">
+                                <label class="text-sm text-gray-600 dark:text-gray-400">Porcentaje ITBM:</label>
+                                <input
+                                    v-model.number="form.itbm_percent"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    class="w-20 px-3 py-1.5 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
+                                />
+                                <span class="text-sm text-gray-500">%</span>
+                            </div>
+                        </div>
+
+                        <!-- Pricing Formula -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Fórmula de precio
+                            </label>
+                            <input
+                                v-model="form.pricing_formula"
+                                type="text"
+                                @keydown.enter.prevent
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white font-mono text-sm"
+                                placeholder="ej: costo * 1.3 + 5"
+                            />
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Variable disponible: <code class="bg-gray-100 dark:bg-muted px-1 rounded">costo</code>.
+                                Ej: <code class="bg-gray-100 dark:bg-muted px-1 rounded">costo * 1.5</code> aplica 50% de margen.
+                            </p>
+                        </div>
+
+                        <!-- Precio Total Calculado -->
+                        <div v-if="form.pricing_formula" class="pt-3 border-t border-gray-200 dark:border-border">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Precio Total:</span>
+                                <div class="text-right">
+                                    <span v-if="previewLoading" class="text-sm text-gray-400 animate-pulse">calculando...</span>
+                                    <template v-else-if="previewPrice !== null">
+                                        <span class="text-xl font-bold text-green-600 dark:text-green-400">
+                                            ${{ previewPrice.toFixed(2) }}
+                                        </span>
+                                        <p v-if="form.applies_itbm" class="text-xs text-gray-500 mt-0.5">
+                                            (incluye {{ form.itbm_percent || 7 }}% ITBM)
+                                        </p>
+                                    </template>
+                                    <span v-else class="text-sm text-red-500">Fórmula inválida</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Actions -->

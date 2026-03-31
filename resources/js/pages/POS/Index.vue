@@ -7,8 +7,9 @@ import { useProducts } from '@/composables/useProducts'
 import { useCustomers } from '@/composables/useCustomers'
 import { useWarehouses } from '@/composables/useWarehouses'
 import apiClient from '@/services/api/client'
-import { Search, Trash2, Save, Banknote, CreditCard, Landmark, AlertTriangle, Keyboard, LogOut, Car, Gift } from 'lucide-vue-next'
+import { Search, Trash2, Save, Banknote, CreditCard, Landmark, AlertTriangle, Keyboard, LogOut, Car, Gift, FileText, SlidersHorizontal, ArrowUpDown, Filter } from 'lucide-vue-next'
 import { usePosSettings } from '@/composables/usePosSettings'
+import POSFilterSidebar from '@/components/POS/POSFilterSidebar.vue'
 import { usePosSession } from '@/composables/usePosSession'
 
 import CashRegisterStatus from '@/components/POS/CashRegisterStatus.vue'
@@ -22,7 +23,7 @@ import CloseSessionModal from '@/components/POS/CloseSessionModal.vue'
 import CashMovementModal from '@/components/POS/CashMovementModal.vue'
 import VariantSelectModal from '@/components/POS/VariantSelectModal.vue'
 import AddPaymentModal from '@/components/POS/AddPaymentModal.vue'
-import PaymentMethods from '@/components/POS/PaymentMethods.vue'
+import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue'
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue'
 import ProductSearchModal from '@/components/POS/ProductSearchModal.vue'
 import QuickCustomerModal from '@/components/POS/QuickCustomerModal.vue'
@@ -126,6 +127,60 @@ const showCashMovementModal = ref(false)
 const showQuickCustomerModal = ref(false)
 const forceShowOpenSessionModal = ref(false)
 const sessionActionLoading = ref(false)
+
+// R45: Filter sidebar state
+const showFilterSidebar = ref(false)
+
+// R44: Cart search and sort state
+const cartSearchQuery = ref('')
+const cartSortBy = ref<'default' | 'name' | 'sku' | 'qty' | 'price'>('default')
+const cartSortDir = ref<'asc' | 'desc'>('asc')
+
+const filteredAndSortedCart = computed(() => {
+  let items = [...cart.value]
+  // Filter by search query
+  const q = cartSearchQuery.value.trim().toLowerCase()
+  if (q) {
+    items = items.filter((item: any) =>
+      (item.product_name || '').toLowerCase().includes(q) ||
+      (item.product_sku || '').toLowerCase().includes(q) ||
+      (item.variant_sku || '').toLowerCase().includes(q) ||
+      (item.variant_name || '').toLowerCase().includes(q)
+    )
+  }
+  // Sort
+  if (cartSortBy.value !== 'default') {
+    items.sort((a: any, b: any) => {
+      let va: any, vb: any
+      switch (cartSortBy.value) {
+        case 'name': va = (a.product_name || '').toLowerCase(); vb = (b.product_name || '').toLowerCase(); break
+        case 'sku': va = (a.product_sku || '').toLowerCase(); vb = (b.product_sku || '').toLowerCase(); break
+        case 'qty': va = a.quantity; vb = b.quantity; break
+        case 'price': va = a.product_price; vb = b.product_price; break
+        default: return 0
+      }
+      const cmp = va < vb ? -1 : va > vb ? 1 : 0
+      return cartSortDir.value === 'asc' ? cmp : -cmp
+    })
+  }
+  return items
+})
+
+const toggleCartSort = (field: 'name' | 'sku' | 'qty' | 'price') => {
+  if (cartSortBy.value === field) {
+    cartSortDir.value = cartSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    cartSortBy.value = field
+    cartSortDir.value = 'asc'
+  }
+}
+
+const cartSortOptions: { key: 'name' | 'sku' | 'qty' | 'price'; label: string }[] = [
+  { key: 'name', label: 'Nombre' },
+  { key: 'sku', label: 'SKU' },
+  { key: 'qty', label: 'Cant.' },
+  { key: 'price', label: 'Precio' },
+]
 const seller_id = ref<number | undefined>((usePage().props.auth?.user as any)?.id)
 
 // Variant selection modal state — queue-based to support multiple products needing variant selection
@@ -657,33 +712,35 @@ const canCheckout = computed(() =>
 )
 
 
-// Smart Search: auto-add single result or show modal for multiple
-const performSearch = async (overrideQuery?: string, overrideQty?: number) => {
+// Smart Search: siempre mostrar modal para permitir selección (R42)
+// showModal=false allows the initial onMounted load to pre-fetch without popping the modal
+const performSearch = async (overrideQuery?: string, overrideQty?: number, showModal = true) => {
   const finalQuery = overrideQuery ?? searchQuery.value
-  if (!finalQuery.trim()) return
+  // Permitir búsqueda vacía para listar productos (BUG-001 fix)
+  const trimmedQuery = finalQuery?.trim() || ''
 
   isSearching.value = true
-  logAction('search', { query: finalQuery.trim() })
+  logAction('search', { query: trimmedQuery || '(todos)' })
   try {
     const filters = {
       ...buildFilters(),
-      search: finalQuery.trim() || undefined,
+      search: trimmedQuery || undefined,
     }
     await fetchProducts(filters)
 
-    if (products.value.length === 1) {
-      // Auto-add single match
-      addProductToCart(products.value[0], overrideQty ?? quantity.value)
-      searchQuery.value = ''
-      await nextTick()
-      searchInput.value?.focus()
-    } else if (products.value.length > 1) {
-      // Show selection modal
+    if (showModal && products.value.length > 0) {
+      // R42: Siempre mostrar modal, incluso con 1 resultado
       selectedProductIds.value = new Set()
+      // Pre-seleccionar si solo hay 1 resultado para facilitar agregar rápido
+      if (products.value.length === 1) {
+        selectedProductIds.value = new Set([products.value[0].id])
+      }
       showProductsModal.value = true
+    } else if (!showModal) {
+      // Silent initial load — products are fetched but modal stays closed
     } else {
       // No results
-      console.warn('No products found for', finalQuery)
+      console.warn('No products found for', trimmedQuery || '(búsqueda vacía)')
     }
   } catch (err) {
     console.error('POS search error:', err)
@@ -713,6 +770,21 @@ const handleControlsSearch = (data: { query: string; quantity: number; category_
   if (data.category_id !== undefined) selectedCategoryId.value = data.category_id
   if (data.brand_id !== undefined) selectedBrandId.value = data.brand_id
   performSearch(data.query, data.quantity)
+}
+
+// R43: Handle search-in-modal — re-run product fetch without closing modal
+const handleModalSearch = (filters: { query: string; category_id?: number; brand_id?: number }) => {
+  searchQuery.value = filters.query
+  if (filters.category_id !== undefined) selectedCategoryId.value = filters.category_id
+  if (filters.brand_id !== undefined) selectedBrandId.value = filters.brand_id
+  performSearch(filters.query)
+}
+
+// R45: Handle filter sidebar filter changes
+const handleSidebarFilter = (filters: { category_id?: number; brand_id?: number }) => {
+  selectedCategoryId.value = filters.category_id
+  selectedBrandId.value = filters.brand_id
+  performSearch()
 }
 
 
@@ -827,10 +899,6 @@ const handleKeyboard = (e: KeyboardEvent) => {
       e.preventDefault()
       clearCart()
       break
-    case 'F5':
-      e.preventDefault()
-      handleSaveDraft()
-      break
     case 'F10':
       e.preventDefault()
       if (!props.quoteMode && isSessionOpen.value && cart.value.length > 0) openPaymentModal('cash')
@@ -842,26 +910,82 @@ const handleKeyboard = (e: KeyboardEvent) => {
   }
 }
 
-// Payment (Cash/Card/Transfer/Multiple)
+// Payment (Cash/Card/Transfer/Multiple) - Now unified
 const openPaymentModal = (method: 'cash' | 'card' | 'transfer' = 'cash') => {
   if (cart.value.length > 0) {
-    paymentMethod.value = method
-
     // Reset all amounts and clear previous errors
-    amountReceived.value = 0
     error.value = null
-    storeCreditToApply.value = 0
-    Object.keys(electronicPayments).forEach(k => delete electronicPayments[k])
-
-    if (method === 'cash') {
-      amountReceived.value = Math.ceil(amountToCharge.value)
-    } else if (method === 'card') {
-      electronicPayments['visa'] = amountToCharge.value
-    } else if (method === 'transfer') {
-      electronicPayments['transferencia'] = amountToCharge.value
-    }
-
     showPaymentModal.value = true
+  }
+}
+
+// Handle unified payment panel finish
+const handleUnifiedPaymentFinish = async (payments: Array<{method: string, amount: number}>) => {
+  if (props.editMode) {
+    // For edit mode, use the existing confirmEditOrder with the payments array
+    // Build payments for edit mode
+    const paymentsArray = payments.map(p => ({
+      method: p.method,
+      amount: p.amount,
+      notes: p.method === 'store_credit' ? 'Aplicado de saldo a favor del cliente' : 
+             p.method === 'credit' ? 'Cobrado a crédito del cliente' : undefined
+    }))
+    
+    // Temporarily store payments for confirmEditOrder
+    amountReceived.value = 0
+    Object.keys(electronicPayments).forEach(k => delete electronicPayments[k])
+    storeCreditToApply.value = 0
+    
+    for (const p of payments) {
+      if (p.method === 'cash') {
+        amountReceived.value = p.amount
+      } else if (p.method === 'store_credit') {
+        storeCreditToApply.value = p.amount
+      } else if (p.method !== 'credit') {
+        electronicPayments[p.method] = p.amount
+      }
+    }
+    
+    await confirmEditOrder()
+    if (!editError.value) {
+      closePaymentModal()
+    }
+    return
+  }
+
+  // Clear any previous payment errors before attempting new payment
+  error.value = null
+  
+  // Validate cart items have valid product_id
+  const invalidItems = cart.value.filter((item: any) => !item.product_id || item.product_id <= 0)
+  if (invalidItems.length > 0) {
+    console.error('Invalid items detected:', invalidItems)
+    error.value = `⚠️ Carrito inválido: ${invalidItems.length} producto(s) con ID inválido. Revisa tu carrito y vuelve a agregar los productos.`
+    return
+  }
+  
+  // Log items being sent to backend for debugging
+  console.log('Payment attempt - Cart items to be processed:', cart.value.map((item: any) => ({ 
+    product_id: item.product_id, 
+    product_name: item.product_name,
+    quantity: item.quantity 
+  })))
+  
+  // Convert payments from unified panel to backend format
+  const paymentsArray = payments.map(p => ({
+    method: p.method,
+    amount: p.amount,
+    notes: p.method === 'store_credit' ? 'Aplicado de saldo a favor del cliente' : 
+           p.method === 'credit' ? 'Cobrado a crédito del cliente' : undefined
+  }))
+
+  const result = await processSale(paymentsArray)
+  if (result) {
+    closePaymentModal()
+    lastOrderId.value = result.id ?? null
+    lastOrderNumber.value = result.order_number ?? ''
+    showPrintTicketModal.value = true
+    searchInput.value?.focus()
   }
 }
 
@@ -878,92 +1002,6 @@ const openCreditSale = () => {
 const closePaymentModal = () => {
     showPaymentModal.value = false
     error.value = null
-}
-
-const handlePayment = async () => {
-  if (props.editMode) {
-    await confirmEditOrder()
-    if (!editError.value) {
-      closePaymentModal()
-    }
-    return
-  }
-
-  // Clear any previous payment errors before attempting new payment
-  error.value = null
-  
-  // Validate cart items before processing
-  const invalidItems = cart.value.filter(item => !item.product_id || item.product_id <= 0)
-  if (invalidItems.length > 0) {
-    console.error('Invalid items in cart:', invalidItems)
-    error.value = `⚠️ Carrito inválido: ${invalidItems.length} producto(s) con ID inválido. Revisa tu carrito y vuelve a agregar los productos.`
-    return
-  }
-  
-  // Log items being sent to backend for debugging
-  console.log('Payment attempt - Cart items to be processed:', cart.value.map(item => ({ 
-    product_id: item.product_id, 
-    product_name: item.product_name,
-    quantity: item.quantity 
-  })))
-  
-  const paymentsArray: Array<{method: string, amount: number, notes?: string}> = []
-    
-  if (amountReceived.value > 0) {
-      const cashEffectiveAmount = localChange.value > 0 
-                                  ? amountReceived.value - localChange.value 
-                                  : amountReceived.value
-      if (cashEffectiveAmount > 0) {
-          paymentsArray.push({
-               method: 'cash',
-               amount: cashEffectiveAmount,
-          })
-      }
-  }
-  
-  for (const [methodId, amount] of Object.entries(electronicPayments)) {
-      if (amount > 0) {
-          paymentsArray.push({
-              method: methodId,
-              amount: amount
-          })
-      }
-  }
-
-  // Add store credit payment if used
-  if (storeCreditToApply.value > 0) {
-      paymentsArray.push({
-          method: 'store_credit',
-          amount: storeCreditToApply.value,
-          notes: 'Aplicado de saldo a favor del cliente'
-      })
-  }
-
-    // Add credit charge if there's pending amount with a customer
-    if (creditToCharge.value > 0 && selectedCustomer.value) {
-      paymentsArray.push({
-        method: 'credit',
-        amount: creditToCharge.value,
-        notes: 'Cobrado a crédito del cliente'
-      })
-    }
-
-  const result = await processSale(paymentsArray)
-  if (result) {
-    closePaymentModal()
-    lastOrderId.value = result.id ?? null
-    lastOrderNumber.value = result.order_number ?? ''
-    showPrintTicketModal.value = true
-    searchInput.value?.focus()
-  }
-}
-
-const handleSaveDraft = async () => {
-  const success = await saveDraft()
-  if (success) {
-    alert('💾 Borrador guardado')
-    searchInput.value?.focus()
-  }
 }
 
 // Detect if the active session was loaded from a SalesQuote
@@ -1121,6 +1159,33 @@ let editSessionId: string | null = null;
 onMounted(async () => {
   window.addEventListener('keydown', handleKeyboard)
 
+  // UX-001: Prevent accidental tab close or refresh when cart has items
+  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (cart.value.length > 0) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+  }
+  window.addEventListener('beforeunload', handleBeforeUnload)
+
+  // UX-001: Intercept Inertia navigation when cart has items
+  const removeInertiaListener = router.on('before', (event) => {
+    if (cart.value.length > 0) {
+      // Allow navigation when explicitly approved (e.g. after sale completes)
+      const target = (event as any)?.detail?.visit?.url?.pathname || ''
+      // Allow visits to the same POS page or order pages after sale  
+      if (target.includes('/sales-orders/') || target === '/pos') return true
+      if (!window.confirm('Tienes productos en el carrito. ¿Seguro que deseas salir? Los cambios no guardados se perderán.')) {
+        return false
+      }
+    }
+    return true
+  })
+
+  // Store cleanup functions
+  ;(window as any).__posCleanup = { handleBeforeUnload, removeInertiaListener }
+
+
   // Clear any previous errors from past sessions
   error.value = null
 
@@ -1147,7 +1212,7 @@ onMounted(async () => {
         setWarehouse(settings.value.default_warehouse_id)
     }
   } else if (!props.returnMode && !props.editMode) {
-    performSearch()
+    performSearch(undefined, undefined, false)
   }
 
   // In return mode, load the order for return
@@ -1214,6 +1279,15 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyboard)
+
+  // UX-001: Cleanup beforeunload and Inertia listener
+  const cleanup = (window as any).__posCleanup
+  if (cleanup) {
+    window.removeEventListener('beforeunload', cleanup.handleBeforeUnload)
+    if (typeof cleanup.removeInertiaListener === 'function') cleanup.removeInertiaListener()
+    delete (window as any).__posCleanup
+  }
+
 
   if (elapsedTimer) {
     clearInterval(elapsedTimer)
@@ -1326,6 +1400,46 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- R41: Quote Mode Header -->
+    <div v-if="props.quoteMode" class="shrink-0 z-20 shadow-sm bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <button
+            @click="router.visit('/sales-quotes')"
+            class="p-2 hover:bg-purple-700 rounded-lg transition"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div class="flex items-center gap-2">
+            <FileText class="w-6 h-6 text-purple-200" />
+            <div>
+              <h1 class="text-xl font-bold">Editor de Cotización</h1>
+              <p class="text-purple-200 text-sm">
+                <template v-if="(activeSession as any)?.source_quote_id">
+                  Cotización #{{ (activeSession as any)?.quote_number || (activeSession as any)?.source_quote_id }}
+                </template>
+                <template v-else>
+                  NUEVA COTIZACIÓN
+                </template>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-6">
+          <div class="text-right">
+            <p class="text-xs text-purple-200">Productos</p>
+            <p class="text-lg font-bold">{{ cartItemCount }}</p>
+          </div>
+          <div class="text-right border-l border-purple-400/40 pl-6">
+            <p class="text-xs text-purple-200">Total Cotización</p>
+            <p class="text-2xl font-bold">{{ formatCurrency(cartTotal) }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Header - Fixed Height (hidden in quoteMode, returnMode, and editMode — no cash register needed) -->
     <div v-if="!props.quoteMode && !props.returnMode && !props.editMode" class="shrink-0 z-20 shadow-sm relative">
         <CashRegisterStatus
@@ -1347,16 +1461,42 @@ onUnmounted(() => {
     <!-- Main Content - Flex to fill remaining height -->
     <main class="flex-1 min-h-0 flex flex-col xl:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
 
+        <!-- R45: Filter Sidebar -->
+        <POSFilterSidebar
+          v-if="showFilterSidebar && !props.returnMode"
+          :categories="categories"
+          :brands="brands"
+          :selected-category-id="selectedCategoryId"
+          :selected-brand-id="selectedBrandId"
+          @filter="handleSidebarFilter"
+          @close="showFilterSidebar = false"
+        />
+
         <!-- Left Column: Controls & Product List (Grows to fill space) -->
         <div class="flex-[3] flex flex-col gap-4 min-w-0 h-full overflow-hidden">
           <!-- Hide search controls in return mode -->
           <div v-if="!props.returnMode" class="shrink-0">
-            <POSControls
-                ref="posControlsRef"
-                :categories="categories"
-                :brands="brands"
-                @search="handleControlsSearch"
-            />
+            <div class="flex items-center gap-2">
+              <POSControls
+                  ref="posControlsRef"
+                  :categories="categories"
+                  :brands="brands"
+                  @search="handleControlsSearch"
+                  class="flex-1"
+              />
+              <!-- R45: Toggle filter sidebar button -->
+              <button
+                @click="showFilterSidebar = !showFilterSidebar"
+                class="h-10 px-3 flex items-center gap-1.5 rounded-lg border transition-colors text-sm font-medium shrink-0"
+                :class="showFilterSidebar
+                  ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-400'
+                  : 'bg-white dark:bg-card border-gray-200 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-muted'"
+                title="Filtros avanzados"
+              >
+                <Filter class="w-4 h-4" />
+                <span class="hidden md:inline">Filtros</span>
+              </button>
+            </div>
           </div>
 
           <!-- Multi-Cart Tabs (hide in return mode and edit mode) -->
@@ -1389,9 +1529,46 @@ onUnmounted(() => {
               title="Nueva venta"
             >+</button>
           </div>
+
+          <!-- R44: Cart search and sort toolbar -->
+          <div v-if="cart.length > 2" class="shrink-0 flex items-center gap-2 px-1">
+            <div class="relative flex-1">
+              <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input
+                v-model="cartSearchQuery"
+                type="text"
+                placeholder="Buscar en carrito…"
+                class="w-full pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-xs text-gray-700 dark:text-foreground placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-shadow"
+              />
+            </div>
+            <div class="flex items-center gap-1">
+              <button
+                v-for="opt in cartSortOptions"
+                :key="opt.key"
+                @click="toggleCartSort(opt.key)"
+                class="px-2 py-1 text-[11px] rounded-md font-medium transition-colors flex items-center gap-0.5"
+                :class="cartSortBy === opt.key
+                  ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-muted'"
+              >
+                {{ opt.label }}
+                <ArrowUpDown v-if="cartSortBy !== opt.key" class="w-3 h-3 opacity-40" />
+                <svg v-else-if="cartSortDir === 'asc'" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                <svg v-else class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <button
+                v-if="cartSortBy !== 'default' || cartSearchQuery"
+                @click="cartSortBy = 'default'; cartSortDir = 'asc'; cartSearchQuery = ''"
+                class="px-2 py-1 text-[11px] rounded-md font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
+
           <div class="flex-1 min-h-0 relative">
             <ProductTable 
-                :items="cart"
+                :items="cartSearchQuery || cartSortBy !== 'default' ? filteredAndSortedCart : cart"
                 :users="users"
                 :products="products"
                 :client-mode="isClientMode()"
@@ -1531,7 +1708,6 @@ onUnmounted(() => {
                 :isQuoteSession="isQuoteSession"
                 :quoteMode="props.quoteMode"
                 @clear="clearCart"
-                @save-draft="handleSaveDraft"
                 @save-quote="handleSaveQuote"
                 @save-quote-changes="handleSaveQuoteChanges"
                 @open-cash-register="forceShowOpenSessionModal = true"
@@ -1554,226 +1730,23 @@ onUnmounted(() => {
       @close="showProductsModal = false"
       @add-products="addSelectedProducts"
       @load-more="loadMoreProducts"
+      @search-in-modal="handleModalSearch"
     />
 
-    <!-- ========== Payment Modal (hidden in quoteMode) ========== -->
-    <div
-      v-if="!props.quoteMode && showPaymentModal"
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-    >
-      <div class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-border flex items-center justify-between shrink-0">
-          <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ props.editMode ? 'Cobrar diferencia' : 'Procesar Pago' }}</h2>
-          <button @click="closePaymentModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="p-6 space-y-4 overflow-y-auto flex-1">
-          <!-- Payment Method Default Selection -->
-          <div class="grid grid-cols-4 gap-2">
-            <button
-              @click="paymentMethod = 'cash'"
-              :class="paymentMethod === 'cash' ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-muted'"
-              class="flex flex-col items-center gap-1 p-3 rounded-xl transition-all text-sm font-medium"
-            >
-              <Banknote :class="paymentMethod === 'cash' ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'" class="w-5 h-5" />
-              <span :class="paymentMethod === 'cash' ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'">Efectivo</span>
-            </button>
-            <button
-              @click="paymentMethod = 'card'"
-              :class="paymentMethod === 'card' ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-muted'"
-              class="flex flex-col items-center gap-1 p-3 rounded-xl transition-all text-sm font-medium"
-            >
-              <CreditCard :class="paymentMethod === 'card' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300'" class="w-5 h-5" />
-              <span :class="paymentMethod === 'card' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300'">Tarjeta</span>
-            </button>
-            <button
-              @click="paymentMethod = 'transfer'"
-              :class="paymentMethod === 'transfer' ? 'ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'bg-gray-50 dark:bg-muted'"
-              class="flex flex-col items-center gap-1 p-3 rounded-xl transition-all text-sm font-medium"
-            >
-              <Landmark :class="paymentMethod === 'transfer' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-600 dark:text-gray-300'" class="w-5 h-5" />
-              <span :class="paymentMethod === 'transfer' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-600 dark:text-gray-300'">Transfer.</span>
-            </button>
-            <button
-              @click="paymentMethod = 'multiple'"
-              :class="paymentMethod === 'multiple' ? 'ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'bg-gray-50 dark:bg-muted'"
-              class="flex flex-col items-center gap-1 p-3 rounded-xl transition-all text-sm font-medium"
-            >
-              <svg :class="paymentMethod === 'multiple' ? 'text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span :class="paymentMethod === 'multiple' ? 'text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'">Dividir Pago</span>
-            </button>
-          </div>
-
-
-
-          <!-- Total -->
-          <div class="bg-gray-50 dark:bg-muted/50 rounded-xl p-4 text-center">
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">{{ props.editMode ? 'Diferencia a cobrar' : 'Total a cobrar' }}</p>
-            <p class="text-3xl font-bold text-indigo-600 dark:text-primary dark:text-indigo-400">{{ formatCurrency(amountToCharge) }}</p>
-            <p v-if="!props.editMode && shippingCost > 0" class="text-xs text-gray-500 dark:text-gray-400 mt-1">(incl. Envío: {{ formatCurrency(shippingCost) }})</p>
-          </div>
-
-          <!-- Store Credit (Saldo a Favor) -->
-          <div v-if="selectedCustomer?.has_store_credit && (selectedCustomer?.store_credit ?? 0) > 0" class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
-            <div class="flex items-center gap-2 mb-2">
-              <Gift class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Saldo a Favor Disponible</span>
-              <span class="ml-auto text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                {{ formatCurrency(selectedCustomer.store_credit) }}
-              </span>
-            </div>
-            <div class="flex items-center gap-3">
-              <label class="text-sm text-emerald-700 dark:text-emerald-300">Aplicar:</label>
-              <div class="relative flex-1">
-                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-500 text-sm">$</span>
-                <input
-                  v-model.number="storeCreditToApply"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  :max="Math.min(selectedCustomer.store_credit ?? 0, amountToCharge)"
-                  class="w-full pl-7 pr-3 py-2 text-right border border-emerald-300 dark:border-emerald-700 rounded-lg bg-white dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-              <button
-                @click="storeCreditToApply = Math.min(selectedCustomer?.store_credit ?? 0, amountToCharge)"
-                class="px-3 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
-              >
-                Usar todo
-              </button>
-            </div>
-          </div>
-
-          <!-- Credit (Crédito a Plazo) - Mostrado como información, no editable -->
-          <div v-if="selectedCustomer && pendingAmount > 0" class="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
-            <div class="flex items-center gap-2 mb-3">
-              <CreditCard class="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              <span class="text-sm font-semibold text-amber-700 dark:text-amber-300">Crédito del Cliente</span>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 mb-3 text-xs text-amber-700 dark:text-amber-300">
-              <div>
-                <span class="font-medium">Límite:</span>
-                <span class="ml-1">{{ formatCurrency(selectedCustomer.credit_limit ?? 0) }}</span>
-              </div>
-              <div>
-                <span class="font-medium">Días crédito:</span>
-                <span class="ml-1">{{ selectedCustomer.credit_days ?? 0 }}</span>
-              </div>
-              <div>
-                <span class="font-medium">Deuda actual:</span>
-                <span class="ml-1">{{ formatCurrency(Math.max(0, selectedCustomer.current_balance ?? 0)) }}</span>
-              </div>
-              <div>
-                <span class="font-medium">Disponible:</span>
-                <span class="ml-1 font-bold">{{ formatCurrency(creditAvailable) }}</span>
-              </div>
-            </div>
-
-            <!-- Monto pendiente que se cargará a crédito -->
-            <div v-if="creditToCharge > 0" class="bg-amber-100 dark:bg-amber-900/40 rounded-lg p-3 text-center">
-              <p class="text-xs text-amber-600 dark:text-amber-400 mb-1">Se cargará a cuenta del cliente:</p>
-              <p class="text-2xl font-bold text-amber-700 dark:text-amber-300">{{ formatCurrency(creditToCharge) }}</p>
-            </div>
-
-            <!-- Advertencia si el crédito disponible no cubre el pendiente -->
-            <div v-if="uncoveredAmount > 0" class="mt-2 bg-red-100 dark:bg-red-900/30 rounded-lg p-2 text-center">
-              <p class="text-xs text-red-600 dark:text-red-400">
-                <AlertTriangle class="w-3 h-3 inline mr-1" />
-                Crédito insuficiente. Faltan: {{ formatCurrency(uncoveredAmount) }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Payment Fields -->
-          <div class="space-y-4">
-            <div v-if="paymentMethod === 'cash' || paymentMethod === 'multiple'">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Efectivo Recibido</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-sm">$</span>
-                <input
-                  v-model.number="amountReceived"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="w-full pl-7 px-4 py-3 text-xl text-right border border-gray-300 dark:border-border rounded-xl bg-white dark:bg-card text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                  autofocus
-                />
-              </div>
-            </div>
-            
-            <div v-if="paymentMethod === 'cash' || paymentMethod === 'multiple'" class="grid grid-cols-4 gap-2">
-              <button
-                v-for="amount in [Math.ceil(cartTotal), Math.ceil(cartTotal / 10) * 10, Math.ceil(cartTotal / 50) * 50, Math.ceil(cartTotal / 100) * 100]"
-                :key="amount"
-                @click="amountReceived = amount"
-                class="py-2 text-sm font-medium bg-gray-100 dark:bg-muted rounded-lg hover:bg-gray-200 dark:hover:bg-muted/80 text-gray-700 dark:text-gray-300"
-              >
-                {{ formatCurrency(amount) }}
-              </button>
-            </div>
-            
-            <PaymentMethods v-if="paymentMethod === 'card' || paymentMethod === 'transfer' || paymentMethod === 'multiple'" :payments="electronicPayments" @paymentChange="handlePaymentChange" />
-
-            <!-- Balance Summary -->
-            <div class="space-y-2">
-              <!-- Total recibido -->
-              <div v-if="totalReceived > 0" class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 flex items-center justify-between">
-                <span class="text-sm text-blue-700 dark:text-blue-400 font-medium">Pago recibido:</span>
-                <span class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ formatCurrency(totalReceived) }}</span>
-              </div>
-
-              <!-- Crédito a cargar -->
-              <div v-if="creditToCharge > 0" class="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 flex items-center justify-between">
-                <span class="text-sm text-amber-700 dark:text-amber-400 font-medium">A crédito:</span>
-                <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ formatCurrency(creditToCharge) }}</span>
-              </div>
-
-              <!-- Cambio a entregar -->
-              <div v-if="localChange > 0" class="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 flex items-center justify-between">
-                <span class="text-sm text-green-700 dark:text-green-400 font-medium">Cambio a Entregar:</span>
-                <span class="text-2xl font-bold text-green-600 dark:text-green-400">{{ formatCurrency(localChange) }}</span>
-              </div>
-
-              <!-- Falta por cobrar (sin cubrir por crédito) -->
-              <div v-else-if="uncoveredAmount > 0" class="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 flex items-center justify-between text-red-600 dark:text-red-400">
-                <span class="text-sm font-medium"><AlertTriangle class="w-4 h-4 inline mr-1" /> Faltan por cobrar:</span>
-                <span class="text-xl font-bold">{{ formatCurrency(uncoveredAmount) }}</span>
-              </div>
-
-              <!-- Pago completo -->
-              <div v-else-if="pendingAmount <= 0 || (pendingAmount > 0 && creditToCharge >= pendingAmount)" class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3 text-center text-sm text-indigo-600 dark:text-primary dark:text-indigo-400 font-medium">
-                {{ creditToCharge > 0 ? '✓ Cubierto (pago + crédito)' : '✓ Pago Completo' }}
-              </div>
-            </div>
-          </div>
-
-          <div v-if="error" class="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 text-sm text-red-600 dark:text-red-400">{{ error }}</div>
-        </div>
-
-        <div class="px-6 py-4 border-t border-gray-200 dark:border-border flex gap-3 shrink-0">
-          <button
-            @click="closePaymentModal"
-            class="flex-1 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-border rounded-xl hover:bg-gray-50 dark:hover:bg-muted"
-          >
-            Cancelar
-          </button>
-          <button
-            @click="handlePayment"
-            :disabled="loading || uncoveredAmount > 0"
-            class="flex-1 py-2.5 text-sm font-bold text-white rounded-xl disabled:opacity-40 shadow-sm bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90"
-          >
-            {{ loading || editLoading ? 'Procesando...' : (props.editMode ? '✓ Confirmar cambios' : '✓ Confirmar Venta') }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- ========== Unified Payment Panel (hidden in quoteMode) ========== -->
+    <UnifiedPaymentPanel
+      v-if="!props.quoteMode"
+      :show="showPaymentModal"
+      :amount-to-charge="amountToCharge"
+      :customer="selectedCustomer"
+      :shipping-cost="shippingCost"
+      :edit-mode="props.editMode"
+      :subtotal="cartSubtotal"
+      :tax-amount="cartTax"
+      :discount-amount="cart.reduce((sum: number, item: any) => sum + ((item.discount || 0) * item.quantity), 0)"
+      @finish="handleUnifiedPaymentFinish"
+      @cancel="closePaymentModal"
+    />
 
     <!-- ========== Keyboard Shortcuts Modal ========== -->
     <div

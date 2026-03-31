@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Package, Warehouse, List, BarChart3, Users, ShoppingCart, Truck, ClipboardList, Factory, ArrowLeftRight, Tag, Car, Wrench, Banknote, Settings, Shield, FileText, Receipt, Store, Inbox } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Package, Warehouse, List, BarChart3, Users, ShoppingCart, Truck, ClipboardList, Factory, ArrowLeftRight, Tag, Car, Wrench, Banknote, Settings, Shield, FileText, Receipt, Store, Inbox, PackageSearch } from 'lucide-vue-next';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -62,7 +62,7 @@ const filterWorkOrders = (items: NavItem[]): NavItem[] => {
 // Role-based access helpers
 const canAccessPOS = computed(() => hasRole(['admin', 'manager', 'cashier']))
 const canAccessQuoteEditor = computed(() => hasRole(['admin', 'manager', 'seller']))
-const canAccessInventory = computed(() => hasRole(['admin', 'manager', 'buyer']))
+const canAccessInventory = computed(() => hasRole(['admin', 'manager', 'buyer', 'assistant']))
 const canAccessPurchaseOrders = computed(() => hasRole(['admin', 'manager', 'buyer']))
 const canAccessReports = computed(() => hasRole(['admin', 'manager']))
 const canAccessCatalog = computed(() => hasRole(['admin', 'manager']))
@@ -123,6 +123,11 @@ const mainNavItems = computed<NavItem[]>(() => {
             icon: ClipboardList,
             items: [
                 {
+                    title: 'Lista de Abastecimiento',
+                    href: '/supply-list',
+                    icon: ClipboardList,
+                },
+                {
                     title: 'Órdenes de Compra',
                     href: '/purchase-orders',
                     icon: ClipboardList,
@@ -182,6 +187,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                     icon: Warehouse,
                 },
                 {
+                    title: 'Cola de Bodega',
+                    href: '/warehouses/queue',
+                    icon: PackageSearch,
+                },
+                {
                     title: 'Stock por Almacén',
                     href: '/inventory',
                     icon: List,
@@ -208,8 +218,19 @@ const mainNavItems = computed<NavItem[]>(() => {
     if (canAccessVehicles.value) {
         items.push({
             title: 'Vehículos',
-            href: '/vehicles',
             icon: Truck,
+            items: [
+                {
+                    title: 'Gestión',
+                    href: '/vehicles',
+                    icon: Car,
+                },
+                {
+                    title: 'Motores',
+                    href: '/vehicles/engines',
+                    icon: Wrench,
+                },
+            ],
         });
     }
 

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { AlertCircle, CheckCircle2, RotateCcw, X, Calculator, FileText } from 'lucide-vue-next'
 import type { PosSession, PosSessionSummary } from '../../types/pos-session'
 import CashSummary from './CashSummary.vue'
 import CashCountTable from './CashCountTable.vue'
 import PaymentMethods from './PaymentMethods.vue'
+import { usePaymentMethods } from '@/composables/usePaymentMethods'
+
+const { methods, fetchMethods, isSpecialMethod } = usePaymentMethods()
 
 const props = defineProps<{
     show: boolean
@@ -29,14 +32,23 @@ const cashCounts = reactive<Record<string, number>>(
     DENOMINATION_KEYS.reduce((acc, id) => ({ ...acc, [`unit_${id}`]: 0, [`pack_${id}`]: 0 }), {})
 )
 
-// ── Electronic payment counts ──
-const PAYMENT_TYPES = [
-    'visa', 'mastercard', 'clave', 'amex', 'yappy', 'transferencia', 'notaCredito', 'creditoCliente'
-]
+// ── Electronic payment counts (dynamic) ──
+const payments = reactive<Record<string, number>>({})
 
-const payments = reactive<Record<string, number>>(
-    PAYMENT_TYPES.reduce((acc, id) => ({ ...acc, [id]: 0 }), {})
-)
+// Fetch methods on modal open and initialize payments
+watch(() => props.show, async (val) => {
+    if (val) {
+        await fetchMethods()
+        // Initialize payments for custom methods (not main ones)
+        methods.value
+            .filter(m => !['cash', 'card', 'transfer'].includes(m.code) && !isSpecialMethod(m.code))
+            .forEach(m => {
+                if (!(m.code in payments)) {
+                    payments[m.code] = 0
+                }
+            })
+    }
+}, { immediate: true })
 
 const notes = ref<string>('')
 
@@ -64,7 +76,7 @@ const totalCashCounted = computed(() =>
 )
 
 const totalElectronicCounted = computed(() =>
-    PAYMENT_TYPES.reduce((acc, id) => acc + (payments[id] || 0), 0)
+    Object.values(payments).reduce((acc, val) => acc + (val || 0), 0)
 )
 
 const totalCounted = computed(() => totalCashCounted.value + totalElectronicCounted.value)
@@ -86,8 +98,8 @@ const handleCashCountChange = (id: string, value: number) => {
     cashCounts[id] = value
 }
 
-const handlePaymentChange = (id: string, value: number) => {
-    payments[id] = value
+const handlePaymentChange = (code: string, value: number) => {
+    payments[code] = value
 }
 
 const handleSubmit = () => {
@@ -103,7 +115,7 @@ const handleCancel = () => {
         cashCounts[`unit_${id}`] = 0
         cashCounts[`pack_${id}`] = 0
     })
-    PAYMENT_TYPES.forEach(id => { payments[id] = 0 })
+    Object.keys(payments).forEach(code => { payments[code] = 0 })
     notes.value = ''
 }
 

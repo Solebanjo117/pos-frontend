@@ -9,6 +9,11 @@ export interface Category {
     description?: string
     icon?: string
     priority: number
+    default_margin_percent?: number | null
+    default_cost?: number | null
+    pricing_formula?: string | null
+    applies_itbm?: boolean
+    itbm_percent?: number | null
     products_count?: number
     children_count?: number
     created_at: string
@@ -36,6 +41,11 @@ export interface CreateCategoryData {
     description?: string
     icon?: string
     priority?: number
+    default_margin_percent?: number | null
+    default_cost?: number | null
+    pricing_formula?: string | null
+    applies_itbm?: boolean
+    itbm_percent?: number | null
 }
 
 export interface UpdateCategoryData extends Partial<CreateCategoryData> { }

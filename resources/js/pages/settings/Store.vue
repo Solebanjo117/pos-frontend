@@ -3,9 +3,10 @@ import { ref, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useStoreSettings } from '@/composables/useStoreSettings'
+import { usePaymentMethods } from '@/composables/usePaymentMethods'
 import { type BreadcrumbItem } from '@/types'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
-import { Store, Upload, Save, Building2, Phone, Mail, MapPin, CreditCard, FileText, Image, Calculator, Clock, Wrench, Percent } from 'lucide-vue-next'
+import { Store, Upload, Save, Building2, Phone, Mail, MapPin, CreditCard, FileText, Image, Calculator, Clock, Wrench, Percent, Plus, ChevronUp, ChevronDown, Trash2, Lock } from 'lucide-vue-next'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -13,12 +14,30 @@ const breadcrumbs: BreadcrumbItem[] = [
 ]
 
 const { settings, loading, saving, error, fetchSettings, saveSettings, uploadLogo } = useStoreSettings()
+const {
+    allMethods: paymentMethods,
+    loading: paymentMethodsLoading,
+    fetchAllMethods,
+    createMethod,
+    updateMethod,
+    archiveMethod,
+    reorderMethods
+} = usePaymentMethods()
 
 const logoPreview   = ref<string | null>(null)
 const logoFile      = ref<File | null>(null)
 const saveMsg       = ref<string | null>(null)
 
-onMounted(() => fetchSettings())
+// Payment methods
+const showAddMethodModal = ref(false)
+const newMethodName = ref('')
+const newMethodRequiresRef = ref(false)
+const addingMethod = ref(false)
+
+onMounted(() => {
+    fetchSettings()
+    fetchAllMethods()
+})
 
 const handleLogoChange = (e: Event) => {
     const input = e.target as HTMLInputElement
@@ -37,6 +56,61 @@ const handleSave = async () => {
     const ok = await saveSettings({ ...settings.value })
     saveMsg.value = ok ? '✓ Configuración guardada correctamente' : null
     if (ok) setTimeout(() => (saveMsg.value = null), 4000)
+}
+
+// Payment methods handlers
+const handleAddMethod = async () => {
+    if (!newMethodName.value.trim()) return
+    addingMethod.value = true
+    try {
+        await createMethod({
+            name: newMethodName.value.trim(),
+            requires_reference: newMethodRequiresRef.value,
+        })
+        newMethodName.value = ''
+        newMethodRequiresRef.value = false
+        showAddMethodModal.value = false
+        await fetchAllMethods()
+    } catch (e) {
+        console.error('Error adding method:', e)
+    } finally {
+        addingMethod.value = false
+    }
+}
+
+const handleToggleActive = async (method: any) => {
+    if (method.is_system) return
+    try {
+        await updateMethod(method.id, { is_active: !method.is_active })
+    } catch (e) {
+        console.error('Error toggling method:', e)
+    }
+}
+
+const handleArchiveMethod = async (method: any) => {
+    if (method.is_system) return
+    if (!confirm(`¿Archivar el método "${method.name}"? Ya no aparecerá en el POS.`)) return
+    try {
+        await archiveMethod(method.id)
+    } catch (e) {
+        console.error('Error archiving method:', e)
+    }
+}
+
+const moveMethodUp = async (index: number) => {
+    if (index === 0) return
+    const order = paymentMethods.value.map(m => m.id)
+    ;[order[index], order[index - 1]] = [order[index - 1], order[index]]
+    await reorderMethods(order)
+    await fetchAllMethods()
+}
+
+const moveMethodDown = async (index: number) => {
+    if (index >= paymentMethods.value.length - 1) return
+    const order = paymentMethods.value.map(m => m.id)
+    ;[order[index], order[index + 1]] = [order[index + 1], order[index]]
+    await reorderMethods(order)
+    await fetchAllMethods()
 }
 </script>
 
@@ -181,6 +255,137 @@ const handleSave = async () => {
                         </div>
                     </div>
                 </section>
+
+                <!-- === PAYMENT METHODS === -->
+                <section class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <CreditCard :size="18" class="text-primary" /> Métodos de Pago
+                        </h2>
+                        <button
+                            @click="showAddMethodModal = true"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition"
+                        >
+                            <Plus :size="16" />
+                            Agregar
+                        </button>
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Configura los métodos de pago disponibles en el POS. Puedes reordenarlos y activar/desactivar según necesites.
+                    </p>
+
+                    <div v-if="paymentMethodsLoading" class="text-sm text-gray-400 py-4">Cargando métodos...</div>
+
+                    <div v-else class="space-y-2">
+                        <div
+                            v-for="(method, index) in paymentMethods"
+                            :key="method.id"
+                            class="flex items-center gap-3 p-3 rounded-lg border transition"
+                            :class="method.is_active
+                                ? 'border-gray-200 dark:border-border bg-gray-50 dark:bg-muted/30'
+                                : 'border-gray-100 dark:border-border/50 bg-gray-100/50 dark:bg-muted/10 opacity-60'"
+                        >
+                            <!-- Reorder buttons -->
+                            <div class="flex flex-col gap-0.5">
+                                <button
+                                    @click="moveMethodUp(index)"
+                                    :disabled="index === 0"
+                                    class="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronUp :size="14" />
+                                </button>
+                                <button
+                                    @click="moveMethodDown(index)"
+                                    :disabled="index >= paymentMethods.length - 1"
+                                    class="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronDown :size="14" />
+                                </button>
+                            </div>
+
+                            <!-- Method info -->
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium text-gray-900 dark:text-white">{{ method.name }}</span>
+                                    <span v-if="method.is_system" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 bg-gray-200 dark:bg-muted rounded">
+                                        <Lock :size="10" />
+                                        Sistema
+                                    </span>
+                                    <span v-if="!method.is_active" class="px-1.5 py-0.5 text-[10px] font-medium text-orange-600 bg-orange-100 dark:bg-orange-900/20 rounded">
+                                        Inactivo
+                                    </span>
+                                </div>
+                                <p class="text-xs text-gray-400 dark:text-gray-500">código: {{ method.code }}</p>
+                            </div>
+
+                            <!-- Toggle active -->
+                            <label class="relative inline-flex items-center cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': method.is_system }">
+                                <input
+                                    type="checkbox"
+                                    :checked="method.is_active"
+                                    :disabled="method.is_system"
+                                    @change="handleToggleActive(method)"
+                                    class="sr-only peer"
+                                />
+                                <div class="w-9 h-5 bg-gray-200 rounded-full peer dark:bg-muted peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                            </label>
+
+                            <!-- Archive button -->
+                            <button
+                                v-if="!method.is_system"
+                                @click="handleArchiveMethod(method)"
+                                class="p-1.5 text-gray-400 hover:text-red-500 transition"
+                                title="Archivar método"
+                            >
+                                <Trash2 :size="16" />
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Add Method Modal -->
+                <Teleport to="body">
+                    <div v-if="showAddMethodModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                        <div class="bg-white dark:bg-card rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Agregar Método de Pago</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del método</label>
+                                    <input
+                                        v-model="newMethodName"
+                                        type="text"
+                                        placeholder="Ej: Yappy, Nequi"
+                                        class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition"
+                                    />
+                                    <p class="mt-1 text-xs text-gray-500">El código se generará automáticamente del nombre</p>
+                                </div>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        v-model="newMethodRequiresRef"
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/50"
+                                    />
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Requiere número de referencia</span>
+                                </label>
+                            </div>
+                            <div class="flex justify-end gap-2 mt-6">
+                                <button
+                                    @click="showAddMethodModal = false; newMethodName = ''; newMethodRequiresRef = false"
+                                    class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    @click="handleAddMethod"
+                                    :disabled="!newMethodName.trim() || addingMethod"
+                                    class="px-4 py-2 text-sm font-semibold text-black bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 transition"
+                                >
+                                    {{ addingMethod ? 'Agregando...' : 'Agregar Método' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </Teleport>
 
                 <!-- === QUOTES === -->
                 <section class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-6">

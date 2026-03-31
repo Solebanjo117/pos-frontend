@@ -6,6 +6,7 @@ import { type BreadcrumbItem } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from '@/components/ui/dialog'
@@ -82,7 +83,7 @@ const toggleModel = async (modelId: number) => {
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
-type ModalType = 'make' | 'model' | 'engine' | null
+type ModalType = 'make' | 'model' | 'engine' | 'quickEngine' | null
 const modalType    = ref<ModalType>(null)
 const processing   = ref(false)
 const modalError   = ref<string | null>(null)
@@ -96,7 +97,34 @@ const editingId      = ref<number | null>(null)
 // Forms
 const makeForm   = ref({ name: '' })
 const modelForm  = ref({ name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), generation: '' })
-const engineForm = ref({ engine_code: '', displacement: '' })
+const engineForm = ref({ engine_code: '', displacement: '', fuel_type: '' })
+
+// ── All engines for SearchableSelect ──────────────────────────────────────────
+const allEngines = ref<VehicleEngine[]>([])
+const allEnginesLoading = ref(false)
+const selectedEngineId = ref<number | null>(null)
+
+const loadAllEngines = async () => {
+    allEnginesLoading.value = true
+    try {
+        const res = await fetchEngines({ per_page: 500 })
+        allEngines.value = res?.data ?? engines.value
+    } finally {
+        allEnginesLoading.value = false
+    }
+}
+
+// Options for SearchableSelect (excluding already assigned to this model)
+const engineSelectOptions = computed<SelectOption[]>(() => {
+    const assignedIds = new Set((enginesByModel.value[activeModelId.value ?? 0] ?? []).map(e => e.id))
+    return allEngines.value
+        .filter(e => !assignedIds.has(e.id))
+        .map(e => ({
+            value: e.id,
+            label: e.engine_code,
+            sublabel: [e.displacement, e.fuel_type].filter(Boolean).join(' • ') || undefined
+        }))
+})
 
 const openMakeCreate = () => { editingId.value = null; makeForm.value = { name: '' }; modalType.value = 'make'; modalError.value = null }
 const openMakeEdit   = (m: VehicleMake) => { editingId.value = m.id; makeForm.value = { name: m.name }; modalType.value = 'make'; modalError.value = null }
@@ -112,26 +140,71 @@ const openModelEdit = (model: VehicleModel) => {
     modalType.value = 'model'; modalError.value = null
 }
 
-const openEngineCreate = (modelId: number) => {
-    activeModelId.value = modelId; editingId.value = null
-    engineForm.value = { engine_code: '', displacement: '' }
-    modalType.value = 'engine'; modalError.value = null
+const openEngineCreate = async (modelId: number) => {
+    activeModelId.value = modelId
+    editingId.value = null
+    selectedEngineId.value = null
+    modalType.value = 'engine'
+    modalError.value = null
     // Reset VIN panel
     _vinEngineId.value = null
     engineVins.value = []
+    // Load all available engines
+    await loadAllEngines()
 }
 const openEngineEdit = async (engine: VehicleEngine) => {
     activeModelId.value = engine.model_id; editingId.value = engine.id
-    engineForm.value = { engine_code: engine.engine_code, displacement: engine.displacement }
+    engineForm.value = { engine_code: engine.engine_code, displacement: engine.displacement, fuel_type: engine.fuel_type || '' }
     modalType.value = 'engine'; modalError.value = null
     // Load VINs
     await loadVins(engine.id)
 }
 
-const closeModal = () => { modalType.value = null; _vinEngineId.value = null; engineVins.value = [] }
+// Quick Add Engine Modal
+const openQuickEngineCreate = () => {
+    engineForm.value = { engine_code: '', displacement: '', fuel_type: '' }
+    modalType.value = 'quickEngine'
+    modalError.value = null
+}
+
+const closeModal = () => { modalType.value = null; _vinEngineId.value = null; engineVins.value = []; selectedEngineId.value = null }
+
+// R20: Check for duplicates helper
+const duplicateConfirmed = ref(false)
+
+const checkMakeDuplicate = (name: string): boolean => {
+    return makes.value.some(m => 
+        m.name.toLowerCase().trim() === name.toLowerCase().trim() && 
+        m.id !== editingId.value
+    )
+}
+
+const checkModelDuplicate = (name: string, makeId: number): boolean => {
+    const modelsInMake = modelsByMake.value[makeId] ?? []
+    return modelsInMake.some(m => 
+        m.name.toLowerCase().trim() === name.toLowerCase().trim() && 
+        m.id !== editingId.value
+    )
+}
+
+const checkEngineDuplicate = (code: string): boolean => {
+    return allEngines.value.some(e => 
+        e.engine_code.toLowerCase().trim() === code.toLowerCase().trim() && 
+        e.id !== editingId.value
+    )
+}
 
 // Make submit
 const submitMake = async () => {
+    // R20: Check for duplicate
+    if (!editingId.value && !duplicateConfirmed.value && checkMakeDuplicate(makeForm.value.name)) {
+        const confirm = window.confirm(
+            `⚠️ Ya existe una marca con el nombre "${makeForm.value.name}".\n\n¿Desea crear una marca duplicada?`
+        )
+        if (!confirm) return
+        duplicateConfirmed.value = true
+    }
+
     processing.value = true; modalError.value = null
     try {
         if (editingId.value) {
@@ -143,12 +216,23 @@ const submitMake = async () => {
             // makes array is automatically updated by the composable
         }
         closeModal()
+        duplicateConfirmed.value = false
     } catch (e: any) { modalError.value = e.response?.data?.message || 'Error' }
     finally { processing.value = false }
 }
 
 // Model submit
 const submitModel = async () => {
+    // R20: Check for duplicate
+    if (!editingId.value && !duplicateConfirmed.value && checkModelDuplicate(modelForm.value.name, activeMakeId.value!)) {
+        const makeName = makes.value.find(m => m.id === activeMakeId.value)?.name || ''
+        const confirm = window.confirm(
+            `⚠️ Ya existe un modelo "${modelForm.value.name}" en la marca ${makeName}.\n\n¿Desea crear un modelo duplicado?`
+        )
+        if (!confirm) return
+        duplicateConfirmed.value = true
+    }
+
     processing.value = true; modalError.value = null
     try {
         const payload = { ...modelForm.value, make_id: activeMakeId.value! }
@@ -166,30 +250,87 @@ const submitModel = async () => {
             }
         }
         closeModal()
+        duplicateConfirmed.value = false
     } catch (e: any) { modalError.value = e.response?.data?.message || 'Error' }
     finally { processing.value = false }
 }
 
-// Engine submit
-const submitEngine = async () => {
+// Assign existing engine to model (update engine's model_id)
+const assignEngineToModel = async () => {
+    if (!selectedEngineId.value || !activeModelId.value) return
     processing.value = true; modalError.value = null
     try {
-        const payload = { model_id: activeModelId.value!, engine_code: engineForm.value.engine_code, displacement: engineForm.value.displacement, fuel_type: 'N/A', aspiration: 'N/A' }
+        const updated = await updateEngine(selectedEngineId.value, { model_id: activeModelId.value })
+        // Add to local tree
+        if (!enginesByModel.value[activeModelId.value]) enginesByModel.value[activeModelId.value] = []
+        if (!enginesByModel.value[activeModelId.value].find(e => e.id === updated.id)) {
+            enginesByModel.value[activeModelId.value].push(updated)
+        }
+        // Open VIN panel for this engine
+        editingId.value = updated.id
+        await loadVins(updated.id)
+    } catch (e: any) { modalError.value = e.response?.data?.message || 'Error' }
+    finally { processing.value = false }
+}
+
+// Engine submit (edit mode only, or quick-create)
+const submitEngine = async () => {
+    // R20: Check for duplicate engine code
+    if (!editingId.value && !duplicateConfirmed.value && checkEngineDuplicate(engineForm.value.engine_code)) {
+        const confirm = window.confirm(
+            `⚠️ Ya existe un motor con el código "${engineForm.value.engine_code}".\n\n¿Desea crear un motor duplicado?`
+        )
+        if (!confirm) return
+        duplicateConfirmed.value = true
+    }
+
+    processing.value = true; modalError.value = null
+    try {
+        const payload = { 
+            model_id: activeModelId.value, 
+            engine_code: engineForm.value.engine_code, 
+            displacement: engineForm.value.displacement, 
+            fuel_type: engineForm.value.fuel_type || 'N/A', 
+            aspiration: 'N/A' 
+        }
         if (editingId.value) {
+            // Editing existing engine
             const updated = await updateEngine(editingId.value, payload)
             const list = enginesByModel.value[activeModelId.value!] ?? []
             const idx = list.findIndex(e => e.id === editingId.value)
             if (idx !== -1) list[idx] = updated
         } else {
+            // Quick create new engine
             const created = await createEngine(payload)
-            if (!enginesByModel.value[activeModelId.value!]) enginesByModel.value[activeModelId.value!] = []
-            if (!enginesByModel.value[activeModelId.value!].find(e => e.id === created.id)) {
-                enginesByModel.value[activeModelId.value!].push(created)
+            
+            // Add to allEngines so it appears in future searches
+            if (!allEngines.value.find(e => e.id === created.id)) {
+                allEngines.value.push(created)
             }
-            // Immediately open VIN panel for new engine
+            
+            if (activeModelId.value) {
+                // Add to model's engine list
+                if (!enginesByModel.value[activeModelId.value]) enginesByModel.value[activeModelId.value] = []
+                if (!enginesByModel.value[activeModelId.value].find(e => e.id === created.id)) {
+                    enginesByModel.value[activeModelId.value].push(created)
+                }
+                
+                // If in quickEngine mode, motor already has model_id assigned
+                // Open VIN panel directly
+                if (modalType.value === 'quickEngine') {
+                    editingId.value = created.id
+                    await loadVins(created.id)
+                    modalType.value = 'engine' // Switch to edit mode with VINs
+                    duplicateConfirmed.value = false
+                    return
+                }
+            }
+            
+            // Immediately open VIN panel for new engine (normal flow)
             editingId.value = created.id
             await loadVins(created.id)
         }
+        duplicateConfirmed.value = false
     } catch (e: any) { modalError.value = e.response?.data?.message || 'Error' }
     finally { processing.value = false }
 }
@@ -436,15 +577,47 @@ const handleRemoveVin = async (vinId: number) => {
             </DialogContent>
         </Dialog>
 
-        <!-- ── Modal: Engine + VINs ── -->
+        <!-- ── Modal: Engine (Select existing + Quick Add) ── -->
         <Dialog :open="modalType === 'engine'" @update:open="v => { if (!v) closeModal() }">
             <DialogContent class="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{{ editingId ? 'Editar Motor' : 'Nuevo Motor' }}</DialogTitle>
-                    <DialogDescription>Motor y números VIN asociados</DialogDescription>
+                    <DialogTitle>{{ editingId ? 'Editar Motor' : 'Asignar Motor' }}</DialogTitle>
+                    <DialogDescription>{{ editingId ? 'Editar motor y VINs asociados' : 'Selecciona un motor existente o crea uno nuevo' }}</DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitEngine" class="space-y-4 py-2">
+                <!-- Mode: Assign existing engine (when not editing) -->
+                <div v-if="!editingId" class="space-y-4 py-2">
+                    <div class="space-y-2">
+                        <Label>Motor</Label>
+                        <div class="flex gap-2">
+                            <div class="flex-1">
+                                <SearchableSelect
+                                    v-model="selectedEngineId"
+                                    :options="engineSelectOptions"
+                                    :loading="allEnginesLoading"
+                                    placeholder="Buscar motor..."
+                                    loadingText="Cargando motores..."
+                                />
+                            </div>
+                            <Button type="button" variant="outline" size="icon" @click="openQuickEngineCreate" title="Crear motor nuevo">
+                                <Plus class="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <p v-if="engineSelectOptions.length === 0 && !allEnginesLoading" class="text-xs text-gray-500">
+                            No hay motores disponibles. <button type="button" class="underline text-blue-500" @click="openQuickEngineCreate">Crear uno nuevo</button>
+                        </p>
+                    </div>
+                    <div v-if="modalError" class="text-sm text-red-600">{{ modalError }}</div>
+                    <div class="flex justify-end gap-2">
+                        <Button type="button" variant="outline" @click="closeModal">Cancelar</Button>
+                        <Button type="button" :disabled="!selectedEngineId || processing" @click="assignEngineToModel">
+                            {{ processing ? 'Asignando...' : 'Asignar Motor' }}
+                        </Button>
+                    </div>
+                </div>
+
+                <!-- Mode: Edit existing engine -->
+                <form v-else @submit.prevent="submitEngine" class="space-y-4 py-2">
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
                             <Label>Motor</Label>
@@ -455,14 +628,18 @@ const handleRemoveVin = async (vinId: number) => {
                             <Input v-model="engineForm.displacement" placeholder="Ej: 2.4L" />
                         </div>
                     </div>
+                    <div class="space-y-2">
+                        <Label>Combustible</Label>
+                        <Input v-model="engineForm.fuel_type" placeholder="Ej: Gasolina, Diesel" />
+                    </div>
                     <div v-if="modalError" class="text-sm text-red-600">{{ modalError }}</div>
                     <div class="flex justify-end gap-2">
                         <Button type="button" variant="outline" @click="closeModal">Cancelar</Button>
-                        <Button type="submit" :disabled="processing">{{ processing ? 'Guardando...' : (editingId ? 'Actualizar' : 'Crear Motor') }}</Button>
+                        <Button type="submit" :disabled="processing">{{ processing ? 'Guardando...' : 'Actualizar' }}</Button>
                     </div>
                 </form>
 
-                <!-- VINs panel (shown after engine exists) -->
+                <!-- VINs panel (shown after engine is assigned/editing) -->
                 <div v-if="editingId" class="border-t pt-4 space-y-3">
                     <div class="flex items-center gap-2">
                         <Hash class="h-4 w-4 text-gray-400" />
@@ -493,7 +670,39 @@ const handleRemoveVin = async (vinId: number) => {
                         </li>
                     </ul>
                 </div>
-                <p v-else class="text-xs text-gray-400 text-center pt-1">Guarda el motor para agregar VINs.</p>
+            </DialogContent>
+        </Dialog>
+
+        <!-- ── Modal: Quick Add Engine ── -->
+        <Dialog :open="modalType === 'quickEngine'" @update:open="v => { if (!v) { modalType = 'engine' } }">
+            <DialogContent class="sm:max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Crear Motor Rápido</DialogTitle>
+                    <DialogDescription>El motor se creará y asignará al modelo</DialogDescription>
+                </DialogHeader>
+                <form @submit.prevent="submitEngine" class="space-y-4 py-2">
+                    <div class="space-y-2">
+                        <Label>Código Motor <span class="text-red-500">*</span></Label>
+                        <Input v-model="engineForm.engine_code" required placeholder="Ej: 2AZ-FE, K20A" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <Label>Desplazamiento</Label>
+                            <Input v-model="engineForm.displacement" placeholder="Ej: 2.4L" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label>Combustible</Label>
+                            <Input v-model="engineForm.fuel_type" placeholder="Ej: Gasolina" />
+                        </div>
+                    </div>
+                    <div v-if="modalError" class="text-sm text-red-600">{{ modalError }}</div>
+                    <div class="flex justify-end gap-2">
+                        <Button type="button" variant="outline" @click="modalType = 'engine'">Cancelar</Button>
+                        <Button type="submit" :disabled="processing || !engineForm.engine_code.trim()">
+                            {{ processing ? 'Creando...' : 'Crear Motor' }}
+                        </Button>
+                    </div>
+                </form>
             </DialogContent>
         </Dialog>
 

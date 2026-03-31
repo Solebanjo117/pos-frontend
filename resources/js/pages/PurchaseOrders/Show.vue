@@ -56,10 +56,24 @@ function openPdf(mode: 'standard' | 'worksheet' = 'worksheet') {
 
 const statusColors: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-300',
+    open: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
     sent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
     partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
     received: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+}
+
+const statusLabels: Record<string, string> = {
+    draft: 'Borrador',
+    open: 'Abierta (Diaria)',
+    sent: 'Enviado',
+    partial: 'Parcial',
+    received: 'Recibido',
+    cancelled: 'Cancelado',
+}
+
+function isDailyPO(): boolean {
+    return !purchaseOrder.value?.supplier
 }
 
 const paymentStatusColors: Record<string, string> = {
@@ -167,6 +181,7 @@ onMounted(async () => {
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
                         <thead class="bg-gray-50 dark:bg-background"><tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                            <th v-if="isDailyPO()" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proveedor</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pedido</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Recibido</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Costo</th>
@@ -176,13 +191,17 @@ onMounted(async () => {
                         <tbody class="divide-y divide-gray-200 dark:divide-border">
                             <tr v-for="item in purchaseOrder.items" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/50">
                                 <td class="px-6 py-3"><Link v-if="item.product" :href="`/products/${item.product.id}`" class="text-sm text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">{{ item.product.name }}</Link><p v-if="item.product" class="text-xs text-gray-500 font-mono">{{ item.product.sku_base }}</p></td>
+                                <td v-if="isDailyPO()" class="px-6 py-3">
+                                    <Link v-if="item.supplier" :href="`/suppliers/${item.supplier.id}`" class="text-sm text-purple-600 dark:text-purple-400 hover:underline">{{ item.supplier.name }}</Link>
+                                    <span v-else class="text-sm text-gray-400">—</span>
+                                </td>
                                 <td class="px-6 py-3 text-right text-sm">{{ item.quantity_ordered }}</td>
                                 <td class="px-6 py-3 text-right text-sm" :class="item.is_fully_received ? 'text-green-600 font-semibold' : ''">{{ item.quantity_received }}</td>
                                 <td class="px-6 py-3 text-right text-sm text-gray-500">${{ Number(item.unit_cost).toFixed(2) }}</td>
                                 <td class="px-6 py-3 text-right text-sm font-medium">${{ Number(item.subtotal).toFixed(2) }}</td>
                                 <td class="px-6 py-3 text-center">
-                                    <span v-if="item.is_fully_received" class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Completo</span>
-                                    <span v-else-if="item.quantity_received > 0" class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Parcial</span>
+                                    <span v-if="item.is_fully_received || item.status === 'received'" class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Completo</span>
+                                    <span v-else-if="item.quantity_received > 0 || item.status === 'partial'" class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Parcial</span>
                                     <span v-else class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-muted dark:text-gray-400">Pendiente</span>
                                 </td>
                             </tr>

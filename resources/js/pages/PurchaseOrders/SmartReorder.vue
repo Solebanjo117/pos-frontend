@@ -2,16 +2,20 @@
 import { ref, onMounted, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
-import { smartReorderService, type SupplierLowStock, type LowStockStats } from '@/services/smart-reorder'
-import { PackageX, AlertTriangle, TrendingDown, ShoppingCart, Check, Minus, Plus } from 'lucide-vue-next'
+import { smartReorderService, type SupplierLowStock, type LowStockStats, type CreatedPurchaseOrder } from '@/services/smart-reorder'
+import { PackageX, AlertTriangle, TrendingDown, ShoppingCart, Check, Minus, Plus, CheckCircle2 } from 'lucide-vue-next'
 import apiClient from '@/services/api/client'
+import { useToast } from '@/composables/useToast'
 
+const toast = useToast()
 const lowStockData = ref<SupplierLowStock[]>([])
 const stats = ref<LowStockStats | null>(null)
 const warehouses = ref<any[]>([])
 const selectedWarehouse = ref<number | undefined>(undefined)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const createdOrders = ref<CreatedPurchaseOrder[]>([])
+const showSuccess = ref(false)
 
 // Track selected items per supplier
 const selectedItems = ref<Record<number, Record<number, boolean>>>({})
@@ -99,18 +103,28 @@ const ordersToCreate = computed(() => {
 
 async function handleGenerate() {
     if (ordersToCreate.value.length === 0) {
-        alert('Selecciona al menos un producto')
+        toast.error('Selecciona al menos un producto')
         return
     }
 
     if (!confirm(`¿Generar ${ordersToCreate.value.length} órdenes de compra en borrador?`)) return
 
     loading.value = true
+    error.value = null
     try {
-        await smartReorderService.batchCreate(ordersToCreate.value)
-        router.visit('/purchase-orders')
+        const result = await smartReorderService.batchCreate(ordersToCreate.value)
+        createdOrders.value = result
+        showSuccess.value = true
+        toast.success(`${result.length} orden(es) de compra creada(s) exitosamente`)
+        
+        // Clear selection after success
+        selectedItems.value = {}
+        quantities.value = {}
+        await loadData()
     } catch (e: any) {
-        error.value = e.response?.data?.message || 'Error al generar órdenes'
+        const errorMsg = e.response?.data?.message || e.response?.data?.errors || 'Error al generar órdenes'
+        error.value = typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg
+        toast.error('Error al generar órdenes de compra')
     } finally {
         loading.value = false
     }
@@ -140,7 +154,7 @@ onMounted(async () => {
             </div>
 
             <!-- Stats -->
-            <div v-if="stats" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div v-if="stats" class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg"><TrendingDown :size="20" class="text-orange-600 dark:text-orange-400" /></div>
@@ -161,12 +175,34 @@ onMounted(async () => {
                 </div>
                 <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-4">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><Check :size="20" class="text-blue-600 dark:text-primary dark:text-blue-400" /></div>
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><Check :size="20" class="text-blue-600 dark:text-blue-400" /></div>
                         <div>
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ selectedCount }}</p>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Productos Seleccionados</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Seleccionados</p>
                         </div>
                     </div>
+                </div>
+                <div v-if="stats.without_supplier > 0" class="bg-white dark:bg-card rounded-lg border border-amber-200 dark:border-amber-800 p-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg"><AlertTriangle :size="20" class="text-amber-600 dark:text-amber-400" /></div>
+                        <div>
+                            <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{{ stats.without_supplier }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Sin Proveedor</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Warning: products without supplier -->
+            <div v-if="stats?.without_supplier > 0" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3">
+                <AlertTriangle :size="18" class="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                    <p class="text-sm text-amber-700 dark:text-amber-400">
+                        <strong>{{ stats.without_supplier }} producto(s)</strong> con bajo stock no tienen proveedor asignado.
+                    </p>
+                    <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                        Estos productos no aparecen en Smart Reorder. Asígnales un proveedor en el módulo de Productos para incluirlos.
+                    </p>
                 </div>
             </div>
 
@@ -184,6 +220,39 @@ onMounted(async () => {
             <!-- Error -->
             <div v-if="error" class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
                 <p class="text-red-600 dark:text-red-400">{{ error }}</p>
+            </div>
+
+            <!-- Success Panel -->
+            <div v-if="showSuccess && createdOrders.length > 0" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <CheckCircle2 :size="20" class="text-green-600 dark:text-green-400" />
+                    <p class="text-sm font-semibold text-green-700 dark:text-green-400">
+                        {{ createdOrders.length }} orden(es) de compra creada(s) exitosamente
+                    </p>
+                    <button @click="showSuccess = false" class="ml-auto text-green-600 hover:text-green-800 text-sm">
+                        Cerrar
+                    </button>
+                </div>
+                <div class="space-y-2">
+                    <Link
+                        v-for="po in createdOrders"
+                        :key="po.id"
+                        :href="`/purchase-orders/${po.id}`"
+                        class="flex items-center justify-between p-2 bg-white dark:bg-card rounded border border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/30 transition"
+                    >
+                        <div class="flex items-center gap-3">
+                            <ShoppingCart :size="16" class="text-green-600" />
+                            <span class="text-sm font-medium text-gray-900 dark:text-white">{{ po.po_number }}</span>
+                            <span class="text-xs text-gray-500">{{ po.supplier?.name }}</span>
+                        </div>
+                        <span class="text-sm font-semibold text-gray-900 dark:text-white">${{ po.total?.toFixed(2) || '0.00' }}</span>
+                    </Link>
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <Link href="/purchase-orders" class="text-sm text-indigo-600 dark:text-primary hover:underline">
+                        Ver todas las órdenes →
+                    </Link>
+                </div>
             </div>
 
             <!-- Loading -->

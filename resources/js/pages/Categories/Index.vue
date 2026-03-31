@@ -195,15 +195,14 @@ onMounted(async () => {
                         <thead class="bg-gray-50 dark:bg-background">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-[40%]">Categoría</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-[30%]">Descripción</th>
-                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Prioridad</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-[35%]">Descripción</th>
                                 <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Productos</th>
                                 <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white dark:bg-card divide-y divide-gray-100 dark:divide-border/50">
                             <tr v-if="loading">
-                                <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                <td colspan="4" class="px-6 py-12 text-center text-gray-500">
                                     <div class="flex items-center justify-center gap-2">
                                         <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600 dark:border-primary"></div>
                                         Cargando estructura...
@@ -211,7 +210,7 @@ onMounted(async () => {
                                 </td>
                             </tr>
                             <tr v-else-if="filteredCategories.length === 0">
-                                <td colspan="5" class="px-6 py-16 text-center text-gray-500 dark:text-gray-400">
+                                <td colspan="4" class="px-6 py-16 text-center text-gray-500 dark:text-gray-400">
                                     <div class="flex flex-col items-center justify-center bg-gray-50 dark:bg-muted/30 w-16 h-16 rounded-full mx-auto mb-4">
                                         <Folder class="text-gray-400" :size="24" />
                                     </div>
@@ -265,11 +264,6 @@ onMounted(async () => {
                                 <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                                     <span class="line-clamp-2" :title="cat.description || ''">
                                         {{ cat.description || '—' }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="inline-flex items-center justify-center px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-700 dark:bg-muted dark:text-gray-300">
-                                        {{ cat.priority ?? 0 }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-center">

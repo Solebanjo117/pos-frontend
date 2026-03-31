@@ -55,11 +55,11 @@ onMounted(() => {
 })
 
 const handleSearch = () => {
+  // Permitir búsqueda vacía para listar todos los productos (BUG-001 fix)
   const trimmed = query.value.trim()
-  if (!trimmed) return
 
   emit('search', {
-    query: trimmed,
+    query: trimmed || undefined,
     quantity: quantity.value,
     category_id: selectedCategory.value || undefined,
     brand_id: selectedBrand.value || undefined,

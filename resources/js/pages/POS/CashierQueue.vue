@@ -5,11 +5,11 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import apiClient from '@/services/api/client'
 import { usePOS } from '@/composables/usePOS'
 import { useCashierQueue, type PendingQuote } from '@/composables/useCashierQueue'
-import { Inbox, Clock, ShoppingCart, User, Package } from 'lucide-vue-next'
+import { Inbox, Clock, ShoppingCart, User, Package, X } from 'lucide-vue-next'
 
 defineOptions({ layout: AppLayout })
 
-const { quotes, count, loading, error, timeAgo, startPolling, stopPolling } = useCashierQueue()
+const { quotes, count, loading, error, timeAgo, startPolling, stopPolling, removeFromQueue } = useCashierQueue()
 const { loadQuoteAsSession } = usePOS()
 
 // Reactive clock: ticks every second so timeAgo re-renders
@@ -70,6 +70,23 @@ const formatCurrency = (value: number | string) => {
   return '$' + num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+const removingId = ref<number | null>(null)
+
+const handleRemoveFromQueue = async (quote: PendingQuote) => {
+  const confirmed = confirm(`¿Remover "${quote.quote_number}" de la cola de caja?\n\nLa cotización NO se eliminará, solo saldrá de la cola.`)
+  if (!confirmed) return
+
+  removingId.value = quote.id
+  try {
+    const success = await removeFromQueue(quote.id)
+    if (!success) alert('Error al remover la cotización de la cola')
+  } catch (e: any) {
+    alert(e.response?.data?.message || 'Error al remover de la cola')
+  } finally {
+    removingId.value = null
+  }
+}
+
 const summarizedProducts = (items: PendingQuote['items']) => {
   const maxShow = 3
   const shown = items.slice(0, maxShow)
@@ -122,12 +139,12 @@ const summarizedProducts = (items: PendingQuote['items']) => {
       </p>
     </div>
 
-    <!-- Quote Cards Grid -->
+    <!-- Cards Grid -->
     <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       <div
         v-for="quote in quotes"
         :key="quote.id"
-        class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border overflow-hidden hover:shadow-lg transition-shadow duration-200"
+        class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border overflow-hidden hover:shadow-lg transition-shadow duration-200 flex flex-col h-[420px]"
       >
         <!-- Card Header -->
         <div class="px-5 py-4 border-b border-gray-100 dark:border-border flex items-center justify-between">
@@ -138,22 +155,34 @@ const summarizedProducts = (items: PendingQuote['items']) => {
               <span class="text-xs text-gray-500 dark:text-gray-400">{{ quote.user?.name ?? 'Sin vendedor' }}</span>
             </div>
           </div>
-          <div class="text-right">
-            <div class="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-              <Clock :size="14" />
-              <span class="text-sm font-semibold tabular-nums">{{ timeAgo(quote.sent_to_cashier_at, now) }}</span>
+          <div class="flex items-center gap-3">
+            <div class="text-right">
+              <div class="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <Clock :size="14" />
+                <span class="text-sm font-semibold tabular-nums">{{ timeAgo(quote.sent_to_cashier_at, now) }}</span>
+              </div>
             </div>
+            <!-- Remove button -->
+            <button
+              @click.stop="handleRemoveFromQueue(quote)"
+              :disabled="removingId === quote.id"
+              class="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+              title="Remover de cola"
+            >
+              <X :size="18" />
+            </button>
           </div>
         </div>
 
         <!-- Card Body -->
-        <div class="px-5 py-4 space-y-3">
+        <div class="px-5 py-4 space-y-3 flex-1 overflow-y-auto">
           <!-- Customer -->
           <div class="flex items-center gap-2">
             <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cliente:</span>
             <span class="text-sm font-semibold text-gray-900 dark:text-white">
               {{ quote.customer?.name || 'Público General' }}
             </span>
+
           </div>
 
           <!-- Products summary -->

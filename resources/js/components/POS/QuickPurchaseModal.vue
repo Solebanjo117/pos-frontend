@@ -5,21 +5,28 @@ import {
   PackageCheck,
   Building2,
   DollarSign,
-  ShoppingCart
+  ShoppingCart,
+  List
 } from 'lucide-vue-next'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import { useSuppliers } from '@/composables/useSuppliers'
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders'
+import { supplyListService } from '@/services/supply-list'
 import { useToast } from '@/composables/useToast'
 import type { Supplier } from '@/types/supplier'
 
 // Reusing global store settings if needed, or simply pass props.
 import { usePosSettings } from '@/composables/usePosSettings'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   isOpen: boolean
   product: any // We pass the selected product from the modal/table
   initialVariantId?: number | null // Pre-select variant from cart item
-}>()
+  // Whether to show the quick purchase (direct PO) action
+  showQuickPurchaseAction?: boolean
+}>(), {
+  showQuickPurchaseAction: true,
+})
 
 const emit = defineEmits(['close', 'success'])
 
@@ -37,20 +44,27 @@ const selectedVariantId = ref<number | ''>('')
 const quantity = ref(1)
 const unitCost = ref(0)
 
+// Computed options for SearchableSelect
+const supplierOptions = computed(() => {
+  const opts = [{ value: '' as number | '', label: 'Sin proveedor asignado' }]
+  if (suppliers.value) {
+    opts.push(...suppliers.value.map(s => ({ value: s.id, label: s.name })))
+  }
+  return opts
+})
+
 // Load suppliers
 const loadSuppliers = async () => {
   loadingSuppliers.value = true
   suppliers.value = await fetchActiveSuppliers()
   loadingSuppliers.value = false
 
-  // Optionally auto-select default supplier if any
-  if (suppliers.value.length > 0) {
-      const hasMainSupplier = props.product?.suppliers?.length > 0 
-      if (hasMainSupplier) {
-          selectedSupplierId.value = props.product.suppliers[0].id
-      } else {
-          selectedSupplierId.value = suppliers.value[0].id
-      }
+  // Don't auto-select supplier - let user choose or leave empty for Supply List
+  // Only pre-select if product has a single main supplier
+  if (props.product?.suppliers?.length === 1) {
+      selectedSupplierId.value = props.product.suppliers[0].id
+  } else {
+      selectedSupplierId.value = '' // Default: no supplier
   }
 }
 
@@ -101,9 +115,42 @@ const handleClose = () => {
   emit('close')
 }
 
-const handleSubmit = async () => {
+// Add to Supply List (recommended flow)
+const handleAddToSupplyList = async () => {
+  if (quantity.value < 1) {
+    return toast.error('La cantidad debe ser mayor a 0')
+  }
+
+  try {
+    isSubmitting.value = true
+    
+    await supplyListService.addItem({
+      product_id: props.product.id,
+      variant_id: selectedVariantId.value || null,
+      supplier_id: selectedSupplierId.value || null,
+      quantity_needed: quantity.value,
+      notes: 'Agregado desde POS'
+    })
+
+    toast.success('Producto agregado a la Lista de Abastecimiento')
+    emit('success', { 
+        productId: props.product.id,
+        variantId: selectedVariantId.value,
+        quantityAdded: quantity.value,
+        addedToSupplyList: true
+    })
+    
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Error al agregar a la lista')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+// Quick Purchase (direct PO - advanced flow)
+const handleQuickPurchase = async () => {
   if (!selectedSupplierId.value || quantity.value < 1 || unitCost.value < 0) {
-    return toast.error('Por favor verifica los datos ingresados')
+    return toast.error('Por favor verifica los datos ingresados (proveedor y costo requeridos)')
   }
 
   try {
@@ -169,8 +216,8 @@ const totalCost = computed(() => quantity.value * unitCost.value)
               <PackageCheck class="w-5 h-5" />
             </div>
             <div>
-              <h2 class="text-xl font-bold text-gray-900 dark:text-white">Abastecimiento Rápido</h2>
-              <p class="text-xs text-gray-500 dark:text-gray-400">Orden de Compra Express</p>
+              <h2 class="text-xl font-bold text-gray-900 dark:text-white">Abastecimiento</h2>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Agregar a lista o compra rápida</p>
             </div>
           </div>
           <button 
@@ -193,22 +240,20 @@ const totalCost = computed(() => quantity.value * unitCost.value)
             </div>
 
             <div class="space-y-4">
-                <!-- Supplier -->
+                <!-- Supplier (optional for supply list) -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
                         <Building2 class="w-4 h-4 text-gray-400" />
-                        Proveedor
+                        Proveedor <span class="text-xs text-gray-400">(opcional)</span>
                     </label>
-                    <select
+                    <SearchableSelect
                         v-model="selectedSupplierId"
-                        class="w-full px-3 py-2.5 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:text-white transition-shadow"
+                        :options="supplierOptions"
                         :disabled="loadingSuppliers"
-                    >
-                        <option value="" disabled>Seleccione un proveedor...</option>
-                        <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
-                        {{ supplier.name }}
-                        </option>
-                    </select>
+                        :loading="loadingSuppliers"
+                        placeholder="Sin proveedor asignado"
+                    />
+                    <p class="text-xs text-gray-400 mt-1">Si no asignas proveedor, se creará una OC sin proveedor al convertir la lista</p>
                 </div>
 
                 <!-- Variant (Only show if multiple variants exist) -->
@@ -228,7 +273,7 @@ const totalCost = computed(() => quantity.value * unitCost.value)
                     </select>
                 </div>
 
-                <!-- Quantity and Cost -->
+                <!-- Quantity (Cost optional for supply list) -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -244,7 +289,7 @@ const totalCost = computed(() => quantity.value * unitCost.value)
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                            Costo Unitario
+                            Costo <span class="text-xs text-gray-400">(opcional)</span>
                         </label>
                         <div class="relative">
                             <DollarSign class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -260,8 +305,8 @@ const totalCost = computed(() => quantity.value * unitCost.value)
                     </div>
                 </div>
 
-                <!-- Total Reference -->
-                <div class="mt-4 flex justify-between items-center text-sm px-1">
+                <!-- Total Reference (only if cost is provided) -->
+                <div v-if="unitCost > 0" class="mt-4 flex justify-between items-center text-sm px-1">
                     <span class="text-gray-500 dark:text-gray-400">Total O.C. estimado:</span>
                     <span class="font-bold text-gray-900 dark:text-white text-lg">{{ formatCurrency(totalCost) }}</span>
                 </div>
@@ -269,25 +314,51 @@ const totalCost = computed(() => quantity.value * unitCost.value)
         </div>
 
         <!-- Footer -->
-        <div class="px-6 py-4 border-t border-gray-100 dark:border-border bg-gray-50/50 dark:bg-muted/20 flex justify-end gap-2">
-          <button
-            @click="handleClose"
-            :disabled="isSubmitting"
-            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            @click="handleSubmit"
-            :disabled="isSubmitting || !selectedSupplierId || quantity < 1 || (product?.variants?.length > 0 && !selectedVariantId)"
-            class="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center justify-center min-w-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg v-if="isSubmitting" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Abastecer
-          </button>
+        <div class="px-6 py-4 border-t border-gray-100 dark:border-border bg-gray-50/50 dark:bg-muted/20">
+          <!-- Info text -->
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 text-center">
+            <strong>Recomendado:</strong> Agregar a lista y consolidar compras al final del día
+          </p>
+          
+          <div class="flex flex-col sm:flex-row justify-end gap-2">
+            <button
+              @click="handleClose"
+              :disabled="isSubmitting"
+              class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            
+            <!-- Primary action: Add to Supply List -->
+            <button
+              @click="handleAddToSupplyList"
+              :disabled="isSubmitting || quantity < 1 || (product?.variants?.length > 0 && !selectedVariantId)"
+              class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-primary dark:hover:bg-primary/90 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[160px] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg v-if="isSubmitting" class="animate-spin -ml-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <List v-else class="w-4 h-4" />
+              Agregar a Lista
+            </button>
+            
+            <!-- Secondary action: Quick Purchase (requires supplier and cost) - hidden when showQuickPurchaseAction is false -->
+            <button
+              v-if="showQuickPurchaseAction"
+              @click="handleQuickPurchase"
+              :disabled="isSubmitting || !selectedSupplierId || quantity < 1 || unitCost <= 0 || (product?.variants?.length > 0 && !selectedVariantId)"
+              class="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[160px] disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Requiere proveedor y costo"
+            >
+              <svg v-if="isSubmitting" class="animate-spin -ml-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <PackageCheck v-else class="w-4 h-4" />
+              Compra Rápida
+            </button>
+          </div>
         </div>
       </div>
     </div>

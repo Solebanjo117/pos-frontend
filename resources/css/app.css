@@ -81,6 +81,30 @@
 }
 
 @layer utilities {
+    .scrollbar-hide {
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox */
+    }
+    
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none; /* Chrome, Safari and Opera */
+    }
+
+    /* ================================================================
+       R34: Hide number input spinners (arrows) globally
+       ================================================================ */
+    /* Chrome, Safari, Edge, Opera */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    /* Firefox */
+    input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
 
     body,
     html {
@@ -182,5 +206,23 @@
 
     body {
         @apply bg-background text-foreground;
+    }
+}
+
+/* ================================================================
+   R34: Hide number input spinners (arrows) globally
+   ================================================================ */
+@layer utilities {
+    /* Chrome, Safari, Edge, Opera */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    /* Firefox */
+    input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
     }
 }

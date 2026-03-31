@@ -18,6 +18,11 @@ import { Wrench, CircleDollarSign, Package } from 'lucide-vue-next'
 const props = defineProps<{
     productId?: number
     categoryId?: number
+    categoryMargin?: number | null
+    categoryFormula?: string | null
+    categoryAppliesItbm?: boolean
+    categoryItbmPercent?: number | null
+    categoryDefaultCost?: number | null
     skuBase?: string
     productName?: string
     defaultVariantAttributes?: { name: string; value: string; unit: string }[]
@@ -116,28 +121,12 @@ const fetchCategoryDefaults = async (categoryId: number | undefined) => {
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 
-// === Total Evaluado ===
-// Por defecto, el total es Base Price + ITBM. Si se usa la fórmula, asume el valor devuelto sin tocar Base Price.
-const custom_total = ref<number | null>(null)
-
-const computed_total = computed(() => {
-    if (custom_total.value !== null && custom_total.value !== undefined) {
-        return custom_total.value
-    }
-    const p = form.value.pricing
-    const base = Number(p.base_price) || 0
-    const rate = Number(p.tax_rate) || 0
-    return Number((base * (1 + rate / 100)).toFixed(2))
-})
-
+// === Precio Final: PricingFormula es la única fuente de verdad ===
+// Al recibir un nuevo precio calculado (sea fórmula o numero directo),
+// lo almacenamos directamente en base_price para que el payload sea correcto.
 const onFormulaTotalChange = (newTotal: number) => {
-    custom_total.value = newTotal
+    form.value.pricing.base_price = newTotal
 }
-
-// Limpiamos el custom_total al cambiar manualmente bases o impuestos
-watch(() => form.value.pricing.base_price, () => { custom_total.value = null })
-watch(() => form.value.pricing.tax_rate, () => { custom_total.value = null })
-watch(() => form.value.pricing_formula, (v) => { if(!v) custom_total.value = null })
 
 // === Auto Variant SKU ===
 const autoVariantSku = computed(() => {
@@ -158,6 +147,70 @@ const skuManuallyEdited = ref(false)
 const onSkuInput = () => { skuManuallyEdited.value = true }
 const customSkuManuallyEdited = ref(false)
 const onCustomSkuInput = () => { customSkuManuallyEdited.value = true }
+
+// === Auto Price Calculation from Category Margin ===
+// Tracks whether the user manually typed a price in this modal session.
+// Only reset when a new modal session opens (not when price reaches 0).
+const priceManuallyEdited = ref(false)
+const onBasePriceInput = () => { priceManuallyEdited.value = true }
+
+const recalculatePriceFromCategory = async () => {
+    const cost = Number(form.value.pricing.cost) || 0
+    if (cost <= 0) { priceManuallyEdited.value = false; return }
+
+    if (props.categoryFormula) {
+        // Formula takes priority over margin
+        try {
+            const { data } = await apiClient.post('/categories/preview-price', {
+                formula: props.categoryFormula,
+                costo: cost,
+                applies_itbm: props.categoryAppliesItbm ?? false,
+                itbm_percent: props.categoryItbmPercent ?? 7,
+            })
+            if (data.price !== null) {
+                form.value.pricing.base_price = data.price
+            }
+        } catch { /* silencioso */ }
+    } else {
+        // Fallback: simple margin (LL-013)
+        const margin = props.categoryMargin
+        if (margin != null && margin > 0) {
+            form.value.pricing.base_price = Number((cost * (1 + margin / 100)).toFixed(2))
+        }
+    }
+    priceManuallyEdited.value = false
+}
+
+// Auto-recalculate when cost changes (only if user hasn't manually overridden price)
+watch(
+    () => form.value.pricing.cost,
+    async (newCost) => {
+        if (priceManuallyEdited.value) return
+        const cost = Number(newCost) || 0
+        if (cost <= 0) return
+
+        if (props.categoryFormula) {
+            // Formula takes priority
+            try {
+                const { data } = await apiClient.post('/categories/preview-price', {
+                    formula: props.categoryFormula,
+                    costo: cost,
+                    applies_itbm: props.categoryAppliesItbm ?? false,
+                    itbm_percent: props.categoryItbmPercent ?? 7,
+                })
+                if (data.price !== null) {
+                    form.value.pricing.base_price = data.price
+                }
+            } catch { /* silencioso */ }
+        } else {
+            // Fallback: simple margin (LL-013)
+            const margin = props.categoryMargin
+            if (margin != null && margin > 0) {
+                form.value.pricing.base_price = Number((cost * (1 + margin / 100)).toFixed(2))
+            }
+        }
+    }
+)
 
 // Auto custom SKU fill
 watch(
@@ -233,14 +286,14 @@ const openCreateModal = () => {
         sku: '',
         upc: '',
         status: 'active',
-        pricing_formula: '',
+        pricing_formula: props.categoryFormula || '',
         pricing: {
             base_price: 0,
             msrp: 0,
-            cost: 0,
-            tax_rate: 7,
+            cost: props.categoryDefaultCost ?? 0,
+            tax_rate: (props.categoryAppliesItbm === false) ? 0 : (props.categoryItbmPercent ?? 7),
             tax_type: 'custom',
-            pricing_formula: '',
+            pricing_formula: props.categoryFormula || '',
         },
         initial_inventory: [
             {
@@ -255,9 +308,14 @@ const openCreateModal = () => {
     previousAutoSku.value = autoVariantSku.value
     skuManuallyEdited.value = false
     customSkuManuallyEdited.value = false
+    priceManuallyEdited.value = false
     form.value.sku = autoVariantSku.value
     form.value.upc = autoVariantSku.value
     showModal.value = true
+    // Auto-calculate price from inherited cost + category formula/margin
+    if ((props.categoryDefaultCost ?? 0) > 0) {
+        recalculatePriceFromCategory()
+    }
 }
 
 const openEditModal = (variant: any) => {
@@ -292,8 +350,7 @@ const openEditModal = (variant: any) => {
         initial_inventory: []
     }
 
-    // Si tiene formula, inicializar custom_total con el base_price que viene del backend
-    custom_total.value = p?.pricing_formula ? (p?.base_price ?? null) : null
+    // base_price ya se carga directo en form.pricing.base_price desde el backend
 
     previousAutoSku.value = variant.sku
     showModal.value = true
@@ -441,7 +498,7 @@ onMounted(async () => {
             <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-muted dark:text-gray-400">
                     <tr>
-                        <th class="px-6 py-3">SKU</th>
+                        <!-- SKU oculto (R38: cliente usa SKU del producto padre) -->
                         <th class="px-6 py-3">Nombre</th>
                         <th class="px-6 py-3">Atributos</th>
                         <th class="px-6 py-3">Marca</th>
@@ -453,7 +510,7 @@ onMounted(async () => {
                 </thead>
                 <tbody>
                     <tr v-for="variant in displayVariants" :key="variant.id ?? variant._draftId" class="border-b bg-white hover:bg-gray-50 dark:border-border dark:bg-card dark:hover:bg-muted">
-                        <td class="px-6 py-4 font-mono text-xs">{{ variant.sku }}</td>
+                        <!-- SKU cell oculto -->
                         <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
                             {{ productName || 'Producto Base' }}
                         </td>
@@ -505,28 +562,16 @@ onMounted(async () => {
                 <DialogHeader>
                     <DialogTitle>{{ editingVariant ? 'Editar Variante' : 'Nueva Variante' }}</DialogTitle>
                     <DialogDescription>
-                        Marca, atributos técnicos, SKU y precios de esta variante.
+                        Marca, atributos técnicos y precios de esta variante.
                     </DialogDescription>
                 </DialogHeader>
                 <!-- Formulario Modal con .stop para evitar burbujeo al padre Create.vue -->
                 <form @submit.prevent.stop="handleSubmit" class="space-y-4 py-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- SKU (Auto-generated) - NOW FIRST -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                SKU Variante
-                                <span v-if="!editingVariant && autoVariantSku && !skuManuallyEdited" class="text-xs text-green-600 dark:text-green-400 ml-1">(auto)</span>
-                            </label>
-                            <input
-                                v-model="form.sku" @input="onSkuInput"
-                                type="text"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white font-mono text-sm"
-                                :placeholder="autoVariantSku || 'Se genera automáticamente'"
-                            />
-                            <p v-if="skuBase" class="mt-1 text-xs text-gray-400">Base: {{ skuBase }}</p>
-                        </div>
+                        <!-- SKU Variante - OCULTO (R38: cliente usa SKU del producto padre) -->
+                        <!-- El campo sigue existiendo en form.sku pero no se muestra -->
 
-                        <!-- Brand - NOW SECOND -->
+                        <!-- Brand - NOW FIRST -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Marca</label>
                             <div :class="editingVariant ? '' : 'flex gap-1'">
@@ -644,35 +689,52 @@ onMounted(async () => {
 
                         <!-- Tax type toggle fue removido: ahora ITBM siempre es numérico y modificable con 7% default -->
 
-                        <!-- 3-way calculator: Precio | ITBM | Total -->
+                        <!-- 3 columnas: Costo | % ITBM | Precio de Venta / Fórmula -->
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 p-3 rounded-lg bg-gray-50 dark:bg-muted/50 border border-dashed border-gray-200 dark:border-border items-start">
+                            <!-- Campo Costo -->
                             <div class="md:col-span-3">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Precio de Venta <span class="text-xs text-gray-400"></span>
+                                    Costo <span class="text-xs text-gray-400">(compra)</span>
                                 </label>
                                 <div class="relative mt-1">
                                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                                    <input v-model.number="form.pricing.base_price" type="number" step="0.01" min="0"
+                                    <input v-model.number="form.pricing.cost" type="number" step="0.01" min="0"
+                                        :title="props.categoryFormula ? `Al ingresar costo, se calculará precio automáticamente usando: ${props.categoryFormula}` : 'Costo de adquisición del producto'"
                                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white pl-7" />
                                 </div>
                             </div>
+                            <!-- Campo % ITBM -->
                             <div class="md:col-span-2">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">% ITBM</label>
                                 <input v-model.number="form.pricing.tax_rate" type="number" step="0.01" min="0" max="100"
                                     class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white" />
                             </div>
+                            <!-- Campo Precio de Venta / Fórmula (única fuente de verdad) -->
                             <div class="md:col-span-7">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Precio Total <span class="text-xs text-green-500 font-semibold">(número o fórmula — <code class="bg-gray-100 dark:bg-muted px-1 rounded">costo</code> = Precio de Venta)</span>
+                                    Precio de Venta
+                                    <span v-if="props.categoryFormula" class="ml-1 text-xs text-blue-500 font-semibold">
+                                        · Fórmula: <code class="font-mono bg-blue-50 dark:bg-blue-900/20 px-1 rounded">{{ props.categoryFormula }}</code>
+                                    </span>
                                 </label>
                                 <PricingFormula
-                                    :cost="Number(form.pricing.base_price) || 0"
+                                    :cost="Number(form.pricing.cost) || 0"
                                     :tax-rate="Number(form.pricing.tax_rate) || 7"
                                     :model-value="form.pricing_formula"
-                                    :price="computed_total"
+                                    :price="Number(form.pricing.base_price) || 0"
                                     @update:model-value="v => form.pricing_formula = v"
                                     @update:price="onFormulaTotalChange"
                                 />
+                                <!-- Botón recalcular por categoría si el usuario editó manualmente -->
+                                <button
+                                    v-if="priceManuallyEdited && (props.categoryFormula || (props.categoryMargin != null && props.categoryMargin > 0))"
+                                    type="button"
+                                    @click="recalculatePriceFromCategory"
+                                    class="mt-1 text-xs text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition flex items-center gap-1"
+                                    :title="props.categoryFormula ? `Fórmula: ${props.categoryFormula}` : `Margen de categoría: ${props.categoryMargin}%`"
+                                >
+                                    &#8635; Recalcular por categor&iacute;a
+                                </button>
                             </div>
                         </div>
                     </div>

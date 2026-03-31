@@ -73,6 +73,17 @@ export function useCashierQueue() {
     return `${hours}h ${remainMin}m`
   }
 
+  async function removeFromQueue(quoteId: number): Promise<boolean> {
+    try {
+      await apiClient.delete(`/sales-quotes/${quoteId}/cashier-queue`)
+      await fetchPending() // Refresh queue
+      return true
+    } catch (e: any) {
+      console.error('Error removing from queue:', e)
+      return false
+    }
+  }
+
   const count = computed(() => quotes.value.length)
 
   onUnmounted(() => stopPolling())
@@ -86,5 +97,6 @@ export function useCashierQueue() {
     fetchPending,
     startPolling,
     stopPolling,
+    removeFromQueue,
   }
 }

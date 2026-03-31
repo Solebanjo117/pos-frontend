@@ -1,139 +1,114 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useVehicleEngines } from '@/composables/useVehicleEngines'
-import { useVehicleModels } from '@/composables/useVehicleModels'
-import { useVehicleMakes } from '@/composables/useVehicleMakes'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Vehículos', href: '/vehicles/makes' },
+    { title: 'Vehículos', href: '/vehicles' },
     { title: 'Motores', href: '/vehicles/engines' },
     { title: 'Crear', href: '/vehicles/engines/create' },
 ]
 
-const { createEngine, loading, error } = useVehicleEngines()
-const { makes, fetchMakes } = useVehicleMakes()
-const { models, fetchModels } = useVehicleModels()
+const { engines, createEngine, fetchEngines, loading, error } = useVehicleEngines()
 
-const selectedMakeId = ref<number | ''>('')
 const form = ref({
-    model_id: '' as string | number,
     engine_code: '',
     displacement: '',
     fuel_type: 'Gasoline',
-    aspiration: 'Naturally Aspirated'
 })
 
-// Load Makes on mount
-onMounted(async () => {
-    await fetchMakes({ per_page: 100 })
-})
+const duplicateConfirmed = ref(false)
 
-// Load Models when Make changes
-watch(selectedMakeId, async (newVal) => {
-    form.value.model_id = ''
-    if (newVal) {
-        await fetchModels({ make_id: Number(newVal), per_page: 100 })
-    } else {
-        models.value = []
-    }
-})
+// R20: Check for duplicate engine code
+const checkDuplicate = (code: string): boolean => {
+    return engines.value.some(e => 
+        e.engine_code.toLowerCase().trim() === code.toLowerCase().trim()
+    )
+}
 
 const handleSubmit = async () => {
+    // R20: Check for duplicate
+    if (!duplicateConfirmed.value && checkDuplicate(form.value.engine_code)) {
+        const confirm = window.confirm(
+            `⚠️ Ya existe un motor con el código "${form.value.engine_code}".\n\n¿Desea crear un motor duplicado?`
+        )
+        if (!confirm) return
+        duplicateConfirmed.value = true
+    }
+
     try {
         await createEngine({
             ...form.value,
-            model_id: Number(form.value.model_id)
+            aspiration: 'N/A',  // Campo legacy, no se usa ya
         })
         router.visit('/vehicles/engines')
     } catch (e) {
         // Error handled in composable
+        duplicateConfirmed.value = false
     }
 }
+
+// Load engines for duplicate check
+fetchEngines({ per_page: 500 })
 </script>
 
 <template>
     <Head title="Crear Motor" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-2xl space-y-6 p-6">
-            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Crear Nuevo Motor</h1>
+        <div class="mx-auto max-w-xl space-y-6 p-6">
+            <div>
+                <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Crear Nuevo Motor</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Los motores son reutilizables y pueden asignarse a múltiples vehículos
+                </p>
+            </div>
 
-            <div v-if="error" class="rounded-md bg-red-50 p-4 text-red-700">
+            <div v-if="error" class="rounded-md bg-red-50 p-4 text-red-700 dark:bg-red-900/30 dark:text-red-400">
                 {{ error }}
             </div>
 
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <form @submit.prevent="handleSubmit" class="space-y-6">
-                    <!-- Make Selection (Helper) -->
+                    <!-- Código de Motor -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Marca (Filtrar Modelos)
-                        </label>
-                        <select
-                            v-model="selectedMakeId"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
-                        >
-                            <option value="" disabled>Selecciona una marca</option>
-                            <option v-for="make in makes" :key="make.id" :value="make.id">
-                                {{ make.name }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <!-- Model Selection -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Modelo
-                        </label>
-                        <select
-                            v-model="form.model_id"
-                            required
-                            :disabled="!selectedMakeId"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
-                        >
-                            <option value="" disabled>Selecciona un modelo</option>
-                            <option v-for="carModel in models" :key="carModel.id" :value="carModel.id">
-                                {{ carModel.name }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <!-- Engine Details -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Código de Motor (Ej: 2ZR-FE)
+                            Código de Motor <span class="text-red-500">*</span>
                         </label>
                         <input
                             v-model="form.engine_code"
                             type="text"
                             required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
+                            placeholder="Ej: 2ZR-FE, K20A, 1GR-FE"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white font-mono"
                         />
+                        <p class="mt-1 text-xs text-gray-500">Código único que identifica este motor</p>
                     </div>
 
+                    <!-- Desplazamiento -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Desplazamiento (Ej: 1.8L)
+                            Desplazamiento
                         </label>
                         <input
                             v-model="form.displacement"
                             type="text"
-                            required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
+                            placeholder="Ej: 1.8L, 2.4L, 3.5L"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         />
                     </div>
 
+                    <!-- Combustible -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                             Combustible
                         </label>
                         <select
                             v-model="form.fuel_type"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         >
                             <option value="Gasoline">Gasolina</option>
                             <option value="Diesel">Diesel</option>
@@ -142,7 +117,7 @@ const handleSubmit = async () => {
                         </select>
                     </div>
 
-                    <div class="flex justify-end gap-3">
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-border">
                         <Link
                             href="/vehicles/engines"
                             class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-muted dark:text-gray-200 dark:hover:bg-muted"
@@ -151,7 +126,7 @@ const handleSubmit = async () => {
                         </Link>
                         <button
                             type="submit"
-                            :disabled="loading"
+                            :disabled="loading || !form.engine_code"
                             class="rounded-md bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-50"
                         >
                             {{ loading ? 'Guardando...' : 'Guardar Motor' }}

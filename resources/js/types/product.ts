@@ -210,6 +210,7 @@ export interface CreateProductRequest {
     description?: string
     product_line_id?: number
     category_id?: number
+    engine_id?: number // R21: motor as reusable entity
     status?: 'active' | 'discontinued' | 'pending'
     batch_tracking?: boolean
     alternate_code?: string      // alternate identifier
@@ -245,6 +246,8 @@ export interface UpdateProductRequest {
     alternate_code?: string      // alternate identifier
     pricing_formula?: string     // Excel-like pricing formula
     product_line_id?: number
+    category_id?: number
+    engine_id?: number // R21: motor as reusable entity
     name?: string
     description?: string
     status?: 'active' | 'discontinued' | 'pending'

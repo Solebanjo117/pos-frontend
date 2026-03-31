@@ -68,7 +68,7 @@ export function usePurchaseOrders() {
         }
     }
 
-    // Quick receive (Backorder)
+    // Quick receive (Backorder) - Legacy method
     async function quickReceivePurchaseOrder(data: any) {
         loading.value = true
         error.value = null
@@ -77,6 +77,51 @@ export function usePurchaseOrders() {
             return created
         } catch (e: any) {
             error.value = e.response?.data?.message || 'Error al procesar abastecimiento rápido'
+            throw e
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // Quick Purchase v2 - Uses daily global PO system
+    async function quickPurchase(data: any) {
+        loading.value = true
+        error.value = null
+        try {
+            const created = await purchaseOrdersService.quickPurchase(data)
+            return created
+        } catch (e: any) {
+            error.value = e.response?.data?.message || 'Error al procesar compra rápida'
+            throw e
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // Reception batch - For POS reception mode
+    async function receptionBatch(warehouseId: number, items: any[]) {
+        loading.value = true
+        error.value = null
+        try {
+            const result = await purchaseOrdersService.receptionBatch({ warehouse_id: warehouseId, items })
+            return result
+        } catch (e: any) {
+            error.value = e.response?.data?.message || 'Error al procesar recepción'
+            throw e
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // Get daily PO
+    async function getDailyPO(warehouseId: number) {
+        loading.value = true
+        error.value = null
+        try {
+            const response = await purchaseOrdersService.getDailyPO(warehouseId)
+            return response.data
+        } catch (e: any) {
+            error.value = e.response?.data?.message || 'Error al obtener OC diaria'
             throw e
         } finally {
             loading.value = false
@@ -193,5 +238,8 @@ export function usePurchaseOrders() {
         cancelPurchaseOrder,
         fetchStatistics,
         quickReceivePurchaseOrder,
+        quickPurchase,
+        receptionBatch,
+        getDailyPO,
     }
 }

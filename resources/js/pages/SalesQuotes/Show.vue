@@ -285,8 +285,6 @@ onMounted(fetchQuote)
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Producto</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cant.</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Precio U.</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Desc.</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Impuesto</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
                             </tr>
                         </thead>
@@ -308,14 +306,6 @@ onMounted(fetchQuote)
                                 </td>
                                 <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">{{ item.quantity }}</td>
                                 <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">{{ formatCurrency(item.unit_price) }}</td>
-                                <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">
-                                    <div>{{ formatCurrency(item.discount_amount) }}</div>
-                                    <div v-if="item.discount_percent > 0" class="text-xs text-green-600">({{ item.discount_percent }}%)</div>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">
-                                    <div>{{ formatCurrency(item.tax_amount) }}</div>
-                                    <div class="text-xs text-gray-400">({{ item.tax_percent }}%)</div>
-                                </td>
                                 <td class="px-6 py-4 text-sm text-right font-bold text-gray-900 dark:text-white">{{ formatCurrency(item.total) }}</td>
                             </tr>
                         </tbody>

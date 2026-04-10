@@ -8,6 +8,7 @@ const props = defineProps<{
   subtotal: number
   taxAmount: number
   total: number
+  discountAmount?: number
   customerId: number | string | null | undefined
   sellerId: number | string | null | undefined
   customers: Array<{ id: number; name: string; document_number?: string; phone?: string | null }>
@@ -118,11 +119,15 @@ watch(() => props.sellerId, (val) => {
           <span>Subtotal</span>
           <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(subtotal) }}</span>
         </div>
+        <div v-if="discountAmount && discountAmount > 0" class="flex justify-between text-green-600 dark:text-green-400 text-sm">
+          <span>Descuento</span>
+          <span class="font-medium">-{{ formatCurrency(discountAmount) }}</span>
+        </div>
         <div class="flex justify-between text-gray-600 dark:text-gray-300 text-sm">
           <span>IVA</span>
           <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(taxAmount) }}</span>
         </div>
-        
+
         <div class="h-px bg-blue-200/50 dark:bg-blue-900/50 my-2"></div>
         
         <div class="flex justify-between items-end">

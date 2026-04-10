@@ -320,8 +320,6 @@ onMounted(() => {
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vendedor</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cantidad</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Precio Unit.</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Descuento</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Impuestos</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
               </tr>
             </thead>
@@ -343,11 +341,6 @@ onMounted(() => {
                 </td>
                 <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">{{ item.quantity }}</td>
                 <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">${{ item.unit_price }}</td>
-                <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">${{ item.discount_amount }}</td>
-                <td class="px-6 py-4 text-sm text-right text-gray-900 dark:text-white">
-                  <div>${{ item.tax_amount }}</div>
-                  <div class="text-xs text-gray-400">({{ item.tax_percent }}%)</div>
-                </td>
                 <td class="px-6 py-4 text-sm text-right font-medium text-gray-900 dark:text-white">{{ item.formatted_total }}</td>
               </tr>
             </tbody>

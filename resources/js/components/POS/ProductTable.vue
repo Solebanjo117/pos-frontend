@@ -168,12 +168,6 @@ const handlePurchaseSuccess = (result: {
                   <div class="flex flex-col">
                     <span class="font-medium text-gray-900 dark:text-white text-sm">{{ item.product_name }}</span>
                     <div class="flex flex-wrap gap-1 mt-0.5">
-                      <span v-if="item.discount_percent > 0" class="text-xs text-green-600 bg-green-100 px-1 py-0.5 rounded inline-block w-max">
-                        -{{ item.discount_percent }}% OFF
-                      </span>
-                      <span v-if="item.tax_percent === 0" class="text-xs text-orange-600 bg-orange-100 px-1 py-0.5 rounded inline-block w-max">
-                        Exento
-                      </span>
                       <span v-if="item.seller_id" class="text-xs text-blue-600 dark:text-primary bg-blue-100 px-1 py-0.5 rounded inline-block w-max">
                         {{ users.find(u => u.id === item.seller_id)?.name || 'Vendedor' }}
                       </span>
@@ -186,11 +180,7 @@ const handlePurchaseSuccess = (result: {
               </td>
               
               <td class="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300 text-sm" @click.stop>
-                <div>{{ formatCurrency(item.product_price) }}</div>
-                <div v-if="item.tax_percent > 0" class="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">
-                  +{{ item.tax_percent }}% ITBMS
-                </div>
-                <div v-else class="text-[10px] text-orange-500 leading-tight">Exento</div>
+                {{ formatCurrency(item.product_price) }}
               </td>
               
               <td class="px-4 py-3" @click.stop>

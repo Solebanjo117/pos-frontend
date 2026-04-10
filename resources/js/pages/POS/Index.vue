@@ -9,11 +9,12 @@ import { useWarehouses } from '@/composables/useWarehouses'
 import apiClient from '@/services/api/client'
 import { Search, Trash2, Save, Banknote, CreditCard, Landmark, AlertTriangle, Keyboard, LogOut, Car, Gift, FileText, SlidersHorizontal, ArrowUpDown, Filter } from 'lucide-vue-next'
 import { usePosSettings } from '@/composables/usePosSettings'
-import POSFilterSidebar from '@/components/POS/POSFilterSidebar.vue'
+// POSFilterSidebar removed — filtering now handled inside ProductSearchModal via ProductFilters
 import { usePosSession } from '@/composables/usePosSession'
 
 import CashRegisterStatus from '@/components/POS/CashRegisterStatus.vue'
 import POSControls from '@/components/POS/POSControls.vue'
+import POSInlineSearch from '@/components/POS/POSInlineSearch.vue'
 import ProductTable from '@/components/POS/ProductTable.vue'
 import SummarySection from '@/components/POS/SummarySection.vue'
 import ActionButtons from '@/components/POS/ActionButtons.vue'
@@ -115,6 +116,7 @@ const {
 // UI State
 const searchQuery = ref('')
 const posControlsRef = ref<InstanceType<typeof POSControls> | null>(null)
+const inlineSearchRef = ref<InstanceType<typeof POSInlineSearch> | null>(null)
 const selectedCategoryId = ref<number | undefined>(undefined)
 const selectedBrandId = ref<number | undefined>(undefined)
 const quantity = ref(1)
@@ -242,6 +244,11 @@ const totalReceived = computed(() => {
 // Monto pendiente (lo que falta por cobrar o se cargará a crédito)
 const pendingAmount = computed(() => {
   return Math.max(0, amountToCharge.value - totalReceived.value)
+})
+
+// Total de descuento en el carrito
+const cartDiscount = computed(() => {
+  return cart.value.reduce((sum, item) => sum + (Number(item.discount_amount) || 0), 0)
 })
 
 // Vuelto a entregar (solo si se recibió más de lo debido)
@@ -691,12 +698,26 @@ const getProductSKU = (product: any): string => {
   return product.sku_base ?? product.sku ?? product.default_variant?.sku ?? ''
 }
 
+// Advanced filter state from ProductSearchModal
+const modalSkuFilter = ref<string | undefined>(undefined)
+const modalMinPrice = ref<number | undefined>(undefined)
+const modalMaxPrice = ref<number | undefined>(undefined)
+const modalInStock = ref<boolean | undefined>(undefined)
+const modalSort = ref<string | undefined>(undefined)
+const modalCategoryIds = ref<number[] | undefined>(undefined)
+const modalBrandIds = ref<number[] | undefined>(undefined)
+
 // Build filters
 const buildFilters = () => ({
   search: searchQuery.value || undefined,
-  category_id: selectedCategoryId.value,
-  brand_id: selectedBrandId.value,
+  category_id: modalCategoryIds.value?.length ? modalCategoryIds.value : (selectedCategoryId.value ? [selectedCategoryId.value] : undefined),
+  brand_id: modalBrandIds.value?.length ? modalBrandIds.value : (selectedBrandId.value ? [selectedBrandId.value] : undefined),
   warehouse_id: currentWarehouseId.value || undefined,
+  sku: modalSkuFilter.value || undefined,
+  min_price: modalMinPrice.value,
+  max_price: modalMaxPrice.value,
+  in_stock: modalInStock.value || undefined,
+  sort: modalSort.value || undefined,
   per_page: 20,
 })
 
@@ -772,19 +793,26 @@ const handleControlsSearch = (data: { query: string; quantity: number; category_
   performSearch(data.query, data.quantity)
 }
 
-// R43: Handle search-in-modal — re-run product fetch without closing modal
-const handleModalSearch = (filters: { query: string; category_id?: number; brand_id?: number }) => {
+// R43: Handle search-in-modal — re-run product fetch without closing modal (with advanced filters)
+const handleModalSearch = (filters: {
+  query: string
+  category_ids?: number[]
+  brand_ids?: number[]
+  sku?: string
+  min_price?: number
+  max_price?: number
+  in_stock?: boolean
+  sort?: string
+}) => {
   searchQuery.value = filters.query
-  if (filters.category_id !== undefined) selectedCategoryId.value = filters.category_id
-  if (filters.brand_id !== undefined) selectedBrandId.value = filters.brand_id
+  modalCategoryIds.value = filters.category_ids
+  modalBrandIds.value = filters.brand_ids
+  modalSkuFilter.value = filters.sku
+  modalMinPrice.value = filters.min_price
+  modalMaxPrice.value = filters.max_price
+  modalInStock.value = filters.in_stock
+  modalSort.value = filters.sort
   performSearch(filters.query)
-}
-
-// R45: Handle filter sidebar filter changes
-const handleSidebarFilter = (filters: { category_id?: number; brand_id?: number }) => {
-  selectedCategoryId.value = filters.category_id
-  selectedBrandId.value = filters.brand_id
-  performSearch()
 }
 
 
@@ -860,6 +888,26 @@ const addSelectedProducts = (ids: Set<number>) => {
   }
 }
 
+// ── Inline Search Handlers ─────────────────────────────────────────────────
+const handleInlineSelect = (product: any) => {
+  // Product with single variant (or default variant) — add directly
+  const variants = product.variants ?? []
+  const variant = variants.length === 1 ? variants[0] : (product.default_variant ?? null)
+  addToCart(product, variant, 1, currentWarehouseId.value || undefined)
+}
+
+const handleInlineVariantNeeded = (product: any) => {
+  // Product with multiple variants — enqueue for variant selection modal
+  variantQueue.value.push(product)
+  if (variantQueue.value.length === 1) {
+    showVariantModal.value = true
+  }
+}
+
+const handleOpenFullSearch = () => {
+  showProductsModal.value = true
+}
+
 // Fetch categories and brands
 const fetchCategories = async () => {
   try {
@@ -889,7 +937,7 @@ const handleKeyboard = (e: KeyboardEvent) => {
   switch (e.key) {
     case 'F1':
       e.preventDefault()
-      searchInput.value?.focus()
+      inlineSearchRef.value?.focusSearch()
       break
     case 'F2':
       e.preventDefault()
@@ -1461,42 +1509,21 @@ onUnmounted(() => {
     <!-- Main Content - Flex to fill remaining height -->
     <main class="flex-1 min-h-0 flex flex-col xl:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
 
-        <!-- R45: Filter Sidebar -->
-        <POSFilterSidebar
-          v-if="showFilterSidebar && !props.returnMode"
-          :categories="categories"
-          :brands="brands"
-          :selected-category-id="selectedCategoryId"
-          :selected-brand-id="selectedBrandId"
-          @filter="handleSidebarFilter"
-          @close="showFilterSidebar = false"
-        />
+        <!-- R45: Filter sidebar now lives inside ProductSearchModal -->
 
         <!-- Left Column: Controls & Product List (Grows to fill space) -->
         <div class="flex-[3] flex flex-col gap-4 min-w-0 h-full overflow-hidden">
           <!-- Hide search controls in return mode -->
           <div v-if="!props.returnMode" class="shrink-0">
-            <div class="flex items-center gap-2">
-              <POSControls
-                  ref="posControlsRef"
-                  :categories="categories"
-                  :brands="brands"
-                  @search="handleControlsSearch"
-                  class="flex-1"
-              />
-              <!-- R45: Toggle filter sidebar button -->
-              <button
-                @click="showFilterSidebar = !showFilterSidebar"
-                class="h-10 px-3 flex items-center gap-1.5 rounded-lg border transition-colors text-sm font-medium shrink-0"
-                :class="showFilterSidebar
-                  ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-400'
-                  : 'bg-white dark:bg-card border-gray-200 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-muted'"
-                title="Filtros avanzados"
-              >
-                <Filter class="w-4 h-4" />
-                <span class="hidden md:inline">Filtros</span>
-              </button>
-            </div>
+            <POSInlineSearch
+                ref="inlineSearchRef"
+                :categories="categories"
+                :brands="brands"
+                :warehouse-id="currentWarehouseId"
+                @product-selected="handleInlineSelect"
+                @product-needs-variant="handleInlineVariantNeeded"
+                @open-full-search="handleOpenFullSearch"
+            />
           </div>
 
           <!-- Multi-Cart Tabs (hide in return mode and edit mode) -->
@@ -1592,10 +1619,11 @@ onUnmounted(() => {
         <!-- Right Column: Summary & Actions -->
         <div class="flex-1 min-w-[300px] max-w-sm bg-white dark:bg-card p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-border flex flex-col h-full overflow-y-auto shrink-0">
           <div class="shrink-0 mb-4">
-            <SummarySection 
+            <SummarySection
                 :subtotal="cartSubtotal"
                 :taxAmount="cartTax"
                 :total="cartTotal"
+                :discountAmount="cartDiscount"
                 :customerId="customer_id"
                 :sellerId="seller_id"
                 :customers="customers"
@@ -1727,6 +1755,8 @@ onUnmounted(() => {
       :total-count="totalProducts"
       :has-more="hasNextPage"
       :loading-more="productsLoading"
+      :categories="categories"
+      :brands="brands"
       @close="showProductsModal = false"
       @add-products="addSelectedProducts"
       @load-more="loadMoreProducts"

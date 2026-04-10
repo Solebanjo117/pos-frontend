@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import type { Product } from '@/types/product'
 import apiClient from '@/services/api/client'
+import { displayFormat } from '@/utils/formatters'
 import { usePOS } from '@/composables/usePOS'
 import { usePosSettings } from '@/composables/usePosSettings'
 
@@ -217,6 +218,7 @@ const fetchVehicleCompatibility = async () => {
 const oemData          = ref<OemReference[]>([])
 const alternativesData = ref<AlternativeRecord[]>([])
 const loadingRefs      = ref(false)
+const showAlternatives = ref(false)
 
 // Tabs removed from layout
 // ── Mount ─────────────────────────────────────────────────────────────────────
@@ -277,8 +279,8 @@ const handleViewAlternative = async (altId: number) => {
                         <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ product.name }}</h2>
                         <span v-if="product.is_universal" class="flex-shrink-0 inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/20" title="Universal">🌐 Universal</span>
                     </div>
-                    <p v-if="product.sku_base && !blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ product.sku_base }}</p>
-                    <p v-else-if="blindMode" class="text-xs text-gray-400 font-mono mt-0.5">#{{ product.id }}</p>
+                    <p v-if="product.sku_base && !blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ displayFormat(product.sku_base) }}</p>
+                    <p v-else-if="blindMode" class="text-xs text-gray-400 font-mono mt-0.5">#{{ String(product.id).padStart(8, '0') }}</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <!-- Blind Mode Toggle -->
@@ -361,17 +363,18 @@ const handleViewAlternative = async (altId: number) => {
                             <div class="text-center mb-6">
                                 <template v-if="!blindMode">
                                     <small class="text-gray-500 uppercase tracking-wide text-xs">Código Base / SKU</small>
-                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ product.sku_base || product.default_variant?.sku || 'N/A' }}</h1>
+                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ displayFormat(product.sku_base || product.default_variant?.sku) || 'N/A' }}</h1>
                                 </template>
                                 <template v-else>
                                     <small class="text-gray-500 uppercase tracking-wide text-xs">Código</small>
-                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">#{{ product.id }}</h1>
+                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">#{{ String(product.id).padStart(8, '0') }}</h1>
                                 </template>
-                                <p class="text-gray-600 dark:text-gray-400" :class="blindMode ? '' : 'mt-2'">{{ product.description || 'Sin descripción' }}</p>
+                                <p v-if="blindMode && product.category?.name" class="text-sm text-gray-700 dark:text-gray-300 mt-2 font-medium">{{ product.category.name }}</p>
+                                <p v-if="product.description && !blindMode" class="text-gray-600 dark:text-gray-400 mt-2">{{ product.description }}</p>
                             </div>
 
                             <!-- Especificaciones Técnicas -->
-                            <div>
+                            <div v-if="!blindMode">
                                 <h6 class="font-bold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-border pb-2 mb-3">
                                     Especificaciones Técnicas
                                     <span v-if="loadingVariantAttrs" class="text-xs font-normal text-gray-400 animate-pulse ml-2">cargando...</span>
@@ -411,7 +414,7 @@ const handleViewAlternative = async (altId: number) => {
                                         <!-- Info Marca -->
                                         <div class="flex flex-col flex-1">
                                             <div class="flex items-center gap-2">
-                                                <span v-if="!blindMode" class="font-bold text-gray-900 dark:text-white font-mono text-base">{{ variant.sku }}</span>
+                                                <span v-if="!blindMode" class="font-bold text-gray-900 dark:text-white font-mono text-base">{{ displayFormat(variant.sku) }}</span>
                                                 <span v-else class="font-bold text-gray-900 dark:text-white text-base">{{ variant.brand?.name ?? 'Sin marca' }}</span>
                                             </div>
                                             <span v-if="!blindMode" class="text-xs text-gray-500 mt-1">
@@ -425,7 +428,7 @@ const handleViewAlternative = async (altId: number) => {
                                         <!-- Precio y Action -->
                                         <div class="flex items-center gap-6 self-end sm:self-auto">
                                             <!-- Quantities -->
-                                            <div class="flex items-center gap-2 bg-gray-50 dark:bg-background rounded-md p-1 border border-gray-200 dark:border-border shrink-0">
+                                            <div v-if="!blindMode" class="flex items-center gap-2 bg-gray-50 dark:bg-background rounded-md p-1 border border-gray-200 dark:border-border shrink-0">
                                                  <button @click.stop="changeQty(variant.id, -1)" :disabled="(variant.total_stock ?? 0) === 0" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 disabled:opacity-30 dark:hover:bg-muted/50">-</button>
                                                  <span class="text-sm font-medium w-6 text-center text-gray-900 dark:text-white">{{ quantities[variant.id] ?? 1 }}</span>
                                                  <button @click.stop="changeQty(variant.id, 1)" :disabled="(variant.total_stock ?? 0) === 0 || (quantities[variant.id] ?? 1) >= (variant.total_stock ?? 0)" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 disabled:opacity-30 dark:hover:bg-muted/50">+</button>
@@ -451,18 +454,19 @@ const handleViewAlternative = async (altId: number) => {
                                                         Sin ITBM
                                                     </template>
                                                 </div>
-                                                <div v-if="!blindMode && getVariantPricing(variant)?.cost > 0" class="text-[10px] text-gray-400">
+                                            <div v-if="!blindMode && getVariantPricing(variant)?.cost > 0" class="text-[10px] text-gray-400">
                                                     Costo: {{ formatCurrency(Number(getVariantPricing(variant).cost)) }}
                                                 </div>
-                                                <div :class="[
-                                                    'text-xs font-medium', 
+                                                <div v-if="!blindMode" :class="[
+                                                    'text-xs font-medium',
                                                     (variant.total_stock ?? 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-orange-500 dark:text-orange-400'
                                                 ]">
                                                     {{ variant.total_stock ?? 0 }} disponibles
                                                 </div>
                                             </div>
 
-                                            <button 
+                                            <button
+                                                v-if="!blindMode"
                                                 @click.stop="handleAddToCart(variant)"
                                                 :disabled="(variant.total_stock ?? 0) === 0"
                                                 class="bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white hover:bg-blue-700 dark:hover:bg-primary/90 w-12 h-12 rounded-lg flex items-center justify-center shadow-sm transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
@@ -490,7 +494,7 @@ const handleViewAlternative = async (altId: number) => {
                 <!-- ══════════════════════════════════════════════════════ -->
                 <!--  BOTTOM: Vehículos Compatibles & OEM                 -->
                 <!-- ══════════════════════════════════════════════════════ -->
-                <div class="mt-auto space-y-6">
+                <div v-if="!blindMode" class="mt-auto space-y-6">
                     
                     <!-- Vehículos Compatibles (Full Width Table) -->
                     <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border flex flex-col max-h-[350px]">
@@ -539,63 +543,81 @@ const handleViewAlternative = async (altId: number) => {
                         </div>
                     </div>
 
-                    <!-- OEM y Alternativas (Grid lado a lado si hay de ambos) -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" v-if="!loadingRefs && (oemData.length > 0 || alternativesData.length > 0)">
-                        <!-- OEM -->
-                        <div v-if="oemData.length > 0" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border">
-                            <div class="p-4 border-b border-gray-100 dark:border-border font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-background rounded-t-lg">
-                                Referencias OEM
-                            </div>
-                            <div class="overflow-hidden rounded-b-lg">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-border text-sm">
-                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
-                                        <tr v-for="oem in oemData" :key="oem.oem_code" class="hover:bg-gray-50 dark:hover:bg-muted/50/50">
-                                            <td class="px-4 py-3 font-mono font-semibold text-amber-700 dark:text-amber-400">
-                                                <a :href="deepLink('oem_code', oem.oem_code)" target="_blank" class="hover:underline">{{ oem.oem_code }}</a>
-                                            </td>
-                                            <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ oem.manufacturer || '—' }}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                    <!-- OEM Referencias (Full Width) -->
+                    <div v-if="!loadingRefs && oemData.length > 0" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border">
+                        <div class="p-4 border-b border-gray-100 dark:border-border font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-background rounded-t-lg flex items-center gap-2">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" /></svg>
+                            Referencias OEM
+                            <span class="text-xs font-normal text-gray-500 bg-gray-200 dark:bg-muted px-2 py-0.5 rounded-full">
+                                {{ oemData.length }}
+                            </span>
                         </div>
+                        <div class="overflow-x-auto rounded-b-lg">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-border text-sm">
+                                <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
+                                    <tr v-for="oem in oemData" :key="oem.oem_code" class="hover:bg-gray-50 dark:hover:bg-muted/50">
+                                        <td class="px-4 py-3 font-mono font-semibold text-amber-700 dark:text-amber-400">
+                                            <a :href="deepLink('oem_code', oem.oem_code)" target="_blank" class="hover:underline">{{ oem.oem_code }}</a>
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ oem.manufacturer || '—' }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
-                        <!-- Alternativas -->
-                        <div v-if="alternativesData.length > 0" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border" :class="oemData.length === 0 ? 'md:col-span-2' : ''">
-                            <div class="p-4 border-b border-gray-100 dark:border-border font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-background rounded-t-lg">
+                    <!-- Alternativas (Collapsible) -->
+                    <div v-if="!loadingRefs && alternativesData.length > 0" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border">
+                        <button
+                            @click="showAlternatives = !showAlternatives"
+                            class="w-full p-4 border-b border-gray-100 dark:border-border font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-background rounded-t-lg flex items-center justify-between hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors"
+                        >
+                            <div class="flex items-center gap-2">
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12M8 12h12M8 17h12M3 7h.01M3 12h.01M3 17h.01" /></svg>
                                 Alternativas y Ref. Cruzadas
+                                <span class="text-xs font-normal text-gray-500 bg-gray-200 dark:bg-muted px-2 py-0.5 rounded-full">
+                                    {{ alternativesData.length }}
+                                </span>
                             </div>
-                            <div class="overflow-x-auto rounded-b-lg">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-border text-sm">
-                                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
-                                        <tr v-for="alt in alternativesData" :key="alt.id" 
-                                            class="hover:bg-gray-50 dark:hover:bg-muted/50/50 cursor-pointer transition-colors"
-                                            @click="handleViewAlternative(alt.id)"
-                                            :title="'Ver detalle de ' + alt.name">
-                                            <td class="whitespace-nowrap px-4 py-3">
-                                                <code class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-muted dark:text-gray-300">{{ alt.sku }}</code>
-                                            </td>
-                                            <td class="px-4 py-3 text-gray-900 dark:text-white">
-                                                <div class="flex items-center gap-2">
-                                                    <span>{{ alt.name }}</span>
-                                                    <svg v-if="loadingAltId === alt.id" class="h-4 w-4 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
-                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                                    </svg>
-                                                    <svg v-else class="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                    </svg>
-                                                </div>
-                                            </td>
-                                            <td class="whitespace-nowrap px-4 py-3 text-right">
-                                                <span :class="relationshipClass(alt.pivot?.relationship_type ?? alt.relationship_type)" class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold">
-                                                    {{ relationshipLabel(alt.pivot?.relationship_type ?? alt.relationship_type) }}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                            <svg
+                                :class="['h-5 w-5 text-gray-400 transition-transform duration-200', showAlternatives ? 'rotate-180' : '']"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <div v-show="showAlternatives" class="overflow-x-auto rounded-b-lg">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-border text-sm">
+                                <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
+                                    <tr v-for="alt in alternativesData" :key="alt.id"
+                                        class="hover:bg-gray-50 dark:hover:bg-muted/50 cursor-pointer transition-colors group"
+                                        @click="handleViewAlternative(alt.id)"
+                                        :title="'Ver detalle de ' + alt.name">
+                                        <td class="whitespace-nowrap px-4 py-3">
+                                            <code class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-muted dark:text-gray-300">{{ alt.sku }}</code>
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-900 dark:text-white">
+                                            <div class="flex items-center gap-2">
+                                                <span>{{ alt.name }}</span>
+                                                <svg v-if="loadingAltId === alt.id" class="h-4 w-4 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                                </svg>
+                                                <svg v-else class="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-right">
+                                            <span :class="relationshipClass(alt.pivot?.relationship_type ?? alt.relationship_type)" class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold">
+                                                {{ relationshipLabel(alt.pivot?.relationship_type ?? alt.relationship_type) }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 

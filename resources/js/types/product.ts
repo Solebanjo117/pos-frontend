@@ -216,7 +216,7 @@ export interface CreateProductRequest {
     alternate_code?: string      // alternate identifier
     pricing_formula?: string     // Excel-like pricing formula
     // Default variant fields
-    brand_id: number
+    brand_id?: number
     sku: string
     upc?: string
     pricing: {
@@ -265,8 +265,8 @@ export interface UpdateProductRequest {
 
 export interface ProductFilters {
     status?: 'active' | 'discontinued' | 'pending'
-    brand_id?: number
-    category_id?: number
+    brand_id?: number | number[]
+    category_id?: number | number[]
     product_line_id?: number
     search?: string
     has_stock?: boolean
@@ -279,6 +279,12 @@ export interface ProductFilters {
     oem_code?: string
     attribute_value?: string
     vin?: string
+    // Sidebar advanced filters
+    sku?: string
+    min_price?: number
+    max_price?: number
+    in_stock?: boolean
+    sort?: string
     // Archive filter
     archived?: 'true' | 'false' | 'all'
     // Sorting

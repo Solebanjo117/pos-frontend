@@ -19,14 +19,13 @@ const form = ref<CreateCategoryData & { default_attributes: { name: string; requ
     icon: '',
     priority: 0, // kept for compatibility but hidden
     default_margin_percent: null,
-    default_cost: null as number | null,
     pricing_formula: null,
     applies_itbm: false,
     itbm_percent: 7, // default ITBM 7%
 })
 
-// — Real-time formula preview — synced from form.default_cost
-const previewCost = computed(() => form.value.default_cost ?? 100)
+// — Real-time formula preview — fixed at $100 for demonstration
+const previewCost = ref(100)
 const previewPrice = ref<number | null>(null)
 const previewLoading = ref(false)
 
@@ -112,7 +111,7 @@ function goBack() {
             </div>
 
             <!-- Form -->
-            <form @submit.prevent="handleSubmit" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6 space-y-6">
+            <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6 space-y-6">
                 <!-- Name -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -195,25 +194,6 @@ function goBack() {
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Configuración de Precios</h3>
                     
                     <div class="p-4 bg-gray-50 dark:bg-muted/30 rounded-lg space-y-4">
-                        <!-- Costo por Defecto -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Costo por Defecto
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <span class="text-gray-500">$</span>
-                                <input
-                                    v-model.number="form.default_cost"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    class="w-32 px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
-                                    placeholder="0.00"
-                                />
-                            </div>
-                            <p class="mt-1 text-xs text-gray-500">Se heredará automáticamente al crear variantes de esta categoría. También se usa para previsualizar la fórmula.</p>
-                        </div>
-
                         <!-- ITBM Checkbox + Porcentaje -->
                         <div class="space-y-2">
                             <label class="flex items-center gap-2 cursor-pointer">

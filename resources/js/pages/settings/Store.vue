@@ -4,6 +4,8 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useStoreSettings } from '@/composables/useStoreSettings'
 import { usePaymentMethods } from '@/composables/usePaymentMethods'
+import { useAuth } from '@/composables/useAuth'
+import apiClient from '@/services/api/client'
 import { type BreadcrumbItem } from '@/types'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
 import { Store, Upload, Save, Building2, Phone, Mail, MapPin, CreditCard, FileText, Image, Calculator, Clock, Wrench, Percent, Plus, ChevronUp, ChevronDown, Trash2, Lock } from 'lucide-vue-next'
@@ -27,6 +29,16 @@ const {
 const logoPreview   = ref<string | null>(null)
 const logoFile      = ref<File | null>(null)
 const saveMsg       = ref<string | null>(null)
+const { isAdmin } = useAuth()
+
+// Transactional reset (danger zone)
+const showResetModal = ref(false)
+const resetPassword = ref('')
+const resetConfirmation = ref('')
+const resetNoBackup = ref(false)
+const resetLoading = ref(false)
+const resetError = ref<string | null>(null)
+const resetSuccess = ref<string | null>(null)
 
 // Payment methods
 const showAddMethodModal = ref(false)
@@ -112,6 +124,49 @@ const moveMethodDown = async (index: number) => {
     await reorderMethods(order)
     await fetchAllMethods()
 }
+
+const openResetModal = () => {
+    resetPassword.value = ''
+    resetConfirmation.value = ''
+    resetNoBackup.value = false
+    resetError.value = null
+    showResetModal.value = true
+}
+
+const closeResetModal = () => {
+    showResetModal.value = false
+    resetLoading.value = false
+}
+
+const handleResetData = async () => {
+    resetError.value = null
+    resetSuccess.value = null
+
+    if (!resetPassword.value) {
+        resetError.value = 'Debes ingresar tu contrasena actual.'
+        return
+    }
+
+    if (resetConfirmation.value.trim() !== 'REINICIAR DATOS') {
+        resetError.value = 'Debes escribir exactamente REINICIAR DATOS.'
+        return
+    }
+
+    resetLoading.value = true
+    try {
+        const response = await apiClient.post('/data/reset', {
+            password: resetPassword.value,
+            confirmation_text: resetConfirmation.value,
+            no_backup: resetNoBackup.value,
+        })
+        resetSuccess.value = response.data?.message || 'Reinicio completado correctamente.'
+        showResetModal.value = false
+    } catch (e: any) {
+        resetError.value = e.response?.data?.message || 'No se pudo reiniciar la data transaccional.'
+    } finally {
+        resetLoading.value = false
+    }
+}
 </script>
 
 <template>
@@ -133,13 +188,16 @@ const moveMethodDown = async (index: number) => {
             <div v-if="saveMsg" class="px-4 py-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-sm font-medium">
                 {{ saveMsg }}
             </div>
+            <div v-if="resetSuccess" class="px-4 py-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-sm font-medium">
+                {{ resetSuccess }}
+            </div>
             <div v-if="error" class="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
                 {{ error }}
             </div>
 
             <div v-if="loading" class="text-center py-12 text-gray-400">Cargando configuración...</div>
 
-            <form v-else @submit.prevent="handleSave" class="space-y-6">
+            <form v-else @submit.prevent="handleSave" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-6">
                 <!-- === LOGO === -->
                 <section class="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border p-6">
                     <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -392,17 +450,31 @@ const moveMethodDown = async (index: number) => {
                     <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                         <Clock :size="18" class="text-primary" /> Cotizaciones
                     </h2>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expiración de Cotizaciones</label>
-                        <select v-model.number="settings.quote_expiration_days"
-                                class="w-48 px-4 py-2 rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition">
-                            <option :value="0">Deshabilitado</option>
-                            <option :value="15">15 días</option>
-                            <option :value="30">30 días</option>
-                            <option :value="60">60 días</option>
-                            <option :value="90">90 días</option>
-                        </select>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fecha "válido hasta" auto-calculada al crear cotizaciones. 0 = sin expiración.</p>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expiración de Cotizaciones</label>
+                            <select v-model.number="settings.quote_expiration_days"
+                                    class="w-48 px-4 py-2 rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition">
+                                <option :value="0">Deshabilitado</option>
+                                <option :value="15">15 días</option>
+                                <option :value="30">30 días</option>
+                                <option :value="60">60 días</option>
+                                <option :value="90">90 días</option>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fecha "válido hasta" auto-calculada al crear cotizaciones. 0 = sin expiración.</p>
+                        </div>
+
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input
+                                v-model="settings.require_stock_for_quotes"
+                                type="checkbox"
+                                class="mt-1 h-4 w-4 rounded border-gray-300 dark:border-border text-primary focus:ring-primary/50"
+                            />
+                            <div>
+                                <p class="text-sm font-medium text-gray-900 dark:text-white">Requerir stock para cotizar</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Si está activo, no se podrán crear cotizaciones cuando algún producto no tenga stock suficiente en el almacén.</p>
+                            </div>
+                        </label>
                     </div>
                 </section>
 
@@ -461,6 +533,23 @@ const moveMethodDown = async (index: number) => {
                     </div>
                 </section>
 
+                <!-- === DANGER ZONE === -->
+                <section v-if="isAdmin" class="bg-white dark:bg-card rounded-xl border border-red-300 dark:border-red-800 p-6">
+                    <h2 class="text-base font-semibold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
+                        <Trash2 :size="18" /> Zona de Peligro
+                    </h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                        Reinicia datos transaccionales (ventas, cotizaciones, ordenes y sesiones de caja) conservando catalogos y configuraciones.
+                    </p>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                        @click="openResetModal"
+                    >
+                        <Trash2 :size="15" /> Reiniciar Data Transaccional
+                    </button>
+                </section>
+
                 <!-- Save button -->
                 <div class="flex justify-end">
                     <button type="submit" :disabled="saving"
@@ -470,6 +559,70 @@ const moveMethodDown = async (index: number) => {
                     </button>
                 </div>
             </form>
+
+            <Teleport to="body">
+                <div
+                    v-if="showResetModal"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+                    @click.self="closeResetModal"
+                >
+                    <div class="w-full max-w-lg rounded-xl border border-red-200 bg-white p-6 shadow-2xl dark:border-red-900 dark:bg-card">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Confirmar reinicio de datos</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                            Esta accion elimina informacion transaccional. No se puede deshacer.
+                        </p>
+
+                        <div class="space-y-3">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Contrasena actual</label>
+                                <input
+                                    v-model="resetPassword"
+                                    type="password"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 dark:border-border dark:bg-muted dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Escribe REINICIAR DATOS para confirmar</label>
+                                <input
+                                    v-model="resetConfirmation"
+                                    type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 dark:border-border dark:bg-muted dark:text-white"
+                                />
+                            </div>
+                            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input
+                                    v-model="resetNoBackup"
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                                />
+                                Ejecutar sin crear backup (solo si ya hiciste respaldo manual)
+                            </label>
+                        </div>
+
+                        <p v-if="resetError" class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                            {{ resetError }}
+                        </p>
+
+                        <div class="mt-5 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                                @click="closeResetModal"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                :disabled="resetLoading"
+                                @click="handleResetData"
+                            >
+                                {{ resetLoading ? 'Reiniciando...' : 'Confirmar Reinicio' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Teleport>
         </div>
     </AppLayout>
 </template>

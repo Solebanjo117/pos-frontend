@@ -529,7 +529,7 @@ const handleRemoveVin = async (vinId: number) => {
                 <DialogHeader>
                     <DialogTitle>{{ editingId ? 'Editar Marca' : 'Nueva Marca' }}</DialogTitle>
                 </DialogHeader>
-                <form @submit.prevent="submitMake" class="space-y-4 py-2">
+                <form @submit.prevent="submitMake" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-4 py-2">
                     <div class="space-y-2">
                         <Label>Nombre</Label>
                         <Input v-model="makeForm.name" required placeholder="Ej: Toyota, Honda" />
@@ -549,7 +549,7 @@ const handleRemoveVin = async (vinId: number) => {
                 <DialogHeader>
                     <DialogTitle>{{ editingId ? 'Editar Modelo' : 'Nuevo Modelo' }}</DialogTitle>
                 </DialogHeader>
-                <form @submit.prevent="submitModel" class="space-y-4 py-2">
+                <form @submit.prevent="submitModel" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-4 py-2">
                     <div class="space-y-2">
                         <Label>Nombre del Modelo</Label>
                         <Input v-model="modelForm.name" required placeholder="Ej: Corolla, Civic, Hilux" />
@@ -617,7 +617,7 @@ const handleRemoveVin = async (vinId: number) => {
                 </div>
 
                 <!-- Mode: Edit existing engine -->
-                <form v-else @submit.prevent="submitEngine" class="space-y-4 py-2">
+                <form v-else @submit.prevent="submitEngine" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-4 py-2">
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
                             <Label>Motor</Label>
@@ -680,7 +680,7 @@ const handleRemoveVin = async (vinId: number) => {
                     <DialogTitle>Crear Motor Rápido</DialogTitle>
                     <DialogDescription>El motor se creará y asignará al modelo</DialogDescription>
                 </DialogHeader>
-                <form @submit.prevent="submitEngine" class="space-y-4 py-2">
+                <form @submit.prevent="submitEngine" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-4 py-2">
                     <div class="space-y-2">
                         <Label>Código Motor <span class="text-red-500">*</span></Label>
                         <Input v-model="engineForm.engine_code" required placeholder="Ej: 2AZ-FE, K20A" />

@@ -276,6 +276,9 @@ const formatDate = (dateString: string) => {
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                 Detalle / Referencia
                             </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                Proveedor
+                            </th>
                             <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                 Acciones
                             </th>
@@ -330,6 +333,10 @@ const formatDate = (dateString: string) => {
                                     {{ getMovementDetail(movement).secondary }}
                                 </div>
                                 <span v-if="!getMovementDetail(movement).primary && !getMovementDetail(movement).secondary" class="text-gray-400 dark:text-gray-500">—</span>
+                            </td>
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                <span v-if="movement.supplier?.name">{{ movement.supplier.name }}</span>
+                                <span v-else-if="movement.movement_type === 'in'" class="text-gray-300">—</span>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                 <button

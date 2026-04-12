@@ -13,6 +13,7 @@ import apiClient from '@/services/api/client'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
 import VariantManager from '@/components/Products/VariantManager.vue'
+import { useStoreSettings } from '@/composables/useStoreSettings'
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -29,7 +30,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 ]
 
 const { createProduct, loading, error } = useProducts()
+const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings()
 const toast = useToast()
+
+// === Rounding helper — respects LL-013: only applied on auto-calc, never on manual input ===
+const applyRounding = (price: number): number => {
+    const increment = Number(storeSettings.value.price_rounding_increment) || 0
+    if (increment <= 0) return price
+    return Math.ceil(price / increment) * increment
+}
 
 const form = ref<CreateProductRequest>({
     sku_base: '',
@@ -41,7 +50,7 @@ const form = ref<CreateProductRequest>({
     status: 'active',
     alternate_code: '',
     pricing_formula: '',
-    brand_id: 0,
+    brand_id: undefined,
     sku: '',
     upc: '',
     pricing: {
@@ -96,7 +105,6 @@ const categoryFormula = ref<string | null>(null)
 const categoryAppliesItbm = ref<boolean>(false)
 const categoryItbmPercent = ref<number | null>(null)
 const categoryMargin = ref<number | null>(null)
-const categoryDefaultCost = ref<number | null>(null)
 const priceManuallyEdited = ref(false)
 const onBasePriceInput = () => { priceManuallyEdited.value = true }
 
@@ -151,32 +159,16 @@ const fetchSkuPreview = async (categoryId: number | undefined) => {
     finally { loadingSkuPreview.value = false }
 }
 
-const autoVariantSku = computed(() => {
-    const base = form.value.sku_base || skuPreview.value
-    if (!base) return ''
-    const brand = brands.value.find(b => b.id === form.value.brand_id)
-    if (!brand) return base
-    const brandCode = brand.name.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
-    return `${base}-${brandCode}`
-})
-
-const customSkuManuallyEdited = ref(false)
-watch(
-    [() => form.value.sku_base, skuPreview],
-    () => {
-        if (!customSkuManuallyEdited.value) {
-            form.value.upc = form.value.sku_base || skuPreview.value || ''
-        }
-    }
-)
-const onCustomSkuInput = () => {
-    customSkuManuallyEdited.value = true
-}
-
 const nameManuallyEdited = ref(false)
 const onNameInput = () => { nameManuallyEdited.value = true }
 
 const addedEngines = ref<{ engine_id: number; make: string; model: string; engine: string }[]>([])
+const vehicleChassisList = ref<any[]>([])
+const selectedChassisIds = ref<number[]>([])
+const addedChassis = ref<{ chassis_id: number; make: string; model: string; chassis: string }[]>([])
+const allEnginesFlag = ref(false)
+const allChassisFlag = ref(false)
+const compatTab = ref<'engines' | 'chassis'>('engines')
 const addedVins = ref<string[]>([])
 const addedRefs = ref<string[]>([])
 
@@ -188,10 +180,14 @@ const namePreview = computed(() => {
         if (cat) parts.push(cat.name)
     }
     let name = parts.join(' ') || 'Producto sin nombre'
-    const vehicleLabels = [...new Set(addedEngines.value.map(e => `${e.make} ${e.model}`))]
+    const vehicleLabels = [
+        ...new Set(addedEngines.value.map(e => `${e.make} ${e.model}`)),
+        ...new Set(addedChassis.value.map(c => `${c.make} ${c.model}`))
+    ]
     if (vehicleLabels.length > 0) {
-        const displayed = vehicleLabels.slice(0, 3).join(', ')
-        const suffix = vehicleLabels.length > 3 ? ' y más' : ''
+        const uniqueLabels = [...new Set(vehicleLabels)]
+        const displayed = uniqueLabels.slice(0, 3).join(', ')
+        const suffix = uniqueLabels.length > 3 ? ' y más' : ''
         name += ' - ' + displayed + suffix
     }
     if (addedVins.value.length > 0 && vehicleLabels.length === 0) {
@@ -240,14 +236,12 @@ watch(
             categoryAppliesItbm.value = cat.applies_itbm ?? false
             categoryItbmPercent.value = cat.itbm_percent ?? 7
             categoryMargin.value = cat.default_margin_percent ?? null
-            categoryDefaultCost.value = cat.default_cost ?? null
         } catch {
             variantAttributes.value = []
             categoryFormula.value = null
             categoryAppliesItbm.value = false
             categoryItbmPercent.value = null
             categoryMargin.value = null
-            categoryDefaultCost.value = null
         }
     }
 )
@@ -270,26 +264,15 @@ watch(
                     itbm_percent: categoryItbmPercent.value ?? 7,
                 })
                 if (data.price !== null) {
-                    form.value.pricing.base_price = data.price
+                    form.value.pricing.base_price = applyRounding(data.price)
                 }
             } catch { /* silencioso */ }
         } else if (categoryMargin.value != null && categoryMargin.value > 0) {
             // Fallback: simple margin (LL-013)
-            form.value.pricing.base_price = Number((cost * (1 + categoryMargin.value / 100)).toFixed(2))
+            form.value.pricing.base_price = applyRounding(Number((cost * (1 + categoryMargin.value / 100)).toFixed(2)))
         }
     }
 )
-
-watch(
-    [() => form.value.brand_id, () => form.value.sku_base, skuPreview],
-    () => {
-        if (!form.value.sku || form.value.sku === previousAutoSku.value) {
-            form.value.sku = autoVariantSku.value
-            previousAutoSku.value = autoVariantSku.value
-        }
-    }
-)
-const previousAutoSku = ref('')
 
 interface VehicleMake { id: number; name: string }
 interface VehicleModelItem { id: number; name: string; year_from?: number; year_to?: number; generation?: string }
@@ -332,13 +315,20 @@ watch(selectedMakeId, async (makeId) => {
 
 watch(selectedModelId, async (modelId) => {
     vehicleEngines.value = []; selectedEngineIds.value = []
+    vehicleChassisList.value = []; selectedChassisIds.value = []
     if (!modelId) return
+    
     loadingEnginesV.value = true
     try {
         const { data } = await apiClient.get(`/vehicle-models/${modelId}/engines`)
         vehicleEngines.value = data.data ?? data
     } catch { vehicleEngines.value = [] }
     finally { loadingEnginesV.value = false }
+
+    try {
+        const { data } = await apiClient.get(`/vehicle-models/${modelId}/chassis`)
+        vehicleChassisList.value = data.data ?? data
+    } catch { vehicleChassisList.value = [] }
 })
 
 const toggleUniversal = () => {
@@ -368,6 +358,24 @@ const addEngines = () => {
 }
 const removeEngine = (idx: number) => addedEngines.value.splice(idx, 1)
 
+const addChassis = () => {
+    if (selectedChassisIds.value.length === 0) return
+    const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
+    const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
+    const modelNameFull = model ? `${model.name}${model.generation ? ` - ${model.generation}` : ''}` : ''
+    
+    selectedChassisIds.value.forEach(chId => {
+        if (addedChassis.value.some(c => c.chassis_id === chId)) return
+        const ch = vehicleChassisList.value.find(c => c.id === chId)
+        addedChassis.value.push({
+            chassis_id: chId,
+            make: make?.name || '', model: modelNameFull, chassis: ch?.code || '',
+        })
+    })
+    selectedChassisIds.value = []
+}
+const removeChassis = (idx: number) => addedChassis.value.splice(idx, 1)
+
 const vinInput = ref('')
 const addVin = () => {
     const v = vinInput.value.trim().toUpperCase()
@@ -384,7 +392,7 @@ const addRef = () => {
 }
 const removeRef = (idx: number) => addedRefs.value.splice(idx, 1)
 
-const inlineModal = ref<'category' | 'brand' | 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | null>(null)
+const inlineModal = ref<'category' | 'brand' | 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null>(null)
 const inlineForm = ref<Record<string, any>>({})
 const inlineProcessing = ref(false)
 const inlineError = ref<string | null>(null)
@@ -398,6 +406,7 @@ const openInline = (type: typeof inlineModal.value) => {
     else if (type === 'vehicleMake') inlineForm.value = { name: '' }
     else if (type === 'vehicleModel') inlineForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear() }
     else if (type === 'vehicleEngine') inlineForm.value = { engine_code: '', displacement: '' }
+    else if (type === 'vehicleChassis') inlineForm.value = { code: '', name: '' }
 }
 const closeInline = () => { inlineModal.value = null }
 
@@ -430,6 +439,11 @@ const submitInline = async () => {
             vehicleEngines.value.push(newEngine)
             // R39: Agregar el nuevo motor a la selección múltiple
             selectedEngineIds.value.push(newEngine.id)
+        } else if (inlineModal.value === 'vehicleChassis') {
+            const { data } = await apiClient.post('/vehicle-chassis', { ...inlineForm.value, model_id: selectedModelId.value })
+            const newChassis = data.data ?? data
+            vehicleChassisList.value.push(newChassis)
+            selectedChassisIds.value.push(newChassis.id)
         }
         closeInline()
     } catch (e: any) {
@@ -454,6 +468,7 @@ const engineOptions = computed(() => vehicleEngines.value.map(e => ({
 })))
 
 onMounted(async () => {
+    fetchStoreSettings()
     loadingCategories.value = true
     try {
         const response = await apiClient.get('/categories')
@@ -465,9 +480,6 @@ onMounted(async () => {
     try {
         const response = await apiClient.get('/brands/all')
         brands.value = response.data.data
-        if (brands.value.length > 0) {
-            form.value.brand_id = brands.value[0].id
-        }
     } catch (e) { console.error('Error loading brands:', e) }
     finally { loadingBrands.value = false }
 
@@ -492,25 +504,24 @@ const onDraftVariantsChanged = (variants: any[]) => {
 const handleSubmit = async () => {
     validationErrors.value = {}
     successMessage.value = ''
-    
-    // Validate required fields
-    if (!form.value.brand_id) {
-        toast.error('Debes seleccionar una marca')
-        return
-    }
-    if (!form.value.initial_inventory?.[0]?.warehouse_id) {
-        toast.error('Debes seleccionar un almacén')
+
+    // Validate required fields (only if creating default variant with brand)
+    if (form.value.brand_id && !form.value.initial_inventory?.[0]?.warehouse_id) {
+        toast.error('Debes seleccionar un almacén cuando creas una variante con marca')
         return
     }
     
     try {
         const payload = {
             ...form.value,
-            sku: form.value.sku || autoVariantSku.value,
+            sku: form.value.sku || form.value.sku_base || '',
             attributes: variantAttributes.value
                 .filter(a => a.value.trim())
                 .map(a => ({ name: a.name, value: a.value, unit: a.unit })),
             vehicle_compatibility: addedEngines.value.map(e => e.engine_id),
+            vehicle_chassis: addedChassis.value.map(c => c.chassis_id),
+            all_engines: allEnginesFlag.value,
+            all_chassis: allChassisFlag.value,
             is_universal: isUniversal.value,
             vins: addedVins.value,
             oem_references: addedRefs.value,
@@ -525,14 +536,15 @@ const handleSubmit = async () => {
                 try {
                     await apiClient.post(`/products/${productId}/variants`, {
                         brand_id: variant.brand_id,
-                        sku: variant.sku,
+                        sku: variant.sku || '', // Backend auto-generates if empty
                         upc: variant.upc || null,
                         status: variant.status || 'active',
                         pricing: variant.pricing,
-                        initial_inventory: variant.initial_inventory,
+                        initial_inventory: variant.initial_inventory || [],
                         attributes: variant.attributes || [],
                     })
-                } catch {
+                } catch (variantError: any) {
+                    console.error('Error creating variant:', variantError.response?.data || variantError)
                     failedVariants.push(variant.brand?.name || variant.sku || 'desconocida')
                 }
             }
@@ -606,7 +618,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 </div>
             </div>
 
-        <form @submit.prevent="handleSubmit" class="space-y-4">
+        <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-4">
 
             <!-- ══ Datos del Producto ══ -->
             <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border space-y-4">
@@ -643,13 +655,12 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 <!-- SKU Base + Código Alterno en 2 cols -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">SKU Base <span class="text-gray-400 font-normal text-xs">(opcional)</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            SKU Base <span class="text-gray-400 font-normal text-xs">(opcional)</span>
+                        </label>
                         <input v-model="form.sku_base" type="text" @input="onSkuBaseInput"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="Autogenerar al guardar" />
-                        <p v-if="skuPreview && !form.sku_base" class="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-                            Se generará: <span class="font-mono font-bold">{{ skuPreview }}</span>
-                        </p>
+                            class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
+                            placeholder="Se genera automaticamente o ingresa manualmente" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Código Alterno</label>
@@ -709,6 +720,20 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                     </button>
 
                     <div v-if="!isUniversal">
+                        <!-- Tabs -->
+                        <div class="flex border-b border-gray-200 dark:border-border mb-4">
+                            <button type="button" @click="compatTab = 'engines'"
+                                :class="compatTab === 'engines' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                class="w-1/2 py-2 px-1 text-center border-b-2 font-medium text-sm flex items-center justify-center gap-2">
+                                🔧 Motores
+                            </button>
+                            <button type="button" @click="compatTab = 'chassis'"
+                                :class="compatTab === 'chassis' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                class="w-1/2 py-2 px-1 text-center border-b-2 font-medium text-sm flex items-center justify-center gap-2">
+                                🚗 Chasis
+                            </button>
+                        </div>
+
                         <!-- Fila 1: Marca y Modelo -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                             <div>
@@ -734,72 +759,116 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                     placeholder="Modelo" :disabled="!selectedMakeId" :loading="loadingModelsV" />
                             </div>
                         </div>
-                        <!-- R39: Fila 2: Multi-select de motores con checkboxes -->
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-                            <div class="md:col-span-3">
-                                <div class="flex items-center justify-between mb-1">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                                        Motores
-                                        <span v-if="selectedEngineIds.length > 0" class="ml-1 text-teal-600">({{ selectedEngineIds.length }} seleccionados)</span>
-                                    </label>
-                                    <button v-if="selectedModelId" type="button" @click="openInline('vehicleEngine')" class="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
-                                        <Plus class="h-3 w-3" />
+
+                        <!-- Panel Motores -->
+                        <div v-show="compatTab === 'engines'">
+                            <div class="mb-3 flex items-center">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" v-model="allEnginesFlag" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                                    <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Compatible con TODOS los motores de este modelo</span>
+                                </label>
+                            </div>
+                            <!-- Multi-select de motores -->
+                            <div v-if="!allEnginesFlag" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                                <div class="md:col-span-3">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                            Motores
+                                            <span v-if="selectedEngineIds.length > 0" class="ml-1 text-teal-600">({{ selectedEngineIds.length }} seleccionados)</span>
+                                        </label>
+                                        <button v-if="selectedModelId" type="button" @click="openInline('vehicleEngine')" class="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
+                                            <Plus class="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                    <div v-if="loadingEnginesV" class="text-center py-4 text-gray-400 text-sm">Cargando motores...</div>
+                                    <div v-else-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">Selecciona un modelo primero</div>
+                                    <div v-else-if="vehicleEngines.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">No hay motores disponibles</div>
+                                    <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
+                                        <label v-for="engine in vehicleEngines" :key="engine.id" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border" :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedEngineIds.includes(engine.id), 'opacity-50': addedEngines.some(e => e.engine_id === engine.id) }">
+                                            <input type="checkbox" :value="engine.id" v-model="selectedEngineIds" :disabled="addedEngines.some(e => e.engine_id === engine.id)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                                            <span class="font-mono text-sm text-gray-900 dark:text-white">{{ engine.engine_code }}</span>
+                                            <span v-if="engine.displacement" class="text-xs text-gray-500">{{ engine.displacement }}</span>
+                                            <span v-if="addedEngines.some(e => e.engine_id === engine.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="button" @click="addEngines" :disabled="selectedEngineIds.length === 0"
+                                        class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40">
+                                        + Agregar {{ selectedEngineIds.length > 0 ? `(${selectedEngineIds.length})` : '' }}
                                     </button>
                                 </div>
-                                <div v-if="loadingEnginesV" class="text-center py-4 text-gray-400 text-sm">
-                                    Cargando motores...
-                                </div>
-                                <div v-else-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">
-                                    Selecciona un modelo primero
-                                </div>
-                                <div v-else-if="vehicleEngines.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">
-                                    No hay motores disponibles
-                                </div>
-                                <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
-                                    <label
-                                        v-for="engine in vehicleEngines"
-                                        :key="engine.id"
-                                        class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border"
-                                        :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedEngineIds.includes(engine.id), 'opacity-50': addedEngines.some(e => e.engine_id === engine.id) }"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            :value="engine.id"
-                                            v-model="selectedEngineIds"
-                                            :disabled="addedEngines.some(e => e.engine_id === engine.id)"
-                                            class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                                        />
-                                        <span class="font-mono text-sm text-gray-900 dark:text-white">{{ engine.engine_code }}</span>
-                                        <span v-if="engine.displacement" class="text-xs text-gray-500">{{ engine.displacement }}</span>
-                                        <span v-if="addedEngines.some(e => e.engine_id === engine.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="flex items-end">
-                                <button type="button" @click="addEngines" :disabled="selectedEngineIds.length === 0"
-                                    class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40">
-                                    + Agregar {{ selectedEngineIds.length > 0 ? `(${selectedEngineIds.length})` : '' }}
-                                </button>
                             </div>
                         </div>
 
-                        <div v-if="addedEngines.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border">
+                        <!-- Panel Chasis -->
+                        <div v-show="compatTab === 'chassis'">
+                            <div class="mb-3 flex items-center">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" v-model="allChassisFlag" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                                    <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Compatible con TODOS los chasis de este modelo</span>
+                                </label>
+                            </div>
+                            <!-- Multi-select de chasis -->
+                            <div v-if="!allChassisFlag" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                                <div class="md:col-span-3">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                            Chasis
+                                            <span v-if="selectedChassisIds.length > 0" class="ml-1 text-teal-600">({{ selectedChassisIds.length }} seleccionados)</span>
+                                        </label>
+                                        <button v-if="selectedModelId" type="button" @click="openInline('vehicleChassis')" class="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
+                                            <Plus class="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                    <div v-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">Selecciona un modelo primero</div>
+                                    <div v-else-if="vehicleChassisList.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">No hay chasis disponibles</div>
+                                    <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
+                                        <label v-for="chassis in vehicleChassisList" :key="chassis.id" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border" :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedChassisIds.includes(chassis.id), 'opacity-50': addedChassis.some(c => c.chassis_id === chassis.id) }">
+                                            <input type="checkbox" :value="chassis.id" v-model="selectedChassisIds" :disabled="addedChassis.some(c => c.chassis_id === chassis.id)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                                            <span class="font-mono text-sm text-gray-900 dark:text-white">{{ chassis.code }}</span>
+                                            <span v-if="chassis.name" class="text-xs text-gray-500">{{ chassis.name }}</span>
+                                            <span v-if="addedChassis.some(c => c.chassis_id === chassis.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="button" @click="addChassis" :disabled="selectedChassisIds.length === 0"
+                                        class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40">
+                                        + Agregar {{ selectedChassisIds.length > 0 ? `(${selectedChassisIds.length})` : '' }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabla Combinada -->
+                        <div v-if="addedEngines.length > 0 || addedChassis.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border mt-4">
                             <table class="w-full text-left text-xs">
                                 <thead class="bg-gray-50 dark:bg-background/50">
                                     <tr>
-                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Marca</th>
-                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Modelo</th>
-                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Motor</th>
+                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Tipo</th>
+                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Vehículo</th>
+                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Especificación</th>
                                         <th class="w-8 px-2 py-2"></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                                    <tr v-for="(eng, idx) in addedEngines" :key="eng.engine_id" class="bg-white dark:bg-card">
-                                        <td class="px-3 py-2 text-gray-900 dark:text-white">{{ eng.make }}</td>
-                                        <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ eng.model }}</td>
+                                    <!-- Listado de Motores -->
+                                    <tr v-for="(eng, idx) in addedEngines" :key="'eng'+eng.engine_id" class="bg-white dark:bg-card">
+                                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">🔧 Motor</td>
+                                        <td class="px-3 py-2 text-gray-900 dark:text-white">{{ eng.make }} {{ eng.model }}</td>
                                         <td class="px-3 py-2 font-mono text-gray-600 dark:text-gray-400">{{ eng.engine }}</td>
                                         <td class="px-2 py-2 text-center">
                                             <button type="button" @click="removeEngine(idx)" class="text-red-400 hover:text-red-600">✕</button>
+                                        </td>
+                                    </tr>
+                                    <!-- Listado de Chasis -->
+                                    <tr v-for="(ch, idx) in addedChassis" :key="'ch'+ch.chassis_id" class="bg-white dark:bg-card">
+                                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">🚗 Chasis</td>
+                                        <td class="px-3 py-2 text-gray-900 dark:text-white">{{ ch.make }} {{ ch.model }}</td>
+                                        <td class="px-3 py-2 font-mono text-gray-600 dark:text-gray-400">{{ ch.chassis }}</td>
+                                        <td class="px-2 py-2 text-center">
+                                            <button type="button" @click="removeChassis(idx)" class="text-red-400 hover:text-red-600">✕</button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -864,7 +933,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                     {{ pendingVariants.length }} pendiente{{ pendingVariants.length > 1 ? 's' : '' }}
                                 </span>
                             </h2>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Agrega variantes adicionales con su propio precio, marca y SKU. Se guardarán junto con el producto.</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Agrega variantes adicionales con su propia marca, atributos y precio. Se guardarán junto con el producto.</p>
                         </div>
                     </div>
                 </div>
@@ -877,7 +946,6 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         :category-formula="categoryFormula"
                         :category-applies-itbm="categoryAppliesItbm"
                         :category-itbm-percent="categoryItbmPercent"
-                        :category-default-cost="categoryDefaultCost"
                         @draft-variants-changed="onDraftVariantsChanged"
                     />
                 </div>
@@ -895,7 +963,8 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                        inlineModal === 'brand' ? 'Nueva Marca de Artículo' :
                        inlineModal === 'vehicleMake' ? 'Nueva Marca Vehicular' :
                        inlineModal === 'vehicleModel' ? 'Nuevo Modelo' :
-                       inlineModal === 'vehicleEngine' ? 'Nuevo Motor' : '' }}
+                       inlineModal === 'vehicleEngine' ? 'Nuevo Motor' :
+                       inlineModal === 'vehicleChassis' ? 'Nuevo Chasis' : '' }}
                 </DialogTitle>
             </DialogHeader>
             <form @submit.prevent="submitInline" class="space-y-4 py-2">
@@ -953,6 +1022,18 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         <div class="space-y-2">
                             <Label>Desplazamiento</Label>
                             <Input v-model="inlineForm.displacement" placeholder="Ej: 2.4L" />
+                        </div>
+                    </div>
+                </template>
+                <template v-if="inlineModal === 'vehicleChassis'">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <Label>Código / Nombre <span class="text-red-500">*</span></Label>
+                            <Input v-model="inlineForm.code" required placeholder="Ej: P90" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label>Descripción Adicional</Label>
+                            <Input v-model="inlineForm.name" placeholder="Ej: Serie P90" />
                         </div>
                     </div>
                 </template>

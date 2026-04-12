@@ -214,6 +214,19 @@ const fetchVehicleCompatibility = async () => {
     }
 }
 
+// Group vehicles by Make + Model + Year range for prominent display
+const groupedVehicles = computed(() => {
+    const groups = new Map<string, { make: string; model: string; year_from?: number; year_to?: number; engines: Array<{ code: string; displacement?: string }> }>()
+    for (const row of vehicleRows.value) {
+        const key = `${row.make}|${row.model}|${row.year_from ?? ''}-${row.year_to ?? ''}`
+        if (!groups.has(key)) {
+            groups.set(key, { make: row.make, model: row.model, year_from: row.year_from, year_to: row.year_to, engines: [] })
+        }
+        groups.get(key)!.engines.push({ code: row.engine, displacement: row.displacement })
+    }
+    return Array.from(groups.values())
+})
+
 // ── OEM + Alternatives ────────────────────────────────────────────────────────
 const oemData          = ref<OemReference[]>([])
 const alternativesData = ref<AlternativeRecord[]>([])
@@ -280,7 +293,7 @@ const handleViewAlternative = async (altId: number) => {
                         <span v-if="product.is_universal" class="flex-shrink-0 inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/20" title="Universal">🌐 Universal</span>
                     </div>
                     <p v-if="product.sku_base && !blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ displayFormat(product.sku_base) }}</p>
-                    <p v-else-if="blindMode" class="text-xs text-gray-400 font-mono mt-0.5">#{{ String(product.id).padStart(8, '0') }}</p>
+                    <p v-else-if="blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ (product as any).system_id || '#' + String(product.id).padStart(8, '0') }}</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <!-- Blind Mode Toggle -->
@@ -367,7 +380,7 @@ const handleViewAlternative = async (altId: number) => {
                                 </template>
                                 <template v-else>
                                     <small class="text-gray-500 uppercase tracking-wide text-xs">Código</small>
-                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">#{{ String(product.id).padStart(8, '0') }}</h1>
+                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ (product as any).system_id || '#' + String(product.id).padStart(8, '0') }}</h1>
                                 </template>
                                 <p v-if="blindMode && product.category?.name" class="text-sm text-gray-700 dark:text-gray-300 mt-2 font-medium">{{ product.category.name }}</p>
                                 <p v-if="product.description && !blindMode" class="text-gray-600 dark:text-gray-400 mt-2">{{ product.description }}</p>
@@ -415,7 +428,10 @@ const handleViewAlternative = async (altId: number) => {
                                         <div class="flex flex-col flex-1">
                                             <div class="flex items-center gap-2">
                                                 <span v-if="!blindMode" class="font-bold text-gray-900 dark:text-white font-mono text-base">{{ displayFormat(variant.sku) }}</span>
-                                                <span v-else class="font-bold text-gray-900 dark:text-white text-base">{{ variant.brand?.name ?? 'Sin marca' }}</span>
+                                                <span v-else class="font-bold text-gray-900 dark:text-white text-base">
+                                                    {{ variant.brand?.name ?? 'Sin marca' }}
+                                                    <span v-if="(variant as any).system_id" class="text-xs font-mono text-gray-400 ml-1">({{ (variant as any).system_id }})</span>
+                                                </span>
                                             </div>
                                             <span v-if="!blindMode" class="text-xs text-gray-500 mt-1">
                                                 <span class="font-semibold text-gray-700 dark:text-gray-300">Marca:</span> {{ variant.brand?.name ?? 'Sin marca' }}
@@ -517,29 +533,27 @@ const handleViewAlternative = async (altId: number) => {
                                 <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>
                                 Sin vehículos vinculados. Agrega compatibilidad vehicular editando el producto.
                             </div>
-                            <table v-else class="w-full text-sm text-left">
-                                <thead class="bg-gray-50 dark:bg-background text-gray-700 dark:text-gray-300 font-semibold sticky top-0 z-10 shadow-sm">
-                                    <tr>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Marca</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Modelo</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Años</th>
-                                        <th class="px-4 py-3 border-b border-gray-200 dark:border-border">Motor / Disp.</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 dark:divide-border bg-white dark:bg-card">
-                                    <tr v-for="row in vehicleRows" :key="row.id" class="hover:bg-blue-50 dark:hover:bg-muted/50/50 transition-colors">
-                                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ row.make }}</td>
-                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ row.model }}</td>
-                                        <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
-                                            <span v-if="row.year_from">{{ row.year_from }}{{ row.year_to ? '–' + row.year_to : '+' }}</span>
-                                            <span v-else>—</span>
-                                        </td>
-                                        <td class="px-4 py-3 font-mono text-gray-600 dark:text-gray-400">
-                                            {{ row.engine }}<span v-if="row.displacement" class="ml-1 text-[10px] text-gray-500"> ({{ row.displacement }}L)</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <div v-else class="p-4 space-y-2">
+                                <div v-for="(group, idx) in groupedVehicles" :key="idx"
+                                    class="flex items-start gap-3 p-3 rounded-lg border border-gray-100 dark:border-border hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+                                    <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                                        <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="font-bold text-gray-900 dark:text-white text-base">{{ group.make }} {{ group.model }}</span>
+                                            <span v-if="group.year_from" class="text-xs font-medium bg-gray-100 dark:bg-muted text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">
+                                                {{ group.year_from }}{{ group.year_to ? '–' + group.year_to : '+' }}
+                                            </span>
+                                        </div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            <span v-for="(eng, eIdx) in group.engines" :key="eIdx">
+                                                <span class="font-mono">{{ eng.code }}</span><span v-if="eng.displacement" class="text-[10px] text-gray-400"> ({{ eng.displacement }}L)</span><span v-if="eIdx < group.engines.length - 1">, </span>
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

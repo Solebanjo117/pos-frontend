@@ -10,7 +10,6 @@ export interface Category {
     icon?: string
     priority: number
     default_margin_percent?: number | null
-    default_cost?: number | null
     pricing_formula?: string | null
     applies_itbm?: boolean
     itbm_percent?: number | null
@@ -42,7 +41,6 @@ export interface CreateCategoryData {
     icon?: string
     priority?: number
     default_margin_percent?: number | null
-    default_cost?: number | null
     pricing_formula?: string | null
     applies_itbm?: boolean
     itbm_percent?: number | null

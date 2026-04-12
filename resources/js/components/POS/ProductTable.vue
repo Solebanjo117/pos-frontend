@@ -44,16 +44,19 @@ const toggleExpand = (itemId: string) => {
 // ====== Right-click / Long-press → open full detail modal ======
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 
-const openDetails = (productId: number) => {
+const openDetails = (productId?: number | null) => {
+  if (!productId) return
   emit('view-details', productId)
 }
 
 const onContextMenu = (e: MouseEvent, item: any) => {
   e.preventDefault()
+  if (item.is_custom_line) return
   openDetails(item.product_id)
 }
 
 const startLongPress = (item: any, e: TouchEvent) => {
+  if (item.is_custom_line) return
   longPressTimer = setTimeout(() => {
     openDetails(item.product_id)
   }, 500)
@@ -64,6 +67,7 @@ const cancelLongPress = () => {
 }
 
 const displaySku = (item: any) => {
+  if (item.is_custom_line) return item.product_sku || 'MISC'
   if (props.clientMode) return `#${item.product_id}`
   return item.variant_sku || item.product_sku || item.variant_name || 'General'
 }
@@ -93,6 +97,7 @@ const productForPurchase = ref<any>(null)
 const variantIdForPurchase = ref<number | null>(null)
 
 const openQuickPurchase = (item: any) => {
+  if (!item.product_id) return
   const fullProduct = props.products?.find((p: any) => p.id === item.product_id)
   if (!fullProduct) return
   productForPurchase.value = fullProduct
@@ -166,7 +171,12 @@ const handlePurchaseSuccess = (result: {
                     class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform"
                   />
                   <div class="flex flex-col">
-                    <span class="font-medium text-gray-900 dark:text-white text-sm">{{ item.product_name }}</span>
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium text-gray-900 dark:text-white text-sm">{{ item.product_name }}</span>
+                      <span v-if="item.is_custom_line" class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                        Miscelaneo
+                      </span>
+                    </div>
                     <div class="flex flex-wrap gap-1 mt-0.5">
                       <span v-if="item.seller_id" class="text-xs text-blue-600 dark:text-primary bg-blue-100 px-1 py-0.5 rounded inline-block w-max">
                         {{ users.find(u => u.id === item.seller_id)?.name || 'Vendedor' }}
@@ -344,7 +354,7 @@ const handlePurchaseSuccess = (result: {
 
                     <!-- Quick Reorder — only when stock = 0 -->
                     <div
-                      v-if="item.available_stock !== undefined && item.available_stock <= 0"
+                      v-if="!item.is_custom_line && item.available_stock !== undefined && item.available_stock <= 0"
                       class="space-y-2"
                     >
                       <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-1">

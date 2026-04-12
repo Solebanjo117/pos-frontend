@@ -14,6 +14,8 @@ export interface InventoryItem {
     target_level: number
     needs_reorder: boolean
     status: 'out_of_stock' | 'low_stock' | 'normal' | 'optimal'
+    base_price: number | null  // precio de venta (product_pricing.base_price)
+    cost: number | null        // costo de adquisición
 }
 
 export interface Warehouse {

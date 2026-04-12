@@ -4,7 +4,9 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useVehicleEngines } from '@/composables/useVehicleEngines'
-import { Search, Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { useVehicleMakes } from '@/composables/useVehicleMakes'
+import { useVehicleModels } from '@/composables/useVehicleModels'
+import { Search, Plus, Pencil, Trash2, X } from 'lucide-vue-next'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -13,23 +15,36 @@ const breadcrumbs: BreadcrumbItem[] = [
 ]
 
 const { engines, loading, fetchEngines, deleteEngine } = useVehicleEngines()
+const { makes, fetchMakes } = useVehicleMakes()
+const { models, fetchModels } = useVehicleModels()
 
 const search = ref('')
 const page = ref(1)
 const total = ref(0)
 const perPage = ref(15)
 
+// Filters
+const selectedMakeId = ref<number | undefined>(undefined)
+const selectedModelId = ref<number | undefined>(undefined)
+
 const loadData = async () => {
-    const data = await fetchEngines({
+    const params: Record<string, any> = {
         page: page.value,
         search: search.value,
         per_page: perPage.value,
-    })
+    }
+    if (selectedMakeId.value) params.make_id = selectedMakeId.value
+    if (selectedModelId.value) params.model_id = selectedModelId.value
+
+    const data = await fetchEngines(params)
     total.value = data.meta.total
     perPage.value = data.meta.per_page
 }
 
-onMounted(() => loadData())
+onMounted(async () => {
+    await fetchMakes()
+    loadData()
+})
 
 // Debounce search
 let timeout: ReturnType<typeof setTimeout>
@@ -40,6 +55,34 @@ watch(search, () => {
         loadData()
     }, 300)
 })
+
+// When make changes, load models and reload engines
+watch(selectedMakeId, async (makeId) => {
+    selectedModelId.value = undefined
+    if (makeId) {
+        await fetchModels({ make_id: makeId, per_page: 200 })
+    } else {
+        models.value = []
+    }
+    page.value = 1
+    loadData()
+})
+
+// When model changes reload engines
+watch(selectedModelId, () => {
+    page.value = 1
+    loadData()
+})
+
+const clearFilters = () => {
+    selectedMakeId.value = undefined
+    selectedModelId.value = undefined
+    search.value = ''
+}
+
+const hasActiveFilters = () => {
+    return !!selectedMakeId.value || !!selectedModelId.value || !!search.value
+}
 
 const handleDelete = async (id: number) => {
     if (confirm('¿Estás seguro de eliminar este motor?')) {
@@ -68,7 +111,7 @@ const fuelTypeLabel = (type: string) => {
     <Head title="Motores" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-5xl space-y-6 p-6">
+        <div class="mx-auto max-w-6xl space-y-6 p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Motores</h1>
@@ -85,8 +128,8 @@ const fuelTypeLabel = (type: string) => {
                 </Link>
             </div>
 
-            <!-- Search -->
-            <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
+            <!-- Search + Filters -->
+            <div class="rounded-lg bg-white p-4 shadow dark:bg-card space-y-4">
                 <div class="relative">
                     <Search class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                     <input
@@ -95,6 +138,42 @@ const fuelTypeLabel = (type: string) => {
                         placeholder="Buscar por código o desplazamiento..."
                         class="w-full rounded-md border border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                     />
+                </div>
+
+                <!-- Make / Model filters -->
+                <div class="flex flex-wrap items-end gap-4">
+                    <div class="flex-1 min-w-[180px]">
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Marca Vehículo</label>
+                        <select
+                            v-model="selectedMakeId"
+                            class="w-full rounded-md border border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                        >
+                            <option :value="undefined">Todas las marcas</option>
+                            <option v-for="make in makes" :key="make.id" :value="make.id">{{ make.name }}</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-[180px]">
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Modelo</label>
+                        <select
+                            v-model="selectedModelId"
+                            :disabled="!selectedMakeId"
+                            class="w-full rounded-md border border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white disabled:opacity-50"
+                        >
+                            <option :value="undefined">Todos los modelos</option>
+                            <option v-for="model in models" :key="model.id" :value="model.id">
+                                {{ model.name }}
+                                <template v-if="model.year_from"> ({{ model.year_from }}<template v-if="model.year_to">–{{ model.year_to }}</template>)</template>
+                            </option>
+                        </select>
+                    </div>
+                    <button
+                        v-if="hasActiveFilters()"
+                        @click="clearFilters"
+                        class="flex items-center gap-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
+                    >
+                        <X class="h-4 w-4" />
+                        Limpiar
+                    </button>
                 </div>
             </div>
 
@@ -105,6 +184,9 @@ const fuelTypeLabel = (type: string) => {
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
                                 Código Motor
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
+                                Marca / Modelo
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
                                 Desplazamiento
@@ -119,10 +201,10 @@ const fuelTypeLabel = (type: string) => {
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-border">
                         <tr v-if="loading" class="animate-pulse">
-                            <td colspan="4" class="px-6 py-4 text-center text-gray-500">Cargando...</td>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">Cargando...</td>
                         </tr>
                         <tr v-else-if="engines.length === 0">
-                            <td colspan="4" class="px-6 py-4 text-center text-gray-500">No se encontraron motores</td>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">No se encontraron motores</td>
                         </tr>
                         <tr
                             v-for="engine in engines"
@@ -131,6 +213,14 @@ const fuelTypeLabel = (type: string) => {
                         >
                             <td class="whitespace-nowrap px-6 py-4 font-mono text-sm font-semibold text-gray-900 dark:text-white">
                                 {{ engine.engine_code }}
+                            </td>
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                                <template v-if="engine.model?.make?.name || engine.model?.name">
+                                    <span class="font-medium">{{ engine.model?.make?.name ?? '—' }}</span>
+                                    <span class="text-gray-400 mx-1">/</span>
+                                    <span>{{ engine.model?.name ?? '—' }}</span>
+                                </template>
+                                <span v-else class="text-gray-400 italic">Sin modelo</span>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-gray-900 dark:text-white">
                                 {{ engine.displacement || '—' }}

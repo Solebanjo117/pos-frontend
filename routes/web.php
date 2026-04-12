@@ -193,6 +193,17 @@ Route::middleware(['auth'])->prefix('vehicles')->name('vehicles.')->group(functi
     Route::get('/engines/{id}/edit', function ($id) {
         return Inertia::render('Vehicles/Engines/Edit', ['engineId' => (int) $id]);
     })->name('engines.edit');
+
+    // Chassis
+    Route::get('/chassis', function () {
+        return Inertia::render('Vehicles/Chassis/Index');
+    })->name('chassis.index');
+    Route::get('/chassis/create', function () {
+        return Inertia::render('Vehicles/Chassis/Create');
+    })->name('chassis.create');
+    Route::get('/chassis/{id}/edit', function ($id) {
+        return Inertia::render('Vehicles/Chassis/Edit', ['chassisId' => (int) $id]);
+    })->name('chassis.edit');
 });
 
 // Work Orders

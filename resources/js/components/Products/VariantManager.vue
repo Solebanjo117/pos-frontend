@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useProducts } from '@/composables/useProducts'
+import { useStoreSettings } from '@/composables/useStoreSettings'
 import apiClient from '@/services/api/client'
 import {
     Dialog,
@@ -12,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
+import AttributeManager from '@/components/Products/AttributeManager.vue'
 import { Wrench, CircleDollarSign, Package } from 'lucide-vue-next'
 
 
@@ -22,7 +24,6 @@ const props = defineProps<{
     categoryFormula?: string | null
     categoryAppliesItbm?: boolean
     categoryItbmPercent?: number | null
-    categoryDefaultCost?: number | null
     skuBase?: string
     productName?: string
     defaultVariantAttributes?: { name: string; value: string; unit: string }[]
@@ -33,6 +34,14 @@ const emit = defineEmits<{
 }>()
 
 const { fetchVariants, createVariant, updateVariant, deleteVariant, loading, error } = useProducts()
+const { settings: storeSettings, fetchSettings } = useStoreSettings()
+
+// === Rounding helper — respects LL-013: only applied on auto-calc, never on manual input ===
+const applyRounding = (price: number): number => {
+    const increment = Number(storeSettings.value.price_rounding_increment) || 0
+    if (increment <= 0) return price
+    return Math.ceil(price / increment) * increment
+}
 
 // Draft mode (when no productId)
 const draftVariants = ref<any[]>([])
@@ -128,25 +137,7 @@ const onFormulaTotalChange = (newTotal: number) => {
     form.value.pricing.base_price = newTotal
 }
 
-// === Auto Variant SKU ===
-const autoVariantSku = computed(() => {
-    const base = props.skuBase || ''
-    if (!base) return ''
-    const brand = brands.value.find(b => b.id === form.value.brand_id)
-    if (!brand) return base
-    const brandCode = brand.name.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
-    const attrParts = variantAttributes.value
-        .filter(a => a.value.trim())
-        .map(a => a.value.trim().substring(0, 8))
-        .join('-')
-    return `${base}-${brandCode}${attrParts ? '-' + attrParts : ''}`
-})
-
-const previousAutoSku = ref('')
-const skuManuallyEdited = ref(false)
-const onSkuInput = () => { skuManuallyEdited.value = true }
-const customSkuManuallyEdited = ref(false)
-const onCustomSkuInput = () => { customSkuManuallyEdited.value = true }
+// SKU is now fully manual - no auto-generation
 
 // === Auto Price Calculation from Category Margin ===
 // Tracks whether the user manually typed a price in this modal session.
@@ -168,14 +159,15 @@ const recalculatePriceFromCategory = async () => {
                 itbm_percent: props.categoryItbmPercent ?? 7,
             })
             if (data.price !== null) {
-                form.value.pricing.base_price = data.price
+                form.value.pricing.base_price = applyRounding(data.price)
             }
         } catch { /* silencioso */ }
     } else {
         // Fallback: simple margin (LL-013)
         const margin = props.categoryMargin
         if (margin != null && margin > 0) {
-            form.value.pricing.base_price = Number((cost * (1 + margin / 100)).toFixed(2))
+            const raw = cost * (1 + margin / 100)
+            form.value.pricing.base_price = applyRounding(Number(raw.toFixed(2)))
         }
     }
     priceManuallyEdited.value = false
@@ -199,28 +191,20 @@ watch(
                     itbm_percent: props.categoryItbmPercent ?? 7,
                 })
                 if (data.price !== null) {
-                    form.value.pricing.base_price = data.price
+                    form.value.pricing.base_price = applyRounding(data.price)
                 }
             } catch { /* silencioso */ }
         } else {
             // Fallback: simple margin (LL-013)
             const margin = props.categoryMargin
             if (margin != null && margin > 0) {
-                form.value.pricing.base_price = Number((cost * (1 + margin / 100)).toFixed(2))
+                const raw = cost * (1 + margin / 100)
+                form.value.pricing.base_price = applyRounding(Number(raw.toFixed(2)))
             }
         }
     }
 )
 
-// Auto custom SKU fill
-watch(
-    () => form.value.sku,
-    (newSku) => {
-        if (!customSkuManuallyEdited.value) {
-            form.value.upc = newSku || ''
-        }
-    }
-)
 
 const loadVariants = async () => {
     if (isDraftMode.value) return // draft mode: no API call
@@ -290,32 +274,22 @@ const openCreateModal = () => {
         pricing: {
             base_price: 0,
             msrp: 0,
-            cost: props.categoryDefaultCost ?? 0,
+            cost: 0,
             tax_rate: (props.categoryAppliesItbm === false) ? 0 : (props.categoryItbmPercent ?? 7),
             tax_type: 'custom',
             pricing_formula: props.categoryFormula || '',
         },
-        initial_inventory: [
+        initial_inventory: warehouses.value.length > 0 ? [
             {
-                warehouse_id: warehouses.value[0]?.id ?? 1,
+                warehouse_id: warehouses.value[0].id,
                 stock_available: 0,
                 reorder_point: 5,
                 reorder_quantity: 10,
             }
-        ]
+        ] : []
     }
-    // Auto-fill SKU after brand is set
-    previousAutoSku.value = autoVariantSku.value
-    skuManuallyEdited.value = false
-    customSkuManuallyEdited.value = false
     priceManuallyEdited.value = false
-    form.value.sku = autoVariantSku.value
-    form.value.upc = autoVariantSku.value
     showModal.value = true
-    // Auto-calculate price from inherited cost + category formula/margin
-    if ((props.categoryDefaultCost ?? 0) > 0) {
-        recalculatePriceFromCategory()
-    }
 }
 
 const openEditModal = (variant: any) => {
@@ -352,21 +326,8 @@ const openEditModal = (variant: any) => {
 
     // base_price ya se carga directo en form.pricing.base_price desde el backend
 
-    previousAutoSku.value = variant.sku
     showModal.value = true
 }
-
-// Watch brand changes to auto-update SKU (only for new variants or if SKU hasn't been manually changed)
-watch(
-    [() => form.value.brand_id, () => variantAttributes.value, autoVariantSku],
-    () => {
-        if (!editingVariant.value && (!form.value.sku || form.value.sku === previousAutoSku.value || !skuManuallyEdited.value)) {
-            form.value.sku = autoVariantSku.value
-            previousAutoSku.value = autoVariantSku.value
-        }
-    },
-    { deep: true }
-)
 
 const handleSubmit = async () => {
     processing.value = true
@@ -383,7 +344,7 @@ const handleSubmit = async () => {
         const payload = {
             ...form.value,
             pricing: pricingPayload,
-            sku: form.value.sku || autoVariantSku.value,
+            sku: form.value.sku || '',
             // For UPDATE: only include attributes when there is at least one valid entry
             // so that saving without touching attributes does NOT send attributes:[]
             // which would silently delete all existing attribute records on the backend.
@@ -473,6 +434,7 @@ onMounted(async () => {
         fetchBrands(),
         fetchWarehouses(),
         fetchCategoryDefaults(props.categoryId),
+        fetchSettings(),
     ])
 })
 </script>
@@ -502,8 +464,8 @@ onMounted(async () => {
                         <th class="px-6 py-3">Nombre</th>
                         <th class="px-6 py-3">Atributos</th>
                         <th class="px-6 py-3">Marca</th>
-                        <th class="px-6 py-3">Precio Base</th>
-                        <th class="px-6 py-3">Precio Total</th>
+                        <th class="px-6 py-3">Costo</th>
+                        <th class="px-6 py-3">Precio</th>
                         <th class="px-6 py-3">Stock Total</th>
                         <th class="px-6 py-3 text-right">Acciones</th>
                     </tr>
@@ -527,16 +489,11 @@ onMounted(async () => {
                             {{ variant.brand?.name }}
                             <span v-if="isDraftMode" class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">Pendiente</span>
                         </td>
+                        <td class="px-6 py-4 text-gray-600 dark:text-gray-400">
+                            {{ variant.pricing ? formatCurrency(variant.pricing.cost) : '—' }}
+                        </td>
                         <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
                             {{ variant.pricing ? formatCurrency(variant.pricing.base_price) : '—' }}
-                        </td>
-                        <td class="px-6 py-4 font-bold" :class="variant.pricing?.calculated_price !== undefined ? 'text-green-600 dark:text-green-500' : 'text-gray-900 dark:text-white'">
-                            {{ variant.pricing 
-                                ? formatCurrency(
-                                    variant.pricing.calculated_price ?? 
-                                    (Number(variant.pricing.base_price) * (1 + ((Number(variant.pricing.tax_rate) || 0) / 100)))
-                                  ) 
-                                : '—' }}
                         </td>
                         <td class="px-6 py-4">
                             {{ variant.inventory?.reduce((sum: number, i: any) => sum + i.quantity_available, 0) || 0 }}
@@ -591,16 +548,8 @@ onMounted(async () => {
                             </div>
                         </div>
 
-                        <!-- Custom SKU (was UPC) -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Custom SKU</label>
-                            <input
-                                v-model="form.upc" @input="onCustomSkuInput"
-                                type="text"
-                                placeholder="Se llena automáticamente"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white"
-                            />
-                        </div>
+                        <!-- Custom SKU / Codigo - OCULTO (R38: no se usa código individual por variante) -->
+                        <!-- El campo form.upc sigue existiendo pero no se muestra en UI -->
 
                          <!-- Status -->
                         <div>
@@ -758,6 +707,21 @@ onMounted(async () => {
 
                     <!-- Error display -->
                     <div v-if="error" class="text-red-500 text-sm mt-2">{{ error }}</div>
+
+                    <!-- ═══ Especificaciones Técnicas de Variante (solo al editar variante guardada) ═══ -->
+                    <div v-if="editingVariant?.id && productId" class="border-t border-gray-200 dark:border-border pt-6 mt-6">
+                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Wrench class="w-4 h-4 text-indigo-600" />
+                            Especificaciones Técnicas de esta Variante
+                        </h4>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                            Define especificaciones propias de esta variante (voltaje, amperaje, etc.). Estas sobreescriben las del producto base al mostrar el detalle.
+                        </p>
+                        <AttributeManager
+                            :product-id="productId"
+                            :variant-id="editingVariant.id"
+                        />
+                    </div>
 
                     <div class="mt-6 flex justify-end space-x-3">
                         <Button

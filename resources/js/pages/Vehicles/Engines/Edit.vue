@@ -93,7 +93,7 @@ const handleSubmit = async () => {
             </div>
 
             <div v-else class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                <form @submit.prevent="handleSubmit" class="space-y-6">
+                <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-6">
                     <!-- Código de Motor -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">

@@ -9,9 +9,10 @@ import apiClient from '@/services/api/client'
 import VariantManager from '@/components/Products/VariantManager.vue'
 import OemReferenceManager from '@/components/Products/OemReferenceManager.vue'
 import AlternativeManager from '@/components/Products/AlternativeManager.vue'
+import AttributeManager from '@/components/Products/AttributeManager.vue'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
-import { Plus, Key, Car, Globe } from 'lucide-vue-next'
+import { Plus, Key, Car, Globe, Wrench } from 'lucide-vue-next'
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -49,7 +50,6 @@ const categoryFormula = ref<string | null>(null)
 const categoryAppliesItbm = ref<boolean>(false)
 const categoryItbmPercent = ref<number | null>(null)
 const categoryMargin = ref<number | null>(null)
-const categoryDefaultCost = ref<number | null>(null)
 
 // Read ?variant= query param (e.g. /products/1/edit?variant=11)
 const variantId = computed(() => {
@@ -83,7 +83,6 @@ onMounted(async () => {
                 categoryAppliesItbm.value = cat.applies_itbm ?? false
                 categoryItbmPercent.value = cat.itbm_percent ?? 7
                 categoryMargin.value = cat.default_margin_percent ?? null
-                categoryDefaultCost.value = cat.default_cost ?? null
             } catch {
                 // Silently fail - variants will work without auto-pricing
             }
@@ -265,22 +264,36 @@ interface CompatibleEngine {
     model?: { id: number; name: string; year_from?: number; year_to?: number; make?: { id: number; name: string }; generation?: string }
 }
 
+interface CompatibleChassis {
+    id: number
+    compat_id: number
+    code: string
+    name?: string
+    model?: { id: number; name: string; year_from?: number; year_to?: number; make?: { id: number; name: string } }
+}
+
 interface VehicleMake { id: number; name: string }
 interface VehicleModelItem { id: number; name: string; year_from?: number; year_to?: number; generation?: string }
 interface VehicleEngineItem { id: number; engine_code: string; displacement?: string }
 
 const compatibleEngines = ref<CompatibleEngine[]>([])
+const compatibleChassis = ref<CompatibleChassis[]>([])
 const loadingCompat = ref(false)
 const addingCompat = ref(false)
+const allEnginesFlag = ref(false)
+const allChassisFlag = ref(false)
+const compatTab = ref<'engines' | 'chassis'>('engines')
 
 const vehicleMakes = ref<VehicleMake[]>([])
 const vehicleModels = ref<VehicleModelItem[]>([])
 const vehicleEnginesList = ref<VehicleEngineItem[]>([])
+const vehicleChassisList = ref<any[]>([])
 
 const selectedMakeId = ref<number | null>(null)
 const selectedModelId = ref<number | null>(null)
 // R39: Multi-select de motores
 const selectedEngineIds = ref<number[]>([])
+const selectedChassisIds = ref<number[]>([])
 
 const loadingMakes = ref(false)
 const loadingModelsV = ref(false)
@@ -291,7 +304,11 @@ const fetchCompatibleEngines = async () => {
     try {
         const res = await apiClient.get(`/products/${props.productId}/compatibility`)
         const compat = res.data.data ?? []
-        compatibleEngines.value = compat.map((c: any) => ({
+        
+        let localAllEngines = false
+        let localAllChassis = false
+
+        compatibleEngines.value = compat.filter((c: any) => c.engine_id).map((c: any) => ({
             id: c.engine?.id ?? c.engine_id,
             compat_id: c.id,  // the compatibility record ID
             engine_code: c.engine?.engine_code ?? 'N/A',
@@ -305,8 +322,32 @@ const fetchCompatibleEngines = async () => {
                 make: c.engine.model.make,
             } : undefined,
         }))
+
+        compatibleChassis.value = compat.filter((c: any) => c.chassis_id).map((c: any) => ({
+            id: c.chassis?.id ?? c.chassis_id,
+            compat_id: c.id,
+            code: c.chassis?.code ?? 'N/A',
+            name: c.chassis?.name,
+            model: c.chassis?.model ? {
+                id: c.chassis.model.id,
+                name: c.chassis.model.name,
+                year_from: c.chassis.model.year_from,
+                year_to: c.chassis.model.year_to,
+                make: c.chassis.model.make,
+            } : undefined,
+        }))
+        
+        // Find if there's any all_engines / all_chassis flag
+        const allE = compat.find((c: any) => c.all_engines)
+        if (allE) { localAllEngines = true; form.value.is_universal = false }
+        const allC = compat.find((c: any) => c.all_chassis)
+        if (allC) { localAllChassis = true; form.value.is_universal = false }
+        
+        allEnginesFlag.value = localAllEngines
+        allChassisFlag.value = localAllChassis
     } catch (e) {
         compatibleEngines.value = []
+        compatibleChassis.value = []
     } finally {
         loadingCompat.value = false
     }
@@ -335,6 +376,7 @@ watch(selectedMakeId, async (makeId) => {
 
 watch(selectedModelId, async (modelId) => {
     vehicleEnginesList.value = []; selectedEngineIds.value = []
+    vehicleChassisList.value = []; selectedChassisIds.value = []
     if (!modelId) return
     loadingEnginesV.value = true
     try {
@@ -342,6 +384,11 @@ watch(selectedModelId, async (modelId) => {
         vehicleEnginesList.value = data.data ?? data
     } catch { vehicleEnginesList.value = [] }
     finally { loadingEnginesV.value = false }
+    
+    try {
+        const { data } = await apiClient.get(`/vehicle-models/${modelId}/chassis`)
+        vehicleChassisList.value = data.data ?? data
+    } catch { vehicleChassisList.value = [] }
 })
 
 const makeSelectOptions = computed(() => vehicleMakes.value.map(m => ({ value: m.id, label: m.name })))
@@ -363,7 +410,7 @@ const handleAddCompatibilities = async () => {
         // Agregar cada motor seleccionado que no esté ya en compatibilidad
         for (const engineId of selectedEngineIds.value) {
             if (compatibleEngines.value.some(e => e.id === engineId)) continue
-            await apiClient.post('/products/compatibility', {
+            await apiClient.post('/product-compatibility', {
                 product_id: props.productId,
                 engine_id: engineId,
             })
@@ -377,11 +424,65 @@ const handleAddCompatibilities = async () => {
     }
 }
 
+const handleAddChassisCompatibilities = async () => {
+    if (selectedChassisIds.value.length === 0) return
+    addingCompat.value = true
+    try {
+        for (const chassisId of selectedChassisIds.value) {
+            if (compatibleChassis.value.some(c => c.id === chassisId)) continue
+            await apiClient.post('/product-compatibility', {
+                product_id: props.productId,
+                chassis_id: chassisId,
+            })
+        }
+        await fetchCompatibleEngines()
+        selectedChassisIds.value = []
+    } catch (e: any) {
+        console.error('Error adding compatibility', e)
+    } finally {
+        addingCompat.value = false
+    }
+}
+
+watch(allEnginesFlag, async (val, oldVal) => {
+    if (val === oldVal) return;
+    try {
+        if (val) {
+            await apiClient.post('/product-compatibility', { product_id: props.productId, all_engines: true })
+        } else {
+            // Need to fetch compatible ID to delete
+            const res = await apiClient.get(`/products/${props.productId}/compatibility`)
+            const compat = res.data.data ?? []
+            const record = compat.find((c: any) => c.all_engines)
+            if (record) {
+                await apiClient.delete(`/product-compatibility/${record.id}`)
+            }
+        }
+    } catch { allEnginesFlag.value = oldVal }
+})
+
+watch(allChassisFlag, async (val, oldVal) => {
+    if (val === oldVal) return;
+    try {
+        if (val) {
+            await apiClient.post('/product-compatibility', { product_id: props.productId, all_chassis: true })
+        } else {
+            const res = await apiClient.get(`/products/${props.productId}/compatibility`)
+            const compat = res.data.data ?? []
+            const record = compat.find((c: any) => c.all_chassis)
+            if (record) {
+                await apiClient.delete(`/product-compatibility/${record.id}`)
+            }
+        }
+    } catch { allChassisFlag.value = oldVal }
+})
+
 const handleRemoveCompatibility = async (compatId: number) => {
     if (!confirm('¿Eliminar esta compatibilidad?')) return
     try {
-        await apiClient.delete(`/products/compatibility/${compatId}`)
+        await apiClient.delete(`/product-compatibility/${compatId}`)
         compatibleEngines.value = compatibleEngines.value.filter(e => e.compat_id !== compatId)
+        compatibleChassis.value = compatibleChassis.value.filter(c => c.compat_id !== compatId)
     } catch (e) {
         console.error('Error removing compatibility', e)
     }
@@ -401,7 +502,7 @@ const toggleUniversalStatus = async () => {
 }
 
 // === Inline Creation Modals (Vehicles) ===
-const inlineModal = ref<'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | null>(null)
+const inlineModal = ref<'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null>(null)
 const inlineForm = ref<Record<string, any>>({})
 const inlineProcessing = ref(false)
 const inlineError = ref<string | null>(null)
@@ -413,6 +514,7 @@ const openInline = (type: typeof inlineModal.value) => {
     if (type === 'vehicleMake') inlineForm.value = { name: '' }
     else if (type === 'vehicleModel') inlineForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), generation: '' }
     else if (type === 'vehicleEngine') inlineForm.value = { engine_code: '', displacement: '' }
+    else if (type === 'vehicleChassis') inlineForm.value = { code: '', name: '' }
 }
 const closeInline = () => { inlineModal.value = null }
 
@@ -436,6 +538,11 @@ const submitInline = async () => {
             vehicleEnginesList.value.push(newEngine)
             // R39: Agregar el nuevo motor a la selección múltiple
             selectedEngineIds.value.push(newEngine.id)
+        } else if (inlineModal.value === 'vehicleChassis') {
+            const { data } = await apiClient.post('/vehicle-chassis', { ...inlineForm.value, model_id: selectedModelId.value })
+            const newChassis = data.data ?? data
+            vehicleChassisList.value.push(newChassis)
+            selectedChassisIds.value.push(newChassis.id)
         }
         closeInline()
     } catch (e: any) {
@@ -479,7 +586,7 @@ onMounted(() => {
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <!--  SECTION 1: Información General (always visible)           -->
                 <!-- ═══════════════════════════════════════════════════════════ -->
-                <form @submit.prevent="handleSubmit" class="space-y-6">
+                <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-6">
 
                 <!-- Producto Base -->
                 <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
@@ -667,80 +774,139 @@ onMounted(() => {
                                 </div>
                             </div>
                         </div>
-                        <!-- R39: Fila 2: Multi-select de motores con checkboxes -->
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4 items-end bg-gray-50 dark:bg-muted/30 p-4 rounded-lg border border-gray-100 dark:border-border/50">
-                            <div class="md:col-span-3">
-                                <div class="flex items-center justify-between mb-1">
-                                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                                        Motores
-                                        <span v-if="selectedEngineIds.length > 0" class="ml-1 text-teal-600">({{ selectedEngineIds.length }} seleccionados)</span>
-                                    </label>
-                                    <button type="button" @click="openInline('vehicleEngine')"
-                                        :disabled="!selectedModelId"
-                                        class="text-xs text-blue-500 hover:underline flex items-center gap-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
-                                        title="Crear nuevo motor">
-                                        <Plus class="h-3 w-3" />
+                        <!-- Tabs -->
+                        <div class="flex border-b border-gray-200 dark:border-border mb-4">
+                            <button type="button" @click="compatTab = 'engines'"
+                                :class="compatTab === 'engines' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                class="w-1/2 py-2 px-1 text-center border-b-2 font-medium text-sm flex items-center justify-center gap-2">
+                                🔧 Motores
+                            </button>
+                            <button type="button" @click="compatTab = 'chassis'"
+                                :class="compatTab === 'chassis' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                class="w-1/2 py-2 px-1 text-center border-b-2 font-medium text-sm flex items-center justify-center gap-2">
+                                🚗 Chasis
+                            </button>
+                        </div>
+
+                        <!-- Panel Motores -->
+                        <div v-show="compatTab === 'engines'" class="space-y-4">
+                            <div class="flex items-center bg-gray-50 dark:bg-muted/30 p-2 rounded-lg border border-gray-100 dark:border-border/50">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" v-model="allEnginesFlag" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                                    <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Compatible con TODOS los motores de este modelo</span>
+                                </label>
+                            </div>
+                            <!-- R39: Fila 2: Multi-select de motores con checkboxes -->
+                            <div v-if="!allEnginesFlag" class="grid grid-cols-1 gap-4 md:grid-cols-4 items-end bg-gray-50 dark:bg-muted/30 p-4 rounded-lg border border-gray-100 dark:border-border/50">
+                                <div class="md:col-span-3">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                            Motores
+                                            <span v-if="selectedEngineIds.length > 0" class="ml-1 text-teal-600">({{ selectedEngineIds.length }} seleccionados)</span>
+                                        </label>
+                                        <button type="button" @click="openInline('vehicleEngine')"
+                                            :disabled="!selectedModelId"
+                                            class="text-xs text-blue-500 hover:underline flex items-center gap-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            title="Crear nuevo motor">
+                                            <Plus class="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                    <div v-if="loadingEnginesV" class="text-center py-4 text-gray-400 text-sm">Cargando motores...</div>
+                                    <div v-else-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">Selecciona un modelo primero</div>
+                                    <div v-else-if="vehicleEnginesList.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">No hay motores disponibles</div>
+                                    <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
+                                        <label v-for="engine in vehicleEnginesList" :key="engine.id" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border" :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedEngineIds.includes(engine.id), 'opacity-50': compatibleEngines.some(e => e.id === engine.id) }">
+                                            <input type="checkbox" :value="engine.id" v-model="selectedEngineIds" :disabled="compatibleEngines.some(e => e.id === engine.id)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                                            <span class="font-mono text-sm text-gray-900 dark:text-white">{{ engine.engine_code }}</span>
+                                            <span v-if="engine.displacement" class="text-xs text-gray-500">{{ engine.displacement }}</span>
+                                            <span v-if="compatibleEngines.some(e => e.id === engine.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="button" @click="handleAddCompatibilities" :disabled="selectedEngineIds.length === 0 || addingCompat"
+                                        class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
+                                        {{ addingCompat ? 'Agregando...' : `+ Agregar ${selectedEngineIds.length > 0 ? `(${selectedEngineIds.length})` : ''}` }}
                                     </button>
                                 </div>
-                                <div v-if="loadingEnginesV" class="text-center py-4 text-gray-400 text-sm">
-                                    Cargando motores...
-                                </div>
-                                <div v-else-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">
-                                    Selecciona un modelo primero
-                                </div>
-                                <div v-else-if="vehicleEnginesList.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">
-                                    No hay motores disponibles
-                                </div>
-                                <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
-                                    <label
-                                        v-for="engine in vehicleEnginesList"
-                                        :key="engine.id"
-                                        class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border"
-                                        :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedEngineIds.includes(engine.id), 'opacity-50': compatibleEngines.some(e => e.id === engine.id) }"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            :value="engine.id"
-                                            v-model="selectedEngineIds"
-                                            :disabled="compatibleEngines.some(e => e.id === engine.id)"
-                                            class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                                        />
-                                        <span class="font-mono text-sm text-gray-900 dark:text-white">{{ engine.engine_code }}</span>
-                                        <span v-if="engine.displacement" class="text-xs text-gray-500">{{ engine.displacement }}</span>
-                                        <span v-if="compatibleEngines.some(e => e.id === engine.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="flex items-end">
-                                <button type="button" @click="handleAddCompatibilities" :disabled="selectedEngineIds.length === 0 || addingCompat"
-                                    class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
-                                    {{ addingCompat ? 'Agregando...' : `+ Agregar ${selectedEngineIds.length > 0 ? `(${selectedEngineIds.length})` : ''}` }}
-                                </button>
                             </div>
                         </div>
 
+                        <!-- Panel Chasis -->
+                        <div v-show="compatTab === 'chassis'" class="space-y-4">
+                            <div class="flex items-center bg-gray-50 dark:bg-muted/30 p-2 rounded-lg border border-gray-100 dark:border-border/50">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" v-model="allChassisFlag" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                                    <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Compatible con TODOS los chasis de este modelo</span>
+                                </label>
+                            </div>
+                            <div v-if="!allChassisFlag" class="grid grid-cols-1 gap-4 md:grid-cols-4 items-end bg-gray-50 dark:bg-muted/30 p-4 rounded-lg border border-gray-100 dark:border-border/50">
+                                <div class="md:col-span-3">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                            Chasis
+                                            <span v-if="selectedChassisIds.length > 0" class="ml-1 text-teal-600">({{ selectedChassisIds.length }} seleccionados)</span>
+                                        </label>
+                                        <button type="button" @click="openInline('vehicleChassis')"
+                                            :disabled="!selectedModelId"
+                                            class="text-xs text-blue-500 hover:underline flex items-center gap-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            title="Crear nuevo chasis">
+                                            <Plus class="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                    <div v-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">Selecciona un modelo primero</div>
+                                    <div v-else-if="vehicleChassisList.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">No hay chasis disponibles</div>
+                                    <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
+                                        <label v-for="chassis in vehicleChassisList" :key="chassis.id" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border" :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedChassisIds.includes(chassis.id), 'opacity-50': compatibleChassis.some(c => c.id === chassis.id) }">
+                                            <input type="checkbox" :value="chassis.id" v-model="selectedChassisIds" :disabled="compatibleChassis.some(c => c.id === chassis.id)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                                            <span class="font-mono text-sm text-gray-900 dark:text-white">{{ chassis.code }}</span>
+                                            <span v-if="chassis.name" class="text-xs text-gray-500">{{ chassis.name }}</span>
+                                            <span v-if="compatibleChassis.some(c => c.id === chassis.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="button" @click="handleAddChassisCompatibilities" :disabled="selectedChassisIds.length === 0 || addingCompat"
+                                        class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
+                                        {{ addingCompat ? 'Agregando...' : `+ Agregar ${selectedChassisIds.length > 0 ? `(${selectedChassisIds.length})` : ''}` }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabla Combinada -->
                         <div v-if="loadingCompat" class="text-center py-8">
                             <div class="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-teal-600 border-r-transparent"></div>
                         </div>
-                        <div v-else-if="compatibleEngines.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border">
+                        <div v-else-if="compatibleEngines.length > 0 || compatibleChassis.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border">
                             <table class="w-full text-left text-sm">
                                 <thead class="bg-gray-50 dark:bg-background/50">
                                     <tr>
-                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Marca</th>
-                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Modelo</th>
-                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Años</th>
-                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Motor</th>
+                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Tipo</th>
+                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Vehículo</th>
+                                        <th class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Especificación</th>
                                         <th class="w-10 px-2 py-2"></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                                    <tr v-for="eng in compatibleEngines" :key="eng.id" class="bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-muted/30 transition-colors">
-                                        <td class="px-4 py-2 text-gray-900 dark:text-white font-medium">{{ eng.model?.make?.name ?? 'N/A' }}</td>
-                                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ eng.model?.name ?? 'N/A' }}{{ eng.model?.generation ? ` - ${eng.model.generation}` : '' }}</td>
-                                        <td class="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs">{{ eng.model?.year_from ?? '' }}{{ eng.model?.year_to ? '–' + eng.model.year_to : '' }}</td>
+                                    <!-- Listado de Motores -->
+                                    <tr v-for="eng in compatibleEngines" :key="'eng'+eng.id" class="bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-muted/30 transition-colors">
+                                        <td class="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs font-medium">🔧 Motor</td>
+                                        <td class="px-4 py-2 text-gray-900 dark:text-white font-medium">{{ eng.model?.make?.name ?? 'N/A' }} {{ eng.model?.name ?? 'N/A' }}</td>
                                         <td class="px-4 py-2 font-mono text-gray-600 dark:text-gray-400">{{ eng.engine_code }}<span v-if="eng.displacement" class="ml-1 text-xs text-gray-400">({{ eng.displacement }})</span></td>
                                         <td class="px-2 py-2 text-center">
                                             <button type="button" @click="handleRemoveCompatibility(eng.compat_id)" class="text-red-400 hover:text-red-600 transition" title="Eliminar">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <!-- Listado de Chasis -->
+                                    <tr v-for="ch in compatibleChassis" :key="'ch'+ch.id" class="bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-muted/30 transition-colors">
+                                        <td class="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs font-medium">🚗 Chasis</td>
+                                        <td class="px-4 py-2 text-gray-900 dark:text-white font-medium">{{ ch.model?.make?.name ?? 'N/A' }} {{ ch.model?.name ?? 'N/A' }}</td>
+                                        <td class="px-4 py-2 font-mono text-gray-600 dark:text-gray-400">{{ ch.code }}</td>
+                                        <td class="px-2 py-2 text-center">
+                                            <button type="button" @click="handleRemoveCompatibility(ch.compat_id)" class="text-red-400 hover:text-red-600 transition" title="Eliminar">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                             </button>
                                         </td>
@@ -768,8 +934,21 @@ onMounted(() => {
                         :category-applies-itbm="categoryAppliesItbm"
                         :category-itbm-percent="categoryItbmPercent"
                         :category-margin="categoryMargin"
-                        :category-default-cost="categoryDefaultCost"
                     />
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <!--  SECTION 5.5: Technical Specifications                     -->
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card border-l-4 border-indigo-500">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                        <Wrench class="w-5 h-5 text-indigo-600" />
+                        Especificaciones Técnicas
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Agrega o edita especificaciones técnicas del producto (voltaje, potencia, dimensiones, etc.).
+                    </p>
+                    <AttributeManager :product-id="props.productId" />
                 </div>
 
                 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -852,6 +1031,7 @@ onMounted(() => {
                     <span v-if="inlineModal === 'vehicleMake'">Nueva Marca de Vehículo</span>
                     <span v-else-if="inlineModal === 'vehicleModel'">Nuevo Modelo de Vehículo</span>
                     <span v-else-if="inlineModal === 'vehicleEngine'">Nuevo Motor</span>
+                    <span v-else-if="inlineModal === 'vehicleChassis'">Nuevo Chasis</span>
                 </DialogTitle>
             </DialogHeader>
 
@@ -911,6 +1091,22 @@ onMounted(() => {
                         <input v-model="inlineForm.displacement" type="text"
                             class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
                             placeholder="Ej: 1.8L, 2.4L, 2000cc..." />
+                    </div>
+                </template>
+
+                <!-- Chassis form -->
+                <template v-else-if="inlineModal === 'vehicleChassis'">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código / Nombre <span class="text-red-500">*</span></label>
+                        <input v-model="inlineForm.code" type="text"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Ej: P90" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción Adicional <span class="text-xs text-gray-400">(opcional)</span></label>
+                        <input v-model="inlineForm.name" type="text"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Ej: Serie P90..." />
                     </div>
                 </template>
 

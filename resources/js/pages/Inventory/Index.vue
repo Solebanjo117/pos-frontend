@@ -96,6 +96,11 @@ const getStatusLabel = (status: string) => {
 }
 
 const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.value.per_page))
+
+const formatCurrency = (value: number | null) => {
+    if (value === null || value === undefined) return '—'
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+}
 </script>
 
 <template>
@@ -209,6 +214,9 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                                 <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Estado
                                 </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                    Precio Venta
+                                </th>
                                 <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Acciones
                                 </th>
@@ -295,6 +303,13 @@ const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
                                     <span :class="getStatusColor(item.status)" class="inline-flex rounded-full px-2 text-xs font-semibold leading-5">
                                         {{ getStatusLabel(item.status) }}
+                                    </span>
+                                </td>
+
+                                <!-- Sale Price -->
+                                <td class="px-6 py-4 whitespace-nowrap text-right">
+                                    <span class="text-sm font-semibold" :class="item.base_price ? 'text-green-700 dark:text-green-400' : 'text-gray-400'">
+                                        {{ formatCurrency(item.base_price) }}
                                     </span>
                                 </td>
 

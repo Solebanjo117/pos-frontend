@@ -53,7 +53,7 @@ async function handleSubmit() {
             </div>
 
             <!-- Form -->
-            <form @submit.prevent="handleSubmit" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6 space-y-6">
+            <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6 space-y-6">
                 <!-- General Info -->
                 <div>
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Información General</h2>

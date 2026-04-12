@@ -26,6 +26,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('settings/Appearance');
     })->name('appearance.edit');
 
+    Route::get('settings/pricing-formulas', function () {
+        return Inertia::render('settings/PricingFormulas');
+    })->name('pricing-formulas.index');
+
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
 });

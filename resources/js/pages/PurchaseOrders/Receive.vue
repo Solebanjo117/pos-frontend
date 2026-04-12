@@ -46,14 +46,15 @@ async function handleSubmit() {
                 </div>
             </div>
             <div v-if="error" class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4"><p class="text-red-600 dark:text-red-400">{{ error }}</p></div>
-            <form v-if="purchaseOrder && receiveData.length" @submit.prevent="handleSubmit" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border overflow-hidden">
+            <form v-if="purchaseOrder && receiveData.length" @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border overflow-hidden">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
                     <thead class="bg-gray-50 dark:bg-background"><tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pedido</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ya Recibido</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pendiente</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Recibir Ahora</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paq. Pedidos</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Und/Paq</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Und.</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pend. Paq.</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Recibir (Paq)</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lote</th>
                     </tr></thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-border">
@@ -65,7 +66,12 @@ async function handleSubmit() {
                                 </template>
                             </td>
                             <td class="px-6 py-3 text-right text-sm">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.quantity_ordered }}</td>
-                            <td class="px-6 py-3 text-right text-sm">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.quantity_received }}</td>
+                            <td class="px-6 py-3 text-right text-sm text-gray-500">
+                                × {{ purchaseOrder.items.find(i => i.id === rd.item_id)?.units_per_package ?? 1 }}
+                            </td>
+                            <td class="px-6 py-3 text-right text-sm font-medium">
+                                {{ purchaseOrder.items.find(i => i.id === rd.item_id)?.total_units_ordered }}
+                            </td>
                             <td class="px-6 py-3 text-right text-sm font-semibold text-orange-600">{{ purchaseOrder.items.find(i => i.id === rd.item_id)?.pending_quantity }}</td>
                             <td class="px-6 py-3"><input v-model.number="rd.quantity_received" type="number" min="0" :max="purchaseOrder.items.find(i => i.id === rd.item_id)?.pending_quantity" class="w-20 text-right px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white" /></td>
                             <td class="px-6 py-3"><input v-model="rd.batch_number" type="text" placeholder="Opcional" class="w-28 px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white text-sm" /></td>

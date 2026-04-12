@@ -37,6 +37,10 @@ export interface InventoryMovement {
         id: number
         name: string
     } | null
+    supplier?: {
+        id: number
+        name: string
+    } | null
     created_at: string
     updated_at: string
 }

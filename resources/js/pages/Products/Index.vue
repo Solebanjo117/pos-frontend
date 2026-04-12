@@ -8,18 +8,55 @@ import { usePOS } from '@/composables/usePOS'
 import type { Product, ProductFilters } from '@/types/product'
 import ProductCatalogView from '@/components/Products/ProductCatalogView.vue'
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue'
+import ProductFiltersComponent from '@/components/Products/ProductFilters.vue'
+import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue'
+import ProductSort from '@/components/Products/ProductSort.vue'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
-import { ShoppingCart, Check, ChevronDown, ChevronUp, Info } from 'lucide-vue-next'
+import { ShoppingCart, Check, ChevronDown, ChevronUp, Info, Filter, Upload, Download, FileSpreadsheet } from 'lucide-vue-next'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { useCategories } from '@/composables/useCategories'
+import { useBrands } from '@/composables/useBrands'
+import { productsApi } from '@/services/api/products'
 
 import { useWarehouses } from '@/composables/useWarehouses'
 
 const { currentWarehouseId, initWarehouse } = usePosSettings()
 const { warehouses } = useWarehouses()
 const { categories, fetchCategories } = useCategories()
+const { brands, fetchBrands: fetchBrandsList } = useBrands()
 
 const showAdvancedFilters = ref(false)
+const showSidebarFilters = ref(true)
+const sidebarSortValue = ref('newest')
+
+// Sidebar filter values
+const sidebarFilterValues = ref<ProductFilterValues>({
+  sku: '',
+  category_ids: [],
+  brand_ids: [],
+  min_price: undefined,
+  max_price: undefined,
+  in_stock: false,
+})
+
+const handleSidebarFilterChange = async (newFilters: ProductFilterValues) => {
+  sidebarFilterValues.value = newFilters
+  // Map sidebar filter values to the main filters object
+  filters.value.category_id = newFilters.category_ids.length > 0 ? newFilters.category_ids : undefined
+  filters.value.brand_id = newFilters.brand_ids.length > 0 ? newFilters.brand_ids : undefined
+  filters.value.sku = newFilters.sku || undefined
+  filters.value.min_price = newFilters.min_price
+  filters.value.max_price = newFilters.max_price
+  filters.value.in_stock = newFilters.in_stock || undefined
+  await applyFilters()
+}
+
+const handleSortChange = async (sortVal: string) => {
+  sidebarSortValue.value = sortVal
+  // Use unified sort instead of legacy sortField/sortDirection
+  filters.value.sort = sortVal
+  await applyFilters()
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -63,6 +100,102 @@ const addVariantToCart = (product: any, variant: any) => {
 }
 
 const addedFeedback = ref<number | null>(null)
+
+// ========== IMPORT STATE ==========
+const showImportModal = ref(false)
+const importFile = ref<File | null>(null)
+const importPreviewRows = ref<any[]>([])
+const importPreviewCount = ref(0)
+const importResult = ref<any | null>(null)
+const importError = ref<string | null>(null)
+const importPreviewLoading = ref(false)
+const importRunning = ref(false)
+
+const openImportModal = () => {
+    showImportModal.value = true
+    importError.value = null
+    importResult.value = null
+    importPreviewRows.value = []
+    importPreviewCount.value = 0
+}
+
+const closeImportModal = () => {
+    showImportModal.value = false
+    importFile.value = null
+    importPreviewRows.value = []
+    importPreviewCount.value = 0
+    importResult.value = null
+    importError.value = null
+}
+
+const handleImportFileChange = (e: Event) => {
+    const input = e.target as HTMLInputElement
+    importFile.value = input.files?.[0] ?? null
+    importPreviewRows.value = []
+    importPreviewCount.value = 0
+    importResult.value = null
+    importError.value = null
+}
+
+const downloadImportTemplate = async () => {
+    importError.value = null
+    try {
+        const blob = await productsApi.downloadImportTemplate()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'plantilla_productos.xlsx'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+    } catch (e: any) {
+        importError.value = e.response?.data?.message || 'No se pudo descargar la plantilla.'
+    }
+}
+
+const previewImportFile = async () => {
+    importError.value = null
+    importResult.value = null
+
+    if (!importFile.value) {
+        importError.value = 'Selecciona un archivo antes de previsualizar.'
+        return
+    }
+
+    importPreviewLoading.value = true
+    try {
+        const response = await productsApi.previewImport(importFile.value)
+        importPreviewRows.value = response.data?.rows ?? []
+        importPreviewCount.value = response.data?.count ?? importPreviewRows.value.length
+    } catch (e: any) {
+        importError.value = e.response?.data?.message || 'No se pudo generar la previsualizacion.'
+        importPreviewRows.value = []
+        importPreviewCount.value = 0
+    } finally {
+        importPreviewLoading.value = false
+    }
+}
+
+const runImport = async () => {
+    importError.value = null
+
+    if (!importFile.value) {
+        importError.value = 'Selecciona un archivo antes de importar.'
+        return
+    }
+
+    importRunning.value = true
+    try {
+        const response = await productsApi.importFromFile(importFile.value)
+        importResult.value = response.data ?? null
+        await applyFilters()
+    } catch (e: any) {
+        importError.value = e.response?.data?.message || 'Error al importar productos.'
+    } finally {
+        importRunning.value = false
+    }
+}
 
 // ========== VIEW MODE TOGGLE ==========
 const viewMode = ref<'table' | 'catalog'>('table')
@@ -138,27 +271,10 @@ const toggleRow = (productId: number) => {
     }
 }
 
-// ── Active deep-link filter badge (for UI banner display) ────────────────────
-const activeDeepLinkFilters = computed(() => {
-    const tags: { label: string; key: keyof typeof filters.value }[] = []
-    if (filters.value.vin)             tags.push({ label: `VIN: ${filters.value.vin}`, key: 'vin' })
-    if (filters.value.oem_code)        tags.push({ label: `OEM: ${filters.value.oem_code}`, key: 'oem_code' })
-    if (filters.value.attribute_value) tags.push({ label: `Especificación: ${filters.value.attribute_value.replace(':', ' = ')}`, key: 'attribute_value' })
-    if (filters.value.category_id)     tags.push({ label: `Categoría #${filters.value.category_id}`, key: 'category_id' })
-    if (filters.value.brand_id)        tags.push({ label: `Marca #${filters.value.brand_id}`, key: 'brand_id' })
-    if (filters.value.product_line_id) tags.push({ label: `Línea #${filters.value.product_line_id}`, key: 'product_line_id' })
-    return tags
-})
-
-const removeDeepLinkFilter = async (key: keyof typeof filters.value) => {
-    (filters.value as any)[key] = undefined
-    await fetchProducts(filters.value)
-}
-
 // Fetch products on mount — read any URL query params for deep linking
 onMounted(async () => {
     await initWarehouse()
-    await fetchCategories()
+    await Promise.all([fetchCategories(), fetchBrandsList()])
     const params = new URLSearchParams(window.location.search)
     if (params.has('search'))          filters.value.search            = params.get('search') ?? ''
     if (params.has('attribute_value')) filters.value.attribute_value   = params.get('attribute_value') ?? undefined
@@ -307,6 +423,14 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                         <span class="bg-white text-green-700 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{{ cartItemCount }}</span>
                     </a>
 
+                    <button
+                        @click="openImportModal"
+                        class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+                    >
+                        <Upload class="h-4 w-4" />
+                        Importar Excel
+                    </button>
+
                     <!-- New Product Button -->
                     <a href="/products/create"
                         class="inline-flex items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 dark:hover:bg-primary/90 transition-colors">
@@ -355,10 +479,10 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                         Estás viendo productos archivados. Estos productos no aparecen en el Punto de Venta pero las facturas históricas los conservan.
                     </p>
                 </div>
-                <!-- Filters -->
-                <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-card dark:shadow-gray-900/50">
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-                        <div>
+                <!-- Compact Search & Controls Bar -->
+                <div class="mb-4 rounded-lg bg-white p-4 shadow dark:bg-card dark:shadow-gray-900/50">
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div class="flex-1 min-w-[200px]">
                             <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                                 Buscar
                             </label>
@@ -367,7 +491,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                 @keyup.enter="applyFilters" />
                         </div>
 
-                        <div>
+                        <div class="w-36">
                             <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                                 Estado
                             </label>
@@ -381,7 +505,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                         </div>
 
                          <!-- Warehouse Filter -->
-                         <div>
+                         <div class="w-40">
                             <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                                 Almacén
                             </label>
@@ -392,12 +516,8 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                             </select>
                         </div>
 
-                        <div class="flex items-end">
-                            <label class="flex items-center">
-                                <input v-model="filters.has_stock" type="checkbox"
-                                    class="mr-2 rounded border-gray-300 dark:border-border" />
-                                <span class="text-sm text-gray-900 dark:text-gray-100">Solo con stock</span>
-                            </label>
+                        <div class="flex items-center gap-2">
+                            <ProductSort :model-value="sidebarSortValue" @update:model-value="handleSortChange" />
                         </div>
 
                         <div class="flex items-end gap-2">
@@ -409,23 +529,32 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                 class="rounded-lg bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:bg-muted dark:text-gray-100 dark:hover:bg-muted/80 dark:focus:ring-offset-gray-800">
                                 Limpiar
                             </button>
+                            <!-- Mobile sidebar toggle -->
+                            <button @click="showSidebarFilters = !showSidebarFilters"
+                                class="md:hidden rounded-lg px-3 py-2 border transition-colors text-sm"
+                                :class="showSidebarFilters
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-400'
+                                  : 'bg-white dark:bg-card border-gray-200 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-muted'"
+                            >
+                                <Filter class="w-4 h-4" />
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Advanced Filters Toggle & Panel -->
-                <div class="mb-6">
+                <div class="mb-4">
                     <button @click="showAdvancedFilters = !showAdvancedFilters"
                         class="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-primary hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
                         <component :is="showAdvancedFilters ? ChevronUp : ChevronDown" class="h-4 w-4" />
-                        {{ showAdvancedFilters ? 'Ocultar' : 'Mostrar' }} Filtros Avanzados
+                        {{ showAdvancedFilters ? 'Ocultar' : 'Mostrar' }} Filtros Avanzados (VIN, OEM, Atributo)
                     </button>
 
                     <transition name="slide">
                         <div v-if="showAdvancedFilters"
                             class="mt-3 rounded-lg bg-white p-4 shadow border border-blue-100 dark:bg-card dark:border-border dark:shadow-gray-900/50">
                             <h3 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Filtros Avanzados</h3>
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 <!-- VIN -->
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">VIN</label>
@@ -440,16 +569,6 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                     <input v-model="filters.oem_code" type="text" placeholder="Ej: 0986JR1520"
                                         class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                                         @keyup.enter="applyFilters" />
-                                </div>
-
-                                <!-- Category -->
-                                <div>
-                                    <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Categoría</label>
-                                    <select v-model="filters.category_id"
-                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white">
-                                        <option :value="undefined">Todas</option>
-                                        <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-                                    </select>
                                 </div>
 
                                 <!-- Attribute Value -->
@@ -471,18 +590,6 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                     </transition>
                 </div>
 
-                <!-- Active Deep-Link Filter Banner -->
-                <div v-if="activeDeepLinkFilters.length > 0" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 dark:border-blue-800/40 dark:bg-blue-900/20">
-                    <span class="text-xs font-semibold text-blue-700 dark:text-blue-400">Filtro activo:</span>
-                    <span v-for="tag in activeDeepLinkFilters" :key="tag.key"
-                        class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-blue-800 shadow-sm dark:bg-card dark:text-blue-300">
-                        {{ tag.label }}
-                        <button @click="removeDeepLinkFilter(tag.key)" class="ml-0.5 rounded-full p-0.5 text-blue-400 hover:bg-blue-100 hover:text-blue-600 dark:text-primary dark:hover:bg-blue-900/50 transition-colors" title="Quitar filtro">
-                            <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-                        </button>
-                    </span>
-                </div>
-
                 <!-- Loading State -->
                 <div v-if="loading" class="text-center py-12">
                     <div
@@ -496,9 +603,21 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                     <p>{{ error }}</p>
                 </div>
 
-                <!-- Products Table -->
-                <div v-else-if="products.length > 0"
-                    class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
+                <!-- ========== SIDEBAR + TABLE LAYOUT ========== -->
+                <div v-else-if="products.length > 0" class="flex gap-4 min-h-0">
+                    <!-- Sidebar Filters -->
+                    <div :class="showSidebarFilters ? 'block' : 'hidden md:block'" class="shrink-0">
+                        <ProductFiltersComponent
+                            :model-value="sidebarFilterValues"
+                            @update:model-value="handleSidebarFilterChange"
+                            :categories="categories"
+                            :brands="brands"
+                            :collapsible="false"
+                        />
+                    </div>
+
+                    <!-- Products Table -->
+                    <div class="flex-1 overflow-hidden rounded-lg bg-white shadow dark:bg-card">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
                         <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
@@ -663,12 +782,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                                     class="min-w-full divide-y divide-gray-200 dark:divide-border">
                                                     <thead class="bg-gray-100 dark:bg-card">
                                                         <tr>
-                                                            <th
-                                                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                                                                SKU</th>
-                                                            <th
-                                                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                                                                Custom SKU</th>
+                                                            <!-- SKU y Custom SKU ocultos (R38: cliente usa SKU del producto padre) -->
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
                                                                 Atributos</th>
@@ -691,16 +805,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                                         <tr v-for="variant in getVariants(product)"
                                                             :key="variant.id"
                                                             class="hover:bg-gray-50 dark:hover:bg-muted/50">
-                                                            <td
-                                                                class="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                                                                <code
-                                                                    class="rounded bg-gray-100 px-2 py-1 text-xs dark:bg-muted font-mono">{{
-                                                                        variant.sku }}</code>
-                                                            </td>
-                                                            <td
-                                                                class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                                                                {{ variant.upc || 'N/A' }}
-                                                            </td>
+                                                            <!-- SKU y Custom SKU ocultos -->
                                                             <td class="px-4 py-3">
                                                                 <div v-if="getVariantAttrs(variant, product).length > 0" class="flex flex-wrap gap-1">
                                                                     <span v-for="attr in getVariantAttrs(variant, product)" :key="attr.id ?? attr.name"
@@ -809,6 +914,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                             </div>
                         </div>
                     </div>
+                    </div>
                 </div>
 
                 <!-- Empty State -->
@@ -831,6 +937,126 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
 
             <!-- Universal Product Detail Modal (accessible from both Table and Catalog views) -->
             <ProductDetailModal v-if="selectedProduct" :product="selectedProduct" @close="closeDetail" @view-alternative="(p: any) => selectedProduct = p" />
+
+            <!-- Product Import Modal -->
+            <Teleport to="body">
+                <div
+                    v-if="showImportModal"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    @click.self="closeImportModal"
+                >
+                    <div class="w-full max-w-5xl rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border dark:bg-card">
+                        <div class="mb-4 flex items-start justify-between gap-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <FileSpreadsheet class="h-5 w-5 text-emerald-600" />
+                                    Importacion de productos
+                                </h3>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    Descarga la plantilla, sube tu archivo y valida filas antes de importar.
+                                </p>
+                            </div>
+                            <button
+                                class="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-muted"
+                                @click="closeImportModal"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 border-b border-gray-200 pb-4 dark:border-border md:grid-cols-[1fr_auto_auto_auto]">
+                            <label class="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 dark:border-border dark:text-gray-300">
+                                <Upload class="h-4 w-4" />
+                                <span class="truncate">{{ importFile?.name || 'Selecciona archivo .xlsx, .xls o .csv' }}</span>
+                                <input type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="handleImportFileChange" />
+                            </label>
+
+                            <button
+                                type="button"
+                                class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                                @click="downloadImportTemplate"
+                            >
+                                <Download class="mr-1 inline h-4 w-4" /> Plantilla
+                            </button>
+
+                            <button
+                                type="button"
+                                class="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-700/40 dark:bg-indigo-900/20 dark:text-indigo-300"
+                                :disabled="!importFile || importPreviewLoading || importRunning"
+                                @click="previewImportFile"
+                            >
+                                {{ importPreviewLoading ? 'Previsualizando...' : 'Previsualizar' }}
+                            </button>
+
+                            <button
+                                type="button"
+                                class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                :disabled="!importFile || importRunning || importPreviewLoading"
+                                @click="runImport"
+                            >
+                                {{ importRunning ? 'Importando...' : 'Importar' }}
+                            </button>
+                        </div>
+
+                        <div v-if="importError" class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                            {{ importError }}
+                        </div>
+
+                        <div v-if="importResult" class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                            Importados: {{ importResult.success_count ?? 0 }} · Errores: {{ importResult.error_count ?? 0 }}
+                        </div>
+
+                        <div v-if="importResult?.errors?.length" class="mt-4 max-h-40 overflow-auto rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                            <p class="mb-2 font-semibold">Filas con error:</p>
+                            <p v-for="row in importResult.errors" :key="`err-${row.row}`" class="mb-1">
+                                Fila {{ row.row }}: {{ row.error }}
+                            </p>
+                        </div>
+
+                        <div v-if="importPreviewRows.length" class="mt-4">
+                            <div class="mb-2 flex items-center justify-between">
+                                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Previsualizacion ({{ importPreviewCount }} filas)</h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Muestra primeras filas del archivo</p>
+                            </div>
+
+                            <div class="max-h-72 overflow-auto rounded-lg border border-gray-200 dark:border-border">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-border text-xs">
+                                    <thead class="bg-gray-50 dark:bg-background">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Fila</th>
+                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Nombre</th>
+                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">SKU</th>
+                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Marca</th>
+                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Categoria</th>
+                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 dark:divide-border">
+                                        <tr v-for="row in importPreviewRows" :key="`preview-${row.row}`">
+                                            <td class="px-3 py-2">{{ row.row }}</td>
+                                            <td class="px-3 py-2">{{ row.nombre }}</td>
+                                            <td class="px-3 py-2">{{ row.sku }}</td>
+                                            <td class="px-3 py-2">{{ row.marca }}</td>
+                                            <td class="px-3 py-2">{{ row.categoria }}</td>
+                                            <td class="px-3 py-2">
+                                                <span v-if="row.is_valid" class="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                                    OK
+                                                </span>
+                                                <span v-else class="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                                    Error
+                                                </span>
+                                                <p v-if="row.errors?.length" class="mt-1 text-[11px] text-red-600 dark:text-red-300">
+                                                    {{ row.errors.join(' ') }}
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Teleport>
         </div>
     </AppLayout>
 </template>

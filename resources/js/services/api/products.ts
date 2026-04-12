@@ -318,4 +318,54 @@ export const productsApi = {
         )
         return response.data
     },
+
+    /**
+     * Download product import Excel template
+     */
+    async downloadImportTemplate(): Promise<Blob> {
+        const response = await apiClient.get('/products/import/template', {
+            responseType: 'blob',
+        })
+        return response.data
+    },
+
+    /**
+     * Preview product import file
+     */
+    async previewImport(file: File): Promise<ApiResponse<any>> {
+        const form = new FormData()
+        form.append('file', file)
+
+        const response = await apiClient.post<ApiResponse<any>>(
+            '/products/import/preview',
+            form,
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            },
+        )
+
+        return response.data
+    },
+
+    /**
+     * Execute product import
+     */
+    async importFromFile(file: File): Promise<ApiResponse<any>> {
+        const form = new FormData()
+        form.append('file', file)
+
+        const response = await apiClient.post<ApiResponse<any>>(
+            '/products/import',
+            form,
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            },
+        )
+
+        return response.data
+    },
 }

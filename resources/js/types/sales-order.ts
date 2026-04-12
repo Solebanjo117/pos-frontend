@@ -5,9 +5,11 @@ export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'credit' | 'multiple'
 export interface SalesOrderItem {
     id: number
     sales_order_id: number
-    product_id: number
+    product_id: number | null
     product_name: string
     product_sku: string
+    is_custom_line?: boolean
+    custom_description?: string | null
     warehouse_id: number
     warehouse_name: string
     seller_id?: number
@@ -95,15 +97,18 @@ export interface CreateSalesOrderData {
     notes?: string
     audit_logs?: Array<{ action: string; metadata: Record<string, any>; timestamp: string }>
     items?: Array<{
-        product_id: number
+        product_id: number | null
         variant_id?: number
-        warehouse_id: number
+        warehouse_id?: number
         quantity: number
         unit_price: number
         discount_percent?: number
         discount_amount?: number
         tax_percent?: number
         seller_id?: number
+        notes?: string
+        is_custom_line?: boolean
+        custom_description?: string
     }>
 }
 
@@ -115,26 +120,32 @@ export interface UpdateSalesOrderData {
     payment_method?: PaymentMethod
     notes?: string
     items?: Array<{
-        product_id: number
-        warehouse_id: number
+        product_id: number | null
+        warehouse_id?: number
         quantity: number
         unit_price: number
         discount_percent?: number
         discount_amount?: number
         tax_percent?: number
         seller_id?: number
+        notes?: string
+        is_custom_line?: boolean
+        custom_description?: string
     }>
 }
 
 export interface AddOrderItemData {
-    product_id: number
-    warehouse_id: number
+    product_id: number | null
+    warehouse_id?: number
     quantity: number
     unit_price: number
     discount_percent?: number
     discount_amount?: number
     tax_percent?: number
     seller_id?: number
+    notes?: string
+    is_custom_line?: boolean
+    custom_description?: string
 }
 
 export interface UpdateOrderItemData {

@@ -13,7 +13,10 @@ export interface StoreSettings {
     store_currency: string
     store_ticket_footer: string
     pricing_formula: string   // NEW: global Excel-like pricing formula
+    price_rounding_increment: number // 0.25 | 0.50 | 1.00 | 5.00 | 10.00
+    sku_format: string[]      // Ordered list of fields for auto-SKU generation
     quote_expiration_days: number // 0 = disabled, 15/30/60/90 days
+    require_stock_for_quotes: boolean // Require available stock to create a quote
     store_tax_rate: number
     modules_work_orders_enabled: boolean
 }
@@ -30,7 +33,10 @@ const settings = ref<StoreSettings>({
     store_currency: 'USD',
     store_ticket_footer: '¡Gracias por su compra!',
     pricing_formula: '',
+    price_rounding_increment: 1.00,
+    sku_format: ['category', 'brand'],
     quote_expiration_days: 0,
+    require_stock_for_quotes: false,
     store_tax_rate: 7.0,
     modules_work_orders_enabled: false,
 })
@@ -42,7 +48,10 @@ let fetched = false
 
 export function useStoreSettings() {
     async function fetchSettings() {
-        if (fetched) return settings.value
+        if (fetched) {
+            loading.value = false
+            return settings.value
+        }
         loading.value = true
         error.value = null
         try {

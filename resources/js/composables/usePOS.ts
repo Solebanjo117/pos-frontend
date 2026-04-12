@@ -8,11 +8,13 @@ import type { CreateSalesOrderData } from '@/types/sales-order'
 
 interface CartItem {
     id: string // temporal ID for cart
-    product_id: number
+    product_id: number | null
     variant_id?: number  // Track which variant/brand was added
     variant_brand?: string  // Brand name for display in cart
     product_name: string
     product_sku: string
+    is_custom_line?: boolean
+    custom_description?: string
     product_price: number
     quantity: number
     available_stock?: number
@@ -27,6 +29,18 @@ interface CartItem {
     subtotal: number
     tax_amount: number
     total: number
+}
+
+interface AddCustomLinePayload {
+    description: string
+    sku?: string
+    quantity: number
+    unit_price: number
+    tax_percent?: number
+    discount_percent?: number
+    seller_id?: number
+    warehouse_id?: number
+    notes?: string
 }
 
 // ============================================
@@ -278,6 +292,53 @@ export function usePOS() {
             cart.value.push(newItem)
         }
         logAction('cart_add', { product_id: product.id, variant_id: variant?.id, quantity, name: product.name })
+    }
+
+    // Add a custom/misc line (no product inventory movement)
+    const addCustomLine = (payload: AddCustomLinePayload) => {
+        if (!payload.description?.trim()) {
+            return
+        }
+
+        if (payload.quantity <= 0) {
+            return
+        }
+
+        const resolvedTax = payload.tax_percent ?? (storeSettings.value.store_tax_rate ?? 7)
+        const resolvedWarehouseId = payload.warehouse_id
+            ?? (isSingleWarehouseMode() ? (getDefaultWarehouseId() ?? undefined) : currentWarehouseId.value ?? undefined)
+
+        const newItem: CartItem = {
+            id: `misc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            product_id: null,
+            variant_id: undefined,
+            variant_brand: undefined,
+            product_name: payload.description.trim(),
+            product_sku: payload.sku?.trim() || 'MISC',
+            is_custom_line: true,
+            custom_description: payload.description.trim(),
+            product_price: Math.max(0, Number(payload.unit_price) || 0),
+            quantity: Math.max(1, Number(payload.quantity) || 1),
+            available_stock: undefined,
+            discount_percent: Math.max(0, Math.min(100, Number(payload.discount_percent ?? 0))),
+            tax_percent: Math.max(0, Number(resolvedTax) || 0),
+            default_tax_percent: Math.max(0, Number(resolvedTax) || 0),
+            is_tax_overridden: false,
+            seller_id: payload.seller_id ?? (page.props.auth?.user as any)?.id,
+            warehouse_id: resolvedWarehouseId,
+            notes: payload.notes || undefined,
+            subtotal: 0,
+            tax_amount: 0,
+            total: 0,
+        }
+
+        recalculateItem(newItem)
+        cart.value.push(newItem)
+        logAction('cart_add_custom_line', {
+            description: newItem.custom_description,
+            quantity: newItem.quantity,
+            price: newItem.product_price,
+        })
     }
 
     // Update item quantity
@@ -533,7 +594,7 @@ export function usePOS() {
                 source_quote_id: activeSession.value.source_quote_id,
                 audit_logs: sessionLogs.value.length > 0 ? sessionLogs.value : undefined,
                 items: cart.value.map(item => ({
-                    product_id: item.product_id,
+                    product_id: item.is_custom_line ? null : item.product_id,
                     variant_id: item.variant_id, // Send variant ID to backend
                     warehouse_id: item.warehouse_id || currentWarehouseId.value || 1, // Use backend context as fallback
                     quantity: item.quantity,
@@ -542,6 +603,8 @@ export function usePOS() {
                     tax_percent: item.tax_percent,
                     seller_id: item.seller_id,
                     notes: item.notes || undefined,
+                    is_custom_line: !!item.is_custom_line,
+                    custom_description: item.is_custom_line ? (item.custom_description || item.product_name) : undefined,
                 })),
             }
 
@@ -621,7 +684,7 @@ export function usePOS() {
                 discount_amount: 0,
                 shipping_cost: shippingCost.value,
                 items: cart.value.map(item => ({
-                    product_id: item.product_id,
+                    product_id: item.is_custom_line ? null : item.product_id,
                     warehouse_id: item.warehouse_id || currentWarehouseId.value || 1,
                     quantity: item.quantity,
                     unit_price: item.product_price,
@@ -629,6 +692,8 @@ export function usePOS() {
                     tax_percent: item.tax_percent,
                     seller_id: item.seller_id,
                     notes: item.notes || undefined,
+                    is_custom_line: !!item.is_custom_line,
+                    custom_description: item.is_custom_line ? (item.custom_description || item.product_name) : undefined,
                 })),
             }
 
@@ -668,7 +733,7 @@ export function usePOS() {
         quote_number: string
         customer_id?: number | null
         items: Array<{
-            product_id: number
+            product_id: number | null
             product_name: string
             product_sku: string
             variant_id?: number | null
@@ -680,6 +745,8 @@ export function usePOS() {
             subtotal: number
             tax_amount: number
             total: number
+            is_custom_line?: boolean
+            custom_description?: string | null
             variant?: { id: number; sku: string; brand?: { name: string } | null } | null
         }>
     }): string => {
@@ -692,11 +759,13 @@ export function usePOS() {
         newSession.cart = quote.items.map((item, idx): CartItem => {
             const cartItem: CartItem = {
                 id: `q${quote.id}-${item.product_id}-${item.variant_id ?? 'nv'}-${idx}`,
-                product_id: item.product_id,
+                product_id: item.product_id ?? null,
                 variant_id: item.variant_id ?? undefined,
                 variant_brand: item.variant?.brand?.name ?? undefined,
                 product_name: item.product_name,
-                product_sku: item.variant?.sku || item.product_sku || '',
+                product_sku: item.variant?.sku || item.product_sku || (item.is_custom_line ? 'MISC' : ''),
+                is_custom_line: !!item.is_custom_line,
+                custom_description: item.custom_description ?? undefined,
                 product_price: Number(item.unit_price) || 0,
                 quantity: Number(item.quantity) || 1,
                 discount_percent: Number(item.discount_percent) || 0,
@@ -741,6 +810,7 @@ export function usePOS() {
 
         // Methods
         addToCart,
+        addCustomLine,
         updateQuantity,
         updateDiscount,
         updateItemPrice,

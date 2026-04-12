@@ -326,13 +326,20 @@ onMounted(() => {
             <tbody class="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
               <tr v-for="item in currentSalesOrder.items" :key="item.id">
                 <td class="px-6 py-4">
-                  <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.product_name }}</div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.product_sku }}</div>
+                  <div class="flex items-center gap-2">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">
+                      {{ (item as any).is_custom_line ? ((item as any).custom_description || item.product_name) : item.product_name }}
+                    </div>
+                    <span v-if="(item as any).is_custom_line" class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                      Miscelaneo
+                    </span>
+                  </div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.product_sku || ((item as any).is_custom_line ? 'MISC' : '') }}</div>
                   <div v-if="item.notes" class="mt-1 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-muted p-1.5 rounded border border-gray-100 dark:border-border italic">
                     <span class="font-medium not-italic text-gray-700 dark:text-gray-300">Nota:</span> {{ item.notes }}
                   </div>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ item.warehouse_name }}</td>
+                <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ (item as any).is_custom_line ? 'N/A' : item.warehouse_name }}</td>
                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
                   <span v-if="item.seller_name" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-medium">
                     {{ item.seller_name }}
@@ -477,7 +484,7 @@ onMounted(() => {
       :has-customer="!!currentSalesOrder.customer_id"
       :users="users"
       :current-user-id="(currentSalesOrder as any).user_id"
-      :items="(currentSalesOrder.items || []).map((i: any) => ({
+      :items="(currentSalesOrder.items || []).filter((i: any) => !i.is_custom_line).map((i: any) => ({
         id: i.id,
         product_id: i.product_id,
         variant_id: i.variant_id,

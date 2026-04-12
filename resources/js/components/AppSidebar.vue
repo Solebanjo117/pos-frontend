@@ -23,11 +23,13 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { useAuth } from '@/composables/useAuth';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useCashierQueue } from '@/composables/useCashierQueue';
+import { useWarehouseQueue } from '@/composables/useWarehouseQueue';
 
 const { fetchSettings, isSingleWarehouseMode } = usePosSettings();
 const { fetchCurrentUser, isAdmin, role: userRole, hasRole } = useAuth();
 const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings();
 const { count: cashierQueueCount, startPolling: startQueuePolling, stopPolling: stopQueuePolling } = useCashierQueue();
+const { count: warehouseQueueCount, startPolling: startWarehousePolling } = useWarehouseQueue();
 
 // Load settings
 onMounted(async () => {
@@ -36,6 +38,10 @@ onMounted(async () => {
         // Start queue polling only for roles that access the cashier queue
         if (hasRole(['admin', 'manager', 'cashier'])) {
             startQueuePolling(30000) // sidebar polling: 30 seconds
+        }
+        // Start warehouse queue polling for inventory-related roles
+        if (hasRole(['admin', 'manager', 'buyer', 'assistant'])) {
+            startWarehousePolling(30000) // Poll every 30 seconds
         }
     } catch (e) {
         console.error('Failed to load settings', e);
@@ -153,6 +159,16 @@ const mainNavItems = computed<NavItem[]>(() => {
         icon: LayoutGrid,
     });
 
+    // --- Warehouse Queue - top level ---
+    if (canAccessInventory.value) {
+        items.push({
+            title: 'Cola de Bodega',
+            href: '/warehouses/queue',
+            icon: PackageSearch,
+            badge: warehouseQueueCount.value > 0 ? String(warehouseQueueCount.value) : undefined,
+        });
+    }
+
     // --- Inventario section ---
     if (canAccessInventory.value) {
         items.push({
@@ -185,11 +201,6 @@ const mainNavItems = computed<NavItem[]>(() => {
                     title: 'Almacenes',
                     href: '/warehouses',
                     icon: Warehouse,
-                },
-                {
-                    title: 'Cola de Bodega',
-                    href: '/warehouses/queue',
-                    icon: PackageSearch,
                 },
                 {
                     title: 'Stock por Almacén',
@@ -229,6 +240,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                     title: 'Motores',
                     href: '/vehicles/engines',
                     icon: Wrench,
+                },
+                {
+                    title: 'Chasis',
+                    href: '/vehicles/chassis',
+                    icon: Truck,
                 },
             ],
         });
@@ -323,6 +339,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                     title: 'Config. de Tienda',
                     href: '/settings/store',
                     icon: Store,
+                },
+                {
+                    title: 'Fórmulas de Precio',
+                    href: '/settings/pricing-formulas',
+                    icon: Settings,
                 },
             ],
         });

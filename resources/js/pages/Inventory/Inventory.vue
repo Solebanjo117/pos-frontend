@@ -25,6 +25,7 @@ interface Product {
     product_id: number
     product_name: string
     product_sku: string
+    base_price: number | null
     total_quantity: number
     warehouses: Array<{
         warehouse_id: number
@@ -350,6 +351,11 @@ const getMovementTypeColor = (type: string) => {
 
 const viewMovement = (id: number) => {
     router.visit(`/inventory-movements/${id}`)
+}
+
+const formatCurrency = (value: number | null) => {
+    if (value == null) return '—'
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 }
 </script>
 
@@ -692,8 +698,11 @@ const viewMovement = (id: number) => {
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <div class="text-right">
+                                                <div class="text-right space-y-1">
                                                     <p class="text-sm font-bold text-gray-900 dark:text-white">{{ product.total_quantity }} unid.</p>
+                                                    <p :class="product.base_price ? 'text-sm font-medium text-green-700 dark:text-green-400' : 'text-xs text-gray-400'">
+                                                        {{ formatCurrency(product.base_price) }}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>

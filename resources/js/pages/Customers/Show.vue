@@ -476,7 +476,7 @@ const goBack = () => {
       <div class="bg-white dark:bg-card rounded-lg p-6 max-w-md w-full">
         <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Ajustar Saldo</h3>
         
-        <form @submit.prevent="handleAdjustBalance">
+        <form @submit.prevent="handleAdjustBalance" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }">
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto</label>
             <input

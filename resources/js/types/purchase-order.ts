@@ -14,6 +14,9 @@ export interface PurchaseOrderItem {
     }
     quantity_ordered: number
     quantity_received: number
+    units_per_package: number
+    total_units_ordered: number
+    total_units_received: number
     unit_cost: number
     subtotal: number
     pending_quantity: number
@@ -92,6 +95,7 @@ export interface CreatePurchaseOrderData {
     items: Array<{
         product_id: number
         quantity_ordered: number
+        units_per_package?: number
         unit_cost: number
         notes?: string
     }>

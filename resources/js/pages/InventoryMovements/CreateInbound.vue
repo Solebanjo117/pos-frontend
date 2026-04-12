@@ -9,6 +9,7 @@ import { useInventoryMovements } from '@/composables/useInventoryMovements'
 import { useProducts } from '@/composables/useProducts'
 import { useWarehouses } from '@/composables/useWarehouses'
 import { usePosSettings } from '@/composables/usePosSettings'
+import { useSuppliers } from '@/composables/useSuppliers'
 
 interface InboundItem {
     id: string // Temp ID for list management
@@ -32,10 +33,12 @@ const { recordBulkInbound, loading, error } = useInventoryMovements()
 const { products, fetchProducts } = useProducts()
 const { warehouses, fetchWarehouses } = useWarehouses()
 const { isSingleWarehouseMode, getDefaultWarehouseId, currentWarehouseId, initWarehouse } = usePosSettings()
+const { suppliers, fetchActiveSuppliers } = useSuppliers()
 
 // Header State
 const headerForm = ref({
     warehouse_id: null as number | null,
+    supplier_id: null as number | null,
     reference_type: undefined as 'purchase' | 'adjustment' | 'return' | undefined,
     reference_id: null as number | null,
     notes: '',
@@ -71,6 +74,7 @@ onMounted(async () => {
     await Promise.all([
         fetchProducts(),
         fetchWarehouses(),
+        fetchActiveSuppliers(),
     ])
 
     // Initialize Warehouse from backend (Priority: Backend Context > Default Setting > First Available)
@@ -242,7 +246,7 @@ const handleSubmit = async () => {
         const payload = {
             items: validItems.map(item => ({
                 product_id: item.product_id!,
-                variant_id: item.variant_id || undefined, // Added
+                variant_id: item.variant_id || undefined,
                 warehouse_id: headerForm.value.warehouse_id!,
                 quantity: item.quantity,
                 reference_type: headerForm.value.reference_type,
@@ -250,6 +254,7 @@ const handleSubmit = async () => {
                 notes: headerForm.value.notes || undefined,
                 batch_number: item.batch_number || undefined,
                 cost: item.cost || undefined,
+                supplier_id: headerForm.value.supplier_id || undefined,
             }))
         }
 
@@ -354,6 +359,17 @@ const cancel = () => {
                                         type="number"
                                         class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     />
+                                </div>
+
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">Proveedor</label>
+                                    <select
+                                        v-model="headerForm.supplier_id"
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
+                                    >
+                                        <option :value="null">Sin proveedor</option>
+                                        <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                    </select>
                                 </div>
 
                                 <div>

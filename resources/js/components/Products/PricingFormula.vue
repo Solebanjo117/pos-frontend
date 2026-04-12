@@ -3,6 +3,7 @@ import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import { Calculator, ChevronDown, Check, X } from 'lucide-vue-next'
 import apiClient from '@/services/api/client'
 import { useDebounceFn } from '@vueuse/core'
+import { usePricingFormulas } from '@/composables/usePricingFormulas'
 
 const props = defineProps<{
   cost: number
@@ -24,15 +25,11 @@ const showPresets = ref(false)
 const isLoadingPreview = ref(false)
 const isFocused = ref(false)
 
-const PRESETS = [
-  { label: 'Costo × 2',                    formula: 'costo * 2' },
-  { label: 'Costo × 1.5 (redondeado)',     formula: 'ROUND(costo * 1.5)' },
-  { label: 'Costo × 2 (redondear arriba)', formula: 'ROUNDUP(costo * 2)' },
-  { label: 'Costo × 2 (termina en .88)',   formula: 'FLOOR(costo * 2) + 0.88' },
-  { label: 'Costo × 2 (termina en .99)',   formula: 'FLOOR(costo * 2) + 0.99' },
-  { label: 'Costo + ITBM',                 formula: 'costo + costo * ITBM' },
-  { label: 'Costo × 1.5 + ITBM',          formula: 'ROUND(costo * 1.5 + costo * 1.5 * ITBM)' },
-]
+const { activeFormulas, fetchActiveFormulas } = usePricingFormulas()
+const PRESETS = computed(() => activeFormulas.value.map((f: any) => ({
+  label: f.name,
+  formula: f.formula
+})))
 
 // ==================== COMPUTED ====================
 
@@ -204,7 +201,7 @@ watch(() => props.price, (newPrice) => {
   }
 }, { immediate: true })
 
-function selectPreset(preset: typeof PRESETS[0]) {
+function selectPreset(preset: { label: string, formula: string }) {
   rawInput.value = preset.formula
   showPresets.value = false
 }
@@ -219,6 +216,11 @@ function clearInput() {
 // Fetch on mount after nextTick so props are fully hydrated
 onMounted(async () => {
   await nextTick()
+  // Fetch formulas dynamically
+  if (activeFormulas.value.length === 0) {
+      await fetchActiveFormulas()
+  }
+  
   if (isFormula.value && rawInput.value.trim()) {
     fetchPreview()
   }

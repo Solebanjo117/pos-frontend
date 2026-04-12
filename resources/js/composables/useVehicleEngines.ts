@@ -25,7 +25,7 @@ export function useVehicleEngines() {
     const error = ref<string | null>(null)
 
     // Fetch all engines (with optional search and model_id filter)
-    const fetchEngines = async (params: { page?: number; search?: string; per_page?: number; model_id?: number } = {}) => {
+    const fetchEngines = async (params: { page?: number; search?: string; per_page?: number; model_id?: number; make_id?: number } = {}) => {
         loading.value = true
         error.value = null
         try {

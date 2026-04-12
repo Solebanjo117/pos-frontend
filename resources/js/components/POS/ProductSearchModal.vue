@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { X, Package, Search, Truck, Eye, ListPlus } from 'lucide-vue-next'
+import { X, Package, Search, Truck, Eye, ListPlus, Filter } from 'lucide-vue-next'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue'
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue'
+import ProductFilters from '@/components/Products/ProductFilters.vue'
+import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue'
+import ProductSort from '@/components/Products/ProductSort.vue'
 import apiClient from '@/services/api/client'
+import { displayFormat } from '@/utils/formatters'
 import type { Product } from '@/types/product'
+
+interface CategoryOption { id: number; name: string }
+interface BrandOption { id: number; name: string }
 
 const props = withDefaults(defineProps<{
   show: boolean
@@ -19,6 +26,9 @@ const props = withDefaults(defineProps<{
   context?: 'pos' | 'supply-list'
   // Whether to show quick purchase action (backorder button)
   showQuickPurchaseAction?: boolean
+  // Filter options
+  categories?: CategoryOption[]
+  brands?: BrandOption[]
 }>(), {
   clientMode: false,
   totalCount: 0,
@@ -26,14 +36,25 @@ const props = withDefaults(defineProps<{
   loadingMore: false,
   context: 'pos',
   showQuickPurchaseAction: true,
+  categories: () => [],
+  brands: () => [],
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'add-products', ids: Set<number>): void
   (e: 'load-more'): void
-  (e: 'product-selected', product: Product): void // Emitted in supply-list context
-  (e: 'search-in-modal', filters: { query: string; category_id?: number; brand_id?: number }): void // R43: Search from within modal
+  (e: 'product-selected', product: Product): void
+  (e: 'search-in-modal', filters: {
+    query: string
+    category_ids?: number[]
+    brand_ids?: number[]
+    sku?: string
+    min_price?: number
+    max_price?: number
+    in_stock?: boolean
+    sort?: string
+  }): void
 }>()
 
 // --- Internal selection state ---
@@ -45,23 +66,71 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const internalSearchQuery = ref('')
 const isSearching = ref(false)
 
+// --- Advanced filter state ---
+const showMobileFilters = ref(false)
+const sortValue = ref('name_asc')
+
+const filterValues = ref<ProductFilterValues>({
+  sku: '',
+  category_ids: [],
+  brand_ids: [],
+  min_price: undefined,
+  max_price: undefined,
+  in_stock: false,
+})
+
+const defaultFilters = (): ProductFilterValues => ({
+  sku: '',
+  category_ids: [],
+  brand_ids: [],
+  min_price: undefined,
+  max_price: undefined,
+  in_stock: false,
+})
+
 // Reset selections and search query when modal opens
 watch(() => props.show, (isOpen) => {
   if (isOpen) {
     selectedIds.value = new Set()
     internalSearchQuery.value = props.searchQuery || ''
+    filterValues.value = defaultFilters()
+    sortValue.value = 'name_asc'
+    showMobileFilters.value = false
     nextTick(() => searchInputRef.value?.focus())
   }
 })
 
-// R43: Handle internal search
+// Emit all filters+sort+query to parent for refetch
+const emitFilters = () => {
+  const f = filterValues.value
+  emit('search-in-modal', {
+    query: internalSearchQuery.value.trim(),
+    category_ids: f.category_ids.length > 0 ? f.category_ids : undefined,
+    brand_ids: f.brand_ids.length > 0 ? f.brand_ids : undefined,
+    sku: f.sku || undefined,
+    min_price: f.min_price ?? undefined,
+    max_price: f.max_price ?? undefined,
+    in_stock: f.in_stock || undefined,
+    sort: sortValue.value,
+  })
+}
+
+// When filters change, auto-search
+const handleFilterChange = (newFilters: ProductFilterValues) => {
+  filterValues.value = newFilters
+  emitFilters()
+}
+
+// When sort changes, auto-search
+watch(sortValue, () => {
+  emitFilters()
+})
+
+// R43: Handle internal search (text search)
 const handleInternalSearch = () => {
   if (isSearching.value) return
   isSearching.value = true
-  emit('search-in-modal', {
-    query: internalSearchQuery.value.trim(),
-  })
-  // Reset after a brief delay
+  emitFilters()
   setTimeout(() => {
     isSearching.value = false
   }, 500)
@@ -205,7 +274,7 @@ const getStock = (p: Product): number =>
 
 const getSKU = (p: Product): string => {
   if (props.clientMode) return `#${p.id}`
-  return p.sku_base ?? p.default_variant?.sku ?? '—'
+  return displayFormat(p.sku_base ?? p.default_variant?.sku) || '—'
 }
 
 const getSpecs = (p: any): { name: string; value: string; unit?: string }[] => {
@@ -288,7 +357,7 @@ const submitSelection = () => {
           v-if="show"
           ref="modalRef"
           tabindex="-1"
-          class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden outline-none ring-1 ring-gray-200 dark:ring-gray-700"
+          class="bg-white dark:bg-card rounded-2xl shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col overflow-hidden outline-none ring-1 ring-gray-200 dark:ring-gray-700"
         >
           <!-- ═══════════ HEADER (sticky) ═══════════ -->
           <div class="shrink-0 px-6 py-4 border-b border-gray-200 dark:border-border bg-white dark:bg-card">
@@ -323,6 +392,16 @@ const submitSelection = () => {
                   class="w-full pl-10 pr-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-700 dark:text-foreground placeholder:text-gray-400 transition-shadow"
                 />
               </div>
+              <ProductSort v-model="sortValue" />
+              <!-- Mobile filter toggle -->
+              <button
+                @click="showMobileFilters = !showMobileFilters"
+                class="md:hidden px-3 py-2 border border-gray-200 dark:border-border rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-muted transition-colors flex items-center gap-1.5 text-sm"
+                :class="showMobileFilters ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800' : ''"
+              >
+                <Filter class="w-4 h-4" />
+                Filtros
+              </button>
               <button
                 @click="handleInternalSearch"
                 :disabled="isSearching"
@@ -334,8 +413,24 @@ const submitSelection = () => {
             </div>
           </div>
 
-          <!-- ═══════════ TABLE BODY (scrollable) ═══════════ -->
-          <div class="flex-1 overflow-y-auto min-h-0">
+          <!-- ═══════════ BODY: Sidebar + Table (scrollable) ═══════════ -->
+          <div class="flex-1 flex min-h-0 overflow-hidden">
+            <!-- Filter Sidebar (desktop always, mobile toggle) -->
+            <div
+              class="shrink-0 overflow-y-auto border-r border-gray-100 dark:border-border"
+              :class="showMobileFilters ? 'block' : 'hidden md:block'"
+            >
+              <ProductFilters
+                :model-value="filterValues"
+                @update:model-value="handleFilterChange"
+                :categories="categories"
+                :brands="brands"
+                :collapsible="false"
+              />
+            </div>
+
+            <!-- Results area -->
+            <div class="flex-1 overflow-y-auto min-h-0">
             <!-- Empty state -->
             <div v-if="products.length === 0" class="flex flex-col items-center justify-center py-16 px-6 text-center">
               <Package class="w-12 h-12 text-gray-300 mb-3" />
@@ -497,6 +592,7 @@ const submitSelection = () => {
                 <span v-if="loadingMore">Cargando...</span>
                 <span v-else>Cargar más resultados</span>
               </button>
+            </div>
             </div>
           </div>
 

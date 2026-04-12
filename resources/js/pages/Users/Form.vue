@@ -124,7 +124,7 @@ const submit = async () => {
             <div class="space-y-6 max-w-lg">
                 <Heading variant="small" :title="pageTitle" :description="isEditMode ? 'Modifica los datos del usuario' : 'Crea un nuevo usuario en el sistema'" />
 
-                <form @submit.prevent="submit" class="space-y-5">
+                <form @submit.prevent="submit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-5">
                     <div class="space-y-1">
                         <label class="block text-sm font-medium">Nombre</label>
                         <input v-model="form.name" type="text" class="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" />

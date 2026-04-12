@@ -16,9 +16,11 @@ const props = defineProps<{ id: number }>()
 
 interface QuoteItem {
     id: number
-    product_id: number
+    product_id: number | null
     product_name: string
     product_sku: string
+    is_custom_line?: boolean
+    custom_description?: string | null
     variant_id?: number
     variant?: { id: number; sku: string; brand?: { name: string } } | null
     warehouse_id: number
@@ -140,7 +142,7 @@ const handleOpenInPOS = () => {
         quote_number: quote.value.quote_number,
         customer_id: quote.value.customer?.id ?? null,
         items: quote.value.items.map(item => ({
-            product_id: item.product_id,
+            product_id: item.product_id ?? null,
             product_name: item.product_name,
             product_sku: item.product_sku,
             variant_id: item.variant_id ?? null,
@@ -152,6 +154,8 @@ const handleOpenInPOS = () => {
             subtotal: item.subtotal,
             tax_amount: item.tax_amount,
             total: item.total,
+            is_custom_line: !!item.is_custom_line,
+            custom_description: item.custom_description ?? null,
             variant: item.variant ?? null,
         }))
     }
@@ -292,9 +296,16 @@ onMounted(fetchQuote)
                             <tr v-for="(item, idx) in quote.items" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-muted/50/30">
                                 <td class="px-6 py-4 text-sm text-gray-400 font-mono">{{ idx + 1 }}</td>
                                 <td class="px-6 py-4">
-                                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.product_name }}</div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                            {{ item.is_custom_line ? (item.custom_description || item.product_name) : item.product_name }}
+                                        </div>
+                                        <span v-if="item.is_custom_line" class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                            Miscelaneo
+                                        </span>
+                                    </div>
                                     <div class="text-xs text-gray-500">
-                                        {{ item.variant?.sku || item.product_sku || '' }}
+                                        {{ item.variant?.sku || item.product_sku || (item.is_custom_line ? 'MISC' : '') }}
                                         <span v-if="item.variant?.brand?.name" class="ml-1 text-indigo-500">&bull; {{ item.variant.brand.name }}</span>
                                     </div>
                                     <!-- Nota interna (no aparece en ticket) -->

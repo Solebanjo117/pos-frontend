@@ -95,7 +95,7 @@ const handleCancel = () => {
             </div>
 
             <!-- Form -->
-            <form v-else @submit.prevent="handleSubmit" class="rounded-lg bg-white p-6 shadow dark:bg-card">
+            <form v-else @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <!-- Name -->
                     <div>

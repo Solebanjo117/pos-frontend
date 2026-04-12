@@ -189,7 +189,7 @@ const getStatusColor = (status: string) => {
                         <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Almacén</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Variante</th>
+                                <!-- Variante SKU oculto (R38: cliente usa SKU del producto padre) -->
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Disponible</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">Reservado</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-900 dark:text-white">En Pedido</th>
@@ -199,7 +199,7 @@ const getStatusColor = (status: string) => {
                         <tbody class="divide-y divide-gray-200 dark:divide-border">
                             <tr v-for="inv in currentProduct.inventory" :key="inv.id">
                                 <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{{ inv.warehouse?.name || 'N/A' }}</td>
-                                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ inv.variant_sku || '-' }}</td>
+                                <!-- Variante SKU oculto -->
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">{{ inv.stock_available }}</td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">{{ inv.stock_reserved }}</td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">{{ inv.stock_on_order }}</td>

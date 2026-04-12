@@ -167,7 +167,7 @@ onMounted(async () => {
       {{ error }}
     </div>
 
-    <form @submit.prevent="handleSubmit" class="space-y-6">
+    <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-6">
       <!-- General Info -->
       <div class="bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border p-6">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Información General</h2>

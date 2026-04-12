@@ -32,7 +32,7 @@ const form = ref<CreatePurchaseOrderData>({
     items: [],
 })
 
-const subtotal = computed(() => form.value.items.reduce((sum, item) => sum + (item.quantity_ordered * item.unit_cost), 0))
+const subtotal = computed(() => form.value.items.reduce((sum, item: any) => sum + (item.quantity_ordered * (item.units_per_package ?? 1) * item.unit_cost), 0))
 const total = computed(() => subtotal.value + (form.value.tax_amount || 0) + (form.value.shipping_cost || 0))
 
 async function searchProducts() {
@@ -86,6 +86,7 @@ function addProduct(row: any) {
         product_id: row.product_id,
         variant_id: row.variant_id,
         quantity_ordered: 1,
+        units_per_package: 1,
         unit_cost: row.cost || 0,
         notes: '',
         // Extra display fields (not sent to API)
@@ -113,6 +114,7 @@ async function handleSubmit() {
                 product_id: item.product_id,
                 variant_id: item.variant_id,
                 quantity_ordered: item.quantity_ordered,
+                units_per_package: item.units_per_package || 1,
                 unit_cost: item.unit_cost,
                 notes: item.notes || ''
             })),
@@ -162,6 +164,7 @@ onMounted(async () => {
                     product_id: item.product_id,
                     variant_id: item.variant_id,
                     quantity_ordered: item.quantity_ordered,
+                    units_per_package: item.units_per_package || 1,
                     unit_cost: Number(item.unit_cost),
                     notes: item.notes || '',
                     // Extra display fields
@@ -198,7 +201,7 @@ onMounted(async () => {
                 <p class="text-red-600 dark:text-red-400">{{ error }}</p>
             </div>
 
-            <form @submit.prevent="handleSubmit" class="space-y-6">
+            <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-6">
                 <!-- Order Info -->
                 <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Información del Pedido</h2>
@@ -274,7 +277,9 @@ onMounted(async () => {
                             <thead class="bg-gray-50 dark:bg-background">
                                 <tr>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Paquetes</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Unidades por paquete">Und/Paq</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total Und.</th>
                                     <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
                                     <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
                                     <th class="px-4 py-2"></th>
@@ -293,10 +298,16 @@ onMounted(async () => {
                                         <input v-model.number="item.quantity_ordered" type="number" min="1" class="w-20 text-right px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white" />
                                     </td>
                                     <td class="px-4 py-2">
+                                        <input v-model.number="(item as any).units_per_package" type="number" min="1" title="Unidades por paquete" class="w-16 text-right px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white" />
+                                    </td>
+                                    <td class="px-4 py-2 text-right text-sm text-gray-600 dark:text-gray-300 font-medium">
+                                        {{ item.quantity_ordered * ((item as any).units_per_package || 1) }}
+                                    </td>
+                                    <td class="px-4 py-2">
                                         <input v-model.number="item.unit_cost" type="number" min="0" step="0.01" class="w-24 text-right px-2 py-1 border border-gray-300 dark:border-border rounded bg-white dark:bg-muted text-gray-900 dark:text-white" />
                                     </td>
                                     <td class="px-4 py-2 text-right text-sm font-medium text-gray-900 dark:text-white">
-                                        ${{ (item.quantity_ordered * item.unit_cost).toFixed(2) }}
+                                        ${{ (item.quantity_ordered * ((item as any).units_per_package || 1) * item.unit_cost).toFixed(2) }}
                                     </td>
                                     <td class="px-4 py-2 text-right">
                                         <button type="button" @click="removeItem(idx)" class="p-1 text-gray-400 hover:text-red-600 transition">

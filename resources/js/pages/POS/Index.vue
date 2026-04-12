@@ -28,6 +28,7 @@ import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue'
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue'
 import ProductSearchModal from '@/components/POS/ProductSearchModal.vue'
 import QuickCustomerModal from '@/components/POS/QuickCustomerModal.vue'
+import AddCustomLineModal from '@/components/POS/AddCustomLineModal.vue'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue'
 import { SalesOrderPaymentApiService } from '@/services/payments'
@@ -63,6 +64,7 @@ const {
   cartItemCount,
   change,
   addToCart,
+  addCustomLine,
   updateQuantity,
   updateDiscount,
   removeItem,
@@ -127,6 +129,7 @@ const isSearching = ref(false)
 const showCloseSessionModal = ref(false)
 const showCashMovementModal = ref(false)
 const showQuickCustomerModal = ref(false)
+const showCustomLineModal = ref(false)
 const forceShowOpenSessionModal = ref(false)
 const sessionActionLoading = ref(false)
 
@@ -205,6 +208,29 @@ const openProductDetail = async (productId: number) => {
   } catch { /* silent */ }
 }
 
+const handleAddCustomLine = (payload: {
+  custom_description: string
+  product_sku?: string
+  quantity: number
+  unit_price: number
+  tax_percent: number
+  discount_percent: number
+  notes?: string
+}) => {
+  addCustomLine({
+    description: payload.custom_description,
+    sku: payload.product_sku,
+    quantity: payload.quantity,
+    unit_price: payload.unit_price,
+    tax_percent: payload.tax_percent,
+    discount_percent: payload.discount_percent,
+    seller_id: seller_id.value,
+    warehouse_id: currentWarehouseId.value || undefined,
+    notes: payload.notes,
+  })
+  showCustomLineModal.value = false
+}
+
 // Quick Customer Modal handler
 const handleCustomerCreated = async (newCustomer: any) => {
     await fetchCustomers()
@@ -248,7 +274,7 @@ const pendingAmount = computed(() => {
 
 // Total de descuento en el carrito
 const cartDiscount = computed(() => {
-  return cart.value.reduce((sum, item) => sum + (Number(item.discount_amount) || 0), 0)
+  return cart.value.reduce((sum, item: any) => sum + (Number(item.discount_amount) || 0), 0)
 })
 
 // Vuelto a entregar (solo si se recibió más de lo debido)
@@ -306,8 +332,19 @@ const originalItems = ref<Record<string, OriginalItemSnapshot>>({})
 const nowTick = ref(Date.now())
 let elapsedTimer: ReturnType<typeof setInterval> | null = null
 
-const getOriginalItemKey = (payload: { product_id: number; variant_id?: number | null; warehouse_id?: number | null }) => {
-  return `${payload.product_id}:${payload.variant_id ?? 'none'}:${payload.warehouse_id ?? 'none'}`
+const getOriginalItemKey = (payload: {
+  product_id?: number | null
+  variant_id?: number | null
+  warehouse_id?: number | null
+  is_custom_line?: boolean
+  custom_description?: string | null
+}) => {
+  if (payload.is_custom_line) {
+    const label = (payload.custom_description || '').trim().toLowerCase()
+    return `custom:${label}:${payload.warehouse_id ?? 'none'}`
+  }
+
+  return `${payload.product_id ?? 'none'}:${payload.variant_id ?? 'none'}:${payload.warehouse_id ?? 'none'}`
 }
 
 // Load order for edit (add/modify items on an existing confirmed order)
@@ -327,6 +364,11 @@ async function loadOrderForReturn(orderId: number) {
 
     // DO NOT call clearCart() because we are in an isolated session
     for (const item of (order.items ?? [])) {
+      if (item.is_custom_line) {
+        // Misc/custom lines are not returnable by design.
+        continue
+      }
+
       const quantity = -Math.abs(item.quantity) // Negative for returns
       const unitPrice = Number(item.unit_price)
       const discountPercent = Number(item.discount_percent ?? 0)
@@ -436,6 +478,8 @@ async function loadOrderForEdit(orderId: number) {
         product_id: item.product_id,
         variant_id: item.variant_id ?? null,
         warehouse_id: item.warehouse_id ?? null,
+        is_custom_line: item.is_custom_line,
+        custom_description: item.custom_description,
       })
 
       // Snapshot original state
@@ -447,10 +491,12 @@ async function loadOrderForEdit(orderId: number) {
 
       cart.value.push({
         id: `edit-${item.id}`,
-        product_id: item.product_id,
+        product_id: item.product_id ?? null,
         variant_id: item.variant_id ?? undefined,
         product_name: item.product_name || item.product?.name || 'Producto',
-        product_sku: item.product_sku || item.product?.sku_base || '',
+        product_sku: item.product_sku || item.product?.sku_base || (item.is_custom_line ? 'MISC' : ''),
+        is_custom_line: !!item.is_custom_line,
+        custom_description: item.custom_description ?? undefined,
         product_price: unitPrice,
         quantity,
         discount_percent: discountPercent,
@@ -476,7 +522,7 @@ const orderDiff = computed(() => {
   if (!props.editMode) return { items: [], total: 0 }
 
   const diffItems: Array<{
-    product_id: number
+    product_id: number | null
     variant_id?: number
     warehouse_id: number
     qty: number
@@ -484,6 +530,8 @@ const orderDiff = computed(() => {
     price: number
     tax_percent: number
     seller_id?: number
+    is_custom_line?: boolean
+    custom_description?: string
     is_new: boolean
     order_item_id?: number
   }> = []
@@ -495,6 +543,8 @@ const orderDiff = computed(() => {
       product_id: item.product_id,
       variant_id: item.variant_id ?? null,
       warehouse_id: item.warehouse_id ?? null,
+      is_custom_line: item.is_custom_line,
+      custom_description: item.custom_description,
     })
     const original = originalItems.value[originalKey]
 
@@ -513,6 +563,8 @@ const orderDiff = computed(() => {
         price: item.product_price,
         tax_percent: item.tax_percent ?? 0,
         seller_id: item.seller_id,
+        is_custom_line: !!item.is_custom_line,
+        custom_description: item.custom_description,
         is_new: true,
       })
     } else if (item.quantity > original.qty) {
@@ -531,6 +583,8 @@ const orderDiff = computed(() => {
         price: item.product_price,
         tax_percent: item.tax_percent ?? 0,
         seller_id: item.seller_id,
+        is_custom_line: !!item.is_custom_line,
+        custom_description: item.custom_description,
         is_new: false,
         order_item_id: original.order_item_id,
       })
@@ -574,6 +628,8 @@ const handleUpdateQuantity = (index: number, qty: number) => {
       product_id: item.product_id,
       variant_id: item.variant_id ?? null,
       warehouse_id: item.warehouse_id ?? null,
+      is_custom_line: item.is_custom_line,
+      custom_description: item.custom_description,
     })
     const original = originalItems.value[originalKey]
     if (original && qty < original.qty) {
@@ -596,13 +652,15 @@ async function confirmEditOrder() {
   try {
     // Build items payload
     const items = orderDiff.value.items.map(item => ({
-      product_id: item.product_id,
+      product_id: item.is_custom_line ? null : item.product_id,
       variant_id: item.variant_id ?? null,
       warehouse_id: Number(item.warehouse_id) || Number(currentWarehouseId.value) || 1,
       qty: item.qty,
       price: item.price,
       tax_percent: item.tax_percent,
       seller_id: item.seller_id ?? null,
+      is_custom_line: !!item.is_custom_line,
+      custom_description: item.is_custom_line ? item.custom_description : null,
     }))
 
     // Build payments array from current modal state
@@ -1004,8 +1062,8 @@ const handleUnifiedPaymentFinish = async (payments: Array<{method: string, amoun
   // Clear any previous payment errors before attempting new payment
   error.value = null
   
-  // Validate cart items have valid product_id
-  const invalidItems = cart.value.filter((item: any) => !item.product_id || item.product_id <= 0)
+  // Validate standard items have valid product_id (custom lines are allowed to be null)
+  const invalidItems = cart.value.filter((item: any) => !item.is_custom_line && (!item.product_id || item.product_id <= 0))
   if (invalidItems.length > 0) {
     console.error('Invalid items detected:', invalidItems)
     error.value = `⚠️ Carrito inválido: ${invalidItems.length} producto(s) con ID inválido. Revisa tu carrito y vuelve a agregar los productos.`
@@ -1015,6 +1073,8 @@ const handleUnifiedPaymentFinish = async (payments: Array<{method: string, amoun
   // Log items being sent to backend for debugging
   console.log('Payment attempt - Cart items to be processed:', cart.value.map((item: any) => ({ 
     product_id: item.product_id, 
+    is_custom_line: !!item.is_custom_line,
+    custom_description: item.custom_description,
     product_name: item.product_name,
     quantity: item.quantity 
   })))
@@ -1068,13 +1128,15 @@ const handleSaveQuoteChanges = async () => {
   saveQuoteChangesLoading.value = true
   try {
     const items = cart.value.map((item: any) => ({
-      product_id:       item.product_id,
+      product_id:       item.is_custom_line ? null : item.product_id,
       variant_id:       item.variant_id ?? null,
       warehouse_id:     item.warehouse_id ?? currentWarehouseId.value,
       quantity:         item.quantity,
       unit_price:       item.product_price,
       discount_percent: item.discount_percent ?? 0,
       tax_percent:      item.tax_percent ?? 0,
+      is_custom_line:   !!item.is_custom_line,
+      custom_description: item.is_custom_line ? (item.custom_description || item.product_name) : null,
     }))
 
     await apiClient.put(`/sales-quotes/${quoteId}`, {
@@ -1103,13 +1165,15 @@ const handleSaveQuote = async () => {
   saveQuoteLoading.value = true
   try {
     const items = cart.value.map((item: any) => ({
-      product_id:       item.product_id,
+      product_id:       item.is_custom_line ? null : item.product_id,
       variant_id:       item.variant_id ?? null,
       warehouse_id:     item.warehouse_id ?? currentWarehouseId.value,
       quantity:         item.quantity,
       unit_price:       item.product_price,
       discount_percent: item.discount_percent ?? 0,
       tax_percent:      item.tax_percent ?? 0,
+      is_custom_line:   !!item.is_custom_line,
+      custom_description: item.is_custom_line ? (item.custom_description || item.product_name) : null,
     }))
 
     const res = await apiClient.post('/sales-quotes/from-pos', {
@@ -1299,7 +1363,7 @@ onMounted(async () => {
         quote_number: q.quote_number,
         customer_id: q.customer?.id ?? null,
         items: (q.items ?? []).map((item: any) => ({
-          product_id: item.product_id,
+          product_id: item.product_id ?? null,
           product_name: item.product_name,
           product_sku: item.product_sku,
           variant_id: item.variant_id ?? null,
@@ -1311,6 +1375,8 @@ onMounted(async () => {
           subtotal: item.subtotal,
           tax_amount: item.tax_amount,
           total: item.total,
+          is_custom_line: !!item.is_custom_line,
+          custom_description: item.custom_description ?? null,
           variant: item.variant ?? null,
         }))
       })
@@ -1524,6 +1590,16 @@ onUnmounted(() => {
                 @product-needs-variant="handleInlineVariantNeeded"
                 @open-full-search="handleOpenFullSearch"
             />
+            <div class="mt-2 flex justify-end">
+              <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-600/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                @click="showCustomLineModal = true"
+              >
+                <FileText class="h-3.5 w-3.5" />
+                Linea miscelanea
+              </button>
+            </div>
           </div>
 
           <!-- Multi-Cart Tabs (hide in return mode and edit mode) -->
@@ -1854,6 +1930,13 @@ onUnmounted(() => {
         :product="selectedProductForModal"
         @close="selectedProductForModal = null"
         @view-alternative="(p: any) => selectedProductForModal = p"
+    />
+
+    <!-- ========== Custom Line Modal ========== -->
+    <AddCustomLineModal
+      :show="showCustomLineModal"
+      @close="showCustomLineModal = false"
+      @submit="handleAddCustomLine"
     />
 
     <!-- ========== Quick Customer Modal ========== -->

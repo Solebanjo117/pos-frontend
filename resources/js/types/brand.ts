@@ -1,6 +1,7 @@
 export interface Brand {
     id: number
     name: string
+    prefix?: string
     description?: string
     logo_url?: string
     website?: string
@@ -20,6 +21,7 @@ export interface BrandFilters {
 
 export interface CreateBrandData {
     name: string
+    prefix?: string
     description?: string
     logo_url?: string
     website?: string

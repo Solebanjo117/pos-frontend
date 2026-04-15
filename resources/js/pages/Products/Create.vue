@@ -180,10 +180,54 @@ const namePreview = computed(() => {
         if (cat) parts.push(cat.name)
     }
     let name = parts.join(' ') || 'Producto sin nombre'
-    const vehicleLabels = [
-        ...new Set(addedEngines.value.map(e => `${e.make} ${e.model}`)),
-        ...new Set(addedChassis.value.map(c => `${c.make} ${c.model}`))
-    ]
+
+    const attributeLabels = variantAttributes.value
+        .map(attr => {
+            const value = String(attr.value || '').trim()
+            if (!value) return ''
+            const unit = String(attr.unit || '').trim()
+            return `${attr.name}: ${value}${unit ? ` ${unit}` : ''}`
+        })
+        .filter(Boolean)
+
+    if (attributeLabels.length > 0) {
+        const uniqueAttrLabels = [...new Set(attributeLabels)]
+        const displayed = uniqueAttrLabels.slice(0, 3).join(', ')
+        const suffix = uniqueAttrLabels.length > 3 ? ' y más' : ''
+        name += ' - ' + displayed + suffix
+    }
+
+    const engineGroups = addedEngines.value.reduce((acc, entry) => {
+        const baseLabel = `${entry.make} ${entry.model}`.trim()
+        if (!baseLabel) return acc
+
+        if (!acc[baseLabel]) {
+            acc[baseLabel] = new Set<string>()
+        }
+
+        const engineLabel = String(entry.engine || '').trim()
+        if (engineLabel) {
+            acc[baseLabel].add(engineLabel)
+        }
+
+        return acc
+    }, {} as Record<string, Set<string>>)
+
+    const groupedEngineLabels = Object.entries(engineGroups).map(([baseLabel, engines]) => {
+        const engineList = [...engines]
+        return engineList.length > 0
+            ? `${baseLabel} (${engineList.join(', ')})`
+            : baseLabel
+    })
+
+    const engineBaseLabels = new Set(Object.keys(engineGroups))
+    const chassisOnlyLabels = [...new Set(
+        addedChassis.value
+            .map(c => `${c.make} ${c.model}`.trim())
+            .filter(label => label && !engineBaseLabels.has(label))
+    )]
+
+    const vehicleLabels = [...groupedEngineLabels, ...chassisOnlyLabels]
     if (vehicleLabels.length > 0) {
         const uniqueLabels = [...new Set(vehicleLabels)]
         const displayed = uniqueLabels.slice(0, 3).join(', ')
@@ -344,7 +388,7 @@ const addEngines = () => {
     if (selectedEngineIds.value.length === 0) return
     const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
     const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
-    const modelNameFull = model ? `${model.name}${model.generation ? ` - ${model.generation}` : ''}` : ''
+    const modelNameFull = model ? `${model.name}${model.generation ? ` (Chasis ${model.generation})` : ''}` : ''
     
     selectedEngineIds.value.forEach(engineId => {
         if (addedEngines.value.some(e => e.engine_id === engineId)) return
@@ -362,7 +406,7 @@ const addChassis = () => {
     if (selectedChassisIds.value.length === 0) return
     const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
     const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
-    const modelNameFull = model ? `${model.name}${model.generation ? ` - ${model.generation}` : ''}` : ''
+    const modelNameFull = model ? `${model.name}${model.generation ? ` (Chasis ${model.generation})` : ''}` : ''
     
     selectedChassisIds.value.forEach(chId => {
         if (addedChassis.value.some(c => c.chassis_id === chId)) return
@@ -378,9 +422,10 @@ const removeChassis = (idx: number) => addedChassis.value.splice(idx, 1)
 
 const vinInput = ref('')
 const addVin = () => {
-    const v = vinInput.value.trim().toUpperCase()
-    if (!v || addedVins.value.includes(v)) return
-    addedVins.value.push(v); vinInput.value = ''
+    const vin = vinInput.value.trim().toUpperCase()
+    if (!vin || addedVins.value.includes(vin)) return
+    addedVins.value.push(vin)
+    vinInput.value = ''
 }
 const removeVin = (idx: number) => addedVins.value.splice(idx, 1)
 
@@ -459,7 +504,7 @@ const brandOptions = computed(() => brands.value.map(b => ({ value: b.id, label:
 const makeOptions = computed(() => vehicleMakes.value.map(m => ({ value: m.id, label: m.name })))
 const modelOptions = computed(() => vehicleModels.value.map(m => {
     const years = m.year_from ? `${m.year_from}-${m.year_to || '...'}` : ''
-    const gen = m.generation ? `${m.generation}` : ''
+    const gen = m.generation ? `Chasis: ${m.generation}` : ''
     const parts = [years, gen].filter(Boolean)
     return { value: m.id, label: m.name, sublabel: parts.join(' - ') }
 }))
@@ -630,7 +675,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del Producto</label>
                         <input v-model="form.name" type="text" @input="onNameInput"
                             class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="Se autogenera con Categoría + Vehículos..." />
+                            placeholder="Se autogenera con Categoría + Atributos + Vehículos..." />
                         <div v-if="!form.name && namePreview" class="mt-1.5 px-2 py-1 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40">
                             <p class="text-xs text-amber-600 dark:text-amber-400">Preview: <span class="font-semibold">{{ namePreview }}</span></p>
                         </div>
@@ -876,47 +921,66 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         </div>
                     </div>
 
-                    <!-- VINs + Referencias en 2 cols -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-white mb-1">VINs del producto</label>
-                            <div class="flex gap-2 mb-2">
-                                <input v-model="vinInput" type="text" @keydown.enter.prevent="addVin"
-                                    class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white font-mono uppercase"
-                                    placeholder="VIN y Enter..." />
-                                <button type="button" @click="addVin" :disabled="!vinInput.trim()"
-                                    class="rounded-md bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40">
-                                    +
-                                </button>
-                            </div>
-                            <div v-if="addedVins.length > 0" class="flex flex-wrap gap-1.5">
-                                <span v-for="(vin, idx) in addedVins" :key="vin"
-                                    class="inline-flex items-center gap-1 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 px-2 py-0.5 text-xs font-mono">
-                                    {{ vin }}
-                                    <button type="button" @click="removeVin(idx)" class="text-teal-600 hover:text-red-500">&times;</button>
-                                </span>
-                            </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-white mb-1">Referencias Cruzadas (OEM)</label>
+                        <div class="flex gap-2 mb-2">
+                            <input v-model="refInput" type="text" @keydown.enter.prevent="addRef"
+                                class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
+                                placeholder="Bosch B123, OEM... y Enter" />
+                            <button type="button" @click="addRef" :disabled="!refInput.trim()"
+                                class="rounded-md bg-indigo-600 dark:bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40">
+                                +
+                            </button>
                         </div>
+                        <div v-if="addedRefs.length > 0" class="flex flex-wrap gap-1.5">
+                            <span v-for="(ref, idx) in addedRefs" :key="ref"
+                                class="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 px-2 py-0.5 text-xs font-mono">
+                                {{ ref }}
+                                <button type="button" @click="removeRef(idx)" class="text-indigo-600 hover:text-red-500">&times;</button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-white mb-1">Referencias Cruzadas (OEM)</label>
-                            <div class="flex gap-2 mb-2">
-                                <input v-model="refInput" type="text" @keydown.enter.prevent="addRef"
-                                    class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
-                                    placeholder="Bosch B123, OEM... y Enter" />
-                                <button type="button" @click="addRef" :disabled="!refInput.trim()"
-                                    class="rounded-md bg-indigo-600 dark:bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40">
-                                    +
-                                </button>
-                            </div>
-                            <div v-if="addedRefs.length > 0" class="flex flex-wrap gap-1.5">
-                                <span v-for="(ref, idx) in addedRefs" :key="ref"
-                                    class="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 px-2 py-0.5 text-xs font-mono">
-                                    {{ ref }}
-                                    <button type="button" @click="removeRef(idx)" class="text-indigo-600 hover:text-red-500">&times;</button>
-                                </span>
-                            </div>
-                        </div>
+            <!-- ══ Vinculación VIN (fuera de compatibilidad vehicular) ══ -->
+            <div class="rounded-xl bg-white shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-cyan-500">
+                <div class="px-5 py-4">
+                    <h2 class="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">
+                        Vinculación VIN
+                        <span class="text-gray-400 font-normal text-xs">(opcional)</span>
+                    </h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Agrega VINs específicos que deben vincularse con este producto.
+                    </p>
+
+                    <div class="flex gap-2 mb-2">
+                        <input
+                            v-model="vinInput"
+                            type="text"
+                            @keydown.enter.prevent="addVin"
+                            class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white font-mono uppercase"
+                            placeholder="VIN... y Enter"
+                        />
+                        <button
+                            type="button"
+                            @click="addVin"
+                            :disabled="!vinInput.trim()"
+                            class="rounded-md bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-40"
+                        >
+                            +
+                        </button>
+                    </div>
+
+                    <div v-if="addedVins.length > 0" class="flex flex-wrap gap-1.5">
+                        <span
+                            v-for="(vin, idx) in addedVins"
+                            :key="vin"
+                            class="inline-flex items-center gap-1 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300 px-2 py-0.5 text-xs font-mono"
+                        >
+                            {{ vin }}
+                            <button type="button" @click="removeVin(idx)" class="text-cyan-600 hover:text-red-500">&times;</button>
+                        </span>
                     </div>
                 </div>
             </div>

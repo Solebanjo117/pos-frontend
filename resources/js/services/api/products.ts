@@ -61,6 +61,16 @@ export const productsApi = {
     },
 
     /**
+     * Duplicate an existing product
+     */
+    async duplicateProduct(id: number): Promise<ApiResponse<Product>> {
+        const response = await apiClient.post<ApiResponse<Product>>(
+            `/products/${id}/duplicate`,
+        )
+        return response.data
+    },
+
+    /**
      * Update existing product
      */
     async updateProduct(

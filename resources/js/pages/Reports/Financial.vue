@@ -7,6 +7,7 @@ import { type BreadcrumbItem } from '@/types'
 import { useReports } from '@/composables/useReports'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { InventoryApiService } from '@/services/inventory'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 
@@ -57,6 +58,14 @@ const filters = ref({
     date_to: today.toISOString().split('T')[0],
     warehouse_id: null as number | null,
 })
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todas' },
+    ...warehouses.value.map((warehouse) => ({
+        value: warehouse.id,
+        label: warehouse.name,
+    })),
+])
 
 const setPreset = (preset: DatePreset) => {
     activePreset.value = preset
@@ -269,16 +278,13 @@ const netProfitColor = computed(() => {
                             <WarehouseIcon :size="12" class="inline mr-1" />
                             Sucursal
                         </label>
-                        <select
+                        <SearchableSelect
                             v-model="filters.warehouse_id"
-                            @change="onWarehouseChange"
-                            class="w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        >
-                            <option :value="null">Todas</option>
-                            <option v-for="wh in warehouses" :key="wh.id" :value="wh.id">
-                                {{ wh.name }}
-                            </option>
-                        </select>
+                            :options="warehouseOptions"
+                            placeholder="Todas"
+                            class="w-48"
+                            @update:model-value="onWarehouseChange"
+                        />
                     </div>
 
                     <!-- Apply (custom) -->

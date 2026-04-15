@@ -85,11 +85,17 @@ const openEditModal = async (engine: VehicleEngine) => {
     }
 
     // Load VINs on demand
-    _vinApi = useVehicleVins(engine.id)
-    vinsLoading.value = true
-    await _vinApi.fetchVins()
-    engineVins.value = _vinApi.vins.value
-    vinsLoading.value = false
+    if (engine.model_id) {
+        _vinApi = useVehicleVins(engine.model_id)
+        vinsLoading.value = true
+        await _vinApi.fetchVins()
+        engineVins.value = _vinApi.vins.value
+        vinsLoading.value = false
+    } else {
+        _vinApi = null
+        engineVins.value = []
+        vinsLoading.value = false
+    }
     newVin.value = ''
     vinError.value = null
     showModal.value = true
@@ -117,9 +123,14 @@ const handleSubmit = async () => {
             const created = await createEngine(payload)
             // Stay open so user can add VINs
             editingEngine.value = created
-            _vinApi = useVehicleVins(created.id)
-            await _vinApi.fetchVins()
-            engineVins.value = _vinApi.vins.value
+            if (created.model_id) {
+                _vinApi = useVehicleVins(created.model_id)
+                await _vinApi.fetchVins()
+                engineVins.value = _vinApi.vins.value
+            } else {
+                _vinApi = null
+                engineVins.value = []
+            }
         }
         await loadData()
     } catch (e) {
@@ -253,7 +264,7 @@ onMounted(() => {
                             <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ engine.displacement }}</td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex justify-end gap-2">
-                                    <Button variant="ghost" size="icon" @click="openEditModal(engine)" title="Editar y gestionar VINs">
+                                    <Button variant="ghost" size="icon" @click="openEditModal(engine)" title="Editar motor">
                                         <Pencil class="h-4 w-4" />
                                     </Button>
                                     <Button variant="ghost" size="icon"
@@ -274,7 +285,7 @@ onMounted(() => {
             <DialogContent class="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>{{ editingEngine ? 'Editar Motor' : 'Nuevo Motor' }}</DialogTitle>
-                    <DialogDescription>Marca, Modelo, Motor y VINs asociados.</DialogDescription>
+                    <DialogDescription>Marca, Modelo, Motor y VINs del modelo asociado.</DialogDescription>
                 </DialogHeader>
 
                 <!-- FORM -->
@@ -329,7 +340,7 @@ onMounted(() => {
                 <div v-if="editingEngine" class="border-t pt-4 space-y-3">
                     <div class="flex items-center gap-2">
                         <Hash class="h-4 w-4 text-gray-400" />
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white">VINs Asociados</h4>
+                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white">VINs del Modelo</h4>
                         <span class="ml-auto text-xs text-gray-400">17 caracteres</span>
                     </div>
 

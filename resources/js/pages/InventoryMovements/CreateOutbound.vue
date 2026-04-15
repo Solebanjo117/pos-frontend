@@ -9,6 +9,7 @@ import { useInventoryMovements } from '@/composables/useInventoryMovements'
 import { useProducts } from '@/composables/useProducts'
 import { useWarehouses } from '@/composables/useWarehouses'
 import { usePosSettings } from '@/composables/usePosSettings'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 interface OutboundItem {
     id: string
@@ -49,6 +50,11 @@ const globalError = ref<string | null>(null)
 // Computed
 // Computed
 const showWarehouseSelect = computed(() => true)
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Seleccionar...' },
+    ...warehouses.value.map((w) => ({ value: w.id, label: w.name })),
+])
 
 onMounted(async () => {
     await Promise.all([
@@ -293,13 +299,11 @@ const cancel = () => {
                             <div class="space-y-4">
                                 <div v-if="showWarehouseSelect">
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">Almacén Origen</label>
-                                    <select
+                                    <SearchableSelect
                                         v-model="headerForm.warehouse_id"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                    >
-                                        <option :value="null">Seleccionar...</option>
-                                        <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                                    </select>
+                                        :options="warehouseOptions"
+                                        placeholder="Seleccionar..."
+                                    />
                                     <p v-if="formErrors.warehouse_id" class="text-xs text-red-600">{{ formErrors.warehouse_id }}</p>
                                 </div>
 

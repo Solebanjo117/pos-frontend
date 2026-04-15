@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
@@ -7,6 +7,7 @@ import { useVehicleEngines } from '@/composables/useVehicleEngines'
 import { useVehicleMakes } from '@/composables/useVehicleMakes'
 import { useVehicleModels } from '@/composables/useVehicleModels'
 import { Search, Plus, Pencil, Trash2, X } from 'lucide-vue-next'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -24,8 +25,24 @@ const total = ref(0)
 const perPage = ref(15)
 
 // Filters
-const selectedMakeId = ref<number | undefined>(undefined)
-const selectedModelId = ref<number | undefined>(undefined)
+const selectedMakeId = ref<number | null>(null)
+const selectedModelId = ref<number | null>(null)
+
+const makeOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todas las marcas' },
+    ...makes.value.map((make) => ({ value: make.id, label: make.name })),
+])
+
+const modelOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos los modelos' },
+    ...models.value.map((model) => ({
+        value: model.id,
+        label: model.name,
+        sublabel: model.year_from
+            ? `(${model.year_from}${model.year_to ? `-${model.year_to}` : ''})`
+            : undefined,
+    })),
+])
 
 const loadData = async () => {
     const params: Record<string, any> = {
@@ -58,7 +75,7 @@ watch(search, () => {
 
 // When make changes, load models and reload engines
 watch(selectedMakeId, async (makeId) => {
-    selectedModelId.value = undefined
+    selectedModelId.value = null
     if (makeId) {
         await fetchModels({ make_id: makeId, per_page: 200 })
     } else {
@@ -75,8 +92,8 @@ watch(selectedModelId, () => {
 })
 
 const clearFilters = () => {
-    selectedMakeId.value = undefined
-    selectedModelId.value = undefined
+    selectedMakeId.value = null
+    selectedModelId.value = null
     search.value = ''
 }
 
@@ -144,27 +161,20 @@ const fuelTypeLabel = (type: string) => {
                 <div class="flex flex-wrap items-end gap-4">
                     <div class="flex-1 min-w-[180px]">
                         <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Marca Vehículo</label>
-                        <select
+                        <SearchableSelect
                             v-model="selectedMakeId"
-                            class="w-full rounded-md border border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todas las marcas</option>
-                            <option v-for="make in makes" :key="make.id" :value="make.id">{{ make.name }}</option>
-                        </select>
+                            :options="makeOptions"
+                            placeholder="Todas las marcas"
+                        />
                     </div>
                     <div class="flex-1 min-w-[180px]">
                         <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Modelo</label>
-                        <select
+                        <SearchableSelect
                             v-model="selectedModelId"
+                            :options="modelOptions"
                             :disabled="!selectedMakeId"
-                            class="w-full rounded-md border border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white disabled:opacity-50"
-                        >
-                            <option :value="undefined">Todos los modelos</option>
-                            <option v-for="model in models" :key="model.id" :value="model.id">
-                                {{ model.name }}
-                                <template v-if="model.year_from"> ({{ model.year_from }}<template v-if="model.year_to">–{{ model.year_to }}</template>)</template>
-                            </option>
-                        </select>
+                            placeholder="Todos los modelos"
+                        />
                     </div>
                     <button
                         v-if="hasActiveFilters()"

@@ -17,18 +17,27 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
+import { toUrl } from '@/lib/utils';
 import { type NavItem } from '@/types';
 
 defineProps<{
     items: NavItem[];
 }>();
 
-const { isCurrentUrl } = useCurrentUrl();
+const { currentUrl, isCurrentUrl } = useCurrentUrl();
+
+const isCurrentOrChildUrl = (href: NavItem['href']): boolean => {
+    const url = toUrl(href);
+    if (!url) return false;
+    if (isCurrentUrl(url)) return true;
+    if (url === '/') return currentUrl.value === '/';
+    return currentUrl.value.startsWith(`${url}/`);
+};
 
 // Only expand the sidebar group that contains the active page
 const isGroupActive = (item: NavItem): boolean => {
     if (!item.items) return false;
-    return item.items.some(sub => sub.href && isCurrentUrl(sub.href));
+    return item.items.some(sub => isCurrentOrChildUrl(sub.href));
 };
 </script>
 

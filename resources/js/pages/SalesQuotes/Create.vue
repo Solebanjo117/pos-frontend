@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import apiClient from '@/services/api/client'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 import {
     FileText, Search, Plus, Minus, Trash2, Save, User, Calendar, Package, Hash, AlertTriangle
 } from 'lucide-vue-next'
@@ -128,6 +129,11 @@ const handleCancelExit = () => {
 
 const cartTotal = computed(() => cart.value.reduce((sum, item) => sum + item.total, 0))
 const cartSubtotal = computed(() => cart.value.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0))
+
+const customerOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Público General' },
+    ...customers.value.map((c) => ({ value: c.id, label: c.name })),
+])
 
 const recalcItem = (item: CartItem) => {
     const sub = item.quantity * item.unit_price
@@ -409,13 +415,11 @@ onMounted(async () => {
                             <User :size="12" class="inline mr-1" />
                             Cliente
                         </label>
-                        <select
+                        <SearchableSelect
                             v-model="selectedCustomerId"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
-                        >
-                            <option :value="null">Público General</option>
-                            <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
-                        </select>
+                            :options="customerOptions"
+                            placeholder="Público General"
+                        />
                     </div>
 
                     <div>

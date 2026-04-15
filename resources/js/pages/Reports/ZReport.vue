@@ -12,6 +12,7 @@ import { useReports } from '@/composables/useReports'
 import { useWarehouses } from '@/composables/useWarehouses'
 import { useUsers } from '@/composables/useUsers'
 import { usePosSettings } from '@/composables/usePosSettings'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -28,6 +29,36 @@ const selectedDate = ref(new Date().toISOString().split('T')[0])
 const selectedWarehouseId = ref<number | undefined>(undefined)
 const selectedUserId = ref<number | undefined>(undefined)
 const exporting = ref(false)
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todas' },
+    ...warehouses.value.map((warehouse) => ({
+        value: warehouse.id,
+        label: warehouse.name,
+    })),
+])
+
+const userOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos' },
+    ...users.value.map((user) => ({
+        value: user.id,
+        label: user.name,
+    })),
+])
+
+const warehouseFilterModel = computed<number | null>({
+    get: () => selectedWarehouseId.value ?? null,
+    set: (value) => {
+        selectedWarehouseId.value = value === null ? undefined : Number(value)
+    },
+})
+
+const userFilterModel = computed<number | null>({
+    get: () => selectedUserId.value ?? null,
+    set: (value) => {
+        selectedUserId.value = value === null ? undefined : Number(value)
+    },
+})
 
 onMounted(async () => {
     await initWarehouse()
@@ -115,27 +146,25 @@ const profitColor = computed(() => {
                         <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Sucursal
                         </label>
-                        <select
-                            v-model="selectedWarehouseId"
-                            @change="applyDate"
-                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        >
-                            <option :value="undefined">Todas</option>
-                            <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="warehouseFilterModel"
+                            :options="warehouseOptions"
+                            placeholder="Todas"
+                            class="w-40"
+                            @update:model-value="applyDate"
+                        />
                     </div>
                     <div>
                         <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Cajero / Usuario
                         </label>
-                        <select
-                            v-model="selectedUserId"
-                            @change="applyDate"
-                            class="w-44 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="userFilterModel"
+                            :options="userOptions"
+                            placeholder="Todos"
+                            class="w-44"
+                            @update:model-value="applyDate"
+                        />
                     </div>
                     <button
                         @click="applyDate"

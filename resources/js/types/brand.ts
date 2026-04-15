@@ -1,3 +1,5 @@
+import type { Supplier } from './supplier'
+
 export interface Brand {
     id: number
     name: string
@@ -7,6 +9,8 @@ export interface Brand {
     website?: string
     status?: string
     product_variants_count?: number
+    suppliers_count?: number
+    suppliers?: Pick<Supplier, 'id' | 'name'>[]
     created_at?: string
     updated_at?: string
 }
@@ -25,6 +29,7 @@ export interface CreateBrandData {
     description?: string
     logo_url?: string
     website?: string
+    supplier_ids?: number[]
 }
 
 export interface UpdateBrandData extends Partial<CreateBrandData> { }

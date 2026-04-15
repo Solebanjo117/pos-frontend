@@ -9,6 +9,7 @@ import { useCustomers } from '@/composables/useCustomers'
 import apiClient from '@/services/api/client'
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-vue-next'
 import type { UpdateSalesOrderData } from '@/types/sales-order'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 defineOptions({ layout: AppLayout })
 
@@ -56,6 +57,23 @@ const filteredProducts = computed(() => {
     p.name.toLowerCase().includes(productSearch.value.toLowerCase()) ||
     p.sku.toLowerCase().includes(productSearch.value.toLowerCase())
   ).slice(0, 10)
+})
+
+const customerOptions = computed<SelectOption[]>(() => [
+  { value: null, label: 'Sin cliente' },
+  ...customers.value.map((customer) => ({ value: customer.id, label: customer.name })),
+])
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+  { value: 0, label: 'Seleccionar...' },
+  ...warehouses.value.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })),
+])
+
+const customerModel = computed<number | null>({
+  get: () => form.value.customer_id ?? null,
+  set: (value) => {
+    form.value.customer_id = value === null ? undefined : Number(value)
+  },
 })
 
 const canEdit = computed(() => {
@@ -221,16 +239,12 @@ onMounted(async () => {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cliente</label>
-            <select
-              v-model="form.customer_id"
+            <SearchableSelect
+              v-model="customerModel"
+              :options="customerOptions"
               :disabled="!canEdit"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white disabled:opacity-50"
-            >
-              <option :value="undefined">Sin cliente</option>
-              <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-                {{ customer.name }}
-              </option>
-            </select>
+              placeholder="Sin cliente"
+            />
           </div>
 
           <div>
@@ -284,15 +298,11 @@ onMounted(async () => {
 
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Almacén</label>
-            <select
+            <SearchableSelect
               v-model="newItem.warehouse_id"
-              class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
-            >
-              <option :value="0">Seleccionar...</option>
-              <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
-                {{ warehouse.name }}
-              </option>
-            </select>
+              :options="warehouseOptions"
+              placeholder="Seleccionar..."
+            />
           </div>
 
           <div>

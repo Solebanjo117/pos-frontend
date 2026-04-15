@@ -15,6 +15,7 @@ interface OrderItem {
     quantity: number
     unit_price: number
     discount_percent: number
+    tax_percent?: number
     total: number
     seller_name?: string
 }
@@ -83,8 +84,18 @@ const estimatedRefund = computed(() => {
     for (const item of props.items) {
         const qty = quantities.value[item.id] ?? 0
         if (qty > 0) {
-            const unitAfterDiscount = item.unit_price * (1 - (item.discount_percent / 100))
-            total += unitAfterDiscount * qty
+            const soldQty = Number(item.quantity || 0)
+            const lineTotal = Number(item.total || 0)
+            if (soldQty > 0 && lineTotal > 0) {
+                // Refund exactly what was charged per unit (discount + tax included when applicable).
+                const effectiveUnitTotal = lineTotal / soldQty
+                total += effectiveUnitTotal * qty
+            } else {
+                // Fallback for old/partial payloads where total is missing.
+                const unitAfterDiscount = item.unit_price * (1 - (item.discount_percent / 100))
+                const taxPercent = Number(item.tax_percent || 0)
+                total += unitAfterDiscount * qty * (1 + taxPercent / 100)
+            }
         }
     }
     return total
@@ -262,6 +273,9 @@ const refundMethodColor = (method: string, color: string) => {
                                                 <td class="px-3 py-3 text-right">
                                                     <span class="text-sm font-medium text-gray-900 dark:text-white">{{ formatCurrency(item.unit_price) }}</span>
                                                     <span v-if="item.discount_percent > 0" class="block text-xs text-red-500">-{{ item.discount_percent }}%</span>
+                                                    <span class="block text-xs" :class="(item.tax_percent ?? 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'">
+                                                        {{ (item.tax_percent ?? 0) > 0 ? `ITBM ${(item.tax_percent ?? 0)}%` : 'Sin ITBM' }}
+                                                    </span>
                                                 </td>
 
                                                 <!-- Quantity to return -->

@@ -782,7 +782,9 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                                     class="min-w-full divide-y divide-gray-200 dark:divide-border">
                                                     <thead class="bg-gray-100 dark:bg-card">
                                                         <tr>
-                                                            <!-- SKU y Custom SKU ocultos (R38: cliente usa SKU del producto padre) -->
+                                                            <th
+                                                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                                                                SKU Variante</th>
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
                                                                 Atributos</th>
@@ -805,7 +807,9 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                                         <tr v-for="variant in getVariants(product)"
                                                             :key="variant.id"
                                                             class="hover:bg-gray-50 dark:hover:bg-muted/50">
-                                                            <!-- SKU y Custom SKU ocultos -->
+                                                            <td class="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
+                                                                {{ variant.sku || product.sku_base || '—' }}
+                                                            </td>
                                                             <td class="px-4 py-3">
                                                                 <div v-if="getVariantAttrs(variant, product).length > 0" class="flex flex-wrap gap-1">
                                                                     <span v-for="attr in getVariantAttrs(variant, product)" :key="attr.id ?? attr.name"

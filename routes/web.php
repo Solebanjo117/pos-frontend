@@ -22,6 +22,14 @@ Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/pos/cashier', f
     return Inertia::render('POS/CashierQueue');
 })->name('pos.cashier');
 
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/queues/delivery', function () {
+    return Inertia::render('Queues/DeliveryQueue');
+})->name('queues.delivery');
+
+Route::middleware(['auth'])->get('/queues/purchase-orders', function () {
+    return Inertia::render('Queues/PurchaseOrderQueue');
+})->name('queues.purchase-orders');
+
 Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -169,6 +177,11 @@ Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->grou
         return Inertia::render('SalesOrders/Edit', ['id' => (int)$id]);
     })->name('edit');
 });
+
+// Returns index (must be before /returns/{orderId})
+Route::middleware(['auth'])->get('/returns', function () {
+    return Inertia::render('Returns/Index');
+})->name('returns.index');
 
 // Returns (POS in return mode)
 Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/{orderId}', fn($orderId) =>

@@ -7,6 +7,7 @@ import { useSuppliers } from '@/composables/useSuppliers'
 import { ArrowLeft, Save, Plus, Trash2, Search } from 'lucide-vue-next'
 import type { CreatePurchaseOrderData } from '@/types/purchase-order'
 import apiClient from '@/services/api/client'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const props = defineProps<{ purchaseOrderId?: number }>()
 
@@ -34,6 +35,16 @@ const form = ref<CreatePurchaseOrderData>({
 
 const subtotal = computed(() => form.value.items.reduce((sum, item: any) => sum + (item.quantity_ordered * (item.units_per_package ?? 1) * item.unit_cost), 0))
 const total = computed(() => subtotal.value + (form.value.tax_amount || 0) + (form.value.shipping_cost || 0))
+
+const supplierOptions = computed<SelectOption[]>(() => [
+    { value: 0, label: 'Selecciona un proveedor' },
+    ...suppliers.value.map((s) => ({ value: s.id, label: s.name })),
+])
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    { value: 0, label: 'Selecciona un almacén' },
+    ...warehouses.value.map((w) => ({ value: w.id, label: w.name })),
+])
 
 async function searchProducts() {
     if (productSearch.value.length < 2) { searchResults.value = []; return }
@@ -103,6 +114,11 @@ function removeItem(index: number) {
 }
 
 async function handleSubmit() {
+    if (!form.value.supplier_id || !form.value.warehouse_id) {
+        alert('Selecciona proveedor y almacén')
+        return
+    }
+
     if (form.value.items.length === 0) {
         alert('Agrega al menos un producto')
         return
@@ -208,17 +224,19 @@ onMounted(async () => {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Proveedor *</label>
-                            <select v-model.number="form.supplier_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white">
-                                <option :value="0" disabled>Selecciona un proveedor</option>
-                                <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="form.supplier_id"
+                                :options="supplierOptions"
+                                placeholder="Selecciona un proveedor"
+                            />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Almacén destino *</label>
-                            <select v-model.number="form.warehouse_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white">
-                                <option :value="0" disabled>Selecciona un almacén</option>
-                                <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                            </select>
+                            <SearchableSelect
+                                v-model="form.warehouse_id"
+                                :options="warehouseOptions"
+                                placeholder="Selecciona un almacén"
+                            />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha del Pedido</label>

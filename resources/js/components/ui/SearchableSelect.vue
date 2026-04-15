@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, getCurrentInstance } from 'vue'
 
 export interface SelectOption {
     value: number | string | null
@@ -14,11 +14,19 @@ const props = withDefaults(defineProps<{
     disabled?: boolean
     loading?: boolean
     loadingText?: string
+    searchPlaceholder?: string
+    emptyResultsText?: string
+    clearable?: boolean
+    ariaLabel?: string
 }>(), {
     placeholder: '-- Selecciona --',
     disabled: false,
     loading: false,
     loadingText: 'Cargando...',
+    searchPlaceholder: 'Buscar...',
+    emptyResultsText: '',
+    clearable: false,
+    ariaLabel: 'Selector con búsqueda',
 })
 
 const emit = defineEmits<{
@@ -31,11 +39,24 @@ const highlightedIndex = ref(-1)
 const containerRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)
+const instanceUid = getCurrentInstance()?.uid ?? 0
+const dropdownId = `searchable-select-listbox-${instanceUid}`
+const searchInputId = `searchable-select-search-${instanceUid}`
 
 const selectedLabel = computed(() => {
     if (props.modelValue === null || props.modelValue === undefined) return ''
     const opt = props.options.find(o => o.value === props.modelValue)
     return opt?.label ?? ''
+})
+
+const hasSelection = computed(() => props.modelValue !== null && props.modelValue !== undefined)
+const showClearButton = computed(() => props.clearable && hasSelection.value && !props.disabled && !props.loading)
+
+const emptyMessage = computed(() => {
+    if (props.emptyResultsText) return props.emptyResultsText
+    const query = searchQuery.value.trim()
+    if (!query) return 'Sin opciones disponibles'
+    return `Sin resultados para "${query}"`
 })
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -66,6 +87,11 @@ const close = () => {
 
 const select = (opt: SelectOption) => {
     emit('update:modelValue', opt.value)
+    close()
+}
+
+const clearSelection = () => {
+    emit('update:modelValue', null)
     close()
 }
 
@@ -118,15 +144,32 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
             type="button"
             @click="open"
             :disabled="disabled || loading"
-            class="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 flex items-center justify-between gap-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
+            :aria-label="ariaLabel"
+            aria-haspopup="listbox"
+            :aria-expanded="isOpen"
+            :aria-controls="dropdownId"
+            class="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 pr-14 text-left text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 flex items-center justify-between gap-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
         >
             <span class="truncate block" :class="selectedLabel ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'">
                 {{ loading ? loadingText : (selectedLabel || placeholder) }}
             </span>
-            <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </button>
+
+        <button
+            v-if="showClearButton"
+            type="button"
+            class="absolute right-8 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-muted dark:hover:text-gray-200"
+            @click.stop="clearSelection"
+            aria-label="Limpiar selección"
+        >
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
+
+        <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
 
         <!-- Dropdown -->
         <Transition
@@ -138,6 +181,9 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
             leave-to-class="opacity-0 scale-95"
         >
             <div v-if="isOpen"
+                :id="dropdownId"
+                role="listbox"
+                :aria-label="ariaLabel"
                 class="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden"
             >
                 <!-- Search input -->
@@ -148,11 +194,15 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
                         </svg>
                         <input
                             ref="inputRef"
+                            :id="searchInputId"
                             v-model="searchQuery"
                             @keydown="onKeydown"
                             type="text"
                             class="w-full rounded-md border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-3 text-sm dark:border-border dark:bg-muted dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-primary"
-                            placeholder="Buscar..."
+                            :placeholder="searchPlaceholder"
+                            :aria-controls="dropdownId"
+                            aria-autocomplete="list"
+                            autocomplete="off"
                         />
                     </div>
                 </div>
@@ -164,6 +214,8 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
                         :key="String(opt.value)"
                         @click="select(opt)"
                         @mouseenter="highlightedIndex = idx"
+                        role="option"
+                        :aria-selected="opt.value === modelValue"
                         class="cursor-pointer px-3 py-2 text-sm transition-colors"
                         :class="[
                             idx === highlightedIndex ? 'bg-blue-50 text-blue-700 dark:bg-primary/10 dark:text-primary' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-muted',
@@ -177,7 +229,7 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
                         </svg>
                     </li>
                     <li v-if="filteredOptions.length === 0" class="px-3 py-4 text-center text-sm text-gray-400">
-                        Sin resultados para "{{ searchQuery }}"
+                        {{ emptyMessage }}
                     </li>
                 </ul>
             </div>

@@ -132,12 +132,15 @@ const openMakeEdit   = (m: VehicleMake) => { editingId.value = m.id; makeForm.va
 const openModelCreate = (makeId: number) => {
     activeMakeId.value = makeId; editingId.value = null
     modelForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), generation: '' }
+    _vinModelId.value = null
+    modelVins.value = []
     modalType.value = 'model'; modalError.value = null
 }
-const openModelEdit = (model: VehicleModel) => {
+const openModelEdit = async (model: VehicleModel) => {
     activeMakeId.value = model.make_id; editingId.value = model.id
     modelForm.value = { name: model.name, year_from: model.year_from ?? new Date().getFullYear(), year_to: model.year_to ?? new Date().getFullYear(), generation: (model as any).generation ?? '' }
     modalType.value = 'model'; modalError.value = null
+    await loadVins(model.id)
 }
 
 const openEngineCreate = async (modelId: number) => {
@@ -146,18 +149,13 @@ const openEngineCreate = async (modelId: number) => {
     selectedEngineId.value = null
     modalType.value = 'engine'
     modalError.value = null
-    // Reset VIN panel
-    _vinEngineId.value = null
-    engineVins.value = []
     // Load all available engines
     await loadAllEngines()
 }
-const openEngineEdit = async (engine: VehicleEngine) => {
+const openEngineEdit = (engine: VehicleEngine) => {
     activeModelId.value = engine.model_id; editingId.value = engine.id
     engineForm.value = { engine_code: engine.engine_code, displacement: engine.displacement, fuel_type: engine.fuel_type || '' }
     modalType.value = 'engine'; modalError.value = null
-    // Load VINs
-    await loadVins(engine.id)
 }
 
 // Quick Add Engine Modal
@@ -167,7 +165,7 @@ const openQuickEngineCreate = () => {
     modalError.value = null
 }
 
-const closeModal = () => { modalType.value = null; _vinEngineId.value = null; engineVins.value = []; selectedEngineId.value = null }
+const closeModal = () => { modalType.value = null; _vinModelId.value = null; modelVins.value = []; selectedEngineId.value = null }
 
 // R20: Check for duplicates helper
 const duplicateConfirmed = ref(false)
@@ -266,9 +264,9 @@ const assignEngineToModel = async () => {
         if (!enginesByModel.value[activeModelId.value].find(e => e.id === updated.id)) {
             enginesByModel.value[activeModelId.value].push(updated)
         }
-        // Open VIN panel for this engine
-        editingId.value = updated.id
-        await loadVins(updated.id)
+        selectedEngineId.value = null
+        await loadAllEngines()
+        closeModal()
     } catch (e: any) { modalError.value = e.response?.data?.message || 'Error' }
     finally { processing.value = false }
 }
@@ -314,22 +312,9 @@ const submitEngine = async () => {
                 if (!enginesByModel.value[activeModelId.value].find(e => e.id === created.id)) {
                     enginesByModel.value[activeModelId.value].push(created)
                 }
-                
-                // If in quickEngine mode, motor already has model_id assigned
-                // Open VIN panel directly
-                if (modalType.value === 'quickEngine') {
-                    editingId.value = created.id
-                    await loadVins(created.id)
-                    modalType.value = 'engine' // Switch to edit mode with VINs
-                    duplicateConfirmed.value = false
-                    return
-                }
             }
-            
-            // Immediately open VIN panel for new engine (normal flow)
-            editingId.value = created.id
-            await loadVins(created.id)
         }
+        closeModal()
         duplicateConfirmed.value = false
     } catch (e: any) { modalError.value = e.response?.data?.message || 'Error' }
     finally { processing.value = false }
@@ -361,21 +346,21 @@ const handleDeleteEngine = async (engine: VehicleEngine) => {
 }
 
 // ── VIN management ────────────────────────────────────────────────────────────
-const engineVins  = ref<VehicleVin[]>([])
+const modelVins   = ref<VehicleVin[]>([])
 const vinsLoading = ref(false)
-const _vinEngineId = ref<number | null>(null)
+const _vinModelId = ref<number | null>(null)
 let _vinApi: ReturnType<typeof useVehicleVins> | null = null
 
 const newVin    = ref('')
 const addingVin = ref(false)
 const vinError  = ref<string | null>(null)
 
-const loadVins = async (engineId: number) => {
-    _vinEngineId.value = engineId
-    _vinApi = useVehicleVins(engineId)
+const loadVins = async (modelId: number) => {
+    _vinModelId.value = modelId
+    _vinApi = useVehicleVins(modelId)
     vinsLoading.value = true
     await _vinApi.fetchVins()
-    engineVins.value = _vinApi.vins.value
+    modelVins.value = _vinApi.vins.value
     vinsLoading.value = false
     newVin.value = ''
     vinError.value = null
@@ -386,7 +371,7 @@ const handleAddVin = async () => {
     addingVin.value = true; vinError.value = null
     try {
         await _vinApi.addVin(newVin.value.toUpperCase())
-        engineVins.value = _vinApi.vins.value
+        modelVins.value = _vinApi.vins.value
         newVin.value = ''
     } catch (e: any) {
         vinError.value = e.response?.data?.message || 'VIN inválido o duplicado'
@@ -396,7 +381,7 @@ const handleAddVin = async () => {
 const handleRemoveVin = async (vinId: number) => {
     if (!_vinApi) return
     await _vinApi.removeVin(vinId)
-    engineVins.value = _vinApi.vins.value
+    modelVins.value = _vinApi.vins.value
 }
 </script>
 
@@ -478,7 +463,7 @@ const handleRemoveVin = async (vinId: number) => {
                                 <span class="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200">
                                     {{ model.name }}
                                     <span v-if="model.year_from" class="ml-2 text-xs text-gray-400">({{ model.year_from }}–{{ model.year_to ?? 'Pres.' }})</span>
-                                    <span v-if="(model as any).generation" class="ml-1 text-xs font-mono text-indigo-500 dark:text-indigo-400">{{ (model as any).generation }}</span>
+                                    <span v-if="(model as any).generation" class="ml-1 text-xs font-mono text-indigo-500 dark:text-indigo-400">Chasis: {{ (model as any).generation }}</span>
                                 </span>
                                 <div class="flex items-center gap-1" @click.stop>
                                     <Button variant="ghost" size="icon" class="h-7 w-7" @click="openEngineCreate(model.id)" title="Nuevo Motor">
@@ -508,7 +493,7 @@ const handleRemoveVin = async (vinId: number) => {
                                         <span v-if="engine.displacement" class="ml-2 text-xs text-gray-500">{{ engine.displacement }}</span>
                                     </div>
                                     <div class="flex items-center gap-1">
-                                        <Button variant="ghost" size="icon" class="h-7 w-7" @click="openEngineEdit(engine)" title="Editar motor y VINs">
+                                        <Button variant="ghost" size="icon" class="h-7 w-7" @click="openEngineEdit(engine)" title="Editar motor">
                                             <Pencil class="h-3.5 w-3.5" />
                                         </Button>
                                         <Button variant="ghost" size="icon" class="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50" @click="handleDeleteEngine(engine)">
@@ -564,8 +549,8 @@ const handleRemoveVin = async (vinId: number) => {
                             <Input v-model.number="modelForm.year_to" type="number" placeholder="2024" />
                         </div>
                         <div class="space-y-2">
-                            <Label>Generación</Label>
-                            <Input v-model="modelForm.generation" placeholder="Ej: E170, W204" />
+                            <Label>Chasis</Label>
+                            <Input v-model="modelForm.generation" placeholder="Ej: P10, E170, W204" />
                         </div>
                     </div>
                     <div v-if="modalError" class="text-sm text-red-600">{{ modalError }}</div>
@@ -574,6 +559,40 @@ const handleRemoveVin = async (vinId: number) => {
                         <Button type="submit" :disabled="processing">{{ processing ? 'Guardando...' : 'Guardar' }}</Button>
                     </div>
                 </form>
+
+                <div v-if="editingId" class="border-t pt-4 space-y-3">
+                    <div class="flex items-center gap-2">
+                        <Hash class="h-4 w-4 text-gray-400" />
+                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white">VINs del Modelo</h4>
+                        <span class="ml-auto text-xs text-gray-400">Alfanumérico</span>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <Input v-model="newVin" maxlength="17" placeholder="VIN (17 caracteres)"
+                            class="font-mono text-sm uppercase"
+                            @keyup.enter="handleAddVin" />
+                        <Button type="button" :disabled="newVin.trim().length !== 17 || addingVin" @click="handleAddVin" size="sm">
+                            <Plus class="h-4 w-4" />
+                        </Button>
+                    </div>
+
+                    <p v-if="newVin.length > 0 && newVin.length !== 17" class="text-xs text-red-500">
+                        {{ newVin.length }} / 17 caracteres
+                    </p>
+                    <p v-if="vinError" class="text-xs text-red-600">{{ vinError }}</p>
+
+                    <div v-if="vinsLoading" class="py-2 text-center text-xs text-gray-400">Cargando VINs...</div>
+                    <div v-else-if="modelVins.length === 0" class="py-2 text-center text-xs text-gray-400">Sin VINs registrados.</div>
+                    <ul v-else class="max-h-36 overflow-y-auto divide-y divide-gray-100 dark:divide-border rounded-md border border-gray-200 dark:border-border">
+                        <li v-for="v in modelVins" :key="v.id"
+                            class="flex items-center justify-between px-3 py-1.5 text-sm bg-white dark:bg-background">
+                            <span class="font-mono text-xs tracking-wide text-gray-800 dark:text-gray-200">{{ v.vin }}</span>
+                            <button type="button" @click="handleRemoveVin(v.id)" class="ml-2 text-red-500 hover:text-red-700">
+                                <X class="h-3.5 w-3.5" />
+                            </button>
+                        </li>
+                    </ul>
+                </div>
             </DialogContent>
         </Dialog>
 
@@ -582,7 +601,7 @@ const handleRemoveVin = async (vinId: number) => {
             <DialogContent class="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>{{ editingId ? 'Editar Motor' : 'Asignar Motor' }}</DialogTitle>
-                    <DialogDescription>{{ editingId ? 'Editar motor y VINs asociados' : 'Selecciona un motor existente o crea uno nuevo' }}</DialogDescription>
+                    <DialogDescription>{{ editingId ? 'Editar datos del motor' : 'Selecciona un motor existente o crea uno nuevo' }}</DialogDescription>
                 </DialogHeader>
 
                 <!-- Mode: Assign existing engine (when not editing) -->
@@ -639,37 +658,6 @@ const handleRemoveVin = async (vinId: number) => {
                     </div>
                 </form>
 
-                <!-- VINs panel (shown after engine is assigned/editing) -->
-                <div v-if="editingId" class="border-t pt-4 space-y-3">
-                    <div class="flex items-center gap-2">
-                        <Hash class="h-4 w-4 text-gray-400" />
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white">VINs del Vehículo</h4>
-                        <span class="ml-auto text-xs text-gray-400">Alfanumérico</span>
-                    </div>
-
-                    <div class="flex gap-2">
-                        <Input v-model="newVin" maxlength="40" placeholder="VIN (ej: 1HGBH41JXMN109186)"
-                            class="font-mono text-sm"
-                            @keyup.enter="handleAddVin" />
-                        <Button type="button" :disabled="newVin.trim().length < 1 || addingVin" @click="handleAddVin" size="sm">
-                            <Plus class="h-4 w-4" />
-                        </Button>
-                    </div>
-
-                    <p v-if="vinError" class="text-xs text-red-600">{{ vinError }}</p>
-
-                    <div v-if="vinsLoading" class="py-2 text-center text-xs text-gray-400">Cargando VINs...</div>
-                    <div v-else-if="engineVins.length === 0" class="py-2 text-center text-xs text-gray-400">Sin VINs registrados.</div>
-                    <ul v-else class="max-h-36 overflow-y-auto divide-y divide-gray-100 dark:divide-border rounded-md border border-gray-200 dark:border-border">
-                        <li v-for="v in engineVins" :key="v.id"
-                            class="flex items-center justify-between px-3 py-1.5 text-sm bg-white dark:bg-background">
-                            <span class="font-mono text-xs tracking-wide text-gray-800 dark:text-gray-200">{{ v.vin }}</span>
-                            <button type="button" @click="handleRemoveVin(v.id)" class="ml-2 text-red-500 hover:text-red-700">
-                                <X class="h-3.5 w-3.5" />
-                            </button>
-                        </li>
-                    </ul>
-                </div>
             </DialogContent>
         </Dialog>
 

@@ -5,7 +5,9 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useProducts } from '@/composables/useProducts'
 import { usePosSettings } from '@/composables/usePosSettings'
-import { Pencil, AlertTriangle, Star } from 'lucide-vue-next'
+import { productsApi } from '@/services/api/products'
+import { useToast } from '@/composables/useToast'
+import { Pencil, Copy, AlertTriangle, Star } from 'lucide-vue-next'
 
 const { isSingleWarehouseMode, fetchSettings, currentWarehouseId } = usePosSettings()
 
@@ -14,6 +16,8 @@ const props = defineProps<{
 }>()
 
 const { currentProduct, loading, error, fetchProduct } = useProducts()
+const toast = useToast()
+const duplicating = ref(false)
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -51,6 +55,28 @@ const getStatusColor = (status: string) => {
             return 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-200'
     }
 }
+
+const handleDuplicate = async () => {
+    if (duplicating.value) return
+
+    duplicating.value = true
+
+    try {
+        const response = await productsApi.duplicateProduct(props.productId)
+        const duplicatedProductId = response?.data?.id
+
+        if (!duplicatedProductId) {
+            throw new Error('No se recibió el ID del producto duplicado')
+        }
+
+        toast.success('Producto duplicado. Ajusta los campos necesarios.')
+        window.location.href = `/products/${duplicatedProductId}/edit`
+    } catch (err: any) {
+        toast.error(err.response?.data?.message || 'Error al duplicar producto')
+    } finally {
+        duplicating.value = false
+    }
+}
 </script>
 
 <template>
@@ -64,6 +90,15 @@ const getStatusColor = (status: string) => {
                     <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Detalle del Producto</h1>
                 </div>
                 <div class="flex gap-2">
+                    <button
+                        type="button"
+                        :disabled="duplicating"
+                        @click="handleDuplicate"
+                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-card dark:text-white dark:hover:bg-muted"
+                    >
+                        <Copy class="w-4 h-4 mr-2" />
+                        {{ duplicating ? 'Duplicando...' : 'Duplicar' }}
+                    </button>
                     <a
                         :href="`/products/${productId}/edit`"
                         class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"

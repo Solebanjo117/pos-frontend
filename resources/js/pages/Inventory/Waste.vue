@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue'
 import apiClient from '@/services/api/client'
 import { usePosSettings } from '@/composables/usePosSettings'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 // ── Form state ──────────────────────────────────────────────────────────────
 interface Variant {
@@ -48,6 +49,10 @@ const REASONS = [
     'Error de Inventario',
     'Otro',
 ]
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    ...warehouses.value.map((w) => ({ value: w.id, label: w.name })),
+])
 
 // ── History ──────────────────────────────────────────────────────────────────
 const history = ref<WasteEntry[]>([])
@@ -230,13 +235,11 @@ onMounted(async () => {
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Almacén <span class="text-red-500">*</span>
                         </label>
-                        <select
+                        <SearchableSelect
                             v-model="warehouseId"
-                            @change="fetchStock"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                        </select>
+                            :options="warehouseOptions"
+                            @update:model-value="fetchStock"
+                        />
                     </div>
 
                     <!-- Quantity -->

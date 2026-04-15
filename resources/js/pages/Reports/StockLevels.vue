@@ -9,6 +9,7 @@ import { useWarehouses } from '@/composables/useWarehouses'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { useBrands } from '@/composables/useBrands'
 import { useCategories } from '@/composables/useCategories'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 import StockStatusChart from '@/components/charts/StockStatusChart.vue'
 import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue'
 import TopProductsChart from '@/components/charts/TopProductsChart.vue'
@@ -31,6 +32,30 @@ const filters = ref({
     category_id: null as number | null,
     status: null as 'critical' | 'low' | 'normal' | 'optimal' | null,
 })
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos los almacenes' },
+    ...warehouses.value.map((warehouse) => ({
+        value: warehouse.id,
+        label: warehouse.name,
+    })),
+])
+
+const brandOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todas las marcas' },
+    ...brands.value.map((brand) => ({
+        value: brand.id,
+        label: brand.name,
+    })),
+])
+
+const categoryOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todas las categorías' },
+    ...categories.value.map((category) => ({
+        value: category.id,
+        label: category.name,
+    })),
+])
 
 watch(currentWarehouseId, (val) => {
     filters.value.warehouse_id = val
@@ -256,43 +281,31 @@ const formatCurrency = (value: number) => {
                     <!-- Warehouse -->
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Almacén</label>
-                        <select
+                        <SearchableSelect
                             v-model="filters.warehouse_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todos los almacenes</option>
-                            <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
-                                {{ warehouse.name }}
-                            </option>
-                        </select>
+                            :options="warehouseOptions"
+                            placeholder="Todos los almacenes"
+                        />
                     </div>
 
                     <!-- Brand -->
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Marca</label>
-                        <select
+                        <SearchableSelect
                             v-model="filters.brand_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todas las marcas</option>
-                            <option v-for="brand in brands" :key="brand.id" :value="brand.id">
-                                {{ brand.name }}
-                            </option>
-                        </select>
+                            :options="brandOptions"
+                            placeholder="Todas las marcas"
+                        />
                     </div>
 
                     <!-- Category -->
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Categoría</label>
-                        <select
+                        <SearchableSelect
                             v-model="filters.category_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todas las categorías</option>
-                            <option v-for="category in categories" :key="category.id" :value="category.id">
-                                {{ category.name }}
-                            </option>
-                        </select>
+                            :options="categoryOptions"
+                            placeholder="Todas las categorías"
+                        />
                     </div>
 
                     <!-- Status -->

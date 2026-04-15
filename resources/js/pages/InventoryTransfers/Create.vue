@@ -5,6 +5,7 @@ import { ArrowLeftRight, Plus, Trash2, Search, Building2 } from 'lucide-vue-next
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import apiClient from '@/services/api/client'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -40,6 +41,16 @@ onMounted(async () => {
 const availableDestinations = computed(() =>
     warehouses.value.filter(w => w.id !== fromWarehouseId.value)
 )
+
+const fromWarehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Seleccionar...' },
+    ...warehouses.value.map((w) => ({ value: w.id, label: w.name })),
+])
+
+const toWarehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Seleccionar...' },
+    ...availableDestinations.value.map((w) => ({ value: w.id, label: w.name })),
+])
 
 let searchTimeout: any
 const searchProducts = () => {
@@ -131,17 +142,19 @@ const submit = async () => {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Almacén Origen</label>
-                        <select v-model="fromWarehouseId" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200">
-                            <option :value="null" disabled>Seleccionar...</option>
-                            <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="fromWarehouseId"
+                            :options="fromWarehouseOptions"
+                            placeholder="Seleccionar..."
+                        />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Almacén Destino</label>
-                        <select v-model="toWarehouseId" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200">
-                            <option :value="null" disabled>Seleccionar...</option>
-                            <option v-for="w in availableDestinations" :key="w.id" :value="w.id">{{ w.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="toWarehouseId"
+                            :options="toWarehouseOptions"
+                            placeholder="Seleccionar..."
+                        />
                     </div>
                 </div>
                 <div class="mt-4">

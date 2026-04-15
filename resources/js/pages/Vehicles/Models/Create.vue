@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useVehicleModels } from '@/composables/useVehicleModels'
 import { useVehicleMakes } from '@/composables/useVehicleMakes'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -17,11 +18,16 @@ const { createModel, loading, error } = useVehicleModels()
 const { makes, fetchMakes } = useVehicleMakes()
 
 const form = ref({
-    make_id: '' as string | number, // Start empty
+    make_id: null as number | null,
     name: '',
     year_from: new Date().getFullYear(),
     year_to: new Date().getFullYear(),
 })
+
+const makeOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Selecciona una marca' },
+    ...makes.value.map((make) => ({ value: make.id, label: make.name })),
+])
 
 onMounted(async () => {
     await fetchMakes({ per_page: 100 })
@@ -29,6 +35,8 @@ onMounted(async () => {
 
 const handleSubmit = async () => {
     try {
+        if (!form.value.make_id) return
+
         await createModel({
             ...form.value,
             make_id: Number(form.value.make_id)
@@ -58,16 +66,13 @@ const handleSubmit = async () => {
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                             Marca
                         </label>
-                        <select
-                            v-model="form.make_id"
-                            required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
-                        >
-                            <option value="" disabled>Selecciona una marca</option>
-                            <option v-for="make in makes" :key="make.id" :value="make.id">
-                                {{ make.name }}
-                            </option>
-                        </select>
+                        <div class="mt-1">
+                            <SearchableSelect
+                                v-model="form.make_id"
+                                :options="makeOptions"
+                                placeholder="Selecciona una marca"
+                            />
+                        </div>
                     </div>
 
                     <!-- Model Name -->

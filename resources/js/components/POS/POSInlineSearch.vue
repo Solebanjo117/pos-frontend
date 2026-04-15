@@ -3,7 +3,8 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import apiClient from '@/services/api/client'
 import { formatCurrency } from '@/utils/formatters'
-import { Search, ChevronDown } from 'lucide-vue-next'
+import { Search } from 'lucide-vue-next'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 interface Category { id: number; name: string }
 interface Brand { id: number; name: string }
@@ -42,6 +43,16 @@ const isSearching = ref(false)
 const showDropdown = ref(false)
 const focusedIndex = ref(-1)
 const searchInput = ref<HTMLInputElement | null>(null)
+
+const categoryOptions = computed<SelectOption[]>(() => [
+  { value: null, label: 'Todas las categorías' },
+  ...((props.categories ?? []).map(cat => ({ value: cat.id, label: cat.name })))
+])
+
+const brandOptions = computed<SelectOption[]>(() => [
+  { value: null, label: 'Todas las marcas' },
+  ...((props.brands ?? []).map(brand => ({ value: brand.id, label: brand.name })))
+])
 
 // Search function
 const performSearch = async () => {
@@ -251,33 +262,23 @@ defineExpose({ focusSearch })
       </div>
 
       <!-- Category Filter (col-3) -->
-      <div class="col-span-3 relative">
-        <select
+      <div class="col-span-3">
+        <SearchableSelect
           v-model="selectedCategoryId"
+          :options="categoryOptions"
           :disabled="disabled"
-          class="w-full px-4 py-3 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-card text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <option :value="null">Todas las categorías</option>
-          <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-            {{ cat.name }}
-          </option>
-        </select>
-        <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          placeholder="Todas las categorías"
+        />
       </div>
 
       <!-- Brand Filter (col-3) -->
-      <div class="col-span-3 relative">
-        <select
+      <div class="col-span-3">
+        <SearchableSelect
           v-model="selectedBrandId"
+          :options="brandOptions"
           :disabled="disabled"
-          class="w-full px-4 py-3 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-card text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <option :value="null">Todas las marcas</option>
-          <option v-for="brand in brands" :key="brand.id" :value="brand.id">
-            {{ brand.name }}
-          </option>
-        </select>
-        <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          placeholder="Todas las marcas"
+        />
       </div>
     </div>
   </div>

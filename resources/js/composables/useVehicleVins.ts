@@ -3,12 +3,13 @@ import apiClient from '@/services/api/client'
 
 export interface VehicleVin {
     id: number
-    engine_id: number
+    model_id: number
+    engine_id?: number | null
     vin: string
     notes?: string | null
 }
 
-export function useVehicleVins(engineId: number) {
+export function useVehicleVins(modelId: number) {
     const vins = ref<VehicleVin[]>([])
     const loading = ref(false)
     const error = ref<string | null>(null)
@@ -17,7 +18,7 @@ export function useVehicleVins(engineId: number) {
         loading.value = true
         error.value = null
         try {
-            const res = await apiClient.get(`/vehicle-engines/${engineId}/vins`)
+            const res = await apiClient.get(`/vehicle-models/${modelId}/vins`)
             vins.value = res.data.data ?? []
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Error cargando VINs'
@@ -29,7 +30,7 @@ export function useVehicleVins(engineId: number) {
     const addVin = async (vin: string, notes?: string) => {
         error.value = null
         try {
-            const res = await apiClient.post(`/vehicle-engines/${engineId}/vins`, { vin, notes })
+            const res = await apiClient.post(`/vehicle-models/${modelId}/vins`, { vin, notes })
             vins.value.unshift(res.data.data)
             return res.data.data as VehicleVin
         } catch (err: any) {
@@ -41,7 +42,7 @@ export function useVehicleVins(engineId: number) {
     const removeVin = async (vinId: number) => {
         error.value = null
         try {
-            await apiClient.delete(`/vehicle-engines/${engineId}/vins/${vinId}`)
+            await apiClient.delete(`/vehicle-models/${modelId}/vins/${vinId}`)
             vins.value = vins.value.filter(v => v.id !== vinId)
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Error al eliminar VIN'

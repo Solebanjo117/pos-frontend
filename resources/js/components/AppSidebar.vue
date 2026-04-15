@@ -1,6 +1,28 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Package, Warehouse, List, BarChart3, Users, ShoppingCart, Truck, ClipboardList, Factory, ArrowLeftRight, Tag, Car, Wrench, Banknote, Settings, Shield, FileText, Receipt, Store, Inbox, PackageSearch } from 'lucide-vue-next';
+import {
+    Banknote,
+    BarChart3,
+    Car,
+    ClipboardCheck,
+    ClipboardList,
+    Factory,
+    FileText,
+    Folder,
+    Inbox,
+    ListOrdered,
+    Package,
+    PackageSearch,
+    RotateCcw,
+    Settings,
+    ShoppingCart,
+    Store,
+    Tag,
+    Truck,
+    Users,
+    Warehouse,
+    Wrench,
+} from 'lucide-vue-next';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -18,30 +40,43 @@ import { type NavItem } from '@/types';
 import AppLogo from './AppLogo.vue';
 
 
-import { ref, onMounted, computed } from 'vue';
+import { onMounted, computed } from 'vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useAuth } from '@/composables/useAuth';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useCashierQueue } from '@/composables/useCashierQueue';
 import { useWarehouseQueue } from '@/composables/useWarehouseQueue';
+import { useDeliveryQueue } from '@/composables/useDeliveryQueue';
+import { usePurchaseOrderQueue } from '@/composables/usePurchaseOrderQueue';
 
-const { fetchSettings, isSingleWarehouseMode } = usePosSettings();
+const { fetchSettings } = usePosSettings();
 const { fetchCurrentUser, isAdmin, role: userRole, hasRole } = useAuth();
 const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings();
-const { count: cashierQueueCount, startPolling: startQueuePolling, stopPolling: stopQueuePolling } = useCashierQueue();
+const { count: cashierQueueCount, startPolling: startCashierPolling } = useCashierQueue();
 const { count: warehouseQueueCount, startPolling: startWarehousePolling } = useWarehouseQueue();
+const { count: deliveryQueueCount, startPolling: startDeliveryPolling } = useDeliveryQueue();
+const { count: purchaseOrderQueueCount, startPolling: startPurchaseOrderQueuePolling } = usePurchaseOrderQueue();
+
+const canAccessCashierQueue = computed(() => hasRole(['admin', 'manager', 'cashier']));
+const canAccessWarehouseQueue = computed(() => hasRole(['admin', 'manager', 'buyer', 'assistant']));
+const canAccessDeliveryQueue = computed(() => hasRole(['admin', 'manager', 'cashier']));
+const canAccessPurchaseOrderQueue = computed(() => Boolean(userRole.value));
 
 // Load settings
 onMounted(async () => {
     try {
         await Promise.all([fetchSettings(), fetchCurrentUser(), fetchStoreSettings()]);
-        // Start queue polling only for roles that access the cashier queue
-        if (hasRole(['admin', 'manager', 'cashier'])) {
-            startQueuePolling(30000) // sidebar polling: 30 seconds
+        if (canAccessCashierQueue.value) {
+            startCashierPolling(30000);
         }
-        // Start warehouse queue polling for inventory-related roles
-        if (hasRole(['admin', 'manager', 'buyer', 'assistant'])) {
-            startWarehousePolling(30000) // Poll every 30 seconds
+        if (canAccessWarehouseQueue.value) {
+            startWarehousePolling(30000);
+        }
+        if (canAccessDeliveryQueue.value) {
+            startDeliveryPolling(30000);
+        }
+        if (canAccessPurchaseOrderQueue.value) {
+            startPurchaseOrderQueuePolling(30000);
         }
     } catch (e) {
         console.error('Failed to load settings', e);
@@ -68,61 +103,91 @@ const filterWorkOrders = (items: NavItem[]): NavItem[] => {
 // Role-based access helpers
 const canAccessPOS = computed(() => hasRole(['admin', 'manager', 'cashier']))
 const canAccessQuoteEditor = computed(() => hasRole(['admin', 'manager', 'seller']))
-const canAccessInventory = computed(() => hasRole(['admin', 'manager', 'buyer', 'assistant']))
 const canAccessPurchaseOrders = computed(() => hasRole(['admin', 'manager', 'buyer']))
 const canAccessReports = computed(() => hasRole(['admin', 'manager']))
 const canAccessCatalog = computed(() => hasRole(['admin', 'manager']))
 const canAccessVehicles = computed(() => hasRole(['admin', 'manager', 'seller']))
+const canAccessReturns = computed(() => hasRole(['admin', 'manager', 'cashier', 'buyer', 'assistant']))
 
 const mainNavItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [];
 
-    // --- Ventas section (role-filtered sub-items) ---
-    const ventasSubItems: NavItem[] = [];
-    if (canAccessPOS.value) {
-        ventasSubItems.push({
-            title: 'Punto de Venta',
-            href: '/pos',
-            icon: ShoppingCart,
-        });
-    }
-    ventasSubItems.push({
-        title: 'Órdenes de Venta',
-        href: '/sales-orders',
-    });
-    ventasSubItems.push({
-        title: 'Cotizaciones',
-        href: '/sales-quotes',
-        icon: FileText,
-    });
-    if (canAccessPOS.value) {
-        ventasSubItems.push({
-            title: 'Cola de Caja',
+    // --- Cola ---
+    const queueItems: NavItem[] = [];
+    if (canAccessCashierQueue.value) {
+        queueItems.push({
+            title: 'Cola Caja',
             href: '/pos/cashier',
             icon: Inbox,
             badge: cashierQueueCount.value > 0 ? String(cashierQueueCount.value) : undefined,
         });
-        ventasSubItems.push({
-            title: 'Cierres de Caja',
-            href: '/pos-sessions',
-            icon: Receipt,
+    }
+    if (canAccessWarehouseQueue.value) {
+        queueItems.push({
+            title: 'Cola Bodega',
+            href: '/warehouses/queue',
+            icon: PackageSearch,
+            badge: warehouseQueueCount.value > 0 ? String(warehouseQueueCount.value) : undefined,
         });
     }
-    ventasSubItems.push({
-        title: 'Órdenes de Trabajo',
-        href: '/work-orders',
-        icon: Wrench,
+    if (canAccessDeliveryQueue.value) {
+        queueItems.push({
+            title: 'Cola Entrega',
+            href: '/queues/delivery',
+            icon: Truck,
+            badge: deliveryQueueCount.value > 0 ? String(deliveryQueueCount.value) : undefined,
+        });
+    }
+    if (canAccessPurchaseOrderQueue.value) {
+        queueItems.push({
+            title: 'Cola Pedidos',
+            href: '/queues/purchase-orders',
+            icon: ClipboardCheck,
+            badge: purchaseOrderQueueCount.value > 0 ? String(purchaseOrderQueueCount.value) : undefined,
+        });
+    }
+
+    if (queueItems.length > 0) {
+        items.push({
+            title: 'Cola',
+            icon: ListOrdered,
+            items: queueItems,
+        });
+    }
+
+    // --- Ventas ---
+    const salesItems: NavItem[] = [];
+    if (canAccessPOS.value) {
+        salesItems.push({
+            title: 'Caja',
+            href: '/pos',
+            icon: ShoppingCart,
+        });
+    }
+
+    salesItems.push({
+        title: 'Órdenes de Venta',
+        href: '/sales-orders',
+        icon: ClipboardList,
     });
 
-    if (ventasSubItems.length > 0) {
+    if (canAccessPOS.value || canAccessQuoteEditor.value) {
+        salesItems.push({
+            title: 'Cotizaciones',
+            href: '/sales-quotes',
+            icon: FileText,
+        });
+    }
+
+    if (salesItems.length > 0) {
         items.push({
             title: 'Ventas',
             icon: ShoppingCart,
-            items: ventasSubItems,
+            items: salesItems,
         });
     }
 
-    // --- Compras section ---
+    // --- Compras ---
     if (canAccessPurchaseOrders.value) {
         items.push({
             title: 'Compras',
@@ -141,7 +206,7 @@ const mainNavItems = computed<NavItem[]>(() => {
                 {
                     title: 'Cuentas por Pagar',
                     href: '/accounts-payable',
-                    icon: Factory,
+                    icon: Banknote,
                 },
                 {
                     title: 'Proveedores',
@@ -152,77 +217,42 @@ const mainNavItems = computed<NavItem[]>(() => {
         });
     }
 
-    // --- Dashboard (visible to all) ---
-    items.push({
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    });
+    // --- Inventario ---
+    const inventoryItems: NavItem[] = [
+        {
+            title: 'Productos',
+            href: '/products',
+            icon: Package,
+        },
+    ];
 
-    // --- Warehouse Queue - top level ---
-    if (canAccessInventory.value) {
-        items.push({
-            title: 'Cola de Bodega',
-            href: '/warehouses/queue',
-            icon: PackageSearch,
-            badge: warehouseQueueCount.value > 0 ? String(warehouseQueueCount.value) : undefined,
+    if (canAccessReturns.value) {
+        inventoryItems.push({
+            title: 'Devoluciones',
+            href: '/returns',
+            icon: RotateCcw,
         });
     }
 
-    // --- Inventario section ---
-    if (canAccessInventory.value) {
+    if (canAccessCatalog.value) {
+        inventoryItems.push({
+            title: 'Categorias',
+            href: '/categories',
+            icon: Folder,
+        });
+        inventoryItems.push({
+            title: 'Marcas',
+            href: '/brands',
+            icon: Tag,
+        });
+    }
+
+    if (inventoryItems.length > 0) {
         items.push({
             title: 'Inventario',
-            href: '/inventory',
             icon: Warehouse,
-            items: [
-                 {
-                    title: 'Ver Inventario',
-                    href: '/inventory',
-                    icon: List,
-                },
-                {
-                    title: 'Movimientos',
-                    href: '/inventory-movements',
-                    icon: ArrowLeftRight,
-                },
-                {
-                    title: 'Transferencias',
-                    href: '/inventory-transfers',
-                    icon: ArrowLeftRight,
-                },
-                 {
-                    title: 'Productos',
-                    href: '/products',
-                    icon: Package,
-                },
-                // Warehouses Management
-                {
-                    title: 'Almacenes',
-                    href: '/warehouses',
-                    icon: Warehouse,
-                },
-                {
-                    title: 'Stock por Almacén',
-                    href: '/inventory',
-                    icon: List,
-                },
-                {
-                    title: 'Mermas',
-                    href: '/inventory/waste',
-                    icon: Wrench,
-                },
-            ],
+            items: inventoryItems,
         });
-    } else {
-        // Seller gets read-only Products link (outside Inventario)
-        if (canAccessQuoteEditor.value) {
-            items.push({
-                title: 'Productos',
-                href: '/products',
-                icon: Package,
-            });
-        }
     }
 
     // --- Vehículos ---
@@ -232,7 +262,7 @@ const mainNavItems = computed<NavItem[]>(() => {
             icon: Truck,
             items: [
                 {
-                    title: 'Gestión',
+                    title: 'Carros',
                     href: '/vehicles',
                     icon: Car,
                 },
@@ -250,43 +280,12 @@ const mainNavItems = computed<NavItem[]>(() => {
         });
     }
 
-    // --- Clientes (visible to all authenticated roles) ---
+    // --- Clientes (standalone) ---
     items.push({
         title: 'Clientes',
+        href: '/customers',
         icon: Users,
-        items: [
-            {
-                title: 'Directorio',
-                href: '/customers',
-                icon: Users,
-            },
-            {
-                title: 'Cuentas por Cobrar',
-                href: '/ar',
-                icon: Banknote,
-            },
-        ],
     });
-
-    // --- Catálogo ---
-    if (canAccessCatalog.value) {
-        items.push({
-            title: 'Catálogo',
-            icon: Tag,
-            items: [
-                {
-                    title: 'Marcas',
-                    href: '/brands',
-                    icon: Tag,
-                },
-                {
-                    title: 'Categorías',
-                    href: '/categories',
-                    icon: Folder,
-                },
-            ],
-        });
-    }
 
     // --- Reportes ---
     if (canAccessReports.value) {
@@ -317,8 +316,8 @@ const mainNavItems = computed<NavItem[]>(() => {
     // --- Administración: visible only for admins ---
     if (isAdmin.value) {
         items.push({
-            title: 'Administración',
-            icon: Shield,
+            title: 'Settings',
+            icon: Settings,
             items: [
                 {
                     title: 'Usuarios',

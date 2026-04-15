@@ -7,6 +7,7 @@ import { useSuppliers } from '@/composables/useSuppliers'
 import { Search, Plus, Eye, Send, XCircle, Trash2, DollarSign, Package, Clock, CheckCircle2, TrendingDown, AlertCircle } from 'lucide-vue-next'
 import type { PurchaseOrderFilters, PurchaseOrderStatus } from '@/types/purchase-order'
 import { useAuth } from '@/composables/useAuth'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const { hasRole } = useAuth()
 const { purchaseOrders, statistics, loading, error, pagination, fetchPurchaseOrders, fetchStatistics, sendPurchaseOrder, cancelPurchaseOrder, deletePurchaseOrder } = usePurchaseOrders()
@@ -48,6 +49,18 @@ const statusOptions: { value: string; label: string; color: string }[] = [
     { value: 'received', label: 'Recibido', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
     { value: 'cancelled', label: 'Cancelado', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
 ]
+
+const supplierFilterOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos' },
+    ...suppliers.value.map((s) => ({ value: s.id, label: s.name })),
+])
+
+const supplierFilterModel = computed<number | null>({
+    get: () => filters.value.supplier_id ?? null,
+    set: (value) => {
+        filters.value.supplier_id = value === null ? undefined : Number(value)
+    },
+})
 
 function getStatusColor(status: string) {
     return statusOptions.find(s => s.value === status)?.color || ''
@@ -197,10 +210,12 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Proveedor</label>
-                        <select v-model="filters.supplier_id" class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white" @change="loadOrders">
-                            <option :value="undefined">Todos</option>
-                            <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="supplierFilterModel"
+                            :options="supplierFilterOptions"
+                            placeholder="Todos"
+                            @update:model-value="loadOrders"
+                        />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Desde</label>

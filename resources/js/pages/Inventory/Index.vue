@@ -5,6 +5,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useInventory } from '@/composables/useInventory'
 import type { InventoryFilters } from '@/types/inventory'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -97,6 +98,18 @@ const getStatusLabel = (status: string) => {
 
 const totalPages = computed(() => Math.ceil(pagination.value.total / pagination.value.per_page))
 
+const warehouseFilterOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos' },
+    ...warehouses.value.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })),
+])
+
+const warehouseFilterModel = computed<number | null>({
+    get: () => filters.value.warehouse_id ?? null,
+    set: (value) => {
+        filters.value.warehouse_id = value === null ? undefined : Number(value)
+    },
+})
+
 const formatCurrency = (value: number | null) => {
     if (value === null || value === undefined) return '—'
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
@@ -141,16 +154,14 @@ const formatCurrency = (value: number | null) => {
                     <!-- Warehouse Filter -->
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-white">Almacén</label>
-                        <select
-                            v-model="filters.warehouse_id"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                            @change="applyFilters"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
-                                {{ warehouse.name }}
-                            </option>
-                        </select>
+                        <div class="mt-1">
+                            <SearchableSelect
+                                v-model="warehouseFilterModel"
+                                :options="warehouseFilterOptions"
+                                placeholder="Todos"
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
                     </div>
 
                     <!-- Low Stock Toggle -->

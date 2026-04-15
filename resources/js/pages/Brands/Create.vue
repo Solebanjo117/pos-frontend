@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useBrands } from '@/composables/useBrands'
+import { useSuppliers } from '@/composables/useSuppliers'
 import { useToast } from '@/composables/useToast'
 import { ArrowLeft, Save } from 'lucide-vue-next'
 import type { CreateBrandData } from '@/types/brand'
+import type { Supplier } from '@/types/supplier'
 
 const { loading, error, createBrand } = useBrands()
+const { fetchActiveSuppliers } = useSuppliers()
 const toast = useToast()
+const availableSuppliers = ref<Supplier[]>([])
 
 const form = ref<CreateBrandData>({
     name: '',
@@ -16,6 +20,11 @@ const form = ref<CreateBrandData>({
     description: '',
     logo_url: '',
     website: '',
+    supplier_ids: [],
+})
+
+onMounted(async () => {
+    availableSuppliers.value = await fetchActiveSuppliers()
 })
 
 async function handleSubmit() {
@@ -125,6 +134,33 @@ function goBack() {
                         class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         placeholder="https://www.ejemplo.com"
                     />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Proveedores
+                    </label>
+                    <div class="max-h-48 overflow-y-auto border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted p-3 space-y-2">
+                        <label
+                            v-for="supplier in availableSuppliers"
+                            :key="supplier.id"
+                            class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                        >
+                            <input
+                                v-model="form.supplier_ids"
+                                type="checkbox"
+                                :value="supplier.id"
+                                class="rounded"
+                            />
+                            <span>{{ supplier.name }}</span>
+                        </label>
+                        <p v-if="availableSuppliers.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                            No hay proveedores activos disponibles.
+                        </p>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {{ form.supplier_ids?.length || 0 }} proveedor(es) seleccionado(s)
+                    </p>
                 </div>
 
                 <!-- Actions -->

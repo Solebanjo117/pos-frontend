@@ -9,8 +9,14 @@ export interface Category {
     description?: string
     icon?: string
     priority: number
+    default_attributes?: Array<{
+        name: string
+        required?: boolean
+        unit?: string
+    }>
     default_margin_percent?: number | null
     pricing_formula?: string | null
+    min_suggested_price?: number | null
     applies_itbm?: boolean
     itbm_percent?: number | null
     products_count?: number
@@ -42,6 +48,7 @@ export interface CreateCategoryData {
     priority?: number
     default_margin_percent?: number | null
     pricing_formula?: string | null
+    min_suggested_price?: number | null
     applies_itbm?: boolean
     itbm_percent?: number | null
 }

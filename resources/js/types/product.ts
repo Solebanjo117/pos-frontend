@@ -238,6 +238,7 @@ export interface CreateProductRequest {
         value: number | string
         unit?: string
     }>
+    vins?: string[]
 }
 
 export interface UpdateProductRequest {

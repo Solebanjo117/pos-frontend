@@ -13,6 +13,7 @@ import { useWarehouses } from '@/composables/useWarehouses'
 import { useUsers } from '@/composables/useUsers'
 import { usePosSettings } from '@/composables/usePosSettings'
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -35,6 +36,36 @@ const filterWarehouseId = ref<number | undefined>(undefined)
 const filterUserId = ref<number | undefined>(undefined)
 const filterDateFrom = ref<string>('')
 const filterDateTo = ref<string>('')
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todas' },
+    ...warehouses.value.map((warehouse) => ({
+        value: warehouse.id,
+        label: warehouse.name,
+    })),
+])
+
+const userOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos' },
+    ...users.value.map((user) => ({
+        value: user.id,
+        label: user.name,
+    })),
+])
+
+const warehouseFilterModel = computed<number | null>({
+    get: () => filterWarehouseId.value ?? null,
+    set: (value) => {
+        filterWarehouseId.value = value === null ? undefined : Number(value)
+    },
+})
+
+const userFilterModel = computed<number | null>({
+    get: () => filterUserId.value ?? null,
+    set: (value) => {
+        filterUserId.value = value === null ? undefined : Number(value)
+    },
+})
 
 // Detail modal
 const selectedSession = ref<PosSessionRecord | null>(null)
@@ -174,25 +205,23 @@ const getDifferenceLabel = (session: PosSessionRecord): string => {
                         <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Sucursal
                         </label>
-                        <select
-                            v-model="filterWarehouseId"
-                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        >
-                            <option :value="undefined">Todas</option>
-                            <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="warehouseFilterModel"
+                            :options="warehouseOptions"
+                            placeholder="Todas"
+                            class="w-40"
+                        />
                     </div>
                     <div>
                         <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Cajero
                         </label>
-                        <select
-                            v-model="filterUserId"
-                            class="w-44 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="userFilterModel"
+                            :options="userOptions"
+                            placeholder="Todos"
+                            class="w-44"
+                        />
                     </div>
                     <button
                         @click="applyFilters"

@@ -3,9 +3,11 @@ import { ref, onMounted } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useBrands } from '@/composables/useBrands'
+import { useSuppliers } from '@/composables/useSuppliers'
 import { useToast } from '@/composables/useToast'
 import { ArrowLeft, Save } from 'lucide-vue-next'
 import type { UpdateBrandData } from '@/types/brand'
+import type { Supplier } from '@/types/supplier'
 
 interface Props {
     id: string
@@ -14,7 +16,9 @@ interface Props {
 const props = defineProps<Props>()
 
 const { brand, loading, error, fetchBrandById, updateBrand } = useBrands()
+const { fetchActiveSuppliers } = useSuppliers()
 const toast = useToast()
+const availableSuppliers = ref<Supplier[]>([])
 
 const form = ref<UpdateBrandData>({
     name: '',
@@ -22,10 +26,16 @@ const form = ref<UpdateBrandData>({
     description: '',
     logo_url: '',
     website: '',
+    supplier_ids: [],
 })
 
 onMounted(async () => {
-    await fetchBrandById(Number(props.id))
+    const [suppliers] = await Promise.all([
+        fetchActiveSuppliers(),
+        fetchBrandById(Number(props.id)),
+    ])
+    availableSuppliers.value = suppliers
+
     if (brand.value) {
         form.value = {
             name: brand.value.name,
@@ -33,6 +43,7 @@ onMounted(async () => {
             description: brand.value.description || '',
             logo_url: brand.value.logo_url || '',
             website: brand.value.website || '',
+            supplier_ids: brand.value.suppliers?.map((supplier) => supplier.id) || [],
         }
     }
 })
@@ -151,6 +162,33 @@ function goBack() {
                         class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         placeholder="https://www.ejemplo.com"
                     />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Proveedores
+                    </label>
+                    <div class="max-h-48 overflow-y-auto border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted p-3 space-y-2">
+                        <label
+                            v-for="supplier in availableSuppliers"
+                            :key="supplier.id"
+                            class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                        >
+                            <input
+                                v-model="form.supplier_ids"
+                                type="checkbox"
+                                :value="supplier.id"
+                                class="rounded"
+                            />
+                            <span>{{ supplier.name }}</span>
+                        </label>
+                        <p v-if="availableSuppliers.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                            No hay proveedores activos disponibles.
+                        </p>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {{ form.supplier_ids?.length || 0 }} proveedor(es) seleccionado(s)
+                    </p>
                 </div>
 
                 <!-- Actions -->

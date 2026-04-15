@@ -4,15 +4,17 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useProducts } from '@/composables/useProducts'
+import { useToast } from '@/composables/useToast'
 import type { UpdateProductRequest } from '@/types/product'
 import apiClient from '@/services/api/client'
+import { productsApi } from '@/services/api/products'
 import VariantManager from '@/components/Products/VariantManager.vue'
 import OemReferenceManager from '@/components/Products/OemReferenceManager.vue'
 import AlternativeManager from '@/components/Products/AlternativeManager.vue'
 import AttributeManager from '@/components/Products/AttributeManager.vue'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
-import { Plus, Key, Car, Globe, Wrench } from 'lucide-vue-next'
+import { Plus, Car, Globe, Wrench, Copy } from 'lucide-vue-next'
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -22,6 +24,8 @@ const props = defineProps<{
 }>()
 
 const { currentProduct, updateProduct, fetchProduct, loading, error } = useProducts()
+const toast = useToast()
+const duplicating = ref(false)
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -114,6 +118,27 @@ const cancel = () => {
     window.location.href = '/products'
 }
 
+const handleDuplicate = async () => {
+    if (duplicating.value) return
+
+    duplicating.value = true
+    try {
+        const response = await productsApi.duplicateProduct(props.productId)
+        const duplicatedProductId = response?.data?.id
+
+        if (!duplicatedProductId) {
+            throw new Error('No se recibio el ID del producto duplicado')
+        }
+
+        toast.success('Producto duplicado. Ajusta los campos necesarios.')
+        window.location.href = `/products/${duplicatedProductId}/edit`
+    } catch (err: any) {
+        toast.error(err.response?.data?.message || 'Error al duplicar producto')
+    } finally {
+        duplicating.value = false
+    }
+}
+
 // ===== Multi-Photo Management =====
 interface ProductImage {
     id: number
@@ -201,58 +226,6 @@ const handleDeleteImage = async (imageId: number) => {
 // Load images on mount
 onMounted(() => {
     fetchImages()
-})
-
-// ===== VIN Management =====
-interface ProductVin {
-    id: number
-    vin: string
-}
-
-const vins = ref<ProductVin[]>([])
-const newVin = ref('')
-const vinError = ref('')
-const addingVin = ref(false)
-
-const fetchVins = async () => {
-    try {
-        const res = await apiClient.get(`/products/${props.productId}/vins`)
-        vins.value = res.data.data ?? []
-    } catch (e) {
-        vins.value = []
-    }
-}
-
-const handleAddVin = async () => {
-    if (newVin.value.trim().length < 1) {
-        vinError.value = 'El VIN no puede estar vacío'
-        return
-    }
-    vinError.value = ''
-    addingVin.value = true
-    try {
-        const res = await apiClient.post(`/products/${props.productId}/vins`, { vin: newVin.value.toUpperCase() })
-        vins.value.push(res.data.data)
-        newVin.value = ''
-    } catch (e: any) {
-        vinError.value = e.response?.data?.message ?? 'Error al agregar VIN'
-    } finally {
-        addingVin.value = false
-    }
-}
-
-const handleRemoveVin = async (vinId: number) => {
-    if (!confirm('¿Eliminar este VIN?')) return
-    try {
-        await apiClient.delete(`/products/${props.productId}/vins/${vinId}`)
-        vins.value = vins.value.filter(v => v.id !== vinId)
-    } catch (e) {
-        console.error('Error removing VIN', e)
-    }
-}
-
-onMounted(() => {
-    fetchVins()
 })
 
 // ===== Vehicle Compatibility Management =====
@@ -394,7 +367,7 @@ watch(selectedModelId, async (modelId) => {
 const makeSelectOptions = computed(() => vehicleMakes.value.map(m => ({ value: m.id, label: m.name })))
 const modelSelectOptions = computed(() => vehicleModels.value.map(m => {
     const years = m.year_from ? `${m.year_from}-${m.year_to || '...'}` : ''
-    const gen = m.generation ? `${m.generation}` : ''
+    const gen = m.generation ? `Chasis: ${m.generation}` : ''
     const parts = [years, gen].filter(Boolean)
     return { value: m.id, label: m.name, sublabel: parts.join(' - ') }
 }))
@@ -562,8 +535,17 @@ onMounted(() => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-4">
             <!-- Header -->
-            <div class="mb-6">
+            <div class="mb-6 flex items-center justify-between gap-3">
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Editar Producto</h1>
+                <button
+                    type="button"
+                    :disabled="duplicating"
+                    @click="handleDuplicate"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-card dark:text-white dark:hover:bg-muted"
+                >
+                    <Copy class="h-4 w-4" />
+                    {{ duplicating ? 'Duplicando...' : 'Duplicar Producto' }}
+                </button>
             </div>
 
             <!-- Loading -->
@@ -669,46 +651,6 @@ onMounted(() => {
                     </button>
                 </div>
                 </form>
-
-                <!-- ═══════════════════════════════════════════════════════════ -->
-                <!--  SECTION 3: VINs (always visible)                         -->
-                <!-- ═══════════════════════════════════════════════════════════ -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-card border-l-4 border-teal-500">
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-                        <Key class="w-5 h-5 text-teal-600" /> VINs Vinculados
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Asocia VINs específicos a este producto. Al escanear un VIN en el POS, se mostrarán los productos compatibles.</p>
-
-                    <div class="flex gap-3 mb-6">
-                        <div class="flex-1">
-                            <input v-model="newVin" type="text" maxlength="40"
-                                placeholder="Ingresa o escanea un VIN"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono uppercase dark:border-border dark:bg-muted dark:text-white"
-                                @keyup.enter="handleAddVin" />
-                            <p v-if="vinError" class="mt-1 text-sm text-red-600">{{ vinError }}</p>
-                        </div>
-                        <button type="button" @click="handleAddVin" :disabled="addingVin || newVin.trim().length < 1"
-                            class="px-4 py-2 bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-50 text-white rounded-lg transition text-sm font-medium">
-                            {{ addingVin ? 'Agregando...' : '+ Agregar VIN' }}
-                        </button>
-                    </div>
-
-                    <div v-if="vins.length" class="space-y-2">
-                        <div v-for="vin in vins" :key="vin.id"
-                            class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-border px-4 py-3 bg-gray-50 dark:bg-background">
-                            <span class="font-mono text-sm font-semibold tracking-widest text-gray-800 dark:text-gray-200">{{ vin.vin }}</span>
-                            <button type="button" @click="handleRemoveVin(vin.id)"
-                                class="p-1 text-gray-400 hover:text-red-600 transition" title="Eliminar VIN">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div v-else class="text-center py-10 text-gray-400">
-                        <Key class="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                        <p class="text-sm">No hay VINs vinculados a este producto</p>
-                        <p class="text-xs mt-1">Agrega VINs para habilitar la búsqueda por VIN en el POS</p>
-                    </div>
-                </div>
 
                 <!-- ═══════════════════════════════════════════════════════════ -->
                 <!--  SECTION 4: Compatibilidad Vehicular (always visible)     -->
@@ -1071,10 +1013,10 @@ onMounted(() => {
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Generación <span class="text-xs text-gray-400">(opcional)</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Chasis <span class="text-xs text-gray-400">(opcional)</span></label>
                         <input v-model="inlineForm.generation" type="text"
                             class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="Ej: E170, W204, MK4..." />
+                            placeholder="Ej: P10, E170, W204..." />
                     </div>
                 </template>
 

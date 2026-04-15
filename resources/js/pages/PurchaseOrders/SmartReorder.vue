@@ -6,6 +6,7 @@ import { smartReorderService, type SupplierLowStock, type LowStockStats, type Cr
 import { PackageX, AlertTriangle, TrendingDown, ShoppingCart, Check, Minus, Plus, CheckCircle2 } from 'lucide-vue-next'
 import apiClient from '@/services/api/client'
 import { useToast } from '@/composables/useToast'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const toast = useToast()
 const lowStockData = ref<SupplierLowStock[]>([])
@@ -16,6 +17,21 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const createdOrders = ref<CreatedPurchaseOrder[]>([])
 const showSuccess = ref(false)
+
+const warehouseFilterOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos' },
+    ...warehouses.value.map((warehouse) => ({
+        value: warehouse.id,
+        label: warehouse.name,
+    })),
+])
+
+const warehouseFilterModel = computed<number | null>({
+    get: () => selectedWarehouse.value ?? null,
+    set: (value) => {
+        selectedWarehouse.value = value === null ? undefined : Number(value)
+    },
+})
 
 // Track selected items per supplier
 const selectedItems = ref<Record<number, Record<number, boolean>>>({})
@@ -210,10 +226,14 @@ onMounted(async () => {
             <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-4">
                 <div class="flex items-center gap-4">
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Almacén:</label>
-                    <select v-model="selectedWarehouse" @change="loadData" class="px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white">
-                        <option :value="undefined">Todos</option>
-                        <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                    </select>
+                    <div class="w-72">
+                        <SearchableSelect
+                            v-model="warehouseFilterModel"
+                            :options="warehouseFilterOptions"
+                            placeholder="Todos"
+                            @update:model-value="loadData"
+                        />
+                    </div>
                 </div>
             </div>
 

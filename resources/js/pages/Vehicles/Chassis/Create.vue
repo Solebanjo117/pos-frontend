@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useVehicleChassis } from '@/composables/useVehicleChassis'
 import apiClient from '@/services/api/client'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -28,6 +29,16 @@ const form = ref({
 const makes = ref<{ id: number; name: string }[]>([])
 const models = ref<{ id: number; name: string }[]>([])
 const selectedMakeId = ref<number | null>(null)
+
+const makeOptions = computed<SelectOption[]>(() => [
+    { value: null, label: '— Sin asociar —' },
+    ...makes.value.map((m) => ({ value: m.id, label: m.name })),
+])
+
+const modelOptions = computed<SelectOption[]>(() => [
+    { value: null, label: '— Sin modelo —' },
+    ...models.value.map((model) => ({ value: model.id, label: model.name })),
+])
 
 const fetchMakes = async () => {
     try {
@@ -141,27 +152,27 @@ const handleSubmit = async () => {
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Marca (opcional)
                             </label>
-                            <select
-                                v-model="selectedMakeId"
-                                @change="onMakeChange"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="null">— Sin asociar —</option>
-                                <option v-for="m in makes" :key="m.id" :value="m.id">{{ m.name }}</option>
-                            </select>
+                            <div class="mt-1">
+                                <SearchableSelect
+                                    v-model="selectedMakeId"
+                                    :options="makeOptions"
+                                    placeholder="— Sin asociar —"
+                                    @update:model-value="onMakeChange"
+                                />
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Modelo (opcional)
                             </label>
-                            <select
-                                v-model="form.model_id"
-                                :disabled="!selectedMakeId"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white disabled:opacity-50"
-                            >
-                                <option :value="null">— Sin modelo —</option>
-                                <option v-for="model in models" :key="model.id" :value="model.id">{{ model.name }}</option>
-                            </select>
+                            <div class="mt-1">
+                                <SearchableSelect
+                                    v-model="form.model_id"
+                                    :options="modelOptions"
+                                    :disabled="!selectedMakeId"
+                                    placeholder="— Sin modelo —"
+                                />
+                            </div>
                         </div>
                     </div>
 

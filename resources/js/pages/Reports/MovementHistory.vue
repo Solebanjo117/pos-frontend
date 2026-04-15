@@ -12,6 +12,7 @@ import { useProducts } from '@/composables/useProducts'
 import MovementTrendChart from '@/components/charts/MovementTrendChart.vue'
 import MovementTypeChart from '@/components/charts/MovementTypeChart.vue'
 import ProductCombobox from '@/components/ProductCombobox.vue'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -39,6 +40,22 @@ const filters = ref({
     movement_type: null as 'in' | 'out' | 'transfer' | null,
     group_by: 'day' as 'day' | 'week' | 'month',
 })
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos los almacenes' },
+    ...warehouses.value.map((warehouse) => ({
+        value: warehouse.id,
+        label: warehouse.name,
+    })),
+])
+
+const userOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos' },
+    ...users.value.map((user) => ({
+        value: user.id,
+        label: user.name,
+    })),
+])
 
 const exporting = ref(false)
 
@@ -200,26 +217,20 @@ const formatDate = (dateString: string) => {
 
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Almacén</label>
-                        <select
+                        <SearchableSelect
                             v-model="filters.warehouse_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todos los almacenes</option>
-                            <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
-                                {{ warehouse.name }}
-                            </option>
-                        </select>
+                            :options="warehouseOptions"
+                            placeholder="Todos los almacenes"
+                        />
                     </div>
 
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Usuario / Responsable</label>
-                        <select
+                        <SearchableSelect
                             v-model="filters.user_id"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todos</option>
-                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
-                        </select>
+                            :options="userOptions"
+                            placeholder="Todos"
+                        />
                     </div>
 
                     <div class="md:col-span-2">

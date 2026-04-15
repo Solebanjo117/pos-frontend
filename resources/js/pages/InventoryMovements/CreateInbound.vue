@@ -10,6 +10,7 @@ import { useProducts } from '@/composables/useProducts'
 import { useWarehouses } from '@/composables/useWarehouses'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { useSuppliers } from '@/composables/useSuppliers'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 interface InboundItem {
     id: string // Temp ID for list management
@@ -60,6 +61,16 @@ const globalError = ref<string | null>(null)
 
 // Computed
 const showWarehouseSelect = computed(() => true)
+
+const warehouseOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Seleccionar...' },
+    ...warehouses.value.map((w) => ({ value: w.id, label: w.name })),
+])
+
+const supplierOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Sin proveedor' },
+    ...suppliers.value.map((s) => ({ value: s.id, label: s.name })),
+])
 
 onMounted(async () => {
     // Generate default batch number based on current timestamp
@@ -329,13 +340,11 @@ const cancel = () => {
                             <div class="space-y-4">
                                 <div v-if="showWarehouseSelect">
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">Almacén Destino</label>
-                                    <select
+                                    <SearchableSelect
                                         v-model="headerForm.warehouse_id"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                    >
-                                        <option :value="null">Seleccionar...</option>
-                                        <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                                    </select>
+                                        :options="warehouseOptions"
+                                        placeholder="Seleccionar..."
+                                    />
                                     <p v-if="formErrors.warehouse_id" class="text-xs text-red-600">{{ formErrors.warehouse_id }}</p>
                                 </div>
 
@@ -363,13 +372,11 @@ const cancel = () => {
 
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">Proveedor</label>
-                                    <select
+                                    <SearchableSelect
                                         v-model="headerForm.supplier_id"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                    >
-                                        <option :value="null">Sin proveedor</option>
-                                        <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-                                    </select>
+                                        :options="supplierOptions"
+                                        placeholder="Sin proveedor"
+                                    />
                                 </div>
 
                                 <div>

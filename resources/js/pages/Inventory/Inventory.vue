@@ -7,6 +7,7 @@ import { type BreadcrumbItem } from '@/types'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { useAuth } from '@/composables/useAuth'
 import apiClient from '@/services/api/client'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const { hasRole } = useAuth()
 const breadcrumbs: BreadcrumbItem[] = [
@@ -108,6 +109,18 @@ const filters = ref<Filters>({
     date_to: '',
     movement_type: undefined,
     expiry_status: undefined,
+})
+
+const warehouseFilterOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos' },
+    ...warehouses.value.map((w) => ({ value: w.id, label: w.name })),
+])
+
+const warehouseFilterModel = computed<number | null>({
+    get: () => filters.value.warehouse_id ?? null,
+    set: (value) => {
+        filters.value.warehouse_id = value === null ? undefined : Number(value)
+    },
 })
 
 // Metrics
@@ -489,13 +502,11 @@ const formatCurrency = (value: number | null) => {
                         <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                             Almacén
                         </label>
-                        <select
-                            v-model="filters.warehouse_id"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
-                        </select>
+                        <SearchableSelect
+                            v-model="warehouseFilterModel"
+                            :options="warehouseFilterOptions"
+                            placeholder="Todos"
+                        />
                     </div>
 
                     <!-- Date Filters (Movements only) -->

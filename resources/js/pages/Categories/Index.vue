@@ -3,10 +3,10 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useCategories } from '@/composables/useCategories'
-import { Search, Plus, Pencil, Trash2, Folder, CornerDownRight, ChevronRight, ChevronDown, ChevronLeft } from 'lucide-vue-next'
+import { Search, Plus, Trash2, Folder, CornerDownRight, ChevronRight, ChevronDown, ChevronLeft } from 'lucide-vue-next'
 import type { Category } from '@/types/category'
 
-const { categories, loading, error, fetchCategoriesWithParent, deleteCategory } = useCategories()
+const { loading, error, fetchCategoriesWithParent, deleteCategory } = useCategories()
 
 const searchQuery = ref('')
 const expandedCategories = ref<Set<number>>(new Set())
@@ -29,23 +29,60 @@ interface UICategory extends Category {
     _isSearchMatched: boolean;
     _hasChildren: boolean;
     _isExpanded: boolean;
+    _path: string;
+}
+
+const categoryMap = computed(() => {
+    const map = new Map<number, Category>()
+    categoriesWithParent.value.forEach((category) => {
+        map.set(category.id, category)
+    })
+    return map
+})
+
+function buildCategoryPath(category: Category): string {
+    const path = [category.name]
+    const visited = new Set<number>([category.id])
+    let parentId = category.parent_id ?? null
+
+    while (parentId) {
+        if (visited.has(parentId)) break
+        const parent = categoryMap.value.get(parentId)
+        if (!parent) break
+
+        path.unshift(parent.name)
+        visited.add(parent.id)
+        parentId = parent.parent_id ?? null
+    }
+
+    return path.join(' / ')
 }
 
 // Compute filtered categories (flattened for search but still preserving parent-child context if possible)
 const processedCategories = computed(() => {
     let list = categoriesWithParent.value;
+    const queryText = searchQuery.value.trim()
     
     // Apply search filter if it exists
-    if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase()
+    if (queryText) {
+        const query = queryText.toLowerCase()
         const matched = list.filter(c => 
             c.name.toLowerCase().includes(query) ||
             c.description?.toLowerCase().includes(query) ||
-            c.parent?.name.toLowerCase().includes(query)
+            c.parent?.name.toLowerCase().includes(query) ||
+            buildCategoryPath(c).toLowerCase().includes(query) ||
+            (c.default_attributes || []).some(attr => attr.name.toLowerCase().includes(query))
         )
         // For search, we show a flat list of all matches
         return {
-            items: matched.map(c => ({...c, _isSearchMatched: true, _indent: 0, _hasChildren: false, _isExpanded: false} as UICategory)),
+            items: matched.map(c => ({
+                ...c,
+                _isSearchMatched: true,
+                _indent: 0,
+                _hasChildren: false,
+                _isExpanded: false,
+                _path: buildCategoryPath(c),
+            } as UICategory)),
             totalPages: 1 // Search doesn't paginate for now, or paginates flat
         }
     }
@@ -81,7 +118,8 @@ const processedCategories = computed(() => {
             _indent: depth, 
             _isSearchMatched: false,
             _hasChildren: hasChildren,
-            _isExpanded: isExpanded
+            _isExpanded: isExpanded,
+            _path: buildCategoryPath(cat),
         } as UICategory)
         
         // Only append children to the list if this node is expanded attached
@@ -112,13 +150,6 @@ function prevPage() {
 
 async function loadCategories() {
     categoriesWithParent.value = await fetchCategoriesWithParent()
-}
-
-function getCategoryDisplayName(category: any): string {
-    if (category._isSearchMatched && category.parent) {
-        return `${category.parent.name} → ${category.name}`
-    }
-    return category.name
 }
 
 function toggleExpand(id: number) {
@@ -195,9 +226,9 @@ onMounted(async () => {
                         <thead class="bg-gray-50 dark:bg-background">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-[40%]">Categoría</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-[35%]">Descripción</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-[35%]">Atributos</th>
                                 <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Productos</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Accion</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white dark:bg-card divide-y divide-gray-100 dark:divide-border/50">
@@ -250,21 +281,40 @@ onMounted(async () => {
                                             
                                             <!-- Text -->
                                             <div>
-                                                <p :class="[
-                                                    'text-gray-900 dark:text-white font-medium cursor-pointer',
-                                                    cat._indent === 0 && !searchQuery ? 'text-base font-bold text-gray-900 dark:text-gray-100' : 'text-sm text-gray-700 dark:text-gray-300'
-                                                ]" @click="cat._hasChildren ? toggleExpand(cat.id) : null">
-                                                    {{ getCategoryDisplayName(cat) }}
+                                                <Link
+                                                    :href="`/categories/${cat.id}/edit`"
+                                                    :class="[
+                                                        'font-medium hover:underline',
+                                                        cat._indent === 0 && !searchQuery ? 'text-base font-bold text-gray-900 dark:text-gray-100' : 'text-sm text-gray-700 dark:text-gray-300'
+                                                    ]"
+                                                >
+                                                    {{ cat.name }}
+                                                </Link>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                    {{ cat._path }}
                                                 </p>
-                                                <p v-if="cat.slug" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">{{ cat.slug }}</p>
                                             </div>
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                                    <span class="line-clamp-2" :title="cat.description || ''">
-                                        {{ cat.description || '—' }}
-                                    </span>
+                                <td class="px-6 py-4">
+                                    <div v-if="cat.default_attributes?.length" class="flex flex-wrap gap-1">
+                                        <span
+                                            v-for="(attr, index) in cat.default_attributes.slice(0, 3)"
+                                            :key="`${cat.id}-attr-${index}`"
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                                        >
+                                            {{ attr.name }}
+                                            <span v-if="attr.required">*</span>
+                                        </span>
+                                        <span
+                                            v-if="cat.default_attributes.length > 3"
+                                            class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-muted dark:text-gray-300"
+                                        >
+                                            +{{ cat.default_attributes.length - 3 }}
+                                        </span>
+                                    </div>
+                                    <span v-else class="text-sm text-gray-400 dark:text-gray-500">Sin atributos</span>
                                 </td>
                                 <td class="px-6 py-4 text-center">
                                     <span :class="[
@@ -276,9 +326,6 @@ onMounted(async () => {
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-1">
-                                        <Link :href="`/categories/${cat.id}/edit`" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 dark:hover:text-primary rounded transition" title="Editar Categoría">
-                                            <Pencil :size="16" />
-                                        </Link>
                                         <button @click="handleDelete(cat.id)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition" title="Eliminar Categoría">
                                             <Trash2 :size="16" />
                                         </button>

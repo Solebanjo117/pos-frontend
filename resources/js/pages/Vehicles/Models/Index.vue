@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useVehicleModels } from '@/composables/useVehicleModels'
 import { useVehicleMakes } from '@/composables/useVehicleMakes'
-import { Search, Plus, Pencil, Trash2, Filter } from 'lucide-vue-next'
+import { Search, Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -21,6 +22,18 @@ const selectedMakeId = ref<number | undefined>(undefined)
 const page = ref(1)
 const total = ref(0)
 const perPage = ref(15)
+
+const makeFilterOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todas las Marcas' },
+    ...makes.value.map((make) => ({ value: make.id, label: make.name })),
+])
+
+const makeFilterModel = computed<number | null>({
+    get: () => selectedMakeId.value ?? null,
+    set: (value) => {
+        selectedMakeId.value = value === null ? undefined : Number(value)
+    },
+})
 
 const loadData = async () => {
     const data = await fetchModels({
@@ -96,19 +109,12 @@ onMounted(() => {
                 </div>
 
                 <!-- Make Filter -->
-                <div class="relative w-full md:w-64">
-                    <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                        <Filter class="h-4 w-4" />
-                    </div>
-                    <select
-                        v-model="selectedMakeId"
-                        class="w-full rounded-md border border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                    >
-                        <option :value="undefined">Todas las Marcas</option>
-                        <option v-for="make in makes" :key="make.id" :value="make.id">
-                            {{ make.name }}
-                        </option>
-                    </select>
+                <div class="w-full md:w-64">
+                    <SearchableSelect
+                        v-model="makeFilterModel"
+                        :options="makeFilterOptions"
+                        placeholder="Todas las Marcas"
+                    />
                 </div>
             </div>
 

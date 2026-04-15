@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useCategories } from '@/composables/useCategories'
 import { ArrowLeft, Save } from 'lucide-vue-next'
-import apiClient from '@/services/api/client'
 import type { CreateCategoryData, Category } from '@/types/category'
+import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
 
 const { loading, error, createCategory, fetchCategoriesWithParent } = useCategories()
 
 const parentCategories = ref<Category[]>([])
+
+const parentCategoryOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Ninguna (categoría raíz)' },
+    ...parentCategories.value.map((category) => ({
+        value: category.id,
+        label: category.parent ? `${category.parent.name} → ${category.name}` : category.name,
+    })),
+])
 
 const form = ref<CreateCategoryData & { default_attributes: { name: string; required: boolean }[] }>({
     name: '',
@@ -20,41 +28,10 @@ const form = ref<CreateCategoryData & { default_attributes: { name: string; requ
     priority: 0, // kept for compatibility but hidden
     default_margin_percent: null,
     pricing_formula: null,
+    min_suggested_price: null,
     applies_itbm: false,
     itbm_percent: 7, // default ITBM 7%
 })
-
-// — Real-time formula preview — fixed at $100 for demonstration
-const previewCost = ref(100)
-const previewPrice = ref<number | null>(null)
-const previewLoading = ref(false)
-
-let previewDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
-function schedulePreview() {
-    if (previewDebounceTimer) clearTimeout(previewDebounceTimer)
-    previewDebounceTimer = setTimeout(runPreview, 400)
-}
-
-async function runPreview() {
-    if (!form.value.pricing_formula) { previewPrice.value = null; return }
-    previewLoading.value = true
-    try {
-        const { data } = await apiClient.post('/categories/preview-price', {
-            formula: form.value.pricing_formula,
-            costo: previewCost.value,
-            applies_itbm: form.value.applies_itbm,
-            itbm_percent: form.value.itbm_percent,
-        })
-        previewPrice.value = data.price
-    } catch {
-        previewPrice.value = null
-    } finally {
-        previewLoading.value = false
-    }
-}
-
-watch([() => form.value.pricing_formula, () => form.value.applies_itbm, () => form.value.itbm_percent, previewCost], schedulePreview)
 
 function addAttribute() {
     form.value.default_attributes.push({ name: '', required: false })
@@ -132,15 +109,11 @@ function goBack() {
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Categoría Padre
                     </label>
-                    <select
+                    <SearchableSelect
                         v-model="form.parent_id"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
-                    >
-                        <option :value="null">Ninguna (categoría raíz)</option>
-                        <option v-for="cat in parentCategories" :key="cat.id" :value="cat.id">
-                            {{ cat.parent ? `${cat.parent.name} → ${cat.name}` : cat.name }}
-                        </option>
-                    </select>
+                        :options="parentCategoryOptions"
+                        placeholder="Ninguna (categoría raíz)"
+                    />
                     <p class="mt-1 text-xs text-gray-500">Selecciona una categoría padre si esta es una subcategoría</p>
                 </div>
 
@@ -233,23 +206,24 @@ function goBack() {
                             </p>
                         </div>
 
-                        <!-- Precio Total Calculado -->
-                        <div v-if="form.pricing_formula" class="pt-3 border-t border-gray-200 dark:border-border">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Precio Total:</span>
-                                <div class="text-right">
-                                    <span v-if="previewLoading" class="text-sm text-gray-400 animate-pulse">calculando...</span>
-                                    <template v-else-if="previewPrice !== null">
-                                        <span class="text-xl font-bold text-green-600 dark:text-green-400">
-                                            ${{ previewPrice.toFixed(2) }}
-                                        </span>
-                                        <p v-if="form.applies_itbm" class="text-xs text-gray-500 mt-0.5">
-                                            (incluye {{ form.itbm_percent || 7 }}% ITBM)
-                                        </p>
-                                    </template>
-                                    <span v-else class="text-sm text-red-500">Fórmula inválida</span>
-                                </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Precio Minimo Sugerido
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2 text-sm text-gray-500">$</span>
+                                <input
+                                    v-model.number="form.min_suggested_price"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    class="w-full pl-7 pr-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
+                                    placeholder="0.00"
+                                />
                             </div>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Precio minimo de venta sugerido para productos de esta categoria
+                            </p>
                         </div>
                     </div>
                 </div>

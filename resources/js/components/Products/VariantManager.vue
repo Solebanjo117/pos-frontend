@@ -267,7 +267,7 @@ const openCreateModal = () => {
 
     form.value = {
         brand_id: brands.value[0]?.id ?? 1,
-        sku: '',
+        sku: props.skuBase || '',
         upc: '',
         status: 'active',
         pricing_formula: props.categoryFormula || '',
@@ -525,22 +525,34 @@ onMounted(async () => {
                 <!-- Formulario Modal con .stop para evitar burbujeo al padre Create.vue -->
                 <form @submit.prevent.stop="handleSubmit" class="space-y-4 py-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- SKU Variante - OCULTO (R38: cliente usa SKU del producto padre) -->
-                        <!-- El campo sigue existiendo en form.sku pero no se muestra -->
+                        <!-- SKU Variante -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                SKU Variante
+                            </label>
+                            <input
+                                v-model="form.sku"
+                                type="text"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white font-mono"
+                                placeholder="Ej: ALT-12V-90A-BOSCH"
+                            />
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Si se deja vacío, se usará el SKU base del producto.
+                            </p>
+                        </div>
 
-                        <!-- Brand - NOW FIRST -->
+                        <!-- Brand -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Marca</label>
-                            <div :class="editingVariant ? '' : 'flex gap-1'">
+                            <div class="flex gap-1">
                                 <SearchableSelect
                                     :options="brandOptions"
                                     :model-value="form.brand_id"
                                     @update:model-value="v => form.brand_id = v as number"
                                     placeholder="-- Selecciona marca --"
                                     :loading="loadingBrands"
-                                    :disabled="!!editingVariant"
                                 />
-                                <button v-if="!editingVariant" type="button" @click="openBrandModal"
+                                <button type="button" @click="openBrandModal"
                                     class="flex-shrink-0 rounded-md border border-gray-300 dark:border-border bg-white dark:bg-muted p-2 text-gray-500 hover:text-blue-600 hover:border-blue-400 dark:hover:text-blue-400 transition"
                                     title="Crear nueva marca">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -548,10 +560,7 @@ onMounted(async () => {
                             </div>
                         </div>
 
-                        <!-- Custom SKU / Codigo - OCULTO (R38: no se usa código individual por variante) -->
-                        <!-- El campo form.upc sigue existiendo pero no se muestra en UI -->
-
-                         <!-- Status -->
+                        <!-- Status -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado</label>
                             <select

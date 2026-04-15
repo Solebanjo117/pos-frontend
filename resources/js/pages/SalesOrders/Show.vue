@@ -493,6 +493,7 @@ onMounted(() => {
         quantity: i.quantity,
         unit_price: Number(i.unit_price),
         discount_percent: Number(i.discount_percent || 0),
+        tax_percent: Number(i.tax_percent || 0),
         total: Number(i.total),
         seller_name: i.seller_name || '',
       }))"

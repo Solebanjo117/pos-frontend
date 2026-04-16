@@ -458,23 +458,43 @@ const getVariants = (product: any) => {
 }
 
 const getTechnicalSpecsPreview = (product: any): string => {
-    const variants = getVariants(product);
-    if (!variants.length) return '';
-    
-    // Recopilar todos los atributos únicos de todas las variantes
-    const allAttrNames = new Set<string>();
-    const attributesHtml: string[] = [];
+    const attributeCandidates: any[] = []
 
-    variants.forEach((v: any) => {
-        v.attributes?.forEach((attr: any) => {
-            if (!allAttrNames.has(attr.name)) {
-                allAttrNames.add(attr.name);
-                attributesHtml.push(`${attr.name}: ${attr.value}${attr.unit ? attr.unit : ''}`);
+    if (Array.isArray(product?.key_attributes) && product.key_attributes.length > 0) {
+        attributeCandidates.push(...product.key_attributes)
+    }
+
+    if (Array.isArray(product?.attributes) && product.attributes.length > 0) {
+        attributeCandidates.push(
+            ...product.attributes.filter((attr: any) => attr && (attr.variant_id === null || attr.variant_id === undefined))
+        )
+    }
+
+    if (attributeCandidates.length === 0) {
+        const variants = getVariants(product)
+        variants.forEach((v: any) => {
+            if (Array.isArray(v?.attributes)) {
+                attributeCandidates.push(...v.attributes)
             }
-        });
-    });
+        })
+    }
 
-    return attributesHtml.slice(0, 3).join(' • ') + (attributesHtml.length > 3 ? '...' : '');
+    const seenNames = new Set<string>()
+    const attributesPreview: string[] = []
+
+    attributeCandidates.forEach((attr: any) => {
+        const name = String(attr?.name ?? '').trim()
+        const value = String(attr?.value ?? '').trim()
+        if (!name || !value || seenNames.has(name)) {
+            return
+        }
+
+        seenNames.add(name)
+        const unit = String(attr?.unit ?? '').trim()
+        attributesPreview.push(`${name}: ${value}${unit ? unit : ''}`)
+    })
+
+    return attributesPreview.slice(0, 3).join(' • ') + (attributesPreview.length > 3 ? '...' : '')
 }
 </script>
 

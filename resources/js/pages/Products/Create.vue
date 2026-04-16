@@ -99,7 +99,70 @@ const brands = ref<Brand[]>([])
 const loadingCategories = ref(false)
 const loadingBrands = ref(false)
 
-const variantAttributes = ref<{ name: string; value: string; unit: string; required: boolean }[]>([])
+type DraftProductAttribute = {
+    name: string
+    value: string
+    unit: string
+    required: boolean
+    fromCategory?: boolean
+}
+
+const variantAttributes = ref<DraftProductAttribute[]>([])
+
+const attributeNameKey = (name: string) => name.trim().toLowerCase()
+
+const mergeCategoryDefaultAttributes = (defaults: any[]) => {
+    const existingByName = new Map<string, DraftProductAttribute>()
+    variantAttributes.value.forEach(attr => {
+        const key = attributeNameKey(attr.name)
+        if (key) existingByName.set(key, attr)
+    })
+
+    const normalizedDefaults = defaults
+        .map((attr: any) => {
+            const name = String(attr?.name ?? '').trim()
+            if (!name) return null
+
+            const key = attributeNameKey(name)
+            const existing = existingByName.get(key)
+
+            return {
+                name,
+                value: existing?.value ?? '',
+                unit: String(attr?.unit ?? existing?.unit ?? '').trim(),
+                required: Boolean(attr?.required),
+                fromCategory: true,
+            } as DraftProductAttribute
+        })
+        .filter(Boolean) as DraftProductAttribute[]
+
+    const defaultKeys = new Set(normalizedDefaults.map(attr => attributeNameKey(attr.name)))
+    const customAttributes = variantAttributes.value
+        .filter(attr => !defaultKeys.has(attributeNameKey(attr.name)))
+        .map(attr => ({ ...attr, fromCategory: false }))
+
+    variantAttributes.value = [...normalizedDefaults, ...customAttributes]
+}
+
+const keepOnlyCustomAttributes = () => {
+    variantAttributes.value = variantAttributes.value
+        .filter(attr => !attr.fromCategory)
+        .map(attr => ({ ...attr, fromCategory: false }))
+}
+
+const addCustomAttribute = () => {
+    variantAttributes.value.push({
+        name: '',
+        value: '',
+        unit: '',
+        required: false,
+        fromCategory: false,
+    })
+}
+
+const removeVariantAttribute = (index: number) => {
+    variantAttributes.value.splice(index, 1)
+}
 
 // Category pricing — formula takes priority over margin (LL-013 compatibility)
 const categoryFormula = ref<string | null>(null)
@@ -447,7 +510,7 @@ watch(
     () => (form.value as any).category_id,
     async (newCategoryId: number | undefined) => {
         if (!newCategoryId) {
-            variantAttributes.value = []
+            keepOnlyCustomAttributes()
             categoryFormula.value = null
             categoryAppliesItbm.value = false
             categoryItbmPercent.value = null
@@ -458,17 +521,17 @@ watch(
             const resp = await apiClient.get(`/categories/${newCategoryId}`)
             const cat = resp.data
             if (cat.default_attributes && Array.isArray(cat.default_attributes)) {
-                variantAttributes.value = cat.default_attributes.map((attr: any) => ({
-                    name: attr.name, value: '', unit: attr.unit || '', required: attr.required || false,
-                }))
-            } else { variantAttributes.value = [] }
+                mergeCategoryDefaultAttributes(cat.default_attributes)
+            } else {
+                keepOnlyCustomAttributes()
+            }
             // R23: capture formula and ITBM flag + percent (LL-013 fallback: margin)
             categoryFormula.value = cat.pricing_formula ?? null
             categoryAppliesItbm.value = cat.applies_itbm ?? false
             categoryItbmPercent.value = cat.itbm_percent ?? 7
             categoryMargin.value = cat.default_margin_percent ?? null
         } catch {
-            variantAttributes.value = []
+            keepOnlyCustomAttributes()
             categoryFormula.value = null
             categoryAppliesItbm.value = false
             categoryItbmPercent.value = null
@@ -867,8 +930,12 @@ const handleSubmit = async () => {
             ...form.value,
             sku: form.value.sku || form.value.sku_base || '',
             attributes: variantAttributes.value
-                .filter(a => a.value.trim())
-                .map(a => ({ name: a.name, value: a.value, unit: a.unit })),
+                .map(a => ({
+                    name: a.name.trim(),
+                    value: a.value.trim(),
+                    unit: (a.unit ?? '').trim(),
+                }))
+                .filter(a => a.name && a.value),
             vehicle_compatibility: addedEngines.value.map(e => e.engine_id),
             vehicle_chassis: addedChassis.value.map(c => c.chassis_id),
             all_engines: allEnginesFlag.value,
@@ -1322,21 +1389,68 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
 
             <!-- ══ SECTION 5: Atributos ══ -->
             <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-indigo-500">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1">
-                    <Wrench class="w-4 h-4" /> Atributos
-                </h2>
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                        <Wrench class="w-4 h-4" /> Atributos
+                    </h2>
+                    <button
+                        type="button"
+                        @click="addCustomAttribute"
+                        class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                    >
+                        <Plus class="h-3.5 w-3.5" /> Agregar atributo
+                    </button>
+                </div>
                 <div v-if="variantAttributes.length === 0" class="rounded-md border border-dashed border-gray-300 dark:border-border px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                    Selecciona una categoría con atributos por defecto para completar esta sección.
+                    Puedes agregar atributos manualmente o seleccionar una categoría con atributos por defecto.
                 </div>
                 <div v-else class="space-y-3">
-                    <div v-for="(attr, index) in variantAttributes" :key="index">
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                            {{ attr.name }} <span v-if="attr.unit" class="text-gray-400">({{ attr.unit }})</span>
-                            <span v-if="attr.required" class="text-red-500">*</span>
-                        </label>
-                        <input v-model="attr.value" type="text" :required="attr.required"
-                            class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            :placeholder="`${attr.name}...`" />
+                    <div v-for="(attr, index) in variantAttributes" :key="index" class="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end">
+                        <div class="sm:col-span-4">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                Nombre del atributo
+                                <span v-if="attr.required" class="text-red-500">*</span>
+                            </label>
+                            <input
+                                v-model="attr.name"
+                                type="text"
+                                :required="attr.required"
+                                class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                placeholder="Ej: Amperaje"
+                            />
+                        </div>
+                        <div class="sm:col-span-5">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                Valor
+                                <span v-if="attr.required" class="text-red-500">*</span>
+                            </label>
+                            <input
+                                v-model="attr.value"
+                                type="text"
+                                :required="attr.required"
+                                class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                :placeholder="attr.name ? `${attr.name}...` : 'Valor'"
+                            />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">Unidad</label>
+                            <input
+                                v-model="attr.unit"
+                                type="text"
+                                class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                placeholder="Ej: A"
+                            />
+                        </div>
+                        <div class="sm:col-span-1">
+                            <button
+                                type="button"
+                                @click="removeVariantAttribute(index)"
+                                class="w-full rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                title="Quitar atributo"
+                            >
+                                <X class="mx-auto h-3.5 w-3.5" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

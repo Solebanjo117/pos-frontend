@@ -267,6 +267,11 @@ export interface UpdateProductRequest {
         tax_type?: 'standard' | 'exempt' | 'custom'
         max_discount_percentage?: number
     }
+    attributes?: Array<{
+        name: string
+        value: number | string
+        unit?: string
+    }>
 }
 
 export interface ProductFilters {

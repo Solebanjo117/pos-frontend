@@ -200,7 +200,7 @@ const getVariantCostAmount = (variant: any): number | null => {
 const getVariantSaleAmount = (variant: any): number | null => {
     if (!variant?.pricing) return null
 
-    const basePrice = toSafeNumber(variant.pricing.calculated_price ?? variant.pricing.base_price)
+    const basePrice = toSafeNumber(variant.pricing.base_price)
     if (!showPriceWithItbm.value) return basePrice
 
     return withItbm(basePrice, toSafeTaxRate(variant.pricing.tax_rate))

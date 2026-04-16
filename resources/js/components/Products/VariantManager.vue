@@ -13,8 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
-import AttributeManager from '@/components/Products/AttributeManager.vue'
-import { Wrench, CircleDollarSign, Package } from 'lucide-vue-next'
+import { CircleDollarSign, Package } from 'lucide-vue-next'
 
 
 const props = defineProps<{
@@ -26,7 +25,6 @@ const props = defineProps<{
     categoryItbmPercent?: number | null
     skuBase?: string
     productName?: string
-    defaultVariantAttributes?: { name: string; value: string; unit: string }[]
 }>()
 
 const emit = defineEmits<{
@@ -52,11 +50,7 @@ const showModal = ref(false)
 const editingVariant = ref<any>(null)
 const processing = ref(false)
 
-// Attributes for the variant being created/edited
-const variantAttributes = ref<{ name: string; value: string; unit: string; required?: boolean }[]>([])
-const newAttrName = ref('')
-const newAttrValue = ref('')
-const newAttrUnit = ref('')
+const modalInitialSnapshot = ref('')
 
 // Form Data
 const form = ref({
@@ -83,6 +77,69 @@ const form = ref({
     ]
 })
 
+const toSafeNumber = (value: any, fallback = 0): number => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const buildModalStateSnapshot = (): string => {
+    return JSON.stringify({
+        form: {
+            brand_id: form.value.brand_id ?? null,
+            sku: form.value.sku ?? '',
+            upc: form.value.upc ?? '',
+            status: form.value.status ?? 'active',
+            pricing_formula: form.value.pricing_formula ?? '',
+            pricing: {
+                base_price: toSafeNumber(form.value.pricing.base_price),
+                msrp: toSafeNumber(form.value.pricing.msrp),
+                cost: toSafeNumber(form.value.pricing.cost),
+                tax_rate: toSafeNumber(form.value.pricing.tax_rate),
+                tax_type: form.value.pricing.tax_type ?? 'custom',
+            },
+            initial_inventory: (form.value.initial_inventory ?? []).map((row: any) => ({
+                warehouse_id: row.warehouse_id ?? null,
+                stock_available: toSafeNumber(row.stock_available),
+                reorder_point: toSafeNumber(row.reorder_point),
+                reorder_quantity: toSafeNumber(row.reorder_quantity),
+            })),
+        },
+    })
+}
+
+const captureModalInitialState = () => {
+    modalInitialSnapshot.value = buildModalStateSnapshot()
+}
+
+const hasUnsavedModalChanges = (): boolean => {
+    if (!showModal.value) return false
+    return buildModalStateSnapshot() !== modalInitialSnapshot.value
+}
+
+const requestCloseModal = (force = false) => {
+    if (!showModal.value) return
+
+    if (!force && hasUnsavedModalChanges()) {
+        const shouldClose = confirm('Tienes cambios sin guardar en la variante. ¿Quieres salir sin guardar?')
+        if (!shouldClose) return
+    }
+
+    showModal.value = false
+    modalInitialSnapshot.value = ''
+}
+
+const handleVariantModalOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+        showModal.value = true
+        if (!modalInitialSnapshot.value) {
+            captureModalInitialState()
+        }
+        return
+    }
+
+    requestCloseModal()
+}
+
 const brands = ref<{ id: number; name: string }[]>([])
 const loadingBrands = ref(false)
 
@@ -106,29 +163,58 @@ const fetchWarehouses = async () => {
     } catch { warehouses.value = [] }
 }
 
-// Category default attributes
-const categoryDefaults = ref<{ name: string; unit: string; required: boolean }[]>([])
-const loadingCategoryDefaults = ref(false)
-
-const fetchCategoryDefaults = async (categoryId: number | undefined) => {
-    if (!categoryId) { categoryDefaults.value = []; return }
-    loadingCategoryDefaults.value = true
-    try {
-        const resp = await apiClient.get(`/categories/${categoryId}`)
-        const cat = resp.data
-        if (cat.default_attributes && Array.isArray(cat.default_attributes)) {
-            categoryDefaults.value = cat.default_attributes.map((attr: any) => ({
-                name: attr.name,
-                unit: attr.unit || '',
-                required: attr.required || false,
-            }))
-        } else { categoryDefaults.value = [] }
-    } catch { categoryDefaults.value = [] }
-    finally { loadingCategoryDefaults.value = false }
-}
-
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+
+const showCostWithItbm = ref(localStorage.getItem('variants_show_cost_with_itbm') === 'true')
+const showPriceWithItbm = ref(localStorage.getItem('variants_show_price_with_itbm') === 'true')
+
+const toggleCostItbmView = () => {
+    showCostWithItbm.value = !showCostWithItbm.value
+    localStorage.setItem('variants_show_cost_with_itbm', String(showCostWithItbm.value))
+}
+
+const togglePriceItbmView = () => {
+    showPriceWithItbm.value = !showPriceWithItbm.value
+    localStorage.setItem('variants_show_price_with_itbm', String(showPriceWithItbm.value))
+}
+
+const toSafeTaxRate = (value: any): number => {
+    const parsed = toSafeNumber(value, 0)
+    return Math.max(0, Math.min(100, parsed))
+}
+
+const withItbm = (amount: number, taxRate: number): number => {
+    return Number((amount * (1 + taxRate / 100)).toFixed(2))
+}
+
+const getVariantCostAmount = (variant: any): number | null => {
+    if (!variant?.pricing) return null
+
+    const cost = toSafeNumber(variant.pricing.cost)
+    if (!showCostWithItbm.value) return cost
+
+    return withItbm(cost, toSafeTaxRate(variant.pricing.tax_rate))
+}
+
+const getVariantSaleAmount = (variant: any): number | null => {
+    if (!variant?.pricing) return null
+
+    const basePrice = toSafeNumber(variant.pricing.calculated_price ?? variant.pricing.base_price)
+    if (!showPriceWithItbm.value) return basePrice
+
+    return withItbm(basePrice, toSafeTaxRate(variant.pricing.tax_rate))
+}
+
+const formatVariantCost = (variant: any): string => {
+    const amount = getVariantCostAmount(variant)
+    return amount === null ? '—' : formatCurrency(amount)
+}
+
+const formatVariantPrice = (variant: any): string => {
+    const amount = getVariantSaleAmount(variant)
+    return amount === null ? '—' : formatCurrency(amount)
+}
 
 // === Precio Final: PricingFormula es la única fuente de verdad ===
 // Al recibir un nuevo precio calculado (sea fórmula o numero directo),
@@ -219,51 +305,8 @@ const loadVariants = async () => {
 // In draft mode, variants displayed are draftVariants; in normal mode, fetched from API
 const displayVariants = computed(() => isDraftMode.value ? draftVariants.value : variants.value)
 
-const addAttribute = () => {
-    if (!newAttrName.value.trim() || !newAttrValue.value.trim()) return
-    variantAttributes.value.push({
-        name: newAttrName.value.trim(),
-        value: newAttrValue.value.trim(),
-        unit: newAttrUnit.value.trim(),
-    })
-    newAttrName.value = ''; newAttrValue.value = ''; newAttrUnit.value = ''
-}
-
-const removeAttribute = (idx: number) => variantAttributes.value.splice(idx, 1)
-
 const openCreateModal = () => {
     editingVariant.value = null
-
-    // Inherit attributes from the LAST variant that has attributes (most recently created = most relevant template)
-    // Use JSON.parse/stringify to safely deep-clone and unwrap Vue proxies (structuredClone fails on some Proxies)
-    const lastWithAttrs = [...displayVariants.value].reverse().find((v: any) => v.attributes && v.attributes.length > 0)
-    if (lastWithAttrs) {
-        const rawAttributes = JSON.parse(JSON.stringify(lastWithAttrs.attributes));
-        variantAttributes.value = rawAttributes.map((a: any) => ({
-            name: a.name,
-            value: a.value,
-            unit: a.unit || '',
-            required: false,
-        }))
-    } else if (props.defaultVariantAttributes && props.defaultVariantAttributes.length > 0) {
-        // Fallback: inherit from the default variant's attributes (passed from parent form)
-        variantAttributes.value = props.defaultVariantAttributes
-            .filter(a => a.name && a.name.trim())
-            .map(a => ({
-                name: a.name,
-                value: a.value || '',
-                unit: a.unit || '',
-                required: false,
-            }))
-    } else {
-        // Last fallback: pre-populate from category defaults
-        variantAttributes.value = categoryDefaults.value.map(d => ({
-            name: d.name,
-            value: '',
-            unit: d.unit,
-            required: d.required,
-        }))
-    }
 
     form.value = {
         brand_id: brands.value[0]?.id ?? 1,
@@ -290,21 +333,11 @@ const openCreateModal = () => {
     }
     priceManuallyEdited.value = false
     showModal.value = true
+    captureModalInitialState()
 }
 
 const openEditModal = (variant: any) => {
     editingVariant.value = variant
-    // Load existing attributes + merge category defaults as guides for missing ones
-    const existingAttrs = (variant.attributes || []).map((a: any) => ({
-        name: a.name,
-        value: a.value,
-        unit: a.unit || '',
-    }))
-    const existingNames = new Set(existingAttrs.map((a: any) => a.name.toLowerCase()))
-    const missingDefaults = categoryDefaults.value
-        .filter(d => !existingNames.has(d.name.toLowerCase()))
-        .map(d => ({ name: d.name, value: '', unit: d.unit, required: d.required }))
-    variantAttributes.value = [...existingAttrs, ...missingDefaults]
 
     const p = variant.pricing
     form.value = {
@@ -327,6 +360,7 @@ const openEditModal = (variant: any) => {
     // base_price ya se carga directo en form.pricing.base_price desde el backend
 
     showModal.value = true
+    captureModalInitialState()
 }
 
 const handleSubmit = async () => {
@@ -337,21 +371,10 @@ const handleSubmit = async () => {
             pricing_formula: form.value.pricing_formula || null,
         }
 
-        const validAttributes = variantAttributes.value.filter(
-            (a) => a.name.trim() && a.value.trim(),
-        )
-
         const payload = {
             ...form.value,
             pricing: pricingPayload,
             sku: form.value.sku || '',
-            // For UPDATE: only include attributes when there is at least one valid entry
-            // so that saving without touching attributes does NOT send attributes:[]
-            // which would silently delete all existing attribute records on the backend.
-            // For CREATE: always include (backend guards assignVariantAttributes with !empty()).
-            ...(editingVariant.value
-                ? validAttributes.length > 0 ? { attributes: validAttributes } : {}
-                : { attributes: validAttributes }),
         }
 
         if (isDraftMode.value) {
@@ -367,7 +390,7 @@ const handleSubmit = async () => {
                 draftVariants.value.push({ ...payload, _draftId: Date.now(), brand })
             }
             emit('draft-variants-changed', draftVariants.value)
-            showModal.value = false
+            requestCloseModal(true)
         } else {
             if (editingVariant.value) {
                 await updateVariant(props.productId!, editingVariant.value.id, payload)
@@ -375,7 +398,7 @@ const handleSubmit = async () => {
                 await createVariant(props.productId!, payload)
             }
             await loadVariants()
-            showModal.value = false
+            requestCloseModal(true)
         }
     } catch (e) {
         console.error(e)
@@ -433,7 +456,6 @@ onMounted(async () => {
         loadVariants(),
         fetchBrands(),
         fetchWarehouses(),
-        fetchCategoryDefaults(props.categoryId),
         fetchSettings(),
     ])
 })
@@ -441,11 +463,59 @@ onMounted(async () => {
 
 <template>
     <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-        <div class="mb-6 flex items-center justify-between">
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Variantes (Marcas)</h2>
-            <Button type="button" @click="openCreateModal">
-                Agregar Variante
-            </Button>
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-border bg-white dark:bg-muted/40 px-2.5 py-1.5">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Costo</span>
+                    <button
+                        type="button"
+                        @click="toggleCostItbmView"
+                        :class="[
+                            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2',
+                            showCostWithItbm ? 'bg-emerald-500 focus:ring-emerald-400' : 'bg-gray-300 dark:bg-gray-600 focus:ring-gray-400'
+                        ]"
+                        :title="showCostWithItbm ? 'Mostrando costo con ITBM' : 'Mostrando costo base sin ITBM'"
+                    >
+                        <span
+                            :class="[
+                                'inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-200',
+                                showCostWithItbm ? 'translate-x-5' : 'translate-x-0.5'
+                            ]"
+                        />
+                    </button>
+                    <span class="text-[10px] font-medium" :class="showCostWithItbm ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'">
+                        {{ showCostWithItbm ? '+ITBM' : 'Base' }}
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-border bg-white dark:bg-muted/40 px-2.5 py-1.5">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Precio</span>
+                    <button
+                        type="button"
+                        @click="togglePriceItbmView"
+                        :class="[
+                            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2',
+                            showPriceWithItbm ? 'bg-emerald-500 focus:ring-emerald-400' : 'bg-gray-300 dark:bg-gray-600 focus:ring-gray-400'
+                        ]"
+                        :title="showPriceWithItbm ? 'Mostrando precio con ITBM' : 'Mostrando precio base sin ITBM'"
+                    >
+                        <span
+                            :class="[
+                                'inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-200',
+                                showPriceWithItbm ? 'translate-x-5' : 'translate-x-0.5'
+                            ]"
+                        />
+                    </button>
+                    <span class="text-[10px] font-medium" :class="showPriceWithItbm ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'">
+                        {{ showPriceWithItbm ? '+ITBM' : 'Base' }}
+                    </span>
+                </div>
+
+                <Button type="button" @click="openCreateModal">
+                    Agregar Variante
+                </Button>
+            </div>
         </div>
 
         <div v-if="loading && !displayVariants.length" class="flex justify-center py-8">
@@ -462,10 +532,9 @@ onMounted(async () => {
                     <tr>
                         <!-- SKU oculto (R38: cliente usa SKU del producto padre) -->
                         <th class="px-6 py-3">Nombre</th>
-                        <th class="px-6 py-3">Atributos</th>
                         <th class="px-6 py-3">Marca</th>
-                        <th class="px-6 py-3">Costo</th>
-                        <th class="px-6 py-3">Precio</th>
+                        <th class="px-6 py-3">{{ showCostWithItbm ? 'Costo + ITBM' : 'Costo Base' }}</th>
+                        <th class="px-6 py-3">{{ showPriceWithItbm ? 'Precio + ITBM' : 'Precio Base' }}</th>
                         <th class="px-6 py-3">Stock Total</th>
                         <th class="px-6 py-3 text-right">Acciones</th>
                     </tr>
@@ -476,24 +545,21 @@ onMounted(async () => {
                         <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
                             {{ productName || 'Producto Base' }}
                         </td>
-                        <td class="px-6 py-4">
-                            <div v-if="variant.attributes?.length" class="flex flex-wrap gap-1">
-                                <span v-for="attr in variant.attributes" :key="attr.id"
-                                    class="inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 text-xs text-indigo-700 dark:text-indigo-300">
-                                    {{ attr.name }}: {{ attr.value }}{{ attr.unit ? ` ${attr.unit}` : '' }}
-                                </span>
-                            </div>
-                            <span v-else class="text-gray-400 text-xs">—</span>
-                        </td>
                         <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
                             {{ variant.brand?.name }}
                             <span v-if="isDraftMode" class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">Pendiente</span>
                         </td>
                         <td class="px-6 py-4 text-gray-600 dark:text-gray-400">
-                            {{ variant.pricing ? formatCurrency(variant.pricing.cost) : '—' }}
+                            {{ formatVariantCost(variant) }}
+                            <div v-if="showCostWithItbm && variant.pricing" class="text-[10px] text-gray-400 mt-0.5">
+                                ITBM {{ toSafeTaxRate(variant.pricing.tax_rate).toFixed(2) }}%
+                            </div>
                         </td>
                         <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                            {{ variant.pricing ? formatCurrency(variant.pricing.base_price) : '—' }}
+                            {{ formatVariantPrice(variant) }}
+                            <div v-if="showPriceWithItbm && variant.pricing" class="text-[10px] text-gray-400 mt-0.5 font-normal">
+                                ITBM {{ toSafeTaxRate(variant.pricing.tax_rate).toFixed(2) }}%
+                            </div>
                         </td>
                         <td class="px-6 py-4">
                             {{ variant.inventory?.reduce((sum: number, i: any) => sum + i.quantity_available, 0) || 0 }}
@@ -514,12 +580,12 @@ onMounted(async () => {
         </div>
 
         <!-- Create/Edit Modal -->
-        <Dialog :open="showModal" @update:open="showModal = $event">
+        <Dialog :open="showModal" @update:open="handleVariantModalOpenChange">
             <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{{ editingVariant ? 'Editar Variante' : 'Nueva Variante' }}</DialogTitle>
                     <DialogDescription>
-                        Marca, atributos técnicos y precios de esta variante.
+                        Marca, precios e inventario de esta variante.
                     </DialogDescription>
                 </DialogHeader>
                 <!-- Formulario Modal con .stop para evitar burbujeo al padre Create.vue -->
@@ -572,71 +638,6 @@ onMounted(async () => {
                                 <option value="pending">Pendiente</option>
                             </select>
                         </div>
-                    </div>
-
-                    <!-- ═══ Attributes Section ═══ -->
-                    <div class="border-t border-gray-200 dark:border-border pt-4">
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-                            <Wrench class="w-4 h-4 text-gray-500" /> Especificaciones Técnicas
-                            <span v-if="loadingCategoryDefaults" class="text-xs text-gray-400 animate-pulse">cargando guías...</span>
-                        </h4>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                            {{ categoryDefaults.length > 0
-                                ? 'Los campos marcados con * son sugeridos por la categoría. Completa los valores.'
-                                : 'Atributos propios de esta marca/variante (ej: Amperaje, Voltaje, Diámetro)' }}
-                        </p>
-
-                        <!-- Category-guided attribute fields (pre-filled from defaults) -->
-                        <div v-if="variantAttributes.length > 0" class="space-y-2 mb-3">
-                            <div v-for="(attr, idx) in variantAttributes" :key="idx"
-                                class="grid grid-cols-12 gap-2 items-center">
-                                <div class="col-span-4">
-                                    <input v-model="attr.name" type="text" placeholder="Nombre"
-                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
-                                        :class="attr.required ? 'border-amber-300 dark:border-amber-600' : ''" />
-                                </div>
-                                <div class="col-span-4">
-                                    <input v-model="attr.value" type="text" :placeholder="attr.required ? 'Requerido *' : 'Valor'"
-                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
-                                        :class="attr.required && !attr.value ? 'border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/10' : ''" />
-                                </div>
-                                <div class="col-span-2">
-                                    <input v-model="attr.unit" type="text" placeholder="Unidad"
-                                        class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white" />
-                                </div>
-                                <div class="col-span-2 flex justify-end">
-                                    <button type="button" @click="removeAttribute(idx)"
-                                        class="rounded-md bg-red-50 dark:bg-red-900/20 text-red-500 hover:text-red-700 px-2 py-1.5 text-xs transition">✕</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Add custom attribute row -->
-                        <div class="grid grid-cols-12 gap-2">
-                            <div class="col-span-4">
-                                <input v-model="newAttrName" type="text" placeholder="Nombre (ej: Amperaje)"
-                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
-                                    @keyup.enter="addAttribute" />
-                            </div>
-                            <div class="col-span-4">
-                                <input v-model="newAttrValue" type="text" placeholder="Valor (ej: 90)"
-                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
-                                    @keyup.enter="addAttribute" />
-                            </div>
-                            <div class="col-span-2">
-                                <input v-model="newAttrUnit" type="text" placeholder="Unidad"
-                                    class="w-full rounded-md border-gray-300 text-sm px-3 py-1.5 dark:bg-muted dark:border-border dark:text-white"
-                                    @keyup.enter="addAttribute" />
-                            </div>
-                            <div class="col-span-2">
-                                <button type="button" @click="addAttribute" :disabled="!newAttrName.trim() || !newAttrValue.trim()"
-                                    class="w-full rounded-md bg-indigo-600 dark:bg-primary dark:text-primary-foreground px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 dark:hover:bg-primary/90 disabled:opacity-40 transition">
-                                    + Agregar
-                                </button>
-                            </div>
-                        </div>
-
-                        <p v-if="variantAttributes.length === 0" class="text-xs text-gray-400 italic mt-2">Sin atributos. Agrega especificaciones si aplica.</p>
                     </div>
 
                     <!-- ═══ Pricing Section ═══ -->
@@ -717,26 +718,11 @@ onMounted(async () => {
                     <!-- Error display -->
                     <div v-if="error" class="text-red-500 text-sm mt-2">{{ error }}</div>
 
-                    <!-- ═══ Especificaciones Técnicas de Variante (solo al editar variante guardada) ═══ -->
-                    <div v-if="editingVariant?.id && productId" class="border-t border-gray-200 dark:border-border pt-6 mt-6">
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Wrench class="w-4 h-4 text-indigo-600" />
-                            Especificaciones Técnicas de esta Variante
-                        </h4>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                            Define especificaciones propias de esta variante (voltaje, amperaje, etc.). Estas sobreescriben las del producto base al mostrar el detalle.
-                        </p>
-                        <AttributeManager
-                            :product-id="productId"
-                            :variant-id="editingVariant.id"
-                        />
-                    </div>
-
                     <div class="mt-6 flex justify-end space-x-3">
                         <Button
                             type="button"
                             variant="outline"
-                            @click="showModal = false"
+                            @click="requestCloseModal()"
                         >
                             Cancelar
                         </Button>

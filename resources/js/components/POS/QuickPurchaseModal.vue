@@ -124,7 +124,7 @@ const handleAddToSupplyList = async () => {
   try {
     isSubmitting.value = true
     
-    await supplyListService.addItem({
+    const result = await supplyListService.addItem({
       product_id: props.product.id,
       variant_id: selectedVariantId.value || null,
       supplier_id: selectedSupplierId.value || null,
@@ -132,11 +132,11 @@ const handleAddToSupplyList = async () => {
       notes: 'Agregado desde POS'
     })
 
-    toast.success('Producto agregado a la Lista de Abastecimiento')
+    toast.success('Producto agregado a la Lista de Abastecimiento y stock actualizado')
     emit('success', { 
         productId: props.product.id,
         variantId: selectedVariantId.value,
-        quantityAdded: quantity.value,
+      quantityAdded: result.stock_added,
         addedToSupplyList: true
     })
     

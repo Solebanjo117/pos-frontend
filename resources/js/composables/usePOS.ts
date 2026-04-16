@@ -43,6 +43,8 @@ interface AddCustomLinePayload {
     notes?: string
 }
 
+type StockValidationContext = 'sale' | 'quote'
+
 // ============================================
 // MULTI-CART SESSION TYPES
 // ============================================
@@ -245,6 +247,45 @@ export function usePOS() {
         item.total = item.subtotal + item.tax_amount
     }
 
+    const getAvailableStock = (item: CartItem): number | null => {
+        if (item.is_custom_line) return null
+        const rawStock = Number(item.available_stock)
+        if (!Number.isFinite(rawStock)) return null
+        return Math.max(0, Math.floor(rawStock))
+    }
+
+    const formatStockIssue = (item: CartItem, available: number, requested: number): string => {
+        const sku = item.product_sku ? ` (${item.product_sku})` : ''
+        if (available <= 0) {
+            return `${item.product_name}${sku}: sin stock disponible.`
+        }
+        return `${item.product_name}${sku}: disponible ${available}, solicitado ${requested}.`
+    }
+
+    const validateCartStock = (context: StockValidationContext = 'sale'): boolean => {
+        const issues: string[] = []
+
+        for (const item of cart.value) {
+            if (item.is_custom_line) continue
+
+            const available = getAvailableStock(item)
+            if (available === null) continue
+
+            const requested = Number(item.quantity) || 0
+            if (available <= 0 || requested > available) {
+                issues.push(formatStockIssue(item, available, requested))
+            }
+        }
+
+        if (issues.length > 0) {
+            const actionLabel = context === 'quote' ? 'cotizar' : 'cobrar'
+            error.value = `Stock insuficiente. Ajusta cantidades antes de ${actionLabel}:\n- ${issues.join('\n- ')}`
+            return false
+        }
+
+        return true
+    }
+
     // Add product to cart (always requires an explicit variant)
     const addToCart = (product: Product, variant: any, quantity: number = 1, warehouse_id?: number) => {
         // Auto-assign default warehouse if in single warehouse mode
@@ -252,11 +293,26 @@ export function usePOS() {
             warehouse_id = getDefaultWarehouseId() ?? undefined
         }
 
+        const availableStockRaw = variant?.total_stock ?? product.total_stock
+        const parsedAvailableStock = Number(availableStockRaw)
+        const availableStock = Number.isFinite(parsedAvailableStock)
+            ? Math.max(0, Math.floor(parsedAvailableStock))
+            : undefined
+
         const existingItem = cart.value.find(
             item => item.product_id === product.id && item.variant_id === variant?.id && item.warehouse_id === warehouse_id
         )
 
         if (existingItem) {
+            if (typeof availableStock === 'number') {
+                existingItem.available_stock = availableStock
+                const targetQty = existingItem.quantity + quantity
+                if (availableStock <= 0 || targetQty > availableStock) {
+                    error.value = formatStockIssue(existingItem, availableStock, targetQty)
+                    return false
+                }
+            }
+
             existingItem.quantity += quantity
             recalculateItem(existingItem)
         } else {
@@ -276,7 +332,7 @@ export function usePOS() {
                 product_sku: variant?.sku || (product as any).sku_base || '',
                 product_price: resolvedPrice,
                 quantity,
-                available_stock: variant?.total_stock ?? product.total_stock ?? undefined,
+                available_stock: availableStock,
                 discount_percent: 0,
                 tax_percent: resolvedTaxRate,
                 default_tax_percent: resolvedTaxRate,
@@ -288,10 +344,20 @@ export function usePOS() {
                 tax_amount: 0,
                 total: 0,
             }
+
+            const newItemStock = getAvailableStock(newItem)
+            if (newItemStock !== null && (newItemStock <= 0 || quantity > newItemStock)) {
+                error.value = formatStockIssue(newItem, newItemStock, quantity)
+                return false
+            }
+
             recalculateItem(newItem)
             cart.value.push(newItem)
         }
+
+        error.value = null
         logAction('cart_add', { product_id: product.id, variant_id: variant?.id, quantity, name: product.name })
+        return true
     }
 
     // Add a custom/misc line (no product inventory movement)
@@ -345,11 +411,21 @@ export function usePOS() {
     const updateQuantity = (itemId: string, quantity: number) => {
         const item = cart.value.find(i => i.id === itemId)
         if (item && quantity > 0) {
+            const available = getAvailableStock(item)
+            if (available !== null && (available <= 0 || quantity > available)) {
+                error.value = formatStockIssue(item, available, quantity)
+                return false
+            }
+
             const oldQty = item.quantity
             item.quantity = quantity
             recalculateItem(item)
+            error.value = null
             logAction('qty_change', { product_id: item.product_id, old_qty: oldQty, new_qty: quantity })
+            return true
         }
+
+        return false
     }
 
     // Update item discount
@@ -546,6 +622,10 @@ export function usePOS() {
             return false
         }
 
+        if (!validateCartStock('sale')) {
+            return false
+        }
+
         // Validate payments vs total
         if (!paymentsArray || paymentsArray.length === 0) {
             // Legacy check
@@ -665,6 +745,10 @@ export function usePOS() {
     const saveDraft = async () => {
         if (cart.value.length === 0) {
             error.value = 'El carrito está vacío'
+            return false
+        }
+
+        if (!validateCartStock('sale')) {
             return false
         }
 
@@ -821,6 +905,7 @@ export function usePOS() {
         updateItemNotes,
         reorderCart,
         clearCart,
+        validateCartStock,
         processSale,
         saveDraft,
         loadQuoteAsSession,

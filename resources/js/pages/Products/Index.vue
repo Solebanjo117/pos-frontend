@@ -70,6 +70,7 @@ const {
     currentPage,
     lastPage,
     total,
+    perPage,
     fetchProducts,
     deleteProduct,
     restoreProduct,
@@ -204,6 +205,7 @@ const filters = ref<ProductFilters>({
     search: '',
     status: undefined,
     brand_id: undefined,
+    oem_code: undefined,
     warehouse_id: currentWarehouseId.value || undefined,
     has_stock: false,
 })
@@ -211,25 +213,33 @@ const filters = ref<ProductFilters>({
 // ========== ARCHIVE TAB ==========
 const archiveTab = ref<'active' | 'archived'>('active')
 
+const buildFetchFilters = (): ProductFilters => ({
+    ...filters.value,
+    archived: archiveTab.value === 'archived' ? 'true' : 'false',
+    sortField: sortField.value,
+    sortDirection: sortDirection.value,
+})
+
 const switchArchiveTab = async (tab: 'active' | 'archived') => {
     archiveTab.value = tab
     currentPage.value = 1
-    await fetchProducts({ ...filters.value, archived: tab === 'archived' ? 'true' : 'false' })
+    await fetchProducts(buildFetchFilters())
 }
 
 // ========== SORTING STATE ==========
 const sortField = ref<string>('created_at')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 
-type ProductsTableColumn = 'expander' | 'image' | 'sku' | 'product' | 'variants' | 'stock' | 'actions'
+type ProductsTableColumn = 'expander' | 'image' | 'sku' | 'product' | 'attributes' | 'variants' | 'stock' | 'actions'
 
 const PRODUCTS_TABLE_WIDTH_STORAGE_KEY = 'products_index_table_column_widths_v1'
-const tableColumns: ProductsTableColumn[] = ['expander', 'image', 'sku', 'product', 'variants', 'stock', 'actions']
+const tableColumns: ProductsTableColumn[] = ['expander', 'image', 'sku', 'product', 'attributes', 'variants', 'stock', 'actions']
 const defaultColumnWidths: Record<ProductsTableColumn, number> = {
     expander: 56,
     image: 72,
     sku: 170,
     product: 360,
+    attributes: 280,
     variants: 140,
     stock: 120,
     actions: 220,
@@ -239,6 +249,7 @@ const minColumnWidths: Record<ProductsTableColumn, number> = {
     image: 64,
     sku: 130,
     product: 240,
+    attributes: 180,
     variants: 110,
     stock: 96,
     actions: 170,
@@ -328,12 +339,15 @@ const toggleSort = async (field: string) => {
         sortDirection.value = 'asc'
     }
     currentPage.value = 1
-    await fetchProducts({
-        ...filters.value,
-        archived: archiveTab.value === 'archived' ? 'true' : 'false',
-        sortField: sortField.value,
-        sortDirection: sortDirection.value,
-    })
+    await fetchProducts(buildFetchFilters())
+}
+
+const handlePrevPage = async () => {
+    await prevPage(buildFetchFilters())
+}
+
+const handleNextPage = async () => {
+    await nextPage(buildFetchFilters())
 }
 
 // ========== ARCHIVE / RESTORE ACTIONS ==========
@@ -379,8 +393,9 @@ onMounted(async () => {
     if (params.has('brand_id'))        filters.value.brand_id          = Number(params.get('brand_id')) || undefined
     if (params.has('category_id'))     filters.value.category_id       = Number(params.get('category_id')) || undefined
     if (params.has('product_line_id')) filters.value.product_line_id   = Number(params.get('product_line_id')) || undefined
+    if (params.has('oem_code'))        filters.value.oem_code          = params.get('oem_code') ?? undefined
     filters.value.warehouse_id = currentWarehouseId.value || undefined
-    await fetchProducts(filters.value)
+    await fetchProducts(buildFetchFilters())
 })
 
 onUnmounted(() => {
@@ -405,18 +420,13 @@ watch(
 watch(currentWarehouseId, (newId) => {
     if (filters.value.warehouse_id !== newId) {
         filters.value.warehouse_id = newId || undefined
-        fetchProducts(filters.value)
+        fetchProducts(buildFetchFilters())
     }
 })
 
 const applyFilters = async () => {
     currentPage.value = 1
-    await fetchProducts({
-        ...filters.value,
-        archived: archiveTab.value === 'archived' ? 'true' : 'false',
-        sortField: sortField.value,
-        sortDirection: sortDirection.value,
-    })
+    await fetchProducts(buildFetchFilters())
 }
 
 const clearFilters = () => {
@@ -424,6 +434,7 @@ const clearFilters = () => {
         search: '',
         status: undefined,
         brand_id: undefined,
+        oem_code: undefined,
         warehouse_id: currentWarehouseId.value || undefined,
         has_stock: false,
     }
@@ -464,15 +475,6 @@ const getTechnicalSpecsPreview = (product: any): string => {
     });
 
     return attributesHtml.slice(0, 3).join(' • ') + (attributesHtml.length > 3 ? '...' : '');
-}
-
-// Helper to get variant attributes, falling back to any sibling variant's attrs
-// (Henry: all variants share the same "base-level" specs)
-const getVariantAttrs = (variant: any, product: any): any[] => {
-    if (variant.attributes?.length) return variant.attributes
-    const variants = getVariants(product)
-    const sibling = variants.find((v: any) => v.id !== variant.id && v.attributes?.length > 0)
-    return sibling ? sibling.attributes : []
 }
 </script>
 
@@ -545,7 +547,19 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
             </div>
 
             <!-- ========== CATALOG VIEW ========== -->
-            <ProductCatalogView v-if="viewMode === 'catalog'" :products="products" :loading="loading" />
+            <ProductCatalogView
+                v-if="viewMode === 'catalog'"
+                :products="products"
+                :loading="loading"
+                :categories="categories"
+                :brands="brands"
+                :current-page="currentPage"
+                :last-page="lastPage"
+                :total="total"
+                :page-size="perPage"
+                @prev-page="handlePrevPage"
+                @next-page="handleNextPage"
+            />
 
             <!-- ========== TABLE VIEW ========== -->
             <template v-else>
@@ -713,6 +727,12 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                     <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'product')" @click.stop.prevent></span>
                                 </th>
                                 <th
+                                    :style="getColumnStyle('attributes')"
+                                    class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                    Atributos
+                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'attributes')" @click.stop.prevent></span>
+                                </th>
+                                <th
                                     :style="getColumnStyle('variants')"
                                     class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Variantes
@@ -761,7 +781,10 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                     <td
                                         :style="getColumnStyle('sku')"
                                         class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
-                                        {{ product.sku_base || product.default_variant?.sku }}
+                                        <div>{{ product.sku_base || product.default_variant?.sku }}</div>
+                                        <div v-if="product.search_match_type && product.search_match_system_id" class="mt-1 text-[10px] font-normal text-indigo-600 dark:text-indigo-300">
+                                            {{ product.search_match_type === 'product' ? 'ID producto' : 'ID variante' }}: {{ product.search_match_system_id }}
+                                        </div>
                                     </td>
                                     <td :style="getColumnStyle('product')" class="px-6 py-4">
                                         <div class="flex items-center gap-2">
@@ -776,9 +799,12 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                             class="text-sm text-gray-500 dark:text-gray-400">
                                             {{ product.product_line.name }}
                                         </div>
-                                        <div v-if="getTechnicalSpecsPreview(product)" class="text-[11px] text-gray-400 dark:text-gray-500 mt-1" :title="getTechnicalSpecsPreview(product)">
-                                            📋 {{ getTechnicalSpecsPreview(product) }}
+                                    </td>
+                                    <td :style="getColumnStyle('attributes')" class="px-6 py-4">
+                                        <div v-if="getTechnicalSpecsPreview(product)" class="text-xs text-gray-600 dark:text-gray-300" :title="getTechnicalSpecsPreview(product)">
+                                            {{ getTechnicalSpecsPreview(product) }}
                                         </div>
+                                        <span v-else class="text-xs text-gray-400">—</span>
                                     </td>
                                     <td
                                         :style="getColumnStyle('variants')"
@@ -825,7 +851,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                 <!-- Expanded Variants Row -->
                                 <tr v-if="expandedRows.has(product.id)"
                                     class="bg-gray-50 dark:bg-muted">
-                                    <td colspan="7" class="px-6 py-4">
+                                    <td colspan="8" class="px-6 py-4">
                                         <div class="ml-12">
                                             <h4
                                                 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -839,9 +865,6 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
                                                                 SKU Variante</th>
-                                                            <th
-                                                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                                                                Atributos</th>
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
                                                                 Marca</th>
@@ -863,16 +886,6 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                                             class="hover:bg-gray-50 dark:hover:bg-muted/50">
                                                             <td class="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
                                                                 {{ variant.sku || product.sku_base || '—' }}
-                                                            </td>
-                                                            <td class="px-4 py-3">
-                                                                <div v-if="getVariantAttrs(variant, product).length > 0" class="flex flex-wrap gap-1">
-                                                                    <span v-for="attr in getVariantAttrs(variant, product)" :key="attr.id ?? attr.name"
-                                                                        class="inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 text-[10px] text-indigo-700 dark:text-indigo-300"
-                                                                        :class="!variant.attributes?.length ? 'opacity-60 italic' : ''">
-                                                                        {{ attr.name }}: {{ attr.value }}{{ attr.unit ? ` ${attr.unit}` : '' }}
-                                                                    </span>
-                                                                </div>
-                                                                <span v-else class="text-gray-400 text-xs">—</span>
                                                             </td>
                                                             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                                                                 {{ variant.brand?.name || '—' }}
@@ -937,11 +950,11 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                     <div
                         class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 dark:border-border dark:bg-card">
                         <div class="flex flex-1 justify-between sm:hidden">
-                            <button @click="prevPage(filters)" :disabled="currentPage === 1"
+                            <button @click="handlePrevPage" :disabled="currentPage === 1"
                                 class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80">
                                 Anterior
                             </button>
-                            <button @click="nextPage(filters)" :disabled="currentPage === lastPage"
+                            <button @click="handleNextPage" :disabled="currentPage === lastPage"
                                 class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80">
                                 Siguiente
                             </button>
@@ -950,23 +963,23 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                             <div>
                                 <p class="text-sm text-gray-900 dark:text-white">
                                     Mostrando
-                                    <span class="font-medium">{{ (currentPage - 1) * 20 + 1 }}</span>
+                                    <span class="font-medium">{{ (currentPage - 1) * perPage + 1 }}</span>
                                     a
-                                    <span class="font-medium">{{ Math.min(currentPage * 20, total) }}</span>
+                                    <span class="font-medium">{{ Math.min(currentPage * perPage, total) }}</span>
                                     de
                                     <span class="font-medium">{{ total }}</span>
                                     productos
                                 </p>
                             </div>
                             <div class="flex gap-2">
-                                <button @click="prevPage(filters)" :disabled="currentPage === 1"
+                                <button @click="handlePrevPage" :disabled="currentPage === 1"
                                     class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80">
                                     Anterior
                                 </button>
                                 <span class="flex items-center px-4 text-sm text-gray-900 dark:text-white">
                                     Página {{ currentPage }} de {{ lastPage }}
                                 </span>
-                                <button @click="nextPage(filters)" :disabled="currentPage === lastPage"
+                                <button @click="handleNextPage" :disabled="currentPage === lastPage"
                                     class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80">
                                     Siguiente
                                 </button>

@@ -10,10 +10,15 @@ export interface ProductAttribute {
     unit?: string | null
 }
 
-export function useProductAttributes(productId: number, variantId?: number | null) {
+export function useProductAttributes(productId: number, initialVariantId?: number | null) {
     const attributes = ref<ProductAttribute[]>([])
     const loading = ref(false)
     const error = ref<string | null>(null)
+    const currentVariantId = ref<number | null>(initialVariantId ?? null)
+
+    const setVariantId = (variantId: number | null | undefined) => {
+        currentVariantId.value = variantId ?? null
+    }
 
     // Fetch attributes — scoped to product-level OR variant-level
     const fetchAttributes = async () => {
@@ -21,7 +26,7 @@ export function useProductAttributes(productId: number, variantId?: number | nul
         error.value = null
         try {
             const params: Record<string, any> = {}
-            if (variantId) params.variant_id = variantId
+            if (currentVariantId.value) params.variant_id = currentVariantId.value
             const response = await apiClient.get(`/products/${productId}/attributes`, { params })
             attributes.value = response.data.data
         } catch (err: any) {
@@ -37,7 +42,7 @@ export function useProductAttributes(productId: number, variantId?: number | nul
         error.value = null
         try {
             const payload: Record<string, any> = { product_id: productId, name, value, unit }
-            if (variantId) payload.variant_id = variantId
+            if (currentVariantId.value) payload.variant_id = currentVariantId.value
             const response = await apiClient.post('/product-attributes', payload)
 
             attributes.value.push(response.data.data)
@@ -88,6 +93,7 @@ export function useProductAttributes(productId: number, variantId?: number | nul
         fetchAttributes,
         addAttribute,
         updateAttribute,
-        removeAttribute
+        removeAttribute,
+        setVariantId,
     }
 }

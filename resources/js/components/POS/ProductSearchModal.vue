@@ -529,9 +529,14 @@ const submitSelection = () => {
 
                   <!-- SKU -->
                   <td class="px-3 py-3">
-                    <span class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-muted px-1.5 py-0.5 rounded">
-                      {{ getSKU(product) }}
-                    </span>
+                    <div class="space-y-1">
+                      <span class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-muted px-1.5 py-0.5 rounded">
+                        {{ getSKU(product) }}
+                      </span>
+                      <div v-if="product.search_match_type && product.search_match_system_id" class="text-[10px] text-indigo-600 dark:text-indigo-300">
+                        {{ product.search_match_type === 'product' ? 'ID producto' : 'ID variante' }}: {{ product.search_match_system_id }}
+                      </div>
+                    </div>
                   </td>
 
                   <!-- Specs -->

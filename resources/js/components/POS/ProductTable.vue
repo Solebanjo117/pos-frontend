@@ -13,6 +13,7 @@ const props = defineProps<{
   products?: any[] // Full product catalog for context menu details
   clientMode?: boolean // Code protection: show DB IDs instead of SKUs
   warehouseId?: number | null
+  returnMode?: boolean
 }>()
 
 const emit = defineEmits([
@@ -70,6 +71,30 @@ const displaySku = (item: any) => {
   if (item.is_custom_line) return item.product_sku || 'MISC'
   if (props.clientMode) return `#${item.product_id}`
   return item.variant_sku || item.product_sku || item.variant_name || 'General'
+}
+
+const getStockLimit = (item: any): number | null => {
+  if (props.returnMode || item.is_custom_line) return null
+  const parsed = Number(item.available_stock)
+  if (!Number.isFinite(parsed)) return null
+  return Math.max(0, Math.floor(parsed))
+}
+
+const isOutOfStock = (item: any): boolean => {
+  const stock = getStockLimit(item)
+  return stock !== null && stock <= 0
+}
+
+const isAtStockLimit = (item: any): boolean => {
+  const stock = getStockLimit(item)
+  if (stock === null) return false
+  return item.quantity >= stock
+}
+
+const getQtyInputMax = (item: any): number | undefined => {
+  const stock = getStockLimit(item)
+  if (stock === null || stock <= 0) return undefined
+  return stock
 }
 
 // Get cost for a cart item from the products catalog
@@ -194,7 +219,8 @@ const handlePurchaseSuccess = (result: {
               </td>
               
               <td class="px-4 py-3" @click.stop>
-                <div class="flex items-center justify-center gap-2">
+                <div class="flex flex-col items-center gap-1">
+                  <div class="flex items-center justify-center gap-2">
                   <button 
                     @click="emit('update-quantity', index, item.quantity - 1)"
                     class="p-0.5 rounded-md hover:bg-gray-200 dark:hover:bg-muted/50 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -204,16 +230,23 @@ const handlePurchaseSuccess = (result: {
                   <input 
                     type="number"
                     min="1"
+                    :max="getQtyInputMax(item)"
                     :value="item.quantity"
-                    @change="emit('update-quantity', index, parseInt(($event.target as HTMLInputElement).value))"
+                    :disabled="isOutOfStock(item)"
+                    @change="emit('update-quantity', index, parseInt(($event.target as HTMLInputElement).value) || item.quantity)"
                     class="font-semibold text-gray-900 dark:text-white w-12 text-center text-sm bg-transparent border-0 focus:ring-0 p-0"
                   />
                   <button 
                     @click="emit('update-quantity', index, item.quantity + 1)"
-                    class="p-0.5 rounded-md hover:bg-gray-200 dark:hover:bg-muted/50 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    :disabled="isOutOfStock(item) || isAtStockLimit(item)"
+                    class="p-0.5 rounded-md hover:bg-gray-200 dark:hover:bg-muted/50 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Plus class="w-3.5 h-3.5" />
                   </button>
+                  </div>
+                  <span v-if="getStockLimit(item) !== null" class="text-[10px] font-medium" :class="isOutOfStock(item) ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'">
+                    {{ isOutOfStock(item) ? 'Sin stock' : `Stock: ${getStockLimit(item)}` }}
+                  </span>
                 </div>
               </td>
               

@@ -23,6 +23,7 @@ import OpenSessionModal from '@/components/POS/OpenSessionModal.vue'
 import CloseSessionModal from '@/components/POS/CloseSessionModal.vue'
 import CashMovementModal from '@/components/POS/CashMovementModal.vue'
 import VariantSelectModal from '@/components/POS/VariantSelectModal.vue'
+import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue'
 import AddPaymentModal from '@/components/POS/AddPaymentModal.vue'
 import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue'
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue'
@@ -75,6 +76,7 @@ const {
   updateItemPrice,
   reorderCart,
   clearCart,
+  validateCartStock,
   processSale,
   saveDraft,
   shippingCost,
@@ -206,6 +208,107 @@ const openProductDetail = async (productId: number) => {
     const { data } = await apiClient.get(`/products/${productId}`)
     selectedProductForModal.value = data.data ?? data
   } catch { /* silent */ }
+}
+
+type PendingQuickRestock = {
+  product: any
+  variant: any | null
+  requestedQty: number
+  warehouseId?: number
+}
+
+const showAutoQuickPurchaseModal = ref(false)
+const autoQuickPurchaseProduct = ref<any | null>(null)
+const autoQuickPurchaseVariantId = ref<number | null>(null)
+const pendingQuickRestock = ref<PendingQuickRestock | null>(null)
+
+const getNumericStock = (product: any, variant: any | null): number | null => {
+  const raw = Number(variant?.total_stock ?? product?.total_stock)
+  if (!Number.isFinite(raw)) return null
+  return Math.max(0, Math.floor(raw))
+}
+
+const closeAutoQuickPurchaseModal = () => {
+  showAutoQuickPurchaseModal.value = false
+  autoQuickPurchaseProduct.value = null
+  autoQuickPurchaseVariantId.value = null
+  pendingQuickRestock.value = null
+}
+
+const openAutoQuickPurchaseForNoStock = (product: any, variant: any | null, requestedQty: number, warehouseId?: number) => {
+  pendingQuickRestock.value = {
+    product,
+    variant,
+    requestedQty: Math.max(1, requestedQty || 1),
+    warehouseId,
+  }
+  autoQuickPurchaseProduct.value = product
+  autoQuickPurchaseVariantId.value = variant?.id ?? null
+  showAutoQuickPurchaseModal.value = true
+}
+
+const attemptAddToCartWithStockFallback = (product: any, variant: any | null, requestedQty: number = 1, warehouseId?: number) => {
+  const qty = Math.max(1, requestedQty || 1)
+  const added = addToCart(product, variant, qty, warehouseId)
+  if (added) return true
+
+  const stock = getNumericStock(product, variant)
+  if (stock !== null && stock <= 0) {
+    openAutoQuickPurchaseForNoStock(product, variant, qty, warehouseId)
+  }
+
+  return false
+}
+
+const handleAutoQuickPurchaseSuccess = (result: { productId: number; variantId: number | null; quantityAdded: number; addedToSupplyList?: boolean }) => {
+  const ctx = pendingQuickRestock.value
+  if (!ctx) {
+    closeAutoQuickPurchaseModal()
+    return
+  }
+
+  const fromSupplyList = !!result.addedToSupplyList
+
+  const qtyAdded = Math.max(0, Number(result.quantityAdded) || 0)
+
+  // Keep stock references in sync before re-trying addToCart.
+  if (ctx.variant) {
+    const currentVariantStock = Number(ctx.variant.total_stock)
+    const safeVariantStock = Number.isFinite(currentVariantStock) ? Math.max(0, currentVariantStock) : 0
+    ctx.variant.total_stock = safeVariantStock + qtyAdded
+  }
+
+  const currentProductStock = Number(ctx.product?.total_stock)
+  const safeProductStock = Number.isFinite(currentProductStock) ? Math.max(0, currentProductStock) : 0
+  if (ctx.product) {
+    ctx.product.total_stock = safeProductStock + qtyAdded
+  }
+
+  const productInResults = products.value.find((p: any) => p.id === result.productId)
+  if (productInResults) {
+    const existingTotalStock = Number(productInResults.total_stock)
+    const safeExistingStock = Number.isFinite(existingTotalStock) ? Math.max(0, existingTotalStock) : 0
+    productInResults.total_stock = safeExistingStock + qtyAdded
+
+    if (result.variantId && Array.isArray(productInResults.variants)) {
+      const variantInResults = productInResults.variants.find((v: any) => v.id === result.variantId)
+      if (variantInResults) {
+        const existingVariantStock = Number(variantInResults.total_stock)
+        const safeExistingVariantStock = Number.isFinite(existingVariantStock) ? Math.max(0, existingVariantStock) : 0
+        variantInResults.total_stock = safeExistingVariantStock + qtyAdded
+      }
+    }
+  }
+
+  const qtyToAdd = Math.max(1, Math.min(ctx.requestedQty, qtyAdded || ctx.requestedQty))
+  attemptAddToCartWithStockFallback(ctx.product, ctx.variant, qtyToAdd, ctx.warehouseId)
+
+  if (fromSupplyList) {
+    error.value = null
+  }
+
+  closeAutoQuickPurchaseModal()
+  nextTick(() => searchInput.value?.focus())
 }
 
 const handleAddCustomLine = (payload: {
@@ -741,6 +844,24 @@ const quantityInput = ref<HTMLInputElement>()
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 
+const extractApiErrorMessage = (err: any, fallback: string): string => {
+  const errData = err?.response?.data
+  if (Array.isArray(errData?.errors)) {
+    return errData.errors.join('\n')
+  }
+
+  if (errData?.errors && typeof errData.errors === 'object') {
+    const nested = Object.values(errData.errors)
+      .flatMap((v: any) => Array.isArray(v) ? v : [String(v)])
+      .filter(Boolean)
+    if (nested.length > 0) {
+      return nested.join('\n')
+    }
+  }
+
+  return errData?.message || fallback
+}
+
 // Get helpers
 const getProductPrice = (product: any): number =>
   product.pricing?.base_price ?? product.default_variant?.pricing?.base_price ?? 0
@@ -879,7 +1000,7 @@ const addProductToCart = (product: any, overrideQty?: number) => {
 
   if (variants.length === 1) {
     // Single variant: add directly
-    addToCart(product, variants[0], qtyToUse, currentWarehouseId.value || undefined)
+    attemptAddToCartWithStockFallback(product, variants[0], qtyToUse, currentWarehouseId.value || undefined)
     searchQuery.value = ''
     nextTick(() => searchInput.value?.focus())
   } else if (variants.length > 1) {
@@ -893,7 +1014,7 @@ const addProductToCart = (product: any, overrideQty?: number) => {
   } else {
     // Fallback: use default_variant if variants array not loaded
     const fallback = product.default_variant ?? null
-    addToCart(product, fallback, qtyToUse, currentWarehouseId.value || undefined)
+    attemptAddToCartWithStockFallback(product, fallback, qtyToUse, currentWarehouseId.value || undefined)
     searchQuery.value = ''
     nextTick(() => searchInput.value?.focus())
   }
@@ -904,7 +1025,7 @@ const onVariantsSelected = (selections: Array<{ variant: any; quantity: number }
   const product = variantQueue.value[0]
   if (product) {
     selections.forEach(({ variant, quantity: qty }) => {
-      addToCart(product, variant, qty, currentWarehouseId.value || undefined)
+      attemptAddToCartWithStockFallback(product, variant, qty, currentWarehouseId.value || undefined)
     })
   }
   // Dequeue the current product
@@ -947,7 +1068,7 @@ const handleInlineSelect = (product: any) => {
   // Product with single variant (or default variant) — add directly
   const variants = product.variants ?? []
   const variant = variants.length === 1 ? variants[0] : (product.default_variant ?? null)
-  addToCart(product, variant, 1, currentWarehouseId.value || undefined)
+  attemptAddToCartWithStockFallback(product, variant, 1, currentWarehouseId.value || undefined)
 }
 
 const handleInlineVariantNeeded = (product: any) => {
@@ -1057,6 +1178,11 @@ const handleUnifiedPaymentFinish = async (payments: Array<{method: string, amoun
 
   // Clear any previous payment errors before attempting new payment
   error.value = null
+
+  if (!validateCartStock('sale')) {
+    alert(error.value || 'Stock insuficiente para completar la venta.')
+    return
+  }
   
   // Validate standard items have valid product_id (custom lines are allowed to be null)
   const invalidItems = cart.value.filter((item: any) => !item.is_custom_line && (!item.product_id || item.product_id <= 0))
@@ -1121,6 +1247,10 @@ const handleSaveQuoteChanges = async () => {
     alert('El carrito está vacío, agrega productos antes de guardar.')
     return
   }
+  if (!validateCartStock('quote')) {
+    alert(error.value || 'Stock insuficiente para actualizar la cotización.')
+    return
+  }
   saveQuoteChangesLoading.value = true
   try {
     const items = cart.value.map((item: any) => ({
@@ -1144,7 +1274,7 @@ const handleSaveQuoteChanges = async () => {
     alert('✅ Cotización actualizada exitosamente.')
     searchInput.value?.focus()
   } catch (e: any) {
-    alert(e.response?.data?.message || 'Error al actualizar la cotización')
+    alert(extractApiErrorMessage(e, 'Error al actualizar la cotización'))
   } finally {
     saveQuoteChangesLoading.value = false
   }
@@ -1156,6 +1286,10 @@ const saveQuoteLoading = ref(false)
 const handleSaveQuote = async () => {
   if (cart.value.length === 0) {
     alert('Agrega productos al carrito antes de guardar una cotización.')
+    return
+  }
+  if (!validateCartStock('quote')) {
+    alert(error.value || 'Stock insuficiente para guardar la cotización.')
     return
   }
   saveQuoteLoading.value = true
@@ -1186,7 +1320,7 @@ const handleSaveQuote = async () => {
       window.location.href = '/sales-quotes'
     }
   } catch (e: any) {
-    alert(e.response?.data?.message || 'Error al guardar la cotización')
+    alert(extractApiErrorMessage(e, 'Error al guardar la cotización'))
   } finally {
     saveQuoteLoading.value = false
   }
@@ -1705,6 +1839,15 @@ onUnmounted(() => {
                 @open-quick-customer="showQuickCustomerModal = true"
             />
           </div>
+          <div
+            v-if="error && !props.returnMode && !props.editMode"
+            class="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300 whitespace-pre-line"
+          >
+            <div class="flex items-start gap-2">
+              <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{{ error }}</span>
+            </div>
+          </div>
           <div class="mt-auto shrink-0 pt-4">
             <!-- Return Mode: Show Confirm Return button -->
             <div v-if="props.returnMode" class="space-y-3">
@@ -1876,6 +2019,15 @@ onUnmounted(() => {
         :product="pendingProduct"
         @select-multiple="onVariantsSelected"
         @close="closeVariantModal"
+    />
+
+    <QuickPurchaseModal
+      v-if="autoQuickPurchaseProduct"
+      :is-open="showAutoQuickPurchaseModal"
+      :product="autoQuickPurchaseProduct"
+      :initial-variant-id="autoQuickPurchaseVariantId"
+      @close="closeAutoQuickPurchaseModal"
+      @success="handleAutoQuickPurchaseSuccess"
     />
 
     <!-- CloseSession + shortcuts remain at bottom as overlays -->

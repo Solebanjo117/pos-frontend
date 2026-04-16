@@ -6,11 +6,12 @@ import { type BreadcrumbItem } from '@/types'
 import { useProducts } from '@/composables/useProducts'
 import { useToast } from '@/composables/useToast'
 import { useVehicleEngines } from '@/composables/useVehicleEngines'
-import type { CreateProductRequest } from '@/types/product'
+import type { CreateProductRequest, Product } from '@/types/product'
 import type { Category } from '@/types/category'
 import type { Brand } from '@/types/brand'
 import apiClient from '@/services/api/client'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
+import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
 import VariantManager from '@/components/Products/VariantManager.vue'
 import { useStoreSettings } from '@/composables/useStoreSettings'
@@ -108,9 +109,6 @@ const categoryMargin = ref<number | null>(null)
 const priceManuallyEdited = ref(false)
 const onBasePriceInput = () => { priceManuallyEdited.value = true }
 
-const skuPreview = ref('')
-const loadingSkuPreview = ref(false)
-
 // R20: Duplicate checking
 const duplicates = ref<{ id: number; name: string; sku_base: string }[]>([])
 const checkingDuplicates = ref(false)
@@ -149,95 +147,294 @@ watch([() => form.value.name, () => form.value.sku_base], () => {
     }, 600)
 })
 
-const fetchSkuPreview = async (categoryId: number | undefined) => {
-    if (!categoryId) { skuPreview.value = ''; return }
-    loadingSkuPreview.value = true
-    try {
-        const { data } = await apiClient.get('/products/next-sku', { params: { category_id: categoryId } })
-        skuPreview.value = data.sku || ''
-    } catch { skuPreview.value = '' }
-    finally { loadingSkuPreview.value = false }
-}
-
 const nameManuallyEdited = ref(false)
 const onNameInput = () => { nameManuallyEdited.value = true }
 
-const addedEngines = ref<{ engine_id: number; make: string; model: string; engine: string }[]>([])
+type EngineCompatibilityEntry = {
+    engine_id: number
+    make: string
+    model: string
+    engine: string
+    year: string
+    chassis: string
+}
+
+type ChassisCompatibilityEntry = {
+    chassis_id: number
+    make: string
+    model: string
+    year: string
+    chassis: string
+}
+
+const formatYearRange = (model?: VehicleModelItem | null): string => {
+    const from = model?.year_from
+    const to = model?.year_to
+
+    if (from && to) return from === to ? `${from}` : `${from}-${to}`
+    if (from) return `${from}`
+    if (to) return `${to}`
+    return ''
+}
+
+const getModelChassis = (model?: VehicleModelItem | null): string => {
+    return String(model?.generation ?? '').trim()
+}
+
+const makeAbbreviationMap: Record<string, string> = {
+    chevrolet: 'Chev',
+    chevy: 'Chev',
+    toyota: 'Toy',
+    volkswagen: 'VW',
+    'mercedes benz': 'Merc',
+    mercedes: 'Merc',
+    mitsubishi: 'Mits',
+    hyundai: 'Hyun',
+    nissan: 'Niss',
+    peugeot: 'Peug',
+    chrysler: 'Chry',
+    porsche: 'Pors',
+    landrover: 'LR',
+    'land rover': 'LR',
+}
+
+const normalizeMakeKey = (make: string): string => {
+    return make
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9 ]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+const abbreviateMakeName = (make?: string): string => {
+    const raw = String(make ?? '').trim()
+    if (!raw) return ''
+
+    const normalizedKey = normalizeMakeKey(raw)
+    if (makeAbbreviationMap[normalizedKey]) {
+        return makeAbbreviationMap[normalizedKey]
+    }
+
+    // Fallback to keep labels compact when make names are very long.
+    if (raw.length > 7) {
+        return raw.slice(0, 4)
+    }
+
+    return raw
+}
+
+const buildChassisLevelLabel = (entry: {
+    make?: string
+    model?: string
+    year?: string
+    chassis?: string
+}): string => {
+    return [abbreviateMakeName(entry.make), entry.model, entry.year, entry.chassis]
+        .map(v => String(v ?? '').trim())
+        .filter(Boolean)
+        .join(', ')
+}
+
+const buildEngineLevelLabel = (entry: {
+    make?: string
+    engine?: string
+    model?: string
+    year?: string
+    chassis?: string
+}): string => {
+    return [abbreviateMakeName(entry.make), entry.engine, entry.model, entry.year, entry.chassis]
+        .map(v => String(v ?? '').trim())
+        .filter(Boolean)
+        .join(', ')
+}
+
+const addedEngines = ref<EngineCompatibilityEntry[]>([])
 const vehicleChassisList = ref<any[]>([])
 const selectedChassisIds = ref<number[]>([])
-const addedChassis = ref<{ chassis_id: number; make: string; model: string; chassis: string }[]>([])
+const addedChassis = ref<ChassisCompatibilityEntry[]>([])
 const allEnginesFlag = ref(false)
 const allChassisFlag = ref(false)
 const compatTab = ref<'engines' | 'chassis'>('engines')
-const addedVins = ref<string[]>([])
-const addedRefs = ref<string[]>([])
 
-const namePreview = computed(() => {
-    const parts: string[] = []
-    const catId = (form.value as any).category_id
-    if (catId) {
-        const cat = categories.value.find(c => c.id === catId)
-        if (cat) parts.push(cat.name)
-    }
-    let name = parts.join(' ') || 'Producto sin nombre'
+type PendingOemReference = {
+    oem_code: string
+    manufacturer: string | null
+}
 
-    const attributeLabels = variantAttributes.value
-        .map(attr => {
-            const value = String(attr.value || '').trim()
-            if (!value) return ''
-            const unit = String(attr.unit || '').trim()
-            return `${attr.name}: ${value}${unit ? ` ${unit}` : ''}`
-        })
-        .filter(Boolean)
+const addedRefs = ref<PendingOemReference[]>([])
 
-    if (attributeLabels.length > 0) {
-        const uniqueAttrLabels = [...new Set(attributeLabels)]
-        const displayed = uniqueAttrLabels.slice(0, 3).join(', ')
-        const suffix = uniqueAttrLabels.length > 3 ? ' y más' : ''
-        name += ' - ' + displayed + suffix
-    }
+type UpsaleRelationship = 'compatible' | 'substitute' | 'upgrade'
 
-    const engineGroups = addedEngines.value.reduce((acc, entry) => {
-        const baseLabel = `${entry.make} ${entry.model}`.trim()
-        if (!baseLabel) return acc
+type PendingUpsale = {
+    id: number
+    sku_base: string
+    name: string
+    relationship_type: UpsaleRelationship
+}
 
-        if (!acc[baseLabel]) {
-            acc[baseLabel] = new Set<string>()
-        }
+const selectedUpsaleProduct = ref<Product | null>(null)
+const upsaleRelationshipType = ref<UpsaleRelationship>('compatible')
+const pendingUpsales = ref<PendingUpsale[]>([])
 
-        const engineLabel = String(entry.engine || '').trim()
-        if (engineLabel) {
-            acc[baseLabel].add(engineLabel)
-        }
+const addUpsale = () => {
+    if (!selectedUpsaleProduct.value) return
 
-        return acc
-    }, {} as Record<string, Set<string>>)
+    const selected = selectedUpsaleProduct.value
+    if (pendingUpsales.value.some(item => item.id === selected.id)) return
 
-    const groupedEngineLabels = Object.entries(engineGroups).map(([baseLabel, engines]) => {
-        const engineList = [...engines]
-        return engineList.length > 0
-            ? `${baseLabel} (${engineList.join(', ')})`
-            : baseLabel
+    pendingUpsales.value.push({
+        id: selected.id,
+        sku_base: selected.sku_base,
+        name: selected.name,
+        relationship_type: upsaleRelationshipType.value,
     })
 
-    const engineBaseLabels = new Set(Object.keys(engineGroups))
-    const chassisOnlyLabels = [...new Set(
-        addedChassis.value
-            .map(c => `${c.make} ${c.model}`.trim())
-            .filter(label => label && !engineBaseLabels.has(label))
-    )]
+    selectedUpsaleProduct.value = null
+    upsaleRelationshipType.value = 'compatible'
+}
 
-    const vehicleLabels = [...groupedEngineLabels, ...chassisOnlyLabels]
-    if (vehicleLabels.length > 0) {
-        const uniqueLabels = [...new Set(vehicleLabels)]
-        const displayed = uniqueLabels.slice(0, 3).join(', ')
-        const suffix = uniqueLabels.length > 3 ? ' y más' : ''
-        name += ' - ' + displayed + suffix
+const removeUpsale = (productId: number) => {
+    pendingUpsales.value = pendingUpsales.value.filter(item => item.id !== productId)
+}
+
+const getUpsaleRelationshipLabel = (type: UpsaleRelationship): string => {
+    const labels: Record<UpsaleRelationship, string> = {
+        compatible: 'Compatible',
+        substitute: 'Sustituto',
+        upgrade: 'Upgrade',
     }
-    if (addedVins.value.length > 0 && vehicleLabels.length === 0) {
-        name += ` - ${addedVins.value.length} VIN${addedVins.value.length > 1 ? 's' : ''}`
+    return labels[type]
+}
+
+type PendingImage = {
+    tempId: string
+    file: File
+    previewUrl: string
+}
+
+const pendingImages = ref<PendingImage[]>([])
+
+const handlePendingImageSelection = (event: Event) => {
+    const input = event.target as HTMLInputElement
+    if (!input.files?.length) return
+
+    for (const file of Array.from(input.files)) {
+        const alreadyAdded = pendingImages.value.some(item =>
+            item.file.name === file.name
+            && item.file.size === file.size
+            && item.file.lastModified === file.lastModified
+        )
+
+        if (alreadyAdded) continue
+
+        pendingImages.value.push({
+            tempId: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+            file,
+            previewUrl: URL.createObjectURL(file),
+        })
     }
-    return name
+
+    input.value = ''
+}
+
+const removePendingImage = (tempId: string) => {
+    const index = pendingImages.value.findIndex(item => item.tempId === tempId)
+    if (index === -1) return
+
+    URL.revokeObjectURL(pendingImages.value[index].previewUrl)
+    pendingImages.value.splice(index, 1)
+}
+
+interface VehicleMake { id: number; name: string }
+interface VehicleModelItem { id: number; name: string; year_from?: number; year_to?: number; generation?: string }
+interface VehicleEngineItem { id: number; engine_code: string; displacement?: string }
+
+const vehicleMakes = ref<VehicleMake[]>([])
+const vehicleModels = ref<VehicleModelItem[]>([])
+const vehicleEngines = ref<VehicleEngineItem[]>([])
+
+const selectedMakeId = ref<number | null>(null)
+const selectedModelId = ref<number | null>(null)
+// R39: Multi-select de motores
+const selectedEngineIds = ref<number[]>([])
+const isUniversal = ref(false)
+
+const selectedModelMeta = computed(() =>
+    vehicleModels.value.find(m => m.id === selectedModelId.value) || null
+)
+
+const compatibilitySummary = computed(() => {
+    if (isUniversal.value) return 'Universal'
+
+    const parts: string[] = []
+    if (allEnginesFlag.value) {
+        parts.push('todos los motores del modelo')
+    } else if (addedEngines.value.length > 0) {
+        parts.push(`${addedEngines.value.length} motor(es)`)
+    }
+
+    if (allChassisFlag.value) {
+        parts.push('todos los chasis del modelo')
+    } else if (addedChassis.value.length > 0) {
+        parts.push(`${addedChassis.value.length} chasis`)
+    }
+
+    return parts.join(' | ')
+})
+
+const namePreview = computed(() => {
+    const catId = (form.value as any).category_id
+    const categoryName = categories.value.find(c => c.id === catId)?.name || 'Producto sin nombre'
+
+    const chassisLabels = addedChassis.value
+        .map(entry => buildChassisLevelLabel(entry))
+        .filter(Boolean)
+
+    const engineLabels = addedEngines.value
+        .map(entry => buildEngineLevelLabel(entry))
+        .filter(Boolean)
+
+    const selectedMake = vehicleMakes.value.find(m => m.id === selectedMakeId.value)?.name || ''
+    const selectedModel = vehicleModels.value.find(m => m.id === selectedModelId.value)
+    const selectedModelName = selectedModel?.name || ''
+    const selectedYear = formatYearRange(selectedModel)
+    const selectedChassis = getModelChassis(selectedModel)
+
+    if (allChassisFlag.value && selectedModelName) {
+        const allChassisLabel = buildChassisLevelLabel({
+            make: selectedMake,
+            model: selectedModelName,
+            year: selectedYear,
+            chassis: selectedChassis || 'todos los chasis',
+        })
+        if (allChassisLabel) {
+            chassisLabels.push(allChassisLabel)
+        }
+    }
+
+    if (allEnginesFlag.value && selectedModelName) {
+        const allEnginesLabel = buildEngineLevelLabel({
+            make: selectedMake,
+            engine: 'todos los motores',
+            model: selectedModelName,
+            year: selectedYear,
+            chassis: selectedChassis || 'todos los chasis',
+        })
+        if (allEnginesLabel) {
+            engineLabels.push(allEnginesLabel)
+        }
+    }
+
+    const compatibilityLabels = [...new Set([...chassisLabels, ...engineLabels])]
+    if (compatibilityLabels.length === 0) {
+        return categoryName
+    }
+
+    const displayed = compatibilityLabels.slice(0, 3).join(' | ')
+    const suffix = compatibilityLabels.length > 3 ? ' y mas' : ''
+    return `${categoryName} - ${displayed}${suffix}`
 })
 
 watch(namePreview, (newVal) => {
@@ -246,19 +443,9 @@ watch(namePreview, (newVal) => {
     }
 })
 
-const skuBaseManuallyEdited = ref(false)
-const onSkuBaseInput = () => { skuBaseManuallyEdited.value = true }
-
-watch(skuPreview, (newVal) => {
-    if (!skuBaseManuallyEdited.value && newVal) {
-        form.value.sku_base = newVal
-    }
-})
-
 watch(
     () => (form.value as any).category_id,
     async (newCategoryId: number | undefined) => {
-        fetchSkuPreview(newCategoryId)
         if (!newCategoryId) {
             variantAttributes.value = []
             categoryFormula.value = null
@@ -318,19 +505,16 @@ watch(
     }
 )
 
-interface VehicleMake { id: number; name: string }
-interface VehicleModelItem { id: number; name: string; year_from?: number; year_to?: number; generation?: string }
-interface VehicleEngineItem { id: number; engine_code: string; displacement?: string }
+const getChassisOptionDetail = (chassis: any): string => {
+    const modelContext = (chassis?.model ?? selectedModelMeta.value) as VehicleModelItem | null
+    const modelName = String(chassis?.model?.name ?? selectedModelMeta.value?.name ?? '').trim()
+    const years = formatYearRange(modelContext)
+    const code = String(chassis?.code ?? getModelChassis(modelContext)).trim()
+    const base = [modelName, years].filter(Boolean).join(' ')
 
-const vehicleMakes = ref<VehicleMake[]>([])
-const vehicleModels = ref<VehicleModelItem[]>([])
-const vehicleEngines = ref<VehicleEngineItem[]>([])
-
-const selectedMakeId = ref<number | null>(null)
-const selectedModelId = ref<number | null>(null)
-// R39: Multi-select de motores
-const selectedEngineIds = ref<number[]>([])
-const isUniversal = ref(false)
+    if (!base && !code) return 'Chasis sin detalle'
+    return code ? `${base || 'Modelo'} - Chasis: ${code}` : base
+}
 
 const loadingMakes = ref(false)
 const loadingModelsV = ref(false)
@@ -388,14 +572,20 @@ const addEngines = () => {
     if (selectedEngineIds.value.length === 0) return
     const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
     const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
-    const modelNameFull = model ? `${model.name}${model.generation ? ` (Chasis ${model.generation})` : ''}` : ''
+    const modelName = model?.name || ''
+    const year = formatYearRange(model)
+    const chassis = getModelChassis(model)
     
     selectedEngineIds.value.forEach(engineId => {
         if (addedEngines.value.some(e => e.engine_id === engineId)) return
         const engine = vehicleEngines.value.find(e => e.id === engineId)
         addedEngines.value.push({
             engine_id: engineId,
-            make: make?.name || '', model: modelNameFull, engine: engine?.engine_code || '',
+            make: make?.name || '',
+            model: modelName,
+            engine: engine?.engine_code || '',
+            year,
+            chassis,
         })
     })
     selectedEngineIds.value = []
@@ -406,34 +596,44 @@ const addChassis = () => {
     if (selectedChassisIds.value.length === 0) return
     const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
     const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
-    const modelNameFull = model ? `${model.name}${model.generation ? ` (Chasis ${model.generation})` : ''}` : ''
+    const modelName = model?.name || ''
+    const year = formatYearRange(model)
+    const modelChassis = getModelChassis(model)
     
     selectedChassisIds.value.forEach(chId => {
         if (addedChassis.value.some(c => c.chassis_id === chId)) return
         const ch = vehicleChassisList.value.find(c => c.id === chId)
         addedChassis.value.push({
             chassis_id: chId,
-            make: make?.name || '', model: modelNameFull, chassis: ch?.code || '',
+            make: make?.name || '',
+            model: modelName,
+            year,
+            chassis: String(ch?.code || '').trim() || modelChassis,
         })
     })
     selectedChassisIds.value = []
 }
 const removeChassis = (idx: number) => addedChassis.value.splice(idx, 1)
 
-const vinInput = ref('')
-const addVin = () => {
-    const vin = vinInput.value.trim().toUpperCase()
-    if (!vin || addedVins.value.includes(vin)) return
-    addedVins.value.push(vin)
-    vinInput.value = ''
-}
-const removeVin = (idx: number) => addedVins.value.splice(idx, 1)
-
 const refInput = ref('')
+const refManufacturerInput = ref<string | null>(null)
 const addRef = () => {
-    const r = refInput.value.trim()
-    if (!r || addedRefs.value.includes(r)) return
-    addedRefs.value.push(r); refInput.value = ''
+    const code = refInput.value.trim()
+    const manufacturer = (refManufacturerInput.value || '').trim() || null
+    if (!code) return
+
+    const exists = addedRefs.value.some(ref =>
+        ref.oem_code.toLowerCase() === code.toLowerCase()
+        && (ref.manufacturer ?? '') === (manufacturer ?? '')
+    )
+    if (exists) return
+
+    addedRefs.value.push({
+        oem_code: code,
+        manufacturer,
+    })
+    refInput.value = ''
+    refManufacturerInput.value = null
 }
 const removeRef = (idx: number) => addedRefs.value.splice(idx, 1)
 
@@ -441,19 +641,47 @@ const inlineModal = ref<'category' | 'brand' | 'vehicleMake' | 'vehicleModel' | 
 const inlineForm = ref<Record<string, any>>({})
 const inlineProcessing = ref(false)
 const inlineError = ref<string | null>(null)
+const vehicleModelDraftBeforeChassis = ref<Record<string, any> | null>(null)
+
+const openModelChassisQuickCreate = () => {
+    vehicleModelDraftBeforeChassis.value = { ...inlineForm.value }
+    inlineModal.value = 'vehicleChassis'
+    inlineError.value = null
+    inlineProcessing.value = false
+    inlineForm.value = { code: '', name: '' }
+}
 
 const openInline = (type: typeof inlineModal.value) => {
+    if (type !== 'vehicleChassis') {
+        vehicleModelDraftBeforeChassis.value = null
+    }
+
     inlineModal.value = type
     inlineError.value = null
     inlineProcessing.value = false
     if (type === 'category') inlineForm.value = { name: '', parent_id: null }
     else if (type === 'brand') inlineForm.value = { name: '' }
     else if (type === 'vehicleMake') inlineForm.value = { name: '' }
-    else if (type === 'vehicleModel') inlineForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear() }
+    else if (type === 'vehicleModel') {
+        inlineForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear() }
+        selectedModelGenerationChassisId.value = null
+        fetchVehicleChassisCatalog()
+    }
     else if (type === 'vehicleEngine') inlineForm.value = { engine_code: '', displacement: '' }
     else if (type === 'vehicleChassis') inlineForm.value = { code: '', name: '' }
 }
-const closeInline = () => { inlineModal.value = null }
+
+const closeInline = () => {
+    if (inlineModal.value === 'vehicleChassis' && vehicleModelDraftBeforeChassis.value) {
+        inlineModal.value = 'vehicleModel'
+        inlineForm.value = { ...vehicleModelDraftBeforeChassis.value }
+        vehicleModelDraftBeforeChassis.value = null
+        return
+    }
+
+    inlineModal.value = null
+    vehicleModelDraftBeforeChassis.value = null
+}
 
 const submitInline = async () => {
     inlineProcessing.value = true
@@ -474,7 +702,22 @@ const submitInline = async () => {
             vehicleMakes.value.push(newMake)
             selectedMakeId.value = newMake.id
         } else if (inlineModal.value === 'vehicleModel') {
-            const { data } = await apiClient.post('/vehicle-models', { ...inlineForm.value, make_id: selectedMakeId.value })
+            const selectedGeneration = vehicleChassisCatalog.value
+                .find(chassis => chassis.id === selectedModelGenerationChassisId.value)
+                ?.code?.trim() || null
+
+            if (selectedGeneration && selectedGeneration.length > 20) {
+                inlineError.value = 'El código de chasis seleccionado supera 20 caracteres y no puede guardarse como generación del modelo.'
+                return
+            }
+
+            const payload = {
+                ...inlineForm.value,
+                make_id: selectedMakeId.value,
+                generation: selectedGeneration,
+            }
+
+            const { data } = await apiClient.post('/vehicle-models', payload)
             const newModel = data.data ?? data
             vehicleModels.value.push(newModel)
             selectedModelId.value = newModel.id
@@ -489,6 +732,19 @@ const submitInline = async () => {
             const newChassis = data.data ?? data
             vehicleChassisList.value.push(newChassis)
             selectedChassisIds.value.push(newChassis.id)
+
+            if (!vehicleChassisCatalog.value.some(chassis => chassis.id === newChassis.id)) {
+                vehicleChassisCatalog.value.push(newChassis)
+            }
+
+            if (vehicleModelDraftBeforeChassis.value) {
+                const modelDraft = { ...vehicleModelDraftBeforeChassis.value }
+                vehicleModelDraftBeforeChassis.value = null
+                selectedModelGenerationChassisId.value = newChassis.id
+                inlineModal.value = 'vehicleModel'
+                inlineForm.value = modelDraft
+                return
+            }
         }
         closeInline()
     } catch (e: any) {
@@ -500,7 +756,7 @@ const categoryOptions = computed(() => categories.value.flatMap(c => ({
     value: c.id, 
     label: c.name
 })))
-const brandOptions = computed(() => brands.value.map(b => ({ value: b.id, label: b.name })))
+const oemBrandOptions = computed(() => brands.value.map(b => ({ value: b.name, label: b.name })))
 const makeOptions = computed(() => vehicleMakes.value.map(m => ({ value: m.id, label: m.name })))
 const modelOptions = computed(() => vehicleModels.value.map(m => {
     const years = m.year_from ? `${m.year_from}-${m.year_to || '...'}` : ''
@@ -511,6 +767,55 @@ const modelOptions = computed(() => vehicleModels.value.map(m => {
 const engineOptions = computed(() => vehicleEngines.value.map(e => ({
     value: e.id, label: e.engine_code, sublabel: e.displacement || '',
 })))
+
+interface VehicleChassisCatalogItem {
+    id: number
+    code: string
+    name?: string | null
+    model?: {
+        id?: number
+        name?: string
+        make?: {
+            id?: number
+            name?: string
+        }
+    } | null
+}
+
+const vehicleChassisCatalog = ref<VehicleChassisCatalogItem[]>([])
+const loadingVehicleChassisCatalog = ref(false)
+const selectedModelGenerationChassisId = ref<number | null>(null)
+
+const vehicleChassisCatalogOptions = computed(() =>
+    vehicleChassisCatalog.value.map(chassis => {
+        const details = [
+            chassis.name,
+            chassis.model?.make?.name,
+            chassis.model?.name,
+        ].filter(Boolean).join(' - ')
+
+        return {
+            value: chassis.id,
+            label: chassis.code,
+            sublabel: details || undefined,
+        }
+    })
+)
+
+const fetchVehicleChassisCatalog = async () => {
+    loadingVehicleChassisCatalog.value = true
+    try {
+        const { data } = await apiClient.get('/vehicle-chassis', {
+            params: { per_page: 300 }
+        })
+        vehicleChassisCatalog.value = data?.data ?? []
+    } catch (e) {
+        console.error('Error loading vehicle chassis catalog:', e)
+        vehicleChassisCatalog.value = []
+    } finally {
+        loadingVehicleChassisCatalog.value = false
+    }
+}
 
 onMounted(async () => {
     fetchStoreSettings()
@@ -538,6 +843,7 @@ onMounted(async () => {
     } catch (e) { console.error('Error loading warehouses:', e) }
 
     fetchMakes()
+    fetchVehicleChassisCatalog()
 })
 
 // Draft variants from VariantManager in draft mode
@@ -568,11 +874,29 @@ const handleSubmit = async () => {
             all_engines: allEnginesFlag.value,
             all_chassis: allChassisFlag.value,
             is_universal: isUniversal.value,
-            vins: addedVins.value,
-            oem_references: addedRefs.value,
         }
         const result = await createProduct(payload)
         const productId = (result as any)?.data?.id ?? (result as any)?.id
+
+        if (productId && addedRefs.value.length > 0) {
+            const failedReferences: string[] = []
+
+            for (const ref of addedRefs.value) {
+                try {
+                    await apiClient.post(`/products/${productId}/oem-references`, {
+                        oem_code: ref.oem_code,
+                        manufacturer: ref.manufacturer,
+                    })
+                } catch (refError: any) {
+                    console.error('Error creating OEM reference:', refError.response?.data || refError)
+                    failedReferences.push(ref.oem_code)
+                }
+            }
+
+            if (failedReferences.length > 0) {
+                toast.error(`Producto creado, pero fallaron códigos alternos: ${failedReferences.join(', ')}`)
+            }
+        }
 
         // Create pending draft variants sequentially
         if (productId && pendingVariants.value.length > 0) {
@@ -586,7 +910,6 @@ const handleSubmit = async () => {
                         status: variant.status || 'active',
                         pricing: variant.pricing,
                         initial_inventory: variant.initial_inventory || [],
-                        attributes: variant.attributes || [],
                     })
                 } catch (variantError: any) {
                     console.error('Error creating variant:', variantError.response?.data || variantError)
@@ -595,6 +918,42 @@ const handleSubmit = async () => {
             }
             if (failedVariants.length > 0) {
                 toast.error(`Producto creado, pero fallaron variantes: ${failedVariants.join(', ')}`)
+            }
+        }
+
+        if (productId && pendingUpsales.value.length > 0) {
+            const failedUpsales: string[] = []
+            for (const upsale of pendingUpsales.value) {
+                try {
+                    await apiClient.post(`/products/${productId}/alternatives`, {
+                        alternative_product_id: upsale.id,
+                        relationship_type: upsale.relationship_type,
+                    })
+                } catch (upsaleError: any) {
+                    console.error('Error creating upsale relation:', upsaleError.response?.data || upsaleError)
+                    failedUpsales.push(`${upsale.sku_base} - ${upsale.name}`)
+                }
+            }
+
+            if (failedUpsales.length > 0) {
+                toast.error(`Producto creado, pero fallaron upsales: ${failedUpsales.join(', ')}`)
+            }
+        }
+
+        if (productId && pendingImages.value.length > 0) {
+            const formData = new FormData()
+            pendingImages.value.forEach(item => formData.append('images[]', item.file))
+
+            try {
+                await apiClient.post(`/products/${productId}/images`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                })
+            } catch (imageError: any) {
+                console.error('Error uploading product images:', imageError.response?.data || imageError)
+                toast.error('Producto creado, pero no se pudieron subir algunas imagenes')
+            } finally {
+                pendingImages.value.forEach(item => URL.revokeObjectURL(item.previewUrl))
+                pendingImages.value = []
             }
         }
 
@@ -618,7 +977,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
 <template>
     <Head title="Crear Producto" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-5xl space-y-4 p-6">
+        <div class="space-y-6 p-4">
 
             <!-- Header -->
             <div class="flex items-center justify-between">
@@ -665,17 +1024,17 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
 
         <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-4">
 
-            <!-- ══ Datos del Producto ══ -->
+            <!-- ══ SECTION 1: Descripcion ══ -->
             <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border space-y-4">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Datos del Producto</h2>
-
-                <!-- Nombre + Categoría en 2 cols -->
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Descripción</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del Producto</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Descripción <span class="text-red-500">*</span>
+                        </label>
                         <input v-model="form.name" type="text" @input="onNameInput"
                             class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="Se autogenera con Categoría + Atributos + Vehículos..." />
+                            placeholder="Se autogenera con categoría + compatibilidad vehicular..." />
                         <div v-if="!form.name && namePreview" class="mt-1.5 px-2 py-1 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40">
                             <p class="text-xs text-amber-600 dark:text-amber-400">Preview: <span class="font-semibold">{{ namePreview }}</span></p>
                         </div>
@@ -696,49 +1055,84 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         />
                     </div>
                 </div>
+            </div>
 
-                <!-- SKU Base + Código Alterno en 2 cols -->
-                <div class="grid grid-cols-2 gap-4">
+            <!-- ══ SECTION 2: Codigo + Estado ══ -->
+            <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Código y Estado</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            SKU Base <span class="text-gray-400 font-normal text-xs">(opcional)</span>
+                            Código <span class="text-gray-400 font-normal text-xs">(opcional)</span>
                         </label>
-                        <input v-model="form.sku_base" type="text" @input="onSkuBaseInput"
+                        <input v-model="form.sku_base" type="text"
                             class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
-                            placeholder="Se genera automaticamente o ingresa manualmente" />
+                            placeholder="Ingresa manualmente el código" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Código Alterno</label>
-                        <input v-model="form.alternate_code" type="text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="Referencia cruzada opcional" />
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
+                        <select v-model="form.status"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white">
+                            <option value="active">Activo</option>
+                            <option value="pending">Pendiente</option>
+                            <option value="discontinued">Descontinuado</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION 3: Codigos alternos ══ -->
+            <div class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-border dark:bg-card">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Códigos alternos</h2>
+                <div class="grid gap-3 sm:grid-cols-12 items-end">
+                    <div class="sm:col-span-5">
+                        <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Código <span class="text-red-500">*</span></label>
+                        <input v-model="refInput" type="text" @keydown.enter.prevent="addRef"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
+                            placeholder="Ej: 123-456-ABC" />
+                    </div>
+                    <div class="sm:col-span-4">
+                        <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Marca</label>
+                        <SearchableSelect
+                            :options="oemBrandOptions"
+                            :model-value="refManufacturerInput"
+                            @update:model-value="value => refManufacturerInput = (value as string | null)"
+                            :loading="loadingBrands"
+                            placeholder="Sin marca"
+                            search-placeholder="Buscar marca..."
+                            :clearable="true"
+                        />
+                    </div>
+                    <div class="sm:col-span-3">
+                        <button type="button" @click="addRef" :disabled="!refInput.trim()"
+                            class="w-full rounded-md bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-40">
+                            Agregar
+                        </button>
                     </div>
                 </div>
 
-                <!-- Notas -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Notas internas</label>
-                    <textarea v-model="form.description" rows="2"
-                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white resize-none"
-                        placeholder="Notas internas del producto..."></textarea>
-                </div>
-
-                <!-- Especificaciones técnicas de categoría (si aplica) -->
-                <div v-if="variantAttributes.length > 0" class="pt-3 border-t border-gray-100 dark:border-border">
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1">
-                        <Wrench class="w-3 h-3" /> Especificaciones Técnicas
-                    </label>
-                    <div class="space-y-3">
-                        <div v-for="(attr, index) in variantAttributes" :key="index">
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                                {{ attr.name }} <span v-if="attr.unit" class="text-gray-400">({{ attr.unit }})</span>
-                                <span v-if="attr.required" class="text-red-500">*</span>
-                            </label>
-                            <input v-model="attr.value" type="text" :required="attr.required"
-                                class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                :placeholder="`${attr.name}...`" />
-                        </div>
+                <div class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background">
+                    <div v-if="addedRefs.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                        No hay códigos alternos agregados.
                     </div>
+                    <table v-else class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 dark:bg-card">
+                            <tr>
+                                <th class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Código</th>
+                                <th class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Marca</th>
+                                <th class="w-12 px-4 py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-border/50">
+                            <tr v-for="(ref, idx) in addedRefs" :key="`${ref.oem_code}-${ref.manufacturer || ''}-${idx}`">
+                                <td class="px-4 py-2 font-mono text-gray-900 dark:text-white">{{ ref.oem_code }}</td>
+                                <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ ref.manufacturer || '-' }}</td>
+                                <td class="px-4 py-2 text-right">
+                                    <button type="button" @click="removeRef(idx)" class="text-red-500 hover:text-red-700 text-xs font-semibold">Eliminar</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -748,8 +1142,8 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                     class="w-full flex items-center justify-between px-5 py-4 text-left">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-semibold text-gray-900 dark:text-white">Compatibilidad Vehicular</span>
-                        <span v-if="addedEngines.length > 0 || isUniversal" class="text-xs px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300">
-                            {{ isUniversal ? 'Universal' : `${addedEngines.length} motor(es)` }}
+                        <span v-if="addedEngines.length > 0 || addedChassis.length > 0 || allEnginesFlag || allChassisFlag || isUniversal" class="text-xs px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300">
+                            {{ compatibilitySummary }}
                         </span>
                     </div>
                     <span class="text-xs text-gray-400">{{ (form as any)._showVehicle ? '▲ Ocultar' : '▼ Expandir' }}</span>
@@ -862,8 +1256,8 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                             Chasis
                                             <span v-if="selectedChassisIds.length > 0" class="ml-1 text-teal-600">({{ selectedChassisIds.length }} seleccionados)</span>
                                         </label>
-                                        <button v-if="selectedModelId" type="button" @click="openInline('vehicleChassis')" class="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
-                                            <Plus class="h-3 w-3" />
+                                        <button v-if="selectedModelId" type="button" @click="openInline('vehicleChassis')" class="text-xs font-medium text-teal-600 hover:text-teal-700 hover:underline underline-offset-2">
+                                            No aparece el VIN/chasis? Agrégalo aquí
                                         </button>
                                     </div>
                                     <div v-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">Selecciona un modelo primero</div>
@@ -871,8 +1265,10 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                     <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
                                         <label v-for="chassis in vehicleChassisList" :key="chassis.id" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border" :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedChassisIds.includes(chassis.id), 'opacity-50': addedChassis.some(c => c.chassis_id === chassis.id) }">
                                             <input type="checkbox" :value="chassis.id" v-model="selectedChassisIds" :disabled="addedChassis.some(c => c.chassis_id === chassis.id)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                                            <span class="font-mono text-sm text-gray-900 dark:text-white">{{ chassis.code }}</span>
-                                            <span v-if="chassis.name" class="text-xs text-gray-500">{{ chassis.name }}</span>
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-sm font-semibold text-gray-900 dark:text-white truncate">{{ getChassisOptionDetail(chassis) }}</p>
+                                                <p v-if="chassis.name" class="text-xs text-gray-500 truncate">{{ chassis.name }}</p>
+                                            </div>
                                             <span v-if="addedChassis.some(c => c.chassis_id === chassis.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
                                         </label>
                                     </div>
@@ -894,7 +1290,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                         <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Tipo</th>
                                         <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Vehículo</th>
                                         <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Especificación</th>
-                                        <th class="w-8 px-2 py-2"></th>
+                                        <th class="w-10 px-2 py-2"></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-border/50">
@@ -921,66 +1317,119 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         </div>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-white mb-1">Referencias Cruzadas (OEM)</label>
-                        <div class="flex gap-2 mb-2">
-                            <input v-model="refInput" type="text" @keydown.enter.prevent="addRef"
-                                class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
-                                placeholder="Bosch B123, OEM... y Enter" />
-                            <button type="button" @click="addRef" :disabled="!refInput.trim()"
-                                class="rounded-md bg-indigo-600 dark:bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40">
-                                +
-                            </button>
-                        </div>
-                        <div v-if="addedRefs.length > 0" class="flex flex-wrap gap-1.5">
-                            <span v-for="(ref, idx) in addedRefs" :key="ref"
-                                class="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 px-2 py-0.5 text-xs font-mono">
-                                {{ ref }}
-                                <button type="button" @click="removeRef(idx)" class="text-indigo-600 hover:text-red-500">&times;</button>
-                            </span>
-                        </div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION 5: Atributos ══ -->
+            <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-indigo-500">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1">
+                    <Wrench class="w-4 h-4" /> Atributos
+                </h2>
+                <div v-if="variantAttributes.length === 0" class="rounded-md border border-dashed border-gray-300 dark:border-border px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    Selecciona una categoría con atributos por defecto para completar esta sección.
+                </div>
+                <div v-else class="space-y-3">
+                    <div v-for="(attr, index) in variantAttributes" :key="index">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                            {{ attr.name }} <span v-if="attr.unit" class="text-gray-400">({{ attr.unit }})</span>
+                            <span v-if="attr.required" class="text-red-500">*</span>
+                        </label>
+                        <input v-model="attr.value" type="text" :required="attr.required"
+                            class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                            :placeholder="`${attr.name}...`" />
                     </div>
                 </div>
             </div>
 
-            <!-- ══ Vinculación VIN (fuera de compatibilidad vehicular) ══ -->
-            <div class="rounded-xl bg-white shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-cyan-500">
-                <div class="px-5 py-4">
-                    <h2 class="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">
-                        Vinculación VIN
-                        <span class="text-gray-400 font-normal text-xs">(opcional)</span>
-                    </h2>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                        Agrega VINs específicos que deben vincularse con este producto.
-                    </p>
+            <!-- ══ SECTION 6: Upsales ══ -->
+            <div class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-border dark:bg-card border-l-4 border-l-violet-500">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Upsales</h2>
 
-                    <div class="flex gap-2 mb-2">
-                        <input
-                            v-model="vinInput"
-                            type="text"
-                            @keydown.enter.prevent="addVin"
-                            class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white font-mono uppercase"
-                            placeholder="VIN... y Enter"
-                        />
-                        <button
-                            type="button"
-                            @click="addVin"
-                            :disabled="!vinInput.trim()"
-                            class="rounded-md bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-40"
-                        >
-                            +
+                <div class="grid gap-4 sm:grid-cols-12 items-end">
+                    <div class="sm:col-span-6">
+                        <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Buscar producto <span class="text-red-500">*</span></label>
+                        <AsyncProductCombobox :model-value="selectedUpsaleProduct?.id ?? null" @select="selectedUpsaleProduct = $event" />
+                    </div>
+                    <div class="sm:col-span-3">
+                        <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Tipo de relación</label>
+                        <select v-model="upsaleRelationshipType"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white">
+                            <option value="compatible">Compatible</option>
+                            <option value="substitute">Sustituto</option>
+                            <option value="upgrade">Upgrade</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-3">
+                        <button type="button" @click="addUpsale" :disabled="!selectedUpsaleProduct"
+                            class="w-full rounded-md bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-40">
+                            Agregar upsale
                         </button>
                     </div>
+                </div>
 
-                    <div v-if="addedVins.length > 0" class="flex flex-wrap gap-1.5">
-                        <span
-                            v-for="(vin, idx) in addedVins"
-                            :key="vin"
-                            class="inline-flex items-center gap-1 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300 px-2 py-0.5 text-xs font-mono"
-                        >
-                            {{ vin }}
-                            <button type="button" @click="removeVin(idx)" class="text-cyan-600 hover:text-red-500">&times;</button>
-                        </span>
+                <div class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background">
+                    <div v-if="pendingUpsales.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                        No hay upsales pendientes por vincular.
+                    </div>
+                    <table v-else class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 dark:bg-card">
+                            <tr>
+                                <th class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Producto</th>
+                                <th class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Relacion</th>
+                                <th class="w-12 px-4 py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-border/50">
+                            <tr v-for="item in pendingUpsales" :key="item.id">
+                                <td class="px-4 py-2 text-gray-900 dark:text-white">
+                                    <span class="font-mono">{{ item.sku_base }}</span>
+                                    <span class="text-gray-500"> - {{ item.name }}</span>
+                                </td>
+                                <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ getUpsaleRelationshipLabel(item.relationship_type) }}</td>
+                                <td class="px-4 py-2 text-right">
+                                    <button type="button" @click="removeUpsale(item.id)" class="text-red-500 hover:text-red-700" title="Quitar upsale">
+                                        <X class="h-4 w-4" />
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══ SECTION 7: Notas ══ -->
+            <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-slate-400">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">Notas</h2>
+                <textarea v-model="form.description" rows="3"
+                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white resize-none"
+                    placeholder="Notas internas del producto..."></textarea>
+            </div>
+
+            <!-- ══ SECTION 8: Imagen del Producto ══ -->
+            <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border">
+                <div class="flex items-center justify-between gap-3 mb-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Imagen del Producto</h2>
+                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90">
+                        Seleccionar imágenes
+                        <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden" @change="handlePendingImageSelection" />
+                    </label>
+                </div>
+
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    Las imágenes se cargarán automáticamente al crear el producto.
+                </p>
+
+                <div v-if="pendingImages.length === 0" class="rounded-md border border-dashed border-gray-300 dark:border-border px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No hay imágenes seleccionadas.
+                </div>
+                <div v-else class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div v-for="item in pendingImages" :key="item.tempId" class="relative rounded-lg overflow-hidden border border-gray-200 dark:border-border bg-gray-50 dark:bg-muted">
+                        <img :src="item.previewUrl" :alt="item.file.name" class="h-28 w-full object-cover" />
+                        <button type="button" @click="removePendingImage(item.tempId)"
+                            class="absolute top-1 right-1 rounded-full bg-black/60 text-white p-1 hover:bg-black/80" title="Quitar imagen">
+                            <X class="h-3 w-3" />
+                        </button>
+                        <p class="px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 truncate" :title="item.file.name">{{ item.file.name }}</p>
                     </div>
                 </div>
             </div>
@@ -997,7 +1446,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                     {{ pendingVariants.length }} pendiente{{ pendingVariants.length > 1 ? 's' : '' }}
                                 </span>
                             </h2>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Agrega variantes adicionales con su propia marca, atributos y precio. Se guardarán junto con el producto.</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Agrega variantes adicionales con su propia marca, precios e inventario. Se guardarán junto con el producto.</p>
                         </div>
                     </div>
                 </div>
@@ -1006,7 +1455,6 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         :category-id="form.category_id"
                         :sku-base="form.sku_base || undefined"
                         :product-name="form.name"
-                        :default-variant-attributes="variantAttributes"
                         :category-formula="categoryFormula"
                         :category-applies-itbm="categoryAppliesItbm"
                         :category-itbm-percent="categoryItbmPercent"
@@ -1028,7 +1476,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                        inlineModal === 'vehicleMake' ? 'Nueva Marca Vehicular' :
                        inlineModal === 'vehicleModel' ? 'Nuevo Modelo' :
                        inlineModal === 'vehicleEngine' ? 'Nuevo Motor' :
-                       inlineModal === 'vehicleChassis' ? 'Nuevo Chasis' : '' }}
+                              inlineModal === 'vehicleChassis' ? 'Nuevo VIN/Chasis' : '' }}
                 </DialogTitle>
             </DialogHeader>
             <form @submit.prevent="submitInline" class="space-y-4 py-2">
@@ -1076,6 +1524,29 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                             <Input v-model.number="inlineForm.year_to" type="number" placeholder="2024" />
                         </div>
                     </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <Label>Chasis (Opcional)</Label>
+                            <button
+                                type="button"
+                                @click="openModelChassisQuickCreate"
+                                class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                                title="Crear nuevo chasis"
+                            >
+                                <Plus class="h-3 w-3" />
+                                Crear
+                            </button>
+                        </div>
+                        <SearchableSelect
+                            :options="vehicleChassisCatalogOptions"
+                            :model-value="selectedModelGenerationChassisId"
+                            @update:model-value="v => selectedModelGenerationChassisId = v as number | null"
+                            :loading="loadingVehicleChassisCatalog"
+                            placeholder="-- Selecciona chasis --"
+                            search-placeholder="Buscar chasis..."
+                            :clearable="true"
+                        />
+                    </div>
                 </template>
                 <template v-if="inlineModal === 'vehicleEngine'">
                     <div class="grid grid-cols-2 gap-4">
@@ -1092,12 +1563,12 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 <template v-if="inlineModal === 'vehicleChassis'">
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
-                            <Label>Código / Nombre <span class="text-red-500">*</span></Label>
-                            <Input v-model="inlineForm.code" required placeholder="Ej: P90" />
+                            <Label>VIN / Código de Chasis <span class="text-red-500">*</span></Label>
+                            <Input v-model="inlineForm.code" required placeholder="Ej: P90 o JTDBR32E..." />
                         </div>
                         <div class="space-y-2">
                             <Label>Descripción Adicional</Label>
-                            <Input v-model="inlineForm.name" placeholder="Ej: Serie P90" />
+                            <Input v-model="inlineForm.name" placeholder="Ej: Serie P90 o generación" />
                         </div>
                     </div>
                 </template>

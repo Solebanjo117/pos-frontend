@@ -16,8 +16,11 @@ const emit = defineEmits<{
 }>()
 
 const modalRef = ref<HTMLDivElement | null>(null)
-
 const variants = computed(() => props.product?.variants ?? [])
+
+// Helpers
+const getStock = (v: ProductVariant): number => v.total_stock ?? 0
+const canSelectVariant = (variant: ProductVariant): boolean => getStock(variant) > 0
 
 // Multi-select state: variantId -> quantity chosen (0 = not selected)
 const selected = ref<Record<number, number>>({})
@@ -32,11 +35,16 @@ watch(() => props.show, (isOpen) => {
 
 // Computed: array of selected variant ids that have qty > 0
 const selectedCount = computed(() =>
-    Object.values(selected.value).filter(q => q > 0).length
+    variants.value.filter(v => canSelectVariant(v) && (selected.value[v.id] ?? 0) > 0).length
 )
 
 // Toggle checkbox (sets qty to 1 if unchecked, or removes selection)
 const toggleVariant = (variantId: number) => {
+    const variant = variants.value.find(v => v.id === variantId)
+    if (!variant || !canSelectVariant(variant)) {
+        return
+    }
+
     if (selected.value[variantId] > 0) {
         delete selected.value[variantId]
     } else {
@@ -48,7 +56,15 @@ const isSelected = (variantId: number) => (selected.value[variantId] ?? 0) > 0
 const getQty = (variantId: number) => selected.value[variantId] ?? 1
 
 const setQty = (variantId: number, qty: number) => {
+    const variant = variants.value.find(v => v.id === variantId)
+    if (!variant) return
+
+    const stock = getStock(variant)
+    if (stock <= 0) return
+
     if (qty < 1) qty = 1
+    if (qty > stock) qty = stock
+
     if (isSelected(variantId)) {
         selected.value[variantId] = qty
     }
@@ -57,8 +73,16 @@ const setQty = (variantId: number, qty: number) => {
 // Confirm and emit all selected variants
 const confirmSelection = () => {
     const selections = variants.value
-        .filter(v => isSelected(v.id))
-        .map(v => ({ variant: v, quantity: selected.value[v.id] ?? 1 }))
+        .filter(v => isSelected(v.id) && canSelectVariant(v))
+        .map(v => {
+            const stock = getStock(v)
+            const requested = selected.value[v.id] ?? 1
+            return {
+                variant: v,
+                quantity: Math.max(1, Math.min(stock, requested)),
+            }
+        })
+
     if (selections.length === 0) return
     emit('select-multiple', selections)
 }
@@ -69,9 +93,6 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 onMounted(() => window.addEventListener('keydown', handleKeydown))
 onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
-
-// Helpers
-const getStock = (v: ProductVariant): number => v.total_stock ?? 0
 
 const stockClass = (stock: number) => {
     if (stock > 5) return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
@@ -195,19 +216,23 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                                         v-for="variant in variants"
                                         :key="variant.id"
                                         @click="toggleVariant(variant.id)"
-                                        class="group cursor-pointer transition-colors"
-                                        :class="isSelected(variant.id)
-                                            ? 'bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/30'
-                                            : 'hover:bg-gray-50/70 dark:hover:bg-muted/30'"
+                                        class="group transition-colors"
+                                        :class="!canSelectVariant(variant)
+                                            ? 'cursor-not-allowed opacity-60 bg-gray-50/40 dark:bg-muted/20'
+                                            : isSelected(variant.id)
+                                                ? 'cursor-pointer bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/30'
+                                                : 'cursor-pointer hover:bg-gray-50/70 dark:hover:bg-muted/30'"
                                     >
                                         <!-- Checkbox -->
                                         <td class="pl-4 pr-2 py-4" @click.stop="toggleVariant(variant.id)">
                                             <div class="flex items-center justify-center">
                                                 <div
                                                     class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0"
-                                                    :class="isSelected(variant.id)
-                                                        ? 'bg-indigo-600 border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500'
-                                                        : 'border-gray-300 dark:border-border bg-white dark:bg-muted'"
+                                                    :class="!canSelectVariant(variant)
+                                                        ? 'border-gray-200 dark:border-border/60 bg-gray-100 dark:bg-muted/50'
+                                                        : isSelected(variant.id)
+                                                            ? 'bg-indigo-600 border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500'
+                                                            : 'border-gray-300 dark:border-border bg-white dark:bg-muted'"
                                                 >
                                                     <svg v-if="isSelected(variant.id)" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
@@ -228,7 +253,7 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                                                     </span>
                                                 </div>
                                                 <span class="text-sm font-semibold text-gray-900 dark:text-white transition-colors"
-                                                    :class="isSelected(variant.id) ? 'text-indigo-700 dark:text-indigo-300' : 'group-hover:text-indigo-600'">
+                                                    :class="isSelected(variant.id) ? 'text-indigo-700 dark:text-indigo-300' : (canSelectVariant(variant) ? 'group-hover:text-indigo-600' : '')">
                                                     {{ variant.brand?.name ?? 'Sin marca' }}
                                                 </span>
                                             </div>
@@ -278,10 +303,13 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                                                 @input="setQty(variant.id, Number(($event.target as HTMLInputElement).value))"
                                                 type="number"
                                                 min="1"
+                                                :max="getStock(variant)"
                                                 class="w-20 text-center rounded-lg border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-muted px-2 py-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-300 focus:ring-2 focus:ring-indigo-400 focus:outline-none"
                                                 @click.stop
                                             />
-                                            <span v-else class="text-xs text-gray-300 dark:text-gray-600">—</span>
+                                            <span v-else class="text-xs" :class="canSelectVariant(variant) ? 'text-gray-300 dark:text-gray-600' : 'text-red-400 dark:text-red-500'">
+                                                {{ canSelectVariant(variant) ? '—' : 'Sin stock' }}
+                                            </span>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -291,7 +319,7 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                         <!-- ═══════════ FOOTER ═══════════ -->
                         <div class="shrink-0 px-6 py-3 border-t border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card gap-3">
                             <p class="text-xs text-gray-400 flex-1">
-                                <span v-if="selectedCount === 0">Haz clic en una fila para seleccionar variantes</span>
+                                <span v-if="selectedCount === 0">Haz clic en una fila para seleccionar variantes con stock</span>
                                 <span v-else class="text-indigo-600 dark:text-indigo-400 font-medium">{{ selectedCount }} variante{{ selectedCount !== 1 ? 's' : '' }} seleccionada{{ selectedCount !== 1 ? 's' : '' }}</span>
                             </p>
                             <button

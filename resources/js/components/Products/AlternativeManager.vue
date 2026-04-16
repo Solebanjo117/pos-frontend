@@ -104,7 +104,7 @@ onMounted(() => {
         <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-card">
             <h3 class="mb-4 text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 <Plus class="h-4 w-4" />
-                Vincular Producto Alternativo
+                Upsales
             </h3>
             
             <div class="grid gap-4 sm:grid-cols-12 items-end">
@@ -130,7 +130,7 @@ onMounted(() => {
                         class="flex w-full items-center justify-center rounded-md bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 dark:hover:bg-primary/90 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                         <span v-if="adding">...</span>
-                        <span v-else>Vincular</span>
+                        <span v-else>Agregar upsale</span>
                     </button>
                 </div>
             </div>
@@ -140,7 +140,7 @@ onMounted(() => {
         <!-- List -->
         <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-background">
             <div class="border-b border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
-                <h3 class="text-base font-semibold text-gray-900 dark:text-white">Productos Alternativos</h3>
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white">Upsales vinculados</h3>
             </div>
             
             <div v-if="loading && alternatives.length === 0" class="p-8 text-center text-gray-500">
@@ -148,7 +148,7 @@ onMounted(() => {
             </div>
 
             <div v-else-if="alternatives.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
-                No hay alternativas vinculadas.
+                No hay upsales vinculados.
             </div>
 
             <table v-else class="min-w-full divide-y divide-gray-200 dark:divide-border">

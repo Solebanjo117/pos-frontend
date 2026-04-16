@@ -2,36 +2,61 @@
 import { ref, computed } from 'vue'
 import type { Product } from '@/types/product'
 import ProductCard from './ProductCard.vue'
-import CatalogFilters from './CatalogFilters.vue'
+import ProductFiltersComponent from './ProductFilters.vue'
+import type { ProductFilterValues } from './ProductFilters.vue'
 import ProductDetailModal from './ProductDetailModal.vue'
 
-interface CatalogFilterState {
-    categories: string[]
-    priceRange: [number, number]
-    availability: 'all' | 'in-stock' | 'out-of-stock'
-    brands: string[]
+interface FilterOption {
+    id: number
+    name: string
 }
 
 interface Props {
     products: Product[]
     loading: boolean
+    categories?: FilterOption[]
+    brands?: FilterOption[]
+    currentPage?: number
+    lastPage?: number
+    total?: number
+    pageSize?: number
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    categories: () => [],
+    brands: () => [],
+    currentPage: 1,
+    lastPage: 1,
+    total: 0,
+    pageSize: 20,
+})
+
+const emit = defineEmits<{
+    (e: 'prev-page'): void
+    (e: 'next-page'): void
+}>()
 
 // Local state
-const catalogViewMode = ref<'grid' | 'list'>('grid')
+const catalogViewMode = ref<'grid' | 'list'>('list')
 const selectedProduct = ref<Product | null>(null)
 const searchQuery = ref('')
-const catalogFilters = ref<CatalogFilterState>({
-    categories: [],
-    priceRange: [0, 50000],
-    availability: 'all',
-    brands: [],
+const sidebarFilterValues = ref<ProductFilterValues>({
+    sku: '',
+    category_ids: [],
+    brand_ids: [],
+    min_price: undefined,
+    max_price: undefined,
+    in_stock: false,
 })
+
+const handleSidebarFilterChange = (newFilters: ProductFilterValues) => {
+    sidebarFilterValues.value = newFilters
+}
 
 // Extract unique categories and brands from products
 const availableCategories = computed(() => {
+    if (props.categories.length > 0) return props.categories
+
     const cats = new Map<number, string>()
     props.products.forEach(p => {
         if (p.category) cats.set(p.category.id, p.category.name)
@@ -40,6 +65,8 @@ const availableCategories = computed(() => {
 })
 
 const availableBrands = computed(() => {
+    if (props.brands.length > 0) return props.brands
+
     const brandMap = new Map<number, string>()
     props.products.forEach(p => {
         p.variants?.forEach(v => {
@@ -52,37 +79,75 @@ const availableBrands = computed(() => {
     return Array.from(brandMap, ([id, name]) => ({ id, name }))
 })
 
+const normalizeQuery = (value?: string) => (value ?? '').trim().toLowerCase()
+
+const searchMatchesProduct = (product: Product, query: string) => {
+    const matchesName = product.name.toLowerCase().includes(query)
+    const matchesSku = product.sku_base?.toLowerCase().includes(query)
+    const matchesVariantSku = product.variants?.some(v => v.sku?.toLowerCase().includes(query))
+    const matchesSpecs = product.key_attributes?.some(a =>
+        `${a.name} ${a.value} ${a.unit ?? ''}`.toLowerCase().includes(query)
+    ) ?? false
+
+    return matchesName || matchesSku || matchesVariantSku || matchesSpecs
+}
+
+const getComparablePrice = (product: Product): number | null => {
+    const prices = [
+        product.pricing?.base_price,
+        product.default_variant?.pricing?.base_price,
+        ...(product.variants?.map(v => v.pricing?.base_price) ?? []),
+    ]
+        .map(value => Number(value))
+        .filter(value => Number.isFinite(value) && value >= 0)
+
+    if (prices.length === 0) return null
+    return Math.min(...prices)
+}
+
 // Filter products locally
 const filteredProducts = computed(() => {
+    const searchTerms = [
+        normalizeQuery(searchQuery.value),
+        normalizeQuery(sidebarFilterValues.value.sku),
+    ].filter(Boolean)
+
     return props.products.filter(product => {
-        // Text search
-        if (searchQuery.value) {
-            const q = searchQuery.value.toLowerCase()
-            const matchesName = product.name.toLowerCase().includes(q)
-            const matchesSku = product.sku_base?.toLowerCase().includes(q)
-            const matchesVariantSku = product.variants?.some(v => v.sku?.toLowerCase().includes(q))
-            const matchesSpecs = product.key_attributes?.some(a =>
-                `${a.name} ${a.value} ${a.unit ?? ''}`.toLowerCase().includes(q)
-            ) ?? false
-            if (!matchesName && !matchesSku && !matchesVariantSku && !matchesSpecs) return false
+        // Text search (header + sidebar search terms must match)
+        if (searchTerms.length > 0) {
+            const matchesAllTerms = searchTerms.every(query => searchMatchesProduct(product, query))
+            if (!matchesAllTerms) return false
         }
 
         // Category filter
-        if (catalogFilters.value.categories.length > 0) {
-            if (!product.category || !catalogFilters.value.categories.includes(product.category.name)) return false
+        if (sidebarFilterValues.value.category_ids.length > 0) {
+            if (!product.category || !sidebarFilterValues.value.category_ids.includes(product.category.id)) return false
         }
 
-        // Availability filter
+        // Stock filter
         const stock = product.total_stock ?? 0
-        if (catalogFilters.value.availability === 'in-stock' && stock <= 0) return false
-        if (catalogFilters.value.availability === 'out-of-stock' && stock > 0) return false
+        if (sidebarFilterValues.value.in_stock && stock <= 0) return false
 
         // Brand filter
-        if (catalogFilters.value.brands.length > 0) {
-            const productBrands = product.variants?.map(v => v.brand?.name).filter(Boolean) ?? []
-            if (product.default_variant?.brand) productBrands.push(product.default_variant.brand.name)
-            const hasMatch = catalogFilters.value.brands.some(b => productBrands.includes(b))
+        if (sidebarFilterValues.value.brand_ids.length > 0) {
+            const productBrandIds = new Set<number>()
+            product.variants?.forEach(v => {
+                if (v.brand?.id) productBrandIds.add(v.brand.id)
+            })
+            if (product.default_variant?.brand?.id) {
+                productBrandIds.add(product.default_variant.brand.id)
+            }
+            const hasMatch = sidebarFilterValues.value.brand_ids.some(id => productBrandIds.has(id))
             if (!hasMatch) return false
+        }
+
+        // Price range filter
+        const productPrice = getComparablePrice(product)
+        if (sidebarFilterValues.value.min_price != null) {
+            if (productPrice == null || productPrice < sidebarFilterValues.value.min_price) return false
+        }
+        if (sidebarFilterValues.value.max_price != null) {
+            if (productPrice == null || productPrice > sidebarFilterValues.value.max_price) return false
         }
 
         return true
@@ -95,6 +160,25 @@ const selectProduct = (product: Product) => {
 
 const closeDetail = () => {
     selectedProduct.value = null
+}
+
+const canGoPrev = computed(() => props.currentPage > 1)
+const canGoNext = computed(() => props.currentPage < props.lastPage)
+const rangeStart = computed(() => {
+    if (props.total <= 0) return 0
+    return (props.currentPage - 1) * props.pageSize + 1
+})
+const rangeEnd = computed(() => {
+    if (props.total <= 0) return 0
+    return Math.min(props.currentPage * props.pageSize, props.total)
+})
+
+const requestPrevPage = () => {
+    if (!props.loading && canGoPrev.value) emit('prev-page')
+}
+
+const requestNextPage = () => {
+    if (!props.loading && canGoNext.value) emit('next-page')
 }
 </script>
 
@@ -151,8 +235,13 @@ const closeDetail = () => {
         <div class="flex gap-6">
             <!-- Sidebar Filters -->
             <aside class="w-64 flex-shrink-0 hidden lg:block">
-                <CatalogFilters :filters="catalogFilters" :available-categories="availableCategories"
-                    :available-brands="availableBrands" @update:filters="catalogFilters = $event" />
+                <ProductFiltersComponent
+                    :model-value="sidebarFilterValues"
+                    @update:model-value="handleSidebarFilterChange"
+                    :categories="availableCategories"
+                    :brands="availableBrands"
+                    :collapsible="false"
+                />
             </aside>
 
             <!-- Product Grid/List -->
@@ -184,6 +273,62 @@ const closeDetail = () => {
                 ]">
                     <ProductCard v-for="product in filteredProducts" :key="product.id" :product="product"
                         :view-mode="catalogViewMode" @select="selectProduct" />
+                </div>
+
+                <!-- Pagination -->
+                <div
+                    v-if="!loading && props.total > 0"
+                    class="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 dark:border-border dark:bg-card"
+                >
+                    <div class="flex flex-1 justify-between sm:hidden">
+                        <button
+                            @click="requestPrevPage"
+                            :disabled="!canGoPrev"
+                            class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80"
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            @click="requestNextPage"
+                            :disabled="!canGoNext"
+                            class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80"
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+
+                    <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm text-gray-900 dark:text-white">
+                                Mostrando
+                                <span class="font-medium">{{ rangeStart }}</span>
+                                a
+                                <span class="font-medium">{{ rangeEnd }}</span>
+                                de
+                                <span class="font-medium">{{ props.total }}</span>
+                                productos
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button
+                                @click="requestPrevPage"
+                                :disabled="!canGoPrev"
+                                class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80"
+                            >
+                                Anterior
+                            </button>
+                            <span class="flex items-center px-4 text-sm text-gray-900 dark:text-white">
+                                Página {{ props.currentPage }} de {{ props.lastPage }}
+                            </span>
+                            <button
+                                @click="requestNextPage"
+                                :disabled="!canGoNext"
+                                class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/80"
+                            >
+                                Siguiente
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </main>
         </div>

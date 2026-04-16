@@ -22,6 +22,11 @@ export interface SupplyListItem {
     created_at: string
 }
 
+export interface SupplyListAddItemResult {
+    item: SupplyListItem
+    stock_added: number
+}
+
 export const supplyListService = {
     /** Get all pending supply list items */
     async getItems(): Promise<SupplyListItem[]> {
@@ -39,9 +44,12 @@ export const supplyListService = {
         tax_rate?: number
         sale_price?: number
         notes?: string
-    }): Promise<SupplyListItem> {
+    }): Promise<SupplyListAddItemResult> {
         const { data } = await apiClient.post(BASE_URL, payload)
-        return data.data
+        return {
+            item: data.data,
+            stock_added: Number(data.stock_added ?? payload.quantity_needed ?? 1),
+        }
     },
 
     /** Update item in supply list (inline editing) */

@@ -1,22 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { Plus, Trash2, Edit2, Check, X, Lock } from 'lucide-vue-next'
 import { useProductAttributes, type ProductAttribute } from '@/composables/useProductAttributes'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     productId: number
     variantId?: number | null
-}>()
+    showVariantContext?: boolean
+}>(), {
+    variantId: null,
+    showVariantContext: true,
+})
+
+const scopedVariantId = computed(() => props.variantId ?? null)
 
 // Variant-scoped (or product-level if no variantId) editable attrs
 const {
     attributes,
     loading,
+    error,
     fetchAttributes,
     addAttribute,
     updateAttribute,
-    removeAttribute
-} = useProductAttributes(props.productId, props.variantId ?? null)
+    removeAttribute,
+    setVariantId,
+} = useProductAttributes(props.productId, scopedVariantId.value)
 
 // Product-level attrs for read-only reference (only when editing a variant)
 const {
@@ -28,29 +36,40 @@ const adding = ref(false)
 const newName = ref('')
 const newValue = ref('')
 const newUnit = ref('')
+const actionError = ref('')
 
 const editingId = ref<number | null>(null)
 const editName = ref('')
 const editValue = ref('')
 const editUnit = ref('')
 
-onMounted(async () => {
+watch(scopedVariantId, async (newVariantId) => {
+    setVariantId(newVariantId)
     await fetchAttributes()
-    if (props.variantId) {
+    if (newVariantId) {
+        await fetchProductAttrs()
+    }
+})
+
+onMounted(async () => {
+    setVariantId(scopedVariantId.value)
+    await fetchAttributes()
+    if (scopedVariantId.value) {
         await fetchProductAttrs()
     }
 })
 
 const handleAdd = async () => {
-    if (!newName.value || !newValue.value) return
+    if (!newName.value.trim() || !newValue.value.trim()) return
     adding.value = true
+    actionError.value = ''
     try {
-        await addAttribute(newName.value, newValue.value, newUnit.value)
+        await addAttribute(newName.value.trim(), newValue.value.trim(), newUnit.value.trim())
         newName.value = ''
         newValue.value = ''
         newUnit.value = ''
-    } catch (e) {
-        // handled by composable
+    } catch (e: any) {
+        actionError.value = e.response?.data?.message || error.value || 'No se pudo agregar el atributo.'
     } finally {
         adding.value = false
     }
@@ -68,17 +87,29 @@ const cancelEdit = () => {
 }
 
 const saveEdit = async (id: number) => {
+    if (!editName.value.trim() || !editValue.value.trim()) {
+        actionError.value = 'Nombre y valor son requeridos.'
+        return
+    }
+
+    actionError.value = ''
     try {
-        await updateAttribute(id, { name: editName.value, value: editValue.value, unit: editUnit.value })
+        await updateAttribute(id, {
+            name: editName.value.trim(),
+            value: editValue.value.trim(),
+            unit: editUnit.value.trim(),
+        })
         editingId.value = null
-    } catch (e) { /* */ }
+    } catch (e: any) {
+        actionError.value = e.response?.data?.message || error.value || 'No se pudo actualizar el atributo.'
+    }
 }
 </script>
 
 <template>
     <div class="space-y-6">
         <!-- Variant context banner -->
-        <div v-if="variantId" class="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2.5 text-sm text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
+        <div v-if="scopedVariantId && showVariantContext" class="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2.5 text-sm text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
             <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             Editando especificaciones <strong>propias de esta variante</strong>. Los valores aquí <span class="font-semibold">sobreescriben</span> los del producto base al mostrar el detalle.
         </div>
@@ -87,7 +118,7 @@ const saveEdit = async (id: number) => {
         <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-card">
             <h3 class="mb-4 text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 <Plus class="h-4 w-4" />
-                {{ variantId ? 'Agregar Especificación de Variante' : 'Agregar Especificación' }}
+                {{ scopedVariantId ? 'Agregar Especificación de Variante' : 'Agregar Especificación' }}
             </h3>
 
             <div class="grid gap-4 sm:grid-cols-12 items-end">
@@ -117,13 +148,15 @@ const saveEdit = async (id: number) => {
                     </button>
                 </div>
             </div>
+
+            <p v-if="actionError" class="mt-3 text-sm text-red-600">{{ actionError }}</p>
         </div>
 
         <!-- Variant-level (or product-level) editable specs -->
         <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-background">
             <div class="border-b border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-                    {{ variantId ? 'Especificaciones propias de la variante' : 'Especificaciones Técnicas' }}
+                    {{ scopedVariantId ? 'Especificaciones propias de la variante' : 'Especificaciones Técnicas' }}
                 </h3>
             </div>
 
@@ -132,7 +165,7 @@ const saveEdit = async (id: number) => {
             </div>
 
             <div v-else-if="attributes.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
-                {{ variantId ? 'Sin especificaciones propias. Las del producto base aplican por defecto.' : 'No hay especificaciones definidas. Agrega características técnicas para mejorar la búsqueda.' }}
+                {{ scopedVariantId ? 'Sin especificaciones propias. Las del producto base aplican por defecto.' : 'No hay especificaciones definidas. Agrega características técnicas para mejorar la búsqueda.' }}
             </div>
 
             <table v-else class="min-w-full divide-y divide-gray-200 dark:divide-border">
@@ -176,7 +209,7 @@ const saveEdit = async (id: number) => {
         </div>
 
         <!-- Product-level specs (read-only reference) — visible only when editing a variant -->
-        <div v-if="variantId && productAttrs.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border">
+        <div v-if="scopedVariantId && productAttrs.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border">
             <div class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-border dark:bg-card flex items-center gap-2">
                 <Lock class="h-3.5 w-3.5 text-gray-400" />
                 <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Especificaciones del producto base (solo referencia)</h3>

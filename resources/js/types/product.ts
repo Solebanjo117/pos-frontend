@@ -128,6 +128,7 @@ export interface AlternativeProduct extends Product {
 // Main Product Interface (Base Product)
 export interface Product {
     id: number
+    system_id?: string
     sku_base: string  // Base SKU (e.g., "ALT-12V-90A")
     name: string
     description?: string
@@ -149,6 +150,9 @@ export interface Product {
     variants_count?: number
     total_stock?: number
     fitment_status?: 'exact' | 'universal' | 'incompatible'
+    search_match_type?: 'product' | 'variant' | null
+    search_match_system_id?: string | null
+    search_match_variant_id?: number | null
     created_at: string
     updated_at: string
     // Optional loaded relationships
@@ -164,6 +168,7 @@ export interface Product {
 // Product Variant Interface (Brand-specific variant)
 export interface ProductVariant {
     id: number
+    system_id?: string
     product_id: number
     brand_id: number
     sku: string

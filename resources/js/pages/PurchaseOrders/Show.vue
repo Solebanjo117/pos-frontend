@@ -76,6 +76,10 @@ function isDailyPO(): boolean {
     return !purchaseOrder.value?.supplier
 }
 
+function hasPreAppliedStock(): boolean {
+    return !!purchaseOrder.value?.items?.some((item: any) => Number((item.pre_applied_quantity ?? item.pre_stock_applied_qty) || 0) > 0)
+}
+
 const paymentStatusColors: Record<string, string> = {
     pending: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
     partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
@@ -148,6 +152,15 @@ onMounted(async () => {
             <div v-if="loading" class="flex justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-primary"></div></div>
 
             <template v-else-if="purchaseOrder">
+                <div
+                    v-if="hasPreAppliedStock()"
+                    class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg p-4"
+                >
+                    <p class="text-sm text-amber-700 dark:text-amber-300">
+                        Aviso: esta OC viene desde POS con stock preaplicado. En recepcion solo se sumara la diferencia si se incrementan cantidades.
+                    </p>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border p-6">
                         <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Información</h2>
@@ -196,7 +209,12 @@ onMounted(async () => {
                                     <span v-else class="text-sm text-gray-400">—</span>
                                 </td>
                                 <td class="px-6 py-3 text-right text-sm">{{ item.quantity_ordered }}</td>
-                                <td class="px-6 py-3 text-right text-sm" :class="item.is_fully_received ? 'text-green-600 font-semibold' : ''">{{ item.quantity_received }}</td>
+                                <td class="px-6 py-3 text-right text-sm" :class="item.is_fully_received ? 'text-green-600 font-semibold' : ''">
+                                    {{ item.effective_received_quantity ?? item.quantity_received }}
+                                    <div v-if="(item.pre_applied_quantity ?? item.pre_stock_applied_qty ?? 0) > 0" class="text-[11px] text-amber-600 dark:text-amber-300">
+                                        POS: {{ item.pre_applied_quantity ?? item.pre_stock_applied_qty }} paq.
+                                    </div>
+                                </td>
                                 <td class="px-6 py-3 text-right text-sm text-gray-500">${{ Number(item.unit_cost).toFixed(2) }}</td>
                                 <td class="px-6 py-3 text-right text-sm font-medium">${{ Number(item.subtotal).toFixed(2) }}</td>
                                 <td class="px-6 py-3 text-center">

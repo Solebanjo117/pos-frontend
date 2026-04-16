@@ -14,6 +14,9 @@ export interface PurchaseOrderItem {
     }
     quantity_ordered: number
     quantity_received: number
+    pre_stock_applied_qty?: number
+    pre_applied_quantity?: number
+    effective_received_quantity?: number
     units_per_package: number
     total_units_ordered: number
     total_units_received: number

@@ -108,13 +108,18 @@ const nextImage = () => {
     currentImageIdx.value = currentImageIdx.value === productImages.value.length - 1 ? 0 : currentImageIdx.value + 1
 }
 
-const fetchImages = async () => {
+const fetchImages = async (productId: number = props.product.id) => {
     try {
-        const res = await apiClient.get(`/products/${props.product.id}/images`)
+        const res = await apiClient.get(`/products/${productId}/images`)
+        if (productId !== props.product.id) return
         productImages.value = res.data.data ?? []
+        currentImageIdx.value = 0
     } catch {
+        if (productId !== props.product.id) return
+        productImages.value = []
         if (props.product.image_url)
             productImages.value = [{ id: 0, url: props.product.image_url, original_filename: '', display_order: 0 }]
+        currentImageIdx.value = 0
     }
 }
 
@@ -154,10 +159,12 @@ const variantAttrsCache   = ref<Map<number, ProductAttribute[]>>(new Map())
 const loadingVariantAttrs = ref(false)
 
 const fetchVariantAttrs = async (variantId: number) => {
+    const productId = props.product.id
     if (variantAttrsCache.value.has(variantId)) return
     loadingVariantAttrs.value = true
     try {
-        const res = await apiClient.get(`/products/${props.product.id}/attributes`, { params: { variant_id: variantId } })
+        const res = await apiClient.get(`/products/${productId}/attributes`, { params: { variant_id: variantId } })
+        if (productId !== props.product.id) return
         variantAttrsCache.value.set(variantId, res.data.data ?? [])
         variantAttrsCache.value = new Map(variantAttrsCache.value)
     } catch (e) { console.error(e) }
@@ -192,10 +199,11 @@ const mergedSpecs = computed(() => {
 const vehicleRows    = ref<VehicleRow[]>([])
 const loadingVehicle = ref(false)
 
-const fetchVehicleCompatibility = async () => {
+const fetchVehicleCompatibility = async (productId: number = props.product.id) => {
     loadingVehicle.value = true
     try {
-        const res = await apiClient.get(`/products/${props.product.id}/compatibility`)
+        const res = await apiClient.get(`/products/${productId}/compatibility`)
+        if (productId !== props.product.id) return
         const compat = res.data.data ?? []
         vehicleRows.value = compat.map((c: any) => ({
             id: c.id,
@@ -210,6 +218,7 @@ const fetchVehicleCompatibility = async () => {
         console.error(e)
         vehicleRows.value = []
     } finally {
+        if (productId !== props.product.id) return
         loadingVehicle.value = false
     }
 }
@@ -233,35 +242,68 @@ const alternativesData = ref<AlternativeRecord[]>([])
 const loadingRefs      = ref(false)
 const showAlternatives = ref(false)
 
-// Tabs removed from layout
-// ── Mount ─────────────────────────────────────────────────────────────────────
-onMounted(async () => {
+const resetModalStateForProduct = () => {
+    productImages.value = []
+    currentImageIdx.value = 0
+    attributesData.value = []
+    variantAttrsCache.value = new Map()
+    vehicleRows.value = []
+    oemData.value = []
+    alternativesData.value = []
+    showAlternatives.value = false
+    activeVariantId.value = props.product.default_variant?.id ?? (variants.value[0]?.id ?? null)
+    quantities.value = Object.fromEntries(variants.value.map(v => [v.id, 1]))
+}
+
+const loadProductDetails = async () => {
+    const productId = props.product.id
+    resetModalStateForProduct()
     loadingAttrs.value = true
-    loadingRefs.value  = true
+    loadingRefs.value = true
 
     await Promise.all([
-        fetchImages(),
-        fetchVehicleCompatibility(),
+        fetchImages(productId),
+        fetchVehicleCompatibility(productId),
         (async () => {
             try {
-                const res = await apiClient.get(`/products/${props.product.id}/attributes`)
+                const res = await apiClient.get(`/products/${productId}/attributes`)
+                if (productId !== props.product.id) return
                 attributesData.value = res.data.data ?? []
             } catch (e) { console.error(e) }
-            finally { loadingAttrs.value = false }
+            finally {
+                if (productId !== props.product.id) return
+                loadingAttrs.value = false
+            }
         })(),
         (async () => {
             try {
                 const [oemRes, altRes] = await Promise.all([
-                    apiClient.get(`/products/${props.product.id}/oem-references`),
-                    apiClient.get(`/products/${props.product.id}/alternatives`),
+                    apiClient.get(`/products/${productId}/oem-references`),
+                    apiClient.get(`/products/${productId}/alternatives`),
                 ])
+                if (productId !== props.product.id) return
                 oemData.value          = oemRes.data.data ?? []
                 alternativesData.value = altRes.data.data ?? []
             } catch (e) { console.error(e) }
-            finally { loadingRefs.value = false }
+            finally {
+                if (productId !== props.product.id) return
+                loadingRefs.value = false
+            }
         })(),
     ])
-})
+}
+
+// Tabs removed from layout
+// ── Mount ─────────────────────────────────────────────────────────────────────
+onMounted(loadProductDetails)
+
+watch(
+    () => props.product.id,
+    (newProductId, previousProductId) => {
+        if (newProductId === previousProductId) return
+        loadProductDetails()
+    },
+)
 
 // ── Navigate to alternative product ──────────────────────────────────────────
 const loadingAltId = ref<number | null>(null)

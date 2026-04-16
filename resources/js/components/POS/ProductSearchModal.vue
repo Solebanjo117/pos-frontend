@@ -94,20 +94,30 @@ watch(() => props.show, (isOpen) => {
     selectedIds.value = new Set()
     internalSearchQuery.value = props.searchQuery || ''
     filterValues.value = defaultFilters()
+    filterValues.value.sku = internalSearchQuery.value
     sortValue.value = 'name_asc'
     showMobileFilters.value = false
     nextTick(() => searchInputRef.value?.focus())
   }
 })
 
+watch(internalSearchQuery, (value) => {
+  if (filterValues.value.sku !== value) {
+    filterValues.value = {
+      ...filterValues.value,
+      sku: value,
+    }
+  }
+})
+
 // Emit all filters+sort+query to parent for refetch
 const emitFilters = () => {
   const f = filterValues.value
+  const query = (internalSearchQuery.value || f.sku || '').trim()
   emit('search-in-modal', {
-    query: internalSearchQuery.value.trim(),
+    query,
     category_ids: f.category_ids.length > 0 ? f.category_ids : undefined,
     brand_ids: f.brand_ids.length > 0 ? f.brand_ids : undefined,
-    sku: f.sku || undefined,
     min_price: f.min_price ?? undefined,
     max_price: f.max_price ?? undefined,
     in_stock: f.in_stock || undefined,
@@ -118,6 +128,9 @@ const emitFilters = () => {
 // When filters change, auto-search
 const handleFilterChange = (newFilters: ProductFilterValues) => {
   filterValues.value = newFilters
+  if ((newFilters.sku ?? '') !== internalSearchQuery.value) {
+    internalSearchQuery.value = newFilters.sku ?? ''
+  }
   emitFilters()
 }
 
@@ -388,7 +401,7 @@ const submitSelection = () => {
                   v-model="internalSearchQuery"
                   @keyup.enter="handleInternalSearch"
                   type="text"
-                  placeholder="Buscar productos..."
+                  placeholder="Buscar por nombre, SKU, VIN, OEM, categoria..."
                   class="w-full pl-10 pr-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-700 dark:text-foreground placeholder:text-gray-400 transition-shadow"
                 />
               </div>

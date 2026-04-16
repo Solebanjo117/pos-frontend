@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
@@ -12,7 +12,7 @@ import ProductFiltersComponent from '@/components/Products/ProductFilters.vue'
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue'
 import ProductSort from '@/components/Products/ProductSort.vue'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
-import { ShoppingCart, Check, ChevronDown, ChevronUp, Info, Filter, Upload, Download, FileSpreadsheet } from 'lucide-vue-next'
+import { ShoppingCart, Check, Info, Filter, Upload, Download, FileSpreadsheet } from 'lucide-vue-next'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { useCategories } from '@/composables/useCategories'
 import { useBrands } from '@/composables/useBrands'
@@ -25,7 +25,6 @@ const { warehouses } = useWarehouses()
 const { categories, fetchCategories } = useCategories()
 const { brands, fetchBrands: fetchBrandsList } = useBrands()
 
-const showAdvancedFilters = ref(false)
 const showSidebarFilters = ref(true)
 const sidebarSortValue = ref('newest')
 
@@ -44,7 +43,7 @@ const handleSidebarFilterChange = async (newFilters: ProductFilterValues) => {
   // Map sidebar filter values to the main filters object
   filters.value.category_id = newFilters.category_ids.length > 0 ? newFilters.category_ids : undefined
   filters.value.brand_id = newFilters.brand_ids.length > 0 ? newFilters.brand_ids : undefined
-  filters.value.sku = newFilters.sku || undefined
+    filters.value.search = newFilters.sku || undefined
   filters.value.min_price = newFilters.min_price
   filters.value.max_price = newFilters.max_price
   filters.value.in_stock = newFilters.in_stock || undefined
@@ -222,7 +221,106 @@ const switchArchiveTab = async (tab: 'active' | 'archived') => {
 const sortField = ref<string>('created_at')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 
+type ProductsTableColumn = 'expander' | 'image' | 'sku' | 'product' | 'variants' | 'stock' | 'actions'
+
+const PRODUCTS_TABLE_WIDTH_STORAGE_KEY = 'products_index_table_column_widths_v1'
+const tableColumns: ProductsTableColumn[] = ['expander', 'image', 'sku', 'product', 'variants', 'stock', 'actions']
+const defaultColumnWidths: Record<ProductsTableColumn, number> = {
+    expander: 56,
+    image: 72,
+    sku: 170,
+    product: 360,
+    variants: 140,
+    stock: 120,
+    actions: 220,
+}
+const minColumnWidths: Record<ProductsTableColumn, number> = {
+    expander: 44,
+    image: 64,
+    sku: 130,
+    product: 240,
+    variants: 110,
+    stock: 96,
+    actions: 170,
+}
+const columnWidths = ref<Record<ProductsTableColumn, number>>({ ...defaultColumnWidths })
+const tableMinWidth = computed(() => tableColumns.reduce((total, column) => total + columnWidths.value[column], 0))
+
+let resizingColumn: ProductsTableColumn | null = null
+let resizeStartX = 0
+let resizeStartWidth = 0
+let suppressSortClickUntil = 0
+
+const getColumnStyle = (column: ProductsTableColumn) => {
+    const width = columnWidths.value[column]
+    return {
+        width: `${width}px`,
+        minWidth: `${width}px`,
+    }
+}
+
+const persistColumnWidths = () => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(PRODUCTS_TABLE_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths.value))
+}
+
+const loadColumnWidths = () => {
+    if (typeof window === 'undefined') return
+
+    const raw = window.localStorage.getItem(PRODUCTS_TABLE_WIDTH_STORAGE_KEY)
+    if (!raw) return
+
+    try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>
+        const loaded: Record<ProductsTableColumn, number> = { ...defaultColumnWidths }
+
+        for (const column of tableColumns) {
+            const value = parsed[column]
+            if (typeof value === 'number' && Number.isFinite(value)) {
+                loaded[column] = Math.max(minColumnWidths[column], Math.round(value))
+            }
+        }
+
+        columnWidths.value = loaded
+    } catch {
+        // Ignore invalid persisted values.
+    }
+}
+
+const handleColumnResizeMouseMove = (event: MouseEvent) => {
+    if (!resizingColumn) return
+
+    const deltaX = event.clientX - resizeStartX
+    const nextWidth = Math.round(resizeStartWidth + deltaX)
+    columnWidths.value[resizingColumn] = Math.max(minColumnWidths[resizingColumn], nextWidth)
+}
+
+const stopColumnResize = () => {
+    if (!resizingColumn) return
+
+    resizingColumn = null
+    suppressSortClickUntil = Date.now() + 150
+    window.removeEventListener('mousemove', handleColumnResizeMouseMove)
+    window.removeEventListener('mouseup', stopColumnResize)
+    persistColumnWidths()
+}
+
+const startColumnResize = (event: MouseEvent, column: ProductsTableColumn) => {
+    event.preventDefault()
+    event.stopPropagation()
+    suppressSortClickUntil = Date.now() + 400
+
+    resizingColumn = column
+    resizeStartX = event.clientX
+    resizeStartWidth = columnWidths.value[column]
+
+    window.addEventListener('mousemove', handleColumnResizeMouseMove)
+    window.addEventListener('mouseup', stopColumnResize)
+}
+
 const toggleSort = async (field: string) => {
+    if (Date.now() < suppressSortClickUntil) return
+
     if (sortField.value === field) {
         sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
     } else {
@@ -275,17 +373,33 @@ const toggleRow = (productId: number) => {
 onMounted(async () => {
     await initWarehouse()
     await Promise.all([fetchCategories(), fetchBrandsList()])
+    loadColumnWidths()
     const params = new URLSearchParams(window.location.search)
     if (params.has('search'))          filters.value.search            = params.get('search') ?? ''
-    if (params.has('attribute_value')) filters.value.attribute_value   = params.get('attribute_value') ?? undefined
-    if (params.has('oem_code'))        filters.value.oem_code          = params.get('oem_code') ?? undefined
-    if (params.has('vin'))             filters.value.vin               = params.get('vin') ?? undefined
     if (params.has('brand_id'))        filters.value.brand_id          = Number(params.get('brand_id')) || undefined
     if (params.has('category_id'))     filters.value.category_id       = Number(params.get('category_id')) || undefined
     if (params.has('product_line_id')) filters.value.product_line_id   = Number(params.get('product_line_id')) || undefined
     filters.value.warehouse_id = currentWarehouseId.value || undefined
     await fetchProducts(filters.value)
 })
+
+onUnmounted(() => {
+    stopColumnResize()
+})
+
+watch(
+    () => filters.value.search,
+    (newSearch) => {
+        const normalized = newSearch ?? ''
+        if ((sidebarFilterValues.value.sku ?? '') !== normalized) {
+            sidebarFilterValues.value = {
+                ...sidebarFilterValues.value,
+                sku: normalized,
+            }
+        }
+    },
+    { immediate: true },
+)
 
 // Watch warehouse changes
 watch(currentWarehouseId, (newId) => {
@@ -323,19 +437,6 @@ const formatCurrency = (value: number) => {
         style: 'currency',
         currency: 'USD',
     }).format(value)
-}
-
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'active':
-            return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
-        case 'discontinued':
-            return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400'
-        case 'pending':
-            return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400'
-        default:
-            return 'bg-gray-100 text-gray-800'
-    }
 }
 
 // Helper to get a safe array of variants for a product
@@ -542,54 +643,6 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                     </div>
                 </div>
 
-                <!-- Advanced Filters Toggle & Panel -->
-                <div class="mb-4">
-                    <button @click="showAdvancedFilters = !showAdvancedFilters"
-                        class="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-primary hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
-                        <component :is="showAdvancedFilters ? ChevronUp : ChevronDown" class="h-4 w-4" />
-                        {{ showAdvancedFilters ? 'Ocultar' : 'Mostrar' }} Filtros Avanzados (VIN, OEM, Atributo)
-                    </button>
-
-                    <transition name="slide">
-                        <div v-if="showAdvancedFilters"
-                            class="mt-3 rounded-lg bg-white p-4 shadow border border-blue-100 dark:bg-card dark:border-border dark:shadow-gray-900/50">
-                            <h3 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Filtros Avanzados</h3>
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                <!-- VIN -->
-                                <div>
-                                    <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">VIN</label>
-                                    <input v-model="filters.vin" type="text" placeholder="Ej: 1HGBH41JXMN109186" maxlength="40"
-                                        class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
-                                        @keyup.enter="applyFilters" />
-                                </div>
-
-                                <!-- OEM Code -->
-                                <div>
-                                    <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Código OEM</label>
-                                    <input v-model="filters.oem_code" type="text" placeholder="Ej: 0986JR1520"
-                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
-                                        @keyup.enter="applyFilters" />
-                                </div>
-
-                                <!-- Attribute Value -->
-                                <div>
-                                    <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">Especificación (valor)</label>
-                                    <input v-model="filters.attribute_value" type="text" placeholder="Ej: 17 o Rojo"
-                                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
-                                        @keyup.enter="applyFilters" />
-                                </div>
-                            </div>
-
-                            <div class="mt-3 flex items-center gap-2">
-                                <button @click="applyFilters"
-                                    class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700 dark:hover:bg-primary/90">
-                                    Aplicar
-                                </button>
-                            </div>
-                        </div>
-                    </transition>
-                </div>
-
                 <!-- Loading State -->
                 <div v-if="loading" class="text-center py-12">
                     <div
@@ -617,19 +670,25 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                     </div>
 
                     <!-- Products Table -->
-                    <div class="flex-1 overflow-hidden rounded-lg bg-white shadow dark:bg-card">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
+                    <div class="flex-1 min-w-0 rounded-lg bg-white shadow dark:bg-card">
+                    <div class="overflow-x-auto">
+                    <table class="table-fixed divide-y divide-gray-200 dark:divide-border" :style="{ minWidth: `${tableMinWidth}px` }">
                         <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
                                 <th
-                                    class="px-6 py-3 w-12 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                    :style="getColumnStyle('expander')"
+                                    class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'expander')" @click.stop.prevent></span>
                                 </th>
                                 <th
-                                    class="px-3 py-3 w-14 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                    :style="getColumnStyle('image')"
+                                    class="relative px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Foto
+                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'image')" @click.stop.prevent></span>
                                 </th>
                                 <th @click="toggleSort('sku')"
-                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors select-none">
+                                    :style="getColumnStyle('sku')"
+                                    class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors select-none">
                                     <span class="inline-flex items-center gap-1">
                                         SKU
                                         <svg v-if="sortField === 'sku'" class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -638,9 +697,11 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                         </svg>
                                         <svg v-else class="h-3 w-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                                     </span>
+                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'sku')" @click.stop.prevent></span>
                                 </th>
                                 <th @click="toggleSort('name')"
-                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors select-none">
+                                    :style="getColumnStyle('product')"
+                                    class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors select-none">
                                     <span class="inline-flex items-center gap-1">
                                         Producto
                                         <svg v-if="sortField === 'name'" class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -649,29 +710,25 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                         </svg>
                                         <svg v-else class="h-3 w-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                                     </span>
+                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'product')" @click.stop.prevent></span>
                                 </th>
                                 <th
-                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                    :style="getColumnStyle('variants')"
+                                    class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Variantes
+                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'variants')" @click.stop.prevent></span>
                                 </th>
                                 <th
-                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                    :style="getColumnStyle('stock')"
+                                    class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Stock
-                                </th>
-                                <th @click="toggleSort('status')"
-                                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white cursor-pointer hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors select-none">
-                                    <span class="inline-flex items-center gap-1">
-                                        Estado
-                                        <svg v-if="sortField === 'status'" class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path v-if="sortDirection === 'asc'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-                                            <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                        <svg v-else class="h-3 w-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-                                    </span>
+                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'stock')" @click.stop.prevent></span>
                                 </th>
                                 <th
-                                    class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
+                                    :style="getColumnStyle('actions')"
+                                    class="relative px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Acciones
+                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'actions')" @click.stop.prevent></span>
                                 </th>
                             </tr>
                         </thead>
@@ -680,7 +737,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                 <!-- Parent Row -->
                                 <tr class="hover:bg-gray-50 dark:hover:bg-muted/50 cursor-pointer"
                                     @click="toggleRow(product.id)">
-                                    <td class="px-6 py-4 text-sm">
+                                    <td :style="getColumnStyle('expander')" class="px-6 py-4 text-sm">
                                         <button
                                             class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                             <svg v-if="!expandedRows.has(product.id)" class="h-5 w-5" fill="none"
@@ -695,17 +752,18 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                             </svg>
                                         </button>
                                     </td>
-                                    <td class="px-3 py-2">
+                                    <td :style="getColumnStyle('image')" class="px-3 py-2">
                                         <div class="h-10 w-10 rounded-md overflow-hidden bg-gray-100 dark:bg-muted flex-shrink-0 flex items-center justify-center">
                                             <img v-if="product.image_url" :src="product.image_url" :alt="product.name" class="h-full w-full object-cover" />
                                             <svg v-else class="h-5 w-5 text-gray-300 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                         </div>
                                     </td>
                                     <td
+                                        :style="getColumnStyle('sku')"
                                         class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                                         {{ product.sku_base || product.default_variant?.sku }}
                                     </td>
-                                    <td class="px-6 py-4">
+                                    <td :style="getColumnStyle('product')" class="px-6 py-4">
                                         <div class="flex items-center gap-2">
                                             <div class="text-sm font-medium text-gray-900 dark:text-white">
                                                 {{ product.name }}
@@ -723,6 +781,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                         </div>
                                     </td>
                                     <td
+                                        :style="getColumnStyle('variants')"
                                         class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                                         <span
                                             class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
@@ -731,16 +790,11 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                         </span>
                                     </td>
                                     <td
+                                        :style="getColumnStyle('stock')"
                                         class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                                         {{ product.total_stock ?? 'N/A' }}
                                     </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <span :class="getStatusColor(product.status)"
-                                            class="inline-flex rounded-full px-2 py-1 text-xs font-semibold leading-5">
-                                            {{ product.status }}
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium"
+                                    <td :style="getColumnStyle('actions')" class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium"
                                         @click.stop>
                                         <template v-if="archiveTab === 'active'">
                                             <button @click="openDetail(product)"
@@ -771,7 +825,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                                 <!-- Expanded Variants Row -->
                                 <tr v-if="expandedRows.has(product.id)"
                                     class="bg-gray-50 dark:bg-muted">
-                                    <td colspan="8" class="px-6 py-4">
+                                    <td colspan="7" class="px-6 py-4">
                                         <div class="ml-12">
                                             <h4
                                                 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -877,6 +931,7 @@ const getVariantAttrs = (variant: any, product: any): any[] => {
                             </template>
                         </tbody>
                     </table>
+                    </div>
 
                     <!-- Pagination -->
                     <div

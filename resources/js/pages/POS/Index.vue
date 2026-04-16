@@ -757,7 +757,6 @@ const getProductSKU = (product: any): string => {
 }
 
 // Advanced filter state from ProductSearchModal
-const modalSkuFilter = ref<string | undefined>(undefined)
 const modalMinPrice = ref<number | undefined>(undefined)
 const modalMaxPrice = ref<number | undefined>(undefined)
 const modalInStock = ref<boolean | undefined>(undefined)
@@ -771,7 +770,6 @@ const buildFilters = () => ({
   category_id: modalCategoryIds.value?.length ? modalCategoryIds.value : (selectedCategoryId.value ? [selectedCategoryId.value] : undefined),
   brand_id: modalBrandIds.value?.length ? modalBrandIds.value : (selectedBrandId.value ? [selectedBrandId.value] : undefined),
   warehouse_id: currentWarehouseId.value || undefined,
-  sku: modalSkuFilter.value || undefined,
   min_price: modalMinPrice.value,
   max_price: modalMaxPrice.value,
   in_stock: modalInStock.value || undefined,
@@ -856,7 +854,6 @@ const handleModalSearch = (filters: {
   query: string
   category_ids?: number[]
   brand_ids?: number[]
-  sku?: string
   min_price?: number
   max_price?: number
   in_stock?: boolean
@@ -865,7 +862,6 @@ const handleModalSearch = (filters: {
   searchQuery.value = filters.query
   modalCategoryIds.value = filters.category_ids
   modalBrandIds.value = filters.brand_ids
-  modalSkuFilter.value = filters.sku
   modalMinPrice.value = filters.min_price
   modalMaxPrice.value = filters.max_price
   modalInStock.value = filters.in_stock

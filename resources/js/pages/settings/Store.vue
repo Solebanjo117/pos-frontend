@@ -65,7 +65,10 @@ const handleSave = async () => {
         await uploadLogo(logoFile.value)
         logoFile.value = null
     }
-    const ok = await saveSettings({ ...settings.value })
+    const normalizedTaxRate = Math.max(0, Math.min(100, Math.round(Number(settings.value.store_tax_rate ?? 7))))
+    settings.value.store_tax_rate = normalizedTaxRate
+
+    const ok = await saveSettings({ ...settings.value, store_tax_rate: normalizedTaxRate })
     saveMsg.value = ok ? '✓ Configuración guardada correctamente' : null
     if (ok) setTimeout(() => (saveMsg.value = null), 4000)
 }
@@ -507,7 +510,7 @@ const handleResetData = async () => {
                             type="number"
                             min="0"
                             max="100"
-                            step="0.01"
+                            step="1"
                             class="w-40 px-4 py-2 rounded-lg border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition"
                         />
                     </div>

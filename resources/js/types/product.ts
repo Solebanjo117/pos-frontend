@@ -17,8 +17,13 @@ export interface ProductPricing {
     calculated_price?: number
     msrp: number
     cost: number
+    cost_base?: number
+    cost_miscellaneous?: number
+    cost_total?: number
     margin_percentage: number
     tax_rate: number
+    sale_tax_rate?: number
+    cost_tax_rate?: number
     tax_type?: 'standard' | 'exempt' | 'custom'
     max_discount_percentage?: number
 }
@@ -228,7 +233,11 @@ export interface CreateProductRequest {
         base_price: number
         msrp: number
         cost: number
+        cost_base?: number
+        cost_miscellaneous?: number
         tax_rate: number
+        sale_tax_rate?: number
+        cost_tax_rate?: number
         tax_type?: 'standard' | 'exempt' | 'custom'
         max_discount_percentage?: number
     }
@@ -263,7 +272,11 @@ export interface UpdateProductRequest {
         base_price?: number
         msrp?: number
         cost?: number
+        cost_base?: number
+        cost_miscellaneous?: number
         tax_rate?: number
+        sale_tax_rate?: number
+        cost_tax_rate?: number
         tax_type?: 'standard' | 'exempt' | 'custom'
         max_discount_percentage?: number
     }

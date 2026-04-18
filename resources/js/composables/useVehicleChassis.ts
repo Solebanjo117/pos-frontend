@@ -4,6 +4,7 @@ import apiClient from '@/services/api/client'
 export interface VehicleChassis {
     id: number
     model_id: number | null // Chassis can be independent (no model)
+    model_ids?: number[]
     code: string
     name?: string
     year_from?: string
@@ -12,11 +13,23 @@ export interface VehicleChassis {
     model?: {
         id: number
         name: string
+        year_from?: number
+        year_to?: number
         make?: {
             id: number
             name: string
         }
     }
+    models?: Array<{
+        id: number
+        name: string
+        year_from?: number
+        year_to?: number
+        make?: {
+            id: number
+            name: string
+        }
+    }>
 }
 
 export function useVehicleChassis() {
@@ -25,8 +38,8 @@ export function useVehicleChassis() {
     const loading = ref(false)
     const error = ref<string | null>(null)
 
-    // Fetch all chassis (with optional search, model_id filter, etc.)
-    const fetchChassis = async (params: { page?: number; search?: string; per_page?: number; model_id?: number } = {}) => {
+    // Fetch all chassis (with optional search and vehicle filters)
+    const fetchChassis = async (params: { page?: number; search?: string; per_page?: number; model_id?: number; make_id?: number } = {}) => {
         loading.value = true
         error.value = null
         try {
@@ -60,6 +73,7 @@ export function useVehicleChassis() {
     // Create a new chassis (model_id is optional)
     const createChassis = async (data: {
         model_id?: number | null;
+        model_ids?: number[];
         code: string;
         name?: string;
         year_from?: string;
@@ -83,6 +97,7 @@ export function useVehicleChassis() {
     // Update an existing chassis
     const updateChassis = async (id: number, data: {
         model_id?: number | null;
+        model_ids?: number[];
         code?: string;
         name?: string;
         year_from?: string;

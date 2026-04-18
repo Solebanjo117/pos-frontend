@@ -151,11 +151,12 @@ const handleDelete = async (engine: VehicleEngine) => {
 
 // VIN actions
 const handleAddVin = async () => {
-    if (!_vinApi || newVin.value.length !== 17) return
+    const normalized = newVin.value.trim()
+    if (!_vinApi || normalized.length < 1 || normalized.length > 40) return
     addingVin.value = true
     vinError.value = null
     try {
-        await _vinApi.addVin(newVin.value.toUpperCase())
+        await _vinApi.addVin(normalized.toUpperCase())
         engineVins.value = _vinApi.vins.value
         newVin.value = ''
     } catch (e: any) {
@@ -341,26 +342,26 @@ onMounted(() => {
                     <div class="flex items-center gap-2">
                         <Hash class="h-4 w-4 text-gray-400" />
                         <h4 class="text-sm font-semibold text-gray-900 dark:text-white">VINs del Modelo</h4>
-                        <span class="ml-auto text-xs text-gray-400">17 caracteres</span>
+                        <span class="ml-auto text-xs text-gray-400">Hasta 40 caracteres</span>
                     </div>
 
                     <!-- Add VIN input -->
                     <div class="flex gap-2">
                         <Input
                             v-model="newVin"
-                            maxlength="17"
-                            placeholder="Ingresa VIN (17 caracteres)"
+                            maxlength="40"
+                            placeholder="Ingresa VIN (hasta 40 caracteres)"
                             class="font-mono text-sm uppercase"
                             @keyup.enter="handleAddVin"
-                            :class="newVin.length > 0 && newVin.length !== 17 ? 'border-red-400' : ''"
+                            :class="newVin.length > 40 ? 'border-red-400' : ''"
                         />
-                        <Button type="button" :disabled="newVin.length !== 17 || addingVin" @click="handleAddVin" size="sm">
+                        <Button type="button" :disabled="newVin.trim().length < 1 || newVin.trim().length > 40 || addingVin" @click="handleAddVin" size="sm">
                             <Plus class="h-4 w-4" />
                         </Button>
                     </div>
 
-                    <p v-if="newVin.length > 0 && newVin.length !== 17" class="text-xs text-red-500">
-                        {{ newVin.length }} / 17 caracteres
+                    <p v-if="newVin.length > 0" class="text-xs text-gray-500">
+                        {{ newVin.length }} / 40 caracteres
                     </p>
                     <p v-if="vinError" class="text-xs text-red-600">{{ vinError }}</p>
 

@@ -7,6 +7,7 @@ export interface VehicleModel {
     name: string
     year_from?: number
     year_to?: number
+    generation?: string
     make?: {
         id: number
         name: string
@@ -53,7 +54,13 @@ export function useVehicleModels() {
     }
 
     // Create a new model
-    const createModel = async (data: { make_id: number; name: string; year_from?: number; year_to?: number }) => {
+    const createModel = async (data: {
+        make_id: number
+        name: string
+        year_from?: number
+        year_to?: number
+        generation?: string
+    }) => {
         loading.value = true
         error.value = null
         try {
@@ -69,7 +76,13 @@ export function useVehicleModels() {
     }
 
     // Update an existing model
-    const updateModel = async (id: number, data: { make_id: number; name: string; year_from?: number; year_to?: number }) => {
+    const updateModel = async (id: number, data: {
+        make_id: number
+        name: string
+        year_from?: number
+        year_to?: number
+        generation?: string
+    }) => {
         loading.value = true
         error.value = null
         try {

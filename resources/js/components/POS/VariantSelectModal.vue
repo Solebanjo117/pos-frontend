@@ -290,7 +290,7 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                                         <td class="px-3 py-4 text-right">
                                             <PriceDisplay
                                                 :base-price="variant.pricing?.base_price ?? 0"
-                                                :tax-rate="variant.pricing?.tax_rate ?? 0"
+                                                :tax-rate="variant.pricing?.sale_tax_rate ?? variant.pricing?.tax_rate ?? 0"
                                                 size="sm"
                                             />
                                         </td>

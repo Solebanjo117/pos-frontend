@@ -35,13 +35,11 @@ const {
 const adding = ref(false)
 const newName = ref('')
 const newValue = ref('')
-const newUnit = ref('')
 const actionError = ref('')
 
 const editingId = ref<number | null>(null)
 const editName = ref('')
 const editValue = ref('')
-const editUnit = ref('')
 
 watch(scopedVariantId, async (newVariantId) => {
     setVariantId(newVariantId)
@@ -64,10 +62,9 @@ const handleAdd = async () => {
     adding.value = true
     actionError.value = ''
     try {
-        await addAttribute(newName.value.trim(), newValue.value.trim(), newUnit.value.trim())
+        await addAttribute(newName.value.trim(), newValue.value.trim())
         newName.value = ''
         newValue.value = ''
-        newUnit.value = ''
     } catch (e: any) {
         actionError.value = e.response?.data?.message || error.value || 'No se pudo agregar el atributo.'
     } finally {
@@ -79,7 +76,6 @@ const startEdit = (attr: ProductAttribute) => {
     editingId.value = attr.id
     editName.value = attr.name
     editValue.value = attr.value
-    editUnit.value = attr.unit || ''
 }
 
 const cancelEdit = () => {
@@ -97,7 +93,6 @@ const saveEdit = async (id: number) => {
         await updateAttribute(id, {
             name: editName.value.trim(),
             value: editValue.value.trim(),
-            unit: editUnit.value.trim(),
         })
         editingId.value = null
     } catch (e: any) {
@@ -122,21 +117,15 @@ const saveEdit = async (id: number) => {
             </h3>
 
             <div class="grid gap-4 sm:grid-cols-12 items-end">
-                <div class="sm:col-span-4">
+                <div class="sm:col-span-5">
                     <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Atributo (Ej. Amperaje)</label>
                     <input v-model="newName" type="text" placeholder="Nombre"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
                         @keyup.enter="handleAdd">
                 </div>
-                <div class="sm:col-span-4">
+                <div class="sm:col-span-5">
                     <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Valor (Ej. 100)</label>
                     <input v-model="newValue" type="text" placeholder="Valor"
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
-                        @keyup.enter="handleAdd">
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Unidad (Ej. A)</label>
-                    <input v-model="newUnit" type="text" placeholder="Unidad"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
                         @keyup.enter="handleAdd">
                 </div>
@@ -173,7 +162,6 @@ const saveEdit = async (id: number) => {
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Atributo</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Valor</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Unidad</th>
                         <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
                     </tr>
                 </thead>
@@ -186,9 +174,6 @@ const saveEdit = async (id: number) => {
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <input v-model="editValue" class="w-full rounded border-gray-300 text-sm dark:bg-card dark:text-white p-1" />
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <input v-model="editUnit" class="w-full rounded border-gray-300 text-sm dark:bg-card dark:text-white p-1" />
-                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button @click="saveEdit(attr.id)" class="text-green-600 hover:text-green-900 mr-2"><Check class="h-4 w-4" /></button>
                                 <button @click="cancelEdit" class="text-gray-600 hover:text-gray-900"><X class="h-4 w-4" /></button>
@@ -197,7 +182,6 @@ const saveEdit = async (id: number) => {
                         <template v-else>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ attr.name }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{{ attr.value }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ attr.unit }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button @click="startEdit(attr)" class="text-indigo-600 dark:text-primary hover:text-indigo-900 mr-3"><Edit2 class="h-4 w-4" /></button>
                                 <button @click="removeAttribute(attr.id)" class="text-red-600 hover:text-red-900"><Trash2 class="h-4 w-4" /></button>
@@ -218,7 +202,7 @@ const saveEdit = async (id: number) => {
                 <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-background">
                     <tr v-for="attr in productAttrs" :key="attr.id" class="opacity-60">
                         <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-300 w-1/3">{{ attr.name }}</td>
-                        <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ attr.value }} <span v-if="attr.unit" class="text-xs">{{ attr.unit }}</span></td>
+                        <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ attr.value }}</td>
                     </tr>
                 </tbody>
             </table>

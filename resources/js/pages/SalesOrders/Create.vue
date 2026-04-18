@@ -36,8 +36,14 @@ const newItem = ref({
   quantity: 1,
   unit_price: 0,
   discount_percent: 0,
-  tax_percent: 16, // IVA México
+  tax_percent: 7,
 })
+
+const normalizeTaxPercent = (value: unknown): number => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, Math.min(100, Math.round(parsed)))
+}
 
 // Search
 const productSearch = ref('')
@@ -114,7 +120,7 @@ const addItem = () => {
     quantity: newItem.value.quantity,
     unit_price: newItem.value.unit_price || product.price,
     discount_percent: newItem.value.discount_percent,
-    tax_percent: newItem.value.tax_percent,
+    tax_percent: normalizeTaxPercent(newItem.value.tax_percent),
   })
 
   // Reset
@@ -124,7 +130,7 @@ const addItem = () => {
     quantity: 1,
     unit_price: 0,
     discount_percent: 0,
-    tax_percent: 16,
+    tax_percent: 7,
   }
   productSearch.value = ''
 }

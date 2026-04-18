@@ -39,6 +39,14 @@ function removeAttribute(index: number) {
     form.value.default_attributes.splice(index, 1)
 }
 
+function normalizeItbmPercent() {
+    if (form.value.itbm_percent === null || form.value.itbm_percent === undefined) return
+    const parsed = Number(form.value.itbm_percent)
+    form.value.itbm_percent = Number.isFinite(parsed)
+        ? Math.max(0, Math.min(100, Math.round(parsed)))
+        : 7
+}
+
 onMounted(async () => {
     await fetchCategoryById(Number(props.id))
     parentCategories.value = await fetchCategoriesWithParent()
@@ -62,6 +70,7 @@ onMounted(async () => {
 
 async function handleSubmit() {
     try {
+        normalizeItbmPercent()
         await updateCategory(Number(props.id), {
             ...form.value,
             name: form.value.name?.toString().trim(),
@@ -212,7 +221,7 @@ const parentCategoryOptions = computed<SelectOption[]>(() => [
                                     type="number"
                                     min="0"
                                     max="100"
-                                    step="0.01"
+                                    step="1"
                                     class="w-20 px-3 py-1.5 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white text-sm"
                                 />
                                 <span class="text-sm text-gray-500">%</span>

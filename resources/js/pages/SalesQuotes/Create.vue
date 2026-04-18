@@ -14,7 +14,11 @@ interface Product {
     id: number
     name: string
     sku_base: string
-    pricing?: { base_price: number }
+    pricing?: {
+        base_price: number
+        tax_rate?: number
+        sale_tax_rate?: number
+    }
     default_variant?: {
         sku: string;
     }
@@ -22,6 +26,11 @@ interface Product {
         id: number; 
         sku: string; 
         name?: string; 
+        pricing?: {
+            base_price: number
+            tax_rate?: number
+            sale_tax_rate?: number
+        }
     }[]
 }
 
@@ -29,6 +38,22 @@ const getPrice = (product: Product, variant?: any) => {
     if (variant?.pricing?.base_price) return Number(variant.pricing.base_price)
     if (product.pricing?.base_price) return Number(product.pricing.base_price)
     return 0
+}
+
+const normalizeTaxPercent = (value: unknown): number => {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, Math.min(100, Math.round(parsed)))
+}
+
+const getSaleTaxRate = (product: Product, variant?: any): number => {
+    return normalizeTaxPercent(
+        variant?.pricing?.sale_tax_rate
+        ?? variant?.pricing?.tax_rate
+        ?? product.pricing?.sale_tax_rate
+        ?? product.pricing?.tax_rate
+        ?? 0
+    )
 }
 
 interface Customer {
@@ -139,6 +164,7 @@ const recalcItem = (item: CartItem) => {
     const sub = item.quantity * item.unit_price
     const disc = sub * (item.discount_percent / 100)
     const afterDisc = sub - disc
+    item.tax_percent = normalizeTaxPercent(item.tax_percent)
     const tax = afterDisc * (item.tax_percent / 100)
     item.total = afterDisc + tax
 }
@@ -181,7 +207,7 @@ const addProduct = (product: Product, variant?: any) => {
             quantity: 1,
             unit_price: price,
             discount_percent: 0,
-            tax_percent: 0,
+            tax_percent: getSaleTaxRate(product, variant),
             total: price,
         }
         cart.value.push(item)
@@ -240,7 +266,7 @@ const handleSave = async () => {
                 quantity: item.quantity,
                 unit_price: item.unit_price,
                 discount_percent: item.discount_percent,
-                tax_percent: item.tax_percent,
+                tax_percent: normalizeTaxPercent(item.tax_percent),
             })),
         }
 

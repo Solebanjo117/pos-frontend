@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
@@ -14,6 +14,7 @@ import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Hash, X, Car, Search }
 import { useVehicleMakes, type VehicleMake } from '@/composables/useVehicleMakes'
 import { useVehicleModels, type VehicleModel } from '@/composables/useVehicleModels'
 import { useVehicleEngines, type VehicleEngine } from '@/composables/useVehicleEngines'
+import { useVehicleChassis } from '@/composables/useVehicleChassis'
 import { useVehicleVins, type VehicleVin } from '@/composables/useVehicleVins'
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -25,6 +26,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 const { makes, fetchMakes, createMake, updateMake, deleteMake } = useVehicleMakes()
 const { models, fetchModels, createModel, updateModel, deleteModel } = useVehicleModels()
 const { engines, fetchEngines, createEngine, updateEngine, deleteEngine } = useVehicleEngines()
+const { chassisList, fetchChassis } = useVehicleChassis()
 
 // ── UI state ─────────────────────────────────────────────────────────────────
 const search = ref('')
@@ -49,7 +51,12 @@ const filteredMakes = computed(() => {
     )
 })
 
-onMounted(async () => { await fetchMakes({ per_page: 200 }) })
+onMounted(async () => {
+    await Promise.all([
+        fetchMakes({ per_page: 200 }),
+        loadAllChassis(),
+    ])
+})
 
 // ── Tree toggle ───────────────────────────────────────────────────────────────
 const toggleMake = async (makeId: number) => {
@@ -104,6 +111,19 @@ const allEngines = ref<VehicleEngine[]>([])
 const allEnginesLoading = ref(false)
 const selectedEngineId = ref<number | null>(null)
 
+// ── All chassis for model modal SearchableSelect ─────────────────────────────
+const allChassisLoading = ref(false)
+const selectedModelChassisId = ref<number | null>(null)
+
+const loadAllChassis = async () => {
+    allChassisLoading.value = true
+    try {
+        await fetchChassis({ per_page: 500 })
+    } finally {
+        allChassisLoading.value = false
+    }
+}
+
 const loadAllEngines = async () => {
     allEnginesLoading.value = true
     try {
@@ -126,19 +146,86 @@ const engineSelectOptions = computed<SelectOption[]>(() => {
         }))
 })
 
+const chassisSelectOptions = computed<SelectOption[]>(() => {
+    return [...chassisList.value]
+        .sort((a, b) => a.code.localeCompare(b.code))
+        .map(chassis => {
+            const yearLabel = chassis.year_from || chassis.year_to
+                ? `${chassis.year_from || '?'}-${chassis.year_to || '?'}`
+                : ''
+
+            const vehicleLabel = [chassis.model?.make?.name, chassis.model?.name]
+                .filter(Boolean)
+                .join(' ')
+
+            const sublabel = [chassis.name, vehicleLabel, yearLabel]
+                .filter(part => Boolean(part && String(part).trim()))
+                .join(' • ')
+
+            return {
+                value: chassis.id,
+                label: chassis.code,
+                sublabel: sublabel || undefined,
+            }
+        })
+})
+
+const syncSelectedChassisFromGeneration = () => {
+    const generationCode = modelForm.value.generation?.trim()
+    if (!generationCode) {
+        selectedModelChassisId.value = null
+        return
+    }
+
+    const match = chassisList.value.find(chassis => chassis.code.toLowerCase() === generationCode.toLowerCase())
+    selectedModelChassisId.value = match?.id ?? null
+}
+
+const handleModelChassisChange = (value: number | string | null) => {
+    const chassisId = typeof value === 'number' ? value : null
+    selectedModelChassisId.value = chassisId
+
+    if (!chassisId) {
+        modelForm.value.generation = ''
+        return
+    }
+
+    const selected = chassisList.value.find(chassis => chassis.id === chassisId)
+    modelForm.value.generation = selected?.code ?? ''
+}
+
+const handleModelGenerationInput = () => {
+    const generationCode = modelForm.value.generation?.trim()
+    if (!generationCode) {
+        selectedModelChassisId.value = null
+        return
+    }
+
+    const match = chassisList.value.find(chassis => chassis.code.toLowerCase() === generationCode.toLowerCase())
+    selectedModelChassisId.value = match?.id ?? null
+}
+
 const openMakeCreate = () => { editingId.value = null; makeForm.value = { name: '' }; modalType.value = 'make'; modalError.value = null }
 const openMakeEdit   = (m: VehicleMake) => { editingId.value = m.id; makeForm.value = { name: m.name }; modalType.value = 'make'; modalError.value = null }
 
 const openModelCreate = (makeId: number) => {
     activeMakeId.value = makeId; editingId.value = null
     modelForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), generation: '' }
+    selectedModelChassisId.value = null
+    if (chassisList.value.length === 0) {
+        void loadAllChassis()
+    }
     _vinModelId.value = null
     modelVins.value = []
     modalType.value = 'model'; modalError.value = null
 }
 const openModelEdit = async (model: VehicleModel) => {
     activeMakeId.value = model.make_id; editingId.value = model.id
-    modelForm.value = { name: model.name, year_from: model.year_from ?? new Date().getFullYear(), year_to: model.year_to ?? new Date().getFullYear(), generation: (model as any).generation ?? '' }
+    modelForm.value = { name: model.name, year_from: model.year_from ?? new Date().getFullYear(), year_to: model.year_to ?? new Date().getFullYear(), generation: model.generation ?? '' }
+    if (chassisList.value.length === 0) {
+        await loadAllChassis()
+    }
+    syncSelectedChassisFromGeneration()
     modalType.value = 'model'; modalError.value = null
     await loadVins(model.id)
 }
@@ -152,10 +239,11 @@ const openEngineCreate = async (modelId: number) => {
     // Load all available engines
     await loadAllEngines()
 }
-const openEngineEdit = (engine: VehicleEngine) => {
+const openEngineEdit = async (engine: VehicleEngine) => {
     activeModelId.value = engine.model_id; editingId.value = engine.id
     engineForm.value = { engine_code: engine.engine_code, displacement: engine.displacement, fuel_type: engine.fuel_type || '' }
     modalType.value = 'engine'; modalError.value = null
+    await loadEngineVins(engine.id)
 }
 
 // Quick Add Engine Modal
@@ -165,7 +253,17 @@ const openQuickEngineCreate = () => {
     modalError.value = null
 }
 
-const closeModal = () => { modalType.value = null; _vinModelId.value = null; modelVins.value = []; selectedEngineId.value = null }
+const closeModal = () => {
+    modalType.value = null
+    _vinModelId.value = null
+    modelVins.value = []
+    selectedEngineId.value = null
+
+    _vinEngineId.value = null
+    engineVins.value = []
+    newEngineVin.value = ''
+    engineVinError.value = null
+}
 
 // R20: Check for duplicates helper
 const duplicateConfirmed = ref(false)
@@ -367,10 +465,11 @@ const loadVins = async (modelId: number) => {
 }
 
 const handleAddVin = async () => {
-    if (!_vinApi || newVin.value.trim().length < 1) return
+    const normalized = newVin.value.trim()
+    if (!_vinApi || normalized.length < 1 || normalized.length > 40) return
     addingVin.value = true; vinError.value = null
     try {
-        await _vinApi.addVin(newVin.value.toUpperCase())
+        await _vinApi.addVin(normalized.toUpperCase())
         modelVins.value = _vinApi.vins.value
         newVin.value = ''
     } catch (e: any) {
@@ -382,6 +481,49 @@ const handleRemoveVin = async (vinId: number) => {
     if (!_vinApi) return
     await _vinApi.removeVin(vinId)
     modelVins.value = _vinApi.vins.value
+}
+
+const engineVins = ref<VehicleVin[]>([])
+const engineVinsLoading = ref(false)
+const _vinEngineId = ref<number | null>(null)
+let _engineVinApi: ReturnType<typeof useVehicleVins> | null = null
+
+const newEngineVin = ref('')
+const addingEngineVin = ref(false)
+const engineVinError = ref<string | null>(null)
+
+const loadEngineVins = async (engineId: number) => {
+    _vinEngineId.value = engineId
+    _engineVinApi = useVehicleVins({ engineId })
+    engineVinsLoading.value = true
+    await _engineVinApi.fetchVins()
+    engineVins.value = _engineVinApi.vins.value
+    engineVinsLoading.value = false
+    newEngineVin.value = ''
+    engineVinError.value = null
+}
+
+const handleAddEngineVin = async () => {
+    const normalized = newEngineVin.value.trim()
+    if (!_engineVinApi || normalized.length < 1 || normalized.length > 40) return
+    addingEngineVin.value = true
+    engineVinError.value = null
+
+    try {
+        await _engineVinApi.addVin(normalized.toUpperCase())
+        engineVins.value = _engineVinApi.vins.value
+        newEngineVin.value = ''
+    } catch (e: any) {
+        engineVinError.value = e.response?.data?.message || 'VIN invalido o duplicado'
+    } finally {
+        addingEngineVin.value = false
+    }
+}
+
+const handleRemoveEngineVin = async (vinId: number) => {
+    if (!_engineVinApi) return
+    await _engineVinApi.removeVin(vinId)
+    engineVins.value = _engineVinApi.vins.value
 }
 </script>
 
@@ -463,7 +605,7 @@ const handleRemoveVin = async (vinId: number) => {
                                 <span class="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200">
                                     {{ model.name }}
                                     <span v-if="model.year_from" class="ml-2 text-xs text-gray-400">({{ model.year_from }}–{{ model.year_to ?? 'Pres.' }})</span>
-                                    <span v-if="(model as any).generation" class="ml-1 text-xs font-mono text-indigo-500 dark:text-indigo-400">Chasis: {{ (model as any).generation }}</span>
+                                    <span v-if="model.generation" class="ml-1 text-xs font-mono text-indigo-500 dark:text-indigo-400">Chasis: {{ model.generation }}</span>
                                 </span>
                                 <div class="flex items-center gap-1" @click.stop>
                                     <Button variant="ghost" size="icon" class="h-7 w-7" @click="openEngineCreate(model.id)" title="Nuevo Motor">
@@ -550,9 +692,25 @@ const handleRemoveVin = async (vinId: number) => {
                         </div>
                         <div class="space-y-2">
                             <Label>Chasis</Label>
-                            <Input v-model="modelForm.generation" placeholder="Ej: P10, E170, W204" />
+                            <SearchableSelect
+                                :model-value="selectedModelChassisId"
+                                :options="chassisSelectOptions"
+                                :loading="allChassisLoading"
+                                :clearable="true"
+                                placeholder="Selecciona chasis"
+                                search-placeholder="Buscar por código o descripción..."
+                                loading-text="Cargando chasis..."
+                                @update:model-value="handleModelChassisChange"
+                            />
+                            <Input
+                                v-model="modelForm.generation"
+                                placeholder="O escribe codigo de chasis (ej: E170)"
+                                maxlength="20"
+                                @input="handleModelGenerationInput"
+                            />
                         </div>
                     </div>
+                    <p class="text-xs text-gray-500">Si no aparece el chasis, puedes crearlo en <a href="/vehicles/chassis" class="underline text-blue-600 dark:text-blue-400">/vehicles/chassis</a>.</p>
                     <div v-if="modalError" class="text-sm text-red-600">{{ modalError }}</div>
                     <div class="flex justify-end gap-2">
                         <Button type="button" variant="outline" @click="closeModal">Cancelar</Button>
@@ -568,16 +726,16 @@ const handleRemoveVin = async (vinId: number) => {
                     </div>
 
                     <div class="flex gap-2">
-                        <Input v-model="newVin" maxlength="17" placeholder="VIN (17 caracteres)"
+                        <Input v-model="newVin" maxlength="40" placeholder="VIN (hasta 40 caracteres)"
                             class="font-mono text-sm uppercase"
                             @keyup.enter="handleAddVin" />
-                        <Button type="button" :disabled="newVin.trim().length !== 17 || addingVin" @click="handleAddVin" size="sm">
+                        <Button type="button" :disabled="newVin.trim().length < 1 || newVin.trim().length > 40 || addingVin" @click="handleAddVin" size="sm">
                             <Plus class="h-4 w-4" />
                         </Button>
                     </div>
 
-                    <p v-if="newVin.length > 0 && newVin.length !== 17" class="text-xs text-red-500">
-                        {{ newVin.length }} / 17 caracteres
+                    <p v-if="newVin.length > 0" class="text-xs text-gray-500">
+                        {{ newVin.length }} / 40 caracteres
                     </p>
                     <p v-if="vinError" class="text-xs text-red-600">{{ vinError }}</p>
 
@@ -651,6 +809,57 @@ const handleRemoveVin = async (vinId: number) => {
                         <Label>Combustible</Label>
                         <Input v-model="engineForm.fuel_type" placeholder="Ej: Gasolina, Diesel" />
                     </div>
+
+                    <div class="border-t pt-4 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <Hash class="h-4 w-4 text-gray-400" />
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white">VINs del Motor</h4>
+                            <span class="ml-auto text-xs text-gray-400">Alfanumerico</span>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <Input
+                                v-model="newEngineVin"
+                                maxlength="40"
+                                placeholder="VIN (hasta 40 caracteres)"
+                                class="font-mono text-sm uppercase"
+                                @keyup.enter="handleAddEngineVin"
+                            />
+                            <Button
+                                type="button"
+                                :disabled="newEngineVin.trim().length < 1 || newEngineVin.trim().length > 40 || addingEngineVin"
+                                @click="handleAddEngineVin"
+                                size="sm"
+                            >
+                                <Plus class="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <p v-if="newEngineVin.length > 0" class="text-xs text-gray-500">
+                            {{ newEngineVin.length }} / 40 caracteres
+                        </p>
+                        <p v-if="engineVinError" class="text-xs text-red-600">{{ engineVinError }}</p>
+
+                        <div v-if="engineVinsLoading" class="py-2 text-center text-xs text-gray-400">Cargando VINs...</div>
+                        <div v-else-if="engineVins.length === 0" class="py-2 text-center text-xs text-gray-400">Sin VINs registrados.</div>
+                        <ul v-else class="max-h-36 overflow-y-auto divide-y divide-gray-100 dark:divide-border rounded-md border border-gray-200 dark:border-border">
+                            <li
+                                v-for="v in engineVins"
+                                :key="v.id"
+                                class="flex items-center justify-between px-3 py-1.5 text-sm bg-white dark:bg-background"
+                            >
+                                <span class="font-mono text-xs tracking-wide text-gray-800 dark:text-gray-200">{{ v.vin }}</span>
+                                <button
+                                    type="button"
+                                    @click="handleRemoveEngineVin(v.id)"
+                                    class="ml-2 text-red-500 hover:text-red-700"
+                                >
+                                    <X class="h-3.5 w-3.5" />
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+
                     <div v-if="modalError" class="text-sm text-red-600">{{ modalError }}</div>
                     <div class="flex justify-end gap-2">
                         <Button type="button" variant="outline" @click="closeModal">Cancelar</Button>

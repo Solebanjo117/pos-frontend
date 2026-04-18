@@ -475,7 +475,7 @@ async function loadOrderForReturn(orderId: number) {
       const quantity = -Math.abs(item.quantity) // Negative for returns
       const unitPrice = Number(item.unit_price)
       const discountPercent = Number(item.discount_percent ?? 0)
-      const taxPercent = Number(item.tax_percent ?? 0)
+      const taxPercent = normalizeTaxPercent(item.tax_percent)
 
       // Use the actual values from the original order to avoid discrepancies
       // Negate them for returns
@@ -572,7 +572,7 @@ async function loadOrderForEdit(orderId: number) {
       const quantity = Math.abs(item.quantity)
       const unitPrice = Number(item.unit_price)
       const discountPercent = Number(item.discount_percent ?? 0)
-      const taxPercent = Number(item.tax_percent ?? 0)
+      const taxPercent = normalizeTaxPercent(item.tax_percent)
       const subtotal = Number(item.subtotal ?? 0)
       const taxAmount = Number(item.tax_amount ?? 0)
       const total = Number(item.total ?? 0)
@@ -654,7 +654,8 @@ const orderDiff = computed(() => {
     if (!original) {
       // New product (not in original order)
       const itemSubtotal = item.quantity * item.product_price
-      const itemTax = itemSubtotal * ((item.tax_percent ?? 0) / 100)
+      const safeTaxPercent = normalizeTaxPercent(item.tax_percent)
+      const itemTax = itemSubtotal * (safeTaxPercent / 100)
       diffTotal += itemSubtotal + itemTax
 
       diffItems.push({
@@ -664,7 +665,7 @@ const orderDiff = computed(() => {
         qty: item.quantity,
         qty_diff: item.quantity,
         price: item.product_price,
-        tax_percent: item.tax_percent ?? 0,
+        tax_percent: safeTaxPercent,
         seller_id: item.seller_id,
         is_custom_line: !!item.is_custom_line,
         custom_description: item.custom_description,
@@ -674,7 +675,8 @@ const orderDiff = computed(() => {
       // Quantity increased
       const qtyDiff = item.quantity - original.qty
       const itemSubtotal = qtyDiff * item.product_price
-      const itemTax = itemSubtotal * ((item.tax_percent ?? 0) / 100)
+      const safeTaxPercent = normalizeTaxPercent(item.tax_percent)
+      const itemTax = itemSubtotal * (safeTaxPercent / 100)
       diffTotal += itemSubtotal + itemTax
 
       diffItems.push({
@@ -684,7 +686,7 @@ const orderDiff = computed(() => {
         qty: item.quantity,
         qty_diff: qtyDiff,
         price: item.product_price,
-        tax_percent: item.tax_percent ?? 0,
+        tax_percent: safeTaxPercent,
         seller_id: item.seller_id,
         is_custom_line: !!item.is_custom_line,
         custom_description: item.custom_description,
@@ -760,7 +762,7 @@ async function confirmEditOrder() {
       warehouse_id: Number(item.warehouse_id) || Number(currentWarehouseId.value) || 1,
       qty: item.qty,
       price: item.price,
-      tax_percent: item.tax_percent,
+      tax_percent: normalizeTaxPercent(item.tax_percent),
       seller_id: item.seller_id ?? null,
       is_custom_line: !!item.is_custom_line,
       custom_description: item.is_custom_line ? item.custom_description : null,
@@ -844,6 +846,12 @@ const quantityInput = ref<HTMLInputElement>()
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 
+const normalizeTaxPercent = (value: unknown): number => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, Math.min(100, Math.round(parsed)))
+}
+
 const extractApiErrorMessage = (err: any, fallback: string): string => {
   const errData = err?.response?.data
   if (Array.isArray(errData?.errors)) {
@@ -867,7 +875,13 @@ const getProductPrice = (product: any): number =>
   product.pricing?.base_price ?? product.default_variant?.pricing?.base_price ?? 0
 
 const getProductTaxRate = (product: any): number =>
-  product.pricing?.tax_rate ?? product.default_variant?.pricing?.tax_rate ?? 0
+  normalizeTaxPercent(
+    product.pricing?.sale_tax_rate
+      ?? product.pricing?.tax_rate
+      ?? product.default_variant?.pricing?.sale_tax_rate
+      ?? product.default_variant?.pricing?.tax_rate
+      ?? 0
+  )
 
 const getProductStock = (product: any): number =>
   product.total_stock ?? product.default_variant?.total_stock ?? 0
@@ -1260,7 +1274,7 @@ const handleSaveQuoteChanges = async () => {
       quantity:         item.quantity,
       unit_price:       item.product_price,
       discount_percent: item.discount_percent ?? 0,
-      tax_percent:      item.tax_percent ?? 0,
+      tax_percent:      normalizeTaxPercent(item.tax_percent),
       is_custom_line:   !!item.is_custom_line,
       custom_description: item.is_custom_line ? (item.custom_description || item.product_name) : null,
     }))
@@ -1301,7 +1315,7 @@ const handleSaveQuote = async () => {
       quantity:         item.quantity,
       unit_price:       item.product_price,
       discount_percent: item.discount_percent ?? 0,
-      tax_percent:      item.tax_percent ?? 0,
+      tax_percent:      normalizeTaxPercent(item.tax_percent),
       is_custom_line:   !!item.is_custom_line,
       custom_description: item.is_custom_line ? (item.custom_description || item.product_name) : null,
     }))
@@ -1501,7 +1515,7 @@ onMounted(async () => {
           quantity: item.quantity,
           unit_price: item.unit_price,
           discount_percent: item.discount_percent,
-          tax_percent: item.tax_percent,
+          tax_percent: normalizeTaxPercent(item.tax_percent),
           subtotal: item.subtotal,
           tax_amount: item.tax_amount,
           total: item.total,

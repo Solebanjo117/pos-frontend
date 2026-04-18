@@ -247,6 +247,21 @@ export function usePOS() {
         item.total = item.subtotal + item.tax_amount
     }
 
+    const normalizeTaxPercent = (value: unknown): number => {
+        const parsed = Number(value)
+        if (!Number.isFinite(parsed)) return 0
+        return Math.max(0, Math.min(100, Math.round(parsed)))
+    }
+
+    const resolveSaleTaxRate = (pricing: any): number | null => {
+        const candidate = pricing?.sale_tax_rate ?? pricing?.tax_rate
+        if (candidate === null || candidate === undefined || candidate === '') {
+            return null
+        }
+
+        return normalizeTaxPercent(candidate)
+    }
+
     const getAvailableStock = (item: CartItem): number | null => {
         if (item.is_custom_line) return null
         const rawStock = Number(item.available_stock)
@@ -321,7 +336,9 @@ export function usePOS() {
             const productPricing = product.pricing
             const resolvedPrice = variantPricing?.calculated_price ?? variantPricing?.base_price
                 ?? productPricing?.calculated_price ?? productPricing?.base_price ?? 0
-            const resolvedTaxRate = variantPricing?.tax_rate ?? productPricing?.tax_rate ?? (storeSettings.value.store_tax_rate ?? 7)
+            const resolvedTaxRate = normalizeTaxPercent(
+                resolveSaleTaxRate(variantPricing) ?? resolveSaleTaxRate(productPricing) ?? (storeSettings.value.store_tax_rate ?? 7)
+            )
 
             const newItem: CartItem = {
                 id: `${product.id}-${variant?.id ?? 'nv'}-${Date.now()}`,
@@ -370,7 +387,7 @@ export function usePOS() {
             return
         }
 
-        const resolvedTax = payload.tax_percent ?? (storeSettings.value.store_tax_rate ?? 7)
+        const resolvedTax = normalizeTaxPercent(payload.tax_percent ?? (storeSettings.value.store_tax_rate ?? 7))
         const resolvedWarehouseId = payload.warehouse_id
             ?? (isSingleWarehouseMode() ? (getDefaultWarehouseId() ?? undefined) : currentWarehouseId.value ?? undefined)
 
@@ -387,8 +404,8 @@ export function usePOS() {
             quantity: Math.max(1, Number(payload.quantity) || 1),
             available_stock: undefined,
             discount_percent: Math.max(0, Math.min(100, Number(payload.discount_percent ?? 0))),
-            tax_percent: Math.max(0, Number(resolvedTax) || 0),
-            default_tax_percent: Math.max(0, Number(resolvedTax) || 0),
+            tax_percent: resolvedTax,
+            default_tax_percent: resolvedTax,
             is_tax_overridden: false,
             seller_id: payload.seller_id ?? (page.props.auth?.user as any)?.id,
             warehouse_id: resolvedWarehouseId,
@@ -451,8 +468,7 @@ export function usePOS() {
         const item = cart.value.find(i => i.id === itemId)
         if (item) {
             const oldTax = item.tax_percent
-            // Cap at 15% to prevent accidental misconfig
-            const safeTax = isNaN(taxPercent) ? 0 : Math.max(0, Math.min(15, taxPercent))
+            const safeTax = normalizeTaxPercent(taxPercent)
             item.tax_percent = safeTax
             item.is_tax_overridden = true
             // NOTE: default_tax_percent is intentionally NOT updated here.
@@ -471,7 +487,7 @@ export function usePOS() {
             item.product_price = Math.max(0, newPrice)
             // Auto-reset: deactivate tax override when price is manually changed
             if (item.is_tax_overridden) {
-                item.tax_percent = item.default_tax_percent || (storeSettings.value.store_tax_rate ?? 7)
+                item.tax_percent = normalizeTaxPercent(item.default_tax_percent || (storeSettings.value.store_tax_rate ?? 7))
                 item.is_tax_overridden = false
             }
             recalculateItem(item)
@@ -490,7 +506,7 @@ export function usePOS() {
             } else {
                 // Restoring: always use the stored original (fallback to store tax rate for
                 // legacy localStorage items that predate this field)
-                item.tax_percent = item.default_tax_percent || (storeSettings.value.store_tax_rate ?? 7)
+                item.tax_percent = normalizeTaxPercent(item.default_tax_percent || (storeSettings.value.store_tax_rate ?? 7))
             }
             recalculateItem(item)
         }
@@ -680,7 +696,7 @@ export function usePOS() {
                     quantity: item.quantity,
                     unit_price: item.product_price,
                     discount_percent: item.discount_percent,
-                    tax_percent: item.tax_percent,
+                    tax_percent: normalizeTaxPercent(item.tax_percent),
                     seller_id: item.seller_id,
                     notes: item.notes || undefined,
                     is_custom_line: !!item.is_custom_line,
@@ -773,7 +789,7 @@ export function usePOS() {
                     quantity: item.quantity,
                     unit_price: item.product_price,
                     discount_percent: item.discount_percent,
-                    tax_percent: item.tax_percent,
+                    tax_percent: normalizeTaxPercent(item.tax_percent),
                     seller_id: item.seller_id,
                     notes: item.notes || undefined,
                     is_custom_line: !!item.is_custom_line,
@@ -853,8 +869,8 @@ export function usePOS() {
                 product_price: Number(item.unit_price) || 0,
                 quantity: Number(item.quantity) || 1,
                 discount_percent: Number(item.discount_percent) || 0,
-                tax_percent: Number(item.tax_percent) || 0,
-                default_tax_percent: Number(item.tax_percent) || 0,
+                tax_percent: normalizeTaxPercent(item.tax_percent),
+                default_tax_percent: normalizeTaxPercent(item.tax_percent),
                 is_tax_overridden: false,
                 warehouse_id: item.warehouse_id ?? undefined,
                 subtotal: 0,

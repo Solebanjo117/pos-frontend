@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useVehicleEngines } from '@/composables/useVehicleEngines'
@@ -122,6 +122,48 @@ const fuelTypeLabel = (type: string) => {
     }
     return labels[type] || type
 }
+
+interface AssociatedModel {
+    id: number
+    name: string
+    make?: {
+        id: number
+        name: string
+    }
+}
+
+const getAssociatedModels = (item: any): AssociatedModel[] => {
+    if (Array.isArray(item.models) && item.models.length > 0) {
+        return item.models
+    }
+
+    if (item.model) {
+        return [item.model]
+    }
+
+    return []
+}
+
+const formatAssociatedModelLabel = (model: AssociatedModel): string => {
+    return [model.make?.name, model.name].filter(Boolean).join(' ')
+}
+
+const getVisibleAssociatedModels = (item: any, maxVisible = 2): AssociatedModel[] => {
+    return getAssociatedModels(item).slice(0, maxVisible)
+}
+
+const getExtraAssociatedModelsCount = (item: any, maxVisible = 2): number => {
+    const total = getAssociatedModels(item).length
+    return total > maxVisible ? total - maxVisible : 0
+}
+
+const getAssociatedModelsTooltip = (item: any): string => {
+    const labels = getAssociatedModels(item)
+        .map((model) => formatAssociatedModelLabel(model))
+        .filter(Boolean)
+
+    return labels.join(', ')
+}
 </script>
 
 <template>
@@ -196,7 +238,7 @@ const fuelTypeLabel = (type: string) => {
                                 Código Motor
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
-                                Marca / Modelo
+                                Modelos asociados
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
                                 Desplazamiento
@@ -224,13 +266,27 @@ const fuelTypeLabel = (type: string) => {
                             <td class="whitespace-nowrap px-6 py-4 font-mono text-sm font-semibold text-gray-900 dark:text-white">
                                 {{ engine.engine_code }}
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
-                                <template v-if="engine.model?.make?.name || engine.model?.name">
-                                    <span class="font-medium">{{ engine.model?.make?.name ?? '—' }}</span>
-                                    <span class="text-gray-400 mx-1">/</span>
-                                    <span>{{ engine.model?.name ?? '—' }}</span>
-                                </template>
-                                <span v-else class="text-gray-400 italic">Sin modelo</span>
+                            <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                                <div
+                                    v-if="getAssociatedModels(engine).length > 0"
+                                    class="flex flex-wrap items-center gap-1"
+                                    :title="getAssociatedModelsTooltip(engine)"
+                                >
+                                    <span
+                                        v-for="model in getVisibleAssociatedModels(engine)"
+                                        :key="`model-chip-${engine.id}-${model.id}`"
+                                        class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                                    >
+                                        {{ formatAssociatedModelLabel(model) }}
+                                    </span>
+                                    <span
+                                        v-if="getExtraAssociatedModelsCount(engine) > 0"
+                                        class="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-muted dark:text-gray-300"
+                                    >
+                                        +{{ getExtraAssociatedModelsCount(engine) }}
+                                    </span>
+                                </div>
+                                <span v-else class="text-gray-400 italic">Independiente</span>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-gray-900 dark:text-white">
                                 {{ engine.displacement || '—' }}

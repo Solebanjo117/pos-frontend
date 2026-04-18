@@ -43,6 +43,13 @@ const priceWithTax = (basePrice: number, taxRate?: number) => {
     return safeBase * (1 + rate / 100)
 }
 
+const resolveSaleTaxRate = (pricing: any): number => {
+    const raw = pricing?.sale_tax_rate ?? pricing?.tax_rate
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, Math.min(100, Math.round(parsed)))
+}
+
 // Returns the best pricing object for a variant (variant-level first, then product-level fallback)
 const getVariantPricing = (variant: any) => {
     const vp = variant?.pricing
@@ -496,7 +503,7 @@ const handleViewAlternative = async (altId: number) => {
                                                 <div class="text-lg font-bold text-green-600 dark:text-green-400">
                                                     <template v-if="getVariantPricing(variant)">
                                                         <template v-if="blindMode">
-                                                            {{ formatCurrency((includeITBM ? priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), Number(getVariantPricing(variant).tax_rate)) : Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
+                                                            {{ formatCurrency((includeITBM ? priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), resolveSaleTaxRate(getVariantPricing(variant))) : Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
                                                         </template>
                                                         <template v-else>
                                                             {{ formatCurrency(Number(getVariantPricing(variant).base_price) * (quantities[variant.id] ?? 1)) }}
@@ -506,7 +513,7 @@ const handleViewAlternative = async (altId: number) => {
                                                 </div>
                                                 <div v-if="blindMode" class="text-[10px] text-gray-400">
                                                     <template v-if="includeITBM">
-                                                         Base {{ formatCurrency(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price) * (quantities[variant.id] ?? 1)) }} + ITBMS {{ formatCurrency((priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), Number(getVariantPricing(variant).tax_rate)) - Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
+                                                          Base {{ formatCurrency(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price) * (quantities[variant.id] ?? 1)) }} + ITBMS {{ formatCurrency((priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), resolveSaleTaxRate(getVariantPricing(variant))) - Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
                                                     </template>
                                                     <template v-else>
                                                         Sin ITBM

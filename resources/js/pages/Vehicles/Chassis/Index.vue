@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useVehicleChassis } from '@/composables/useVehicleChassis'
@@ -51,6 +51,48 @@ const handleDelete = async (id: number) => {
 const changePage = (newPage: number) => {
     page.value = newPage
     loadData()
+}
+
+interface AssociatedModel {
+    id: number
+    name: string
+    make?: {
+        id: number
+        name: string
+    }
+}
+
+const getAssociatedModels = (item: any): AssociatedModel[] => {
+    if (Array.isArray(item.models) && item.models.length > 0) {
+        return item.models
+    }
+
+    if (item.model) {
+        return [item.model]
+    }
+
+    return []
+}
+
+const formatAssociatedModelLabel = (model: AssociatedModel): string => {
+    return [model.make?.name, model.name].filter(Boolean).join(' ')
+}
+
+const getVisibleAssociatedModels = (item: any, maxVisible = 2): AssociatedModel[] => {
+    return getAssociatedModels(item).slice(0, maxVisible)
+}
+
+const getExtraAssociatedModelsCount = (item: any, maxVisible = 2): number => {
+    const total = getAssociatedModels(item).length
+    return total > maxVisible ? total - maxVisible : 0
+}
+
+const getAssociatedModelsTooltip = (item: any): string => {
+    const labels = getAssociatedModels(item)
+        .map((model) => formatAssociatedModelLabel(model))
+        .filter(Boolean)
+
+    return labels.join(', ')
 }
 </script>
 
@@ -128,10 +170,26 @@ const changePage = (newPage: number) => {
                             <td class="whitespace-nowrap px-6 py-4 text-gray-900 dark:text-white">
                                 {{ item.name || '—' }}
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-gray-500 dark:text-gray-300">
-                                <template v-if="item.model">
-                                    {{ item.model.make?.name }} {{ item.model.name }}
-                                </template>
+                            <td class="px-6 py-4 text-gray-500 dark:text-gray-300">
+                                <div
+                                    v-if="getAssociatedModels(item).length > 0"
+                                    class="flex flex-wrap items-center gap-1"
+                                    :title="getAssociatedModelsTooltip(item)"
+                                >
+                                    <span
+                                        v-for="model in getVisibleAssociatedModels(item)"
+                                        :key="`model-chip-${item.id}-${model.id}`"
+                                        class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                                    >
+                                        {{ formatAssociatedModelLabel(model) }}
+                                    </span>
+                                    <span
+                                        v-if="getExtraAssociatedModelsCount(item) > 0"
+                                        class="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-muted dark:text-gray-300"
+                                    >
+                                        +{{ getExtraAssociatedModelsCount(item) }}
+                                    </span>
+                                </div>
                                 <span v-else class="text-gray-400 italic">Independiente</span>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-300">

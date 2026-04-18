@@ -4,6 +4,7 @@ import apiClient from '@/services/api/client'
 export interface VehicleEngine {
     id: number
     model_id: number | null // R21: Engines can be independent (no model)
+    model_ids?: number[]
     engine_code: string
     displacement: string // e.g., "2.0L"
     fuel_type: string
@@ -11,11 +12,23 @@ export interface VehicleEngine {
     model?: {
         id: number
         name: string
+        year_from?: number
+        year_to?: number
         make?: {
             id: number
             name: string
         }
     }
+    models?: Array<{
+        id: number
+        name: string
+        year_from?: number
+        year_to?: number
+        make?: {
+            id: number
+            name: string
+        }
+    }>
 }
 
 export function useVehicleEngines() {
@@ -59,6 +72,7 @@ export function useVehicleEngines() {
     // Create a new engine (R21: model_id is now optional)
     const createEngine = async (data: {
         model_id?: number | null;
+        model_ids?: number[];
         engine_code: string;
         displacement?: string;
         fuel_type?: string;
@@ -81,6 +95,7 @@ export function useVehicleEngines() {
     // Update an existing engine (R21: model_id is optional for updates)
     const updateEngine = async (id: number, data: {
         model_id?: number | null;
+        model_ids?: number[];
         engine_code?: string;
         displacement?: string;
         fuel_type?: string;

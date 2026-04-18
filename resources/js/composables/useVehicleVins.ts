@@ -9,7 +9,30 @@ export interface VehicleVin {
     notes?: string | null
 }
 
-export function useVehicleVins(modelId: number) {
+export interface VehicleVinScope {
+    modelId?: number | null
+    engineId?: number | null
+}
+
+const resolveBasePath = (scope: VehicleVinScope): string => {
+    if (scope.engineId !== null && scope.engineId !== undefined) {
+        return `/vehicle-engines/${scope.engineId}/vins`
+    }
+
+    if (scope.modelId !== null && scope.modelId !== undefined) {
+        return `/vehicle-models/${scope.modelId}/vins`
+    }
+
+    throw new Error('useVehicleVins requires modelId or engineId')
+}
+
+export function useVehicleVins(scopeOrModelId: number | VehicleVinScope) {
+    const scope: VehicleVinScope = typeof scopeOrModelId === 'number'
+        ? { modelId: scopeOrModelId }
+        : scopeOrModelId
+
+    const basePath = resolveBasePath(scope)
+
     const vins = ref<VehicleVin[]>([])
     const loading = ref(false)
     const error = ref<string | null>(null)
@@ -18,7 +41,7 @@ export function useVehicleVins(modelId: number) {
         loading.value = true
         error.value = null
         try {
-            const res = await apiClient.get(`/vehicle-models/${modelId}/vins`)
+            const res = await apiClient.get(basePath)
             vins.value = res.data.data ?? []
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Error cargando VINs'
@@ -30,7 +53,7 @@ export function useVehicleVins(modelId: number) {
     const addVin = async (vin: string, notes?: string) => {
         error.value = null
         try {
-            const res = await apiClient.post(`/vehicle-models/${modelId}/vins`, { vin, notes })
+            const res = await apiClient.post(basePath, { vin, notes })
             vins.value.unshift(res.data.data)
             return res.data.data as VehicleVin
         } catch (err: any) {
@@ -42,7 +65,7 @@ export function useVehicleVins(modelId: number) {
     const removeVin = async (vinId: number) => {
         error.value = null
         try {
-            await apiClient.delete(`/vehicle-models/${modelId}/vins/${vinId}`)
+            await apiClient.delete(`${basePath}/${vinId}`)
             vins.value = vins.value.filter(v => v.id !== vinId)
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Error al eliminar VIN'

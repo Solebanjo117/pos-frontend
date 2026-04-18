@@ -46,9 +46,15 @@ const newItem = ref({
   quantity: 1,
   unit_price: 0,
   discount_percent: 0,
-  tax_percent: 16,
+  tax_percent: 7,
   seller_id: undefined as number | undefined,
 })
+
+const normalizeTaxPercent = (value: unknown): number => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, Math.min(100, Math.round(parsed)))
+}
 
 const productSearch = ref('')
 const filteredProducts = computed(() => {
@@ -126,7 +132,7 @@ const addItem = () => {
     quantity: newItem.value.quantity,
     unit_price: newItem.value.unit_price || product.price,
     discount_percent: newItem.value.discount_percent,
-    tax_percent: newItem.value.tax_percent,
+    tax_percent: normalizeTaxPercent(newItem.value.tax_percent),
     seller_id: newItem.value.seller_id,
   })
 
@@ -136,7 +142,7 @@ const addItem = () => {
     quantity: 1,
     unit_price: 0,
     discount_percent: 0,
-    tax_percent: 16,
+    tax_percent: 7,
     seller_id: undefined,
   }
   productSearch.value = ''
@@ -194,7 +200,7 @@ onMounted(async () => {
         quantity: item.quantity,
         unit_price: item.unit_price,
         discount_percent: item.discount_percent,
-        tax_percent: item.tax_percent,
+        tax_percent: normalizeTaxPercent(item.tax_percent),
         seller_id: item.seller_id,
       })),
     }

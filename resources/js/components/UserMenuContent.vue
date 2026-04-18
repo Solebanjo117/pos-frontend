@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
-import { LogOut, Settings } from 'lucide-vue-next';
+import { BookOpen, LogOut, Settings } from 'lucide-vue-next';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -34,6 +34,14 @@ defineProps<Props>();
             <Link class="block w-full cursor-pointer" :href="edit()" prefetch>
                 <Settings class="mr-2 h-4 w-4" />
                 Settings
+            </Link>
+        </DropdownMenuItem>
+    </DropdownMenuGroup>
+    <DropdownMenuGroup>
+        <DropdownMenuItem :as-child="true">
+            <Link class="block w-full cursor-pointer" href="/changelog" prefetch>
+                <BookOpen class="mr-2 h-4 w-4" />
+                Changelog
             </Link>
         </DropdownMenuItem>
     </DropdownMenuGroup>

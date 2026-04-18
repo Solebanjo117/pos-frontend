@@ -52,6 +52,12 @@ const batchDefaults = ref({
     tax_rate: 7, // Default 7% ITBMS
 })
 
+const normalizeTaxRate = (value: unknown): number => {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, Math.min(100, Math.round(parsed)))
+}
+
 // Items List
 const items = ref<InboundItem[]>([])
 
@@ -107,14 +113,16 @@ onMounted(async () => {
 })
 
 const addItem = () => {
+    const normalizedDefaultTaxRate = normalizeTaxRate(batchDefaults.value.tax_rate)
+
     items.value.push({
         id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         product_id: null,
         variant_id: null, // Added
         batch_number: batchDefaults.value.batch_number,
         cost: batchDefaults.value.cost,
-        tax_rate: batchDefaults.value.tax_rate,
-        final_cost: batchDefaults.value.cost ? batchDefaults.value.cost * (1 + (batchDefaults.value.tax_rate / 100)) : null,
+        tax_rate: normalizedDefaultTaxRate,
+        final_cost: batchDefaults.value.cost ? batchDefaults.value.cost * (1 + (normalizedDefaultTaxRate / 100)) : null,
         quantity: 1,
     })
 }
@@ -137,21 +145,21 @@ const handleProductSelect = (index: number, productId: number | null, variantId?
     // Auto-fill cost from variant or product default
     if (product) {
         let baseCost = null;
-        let taxRate = product.pricing?.tax_rate || 7;
+        let taxRate = normalizeTaxRate(product.pricing?.cost_tax_rate ?? product.pricing?.tax_rate ?? 7);
 
         if (variantId) {
             const variant = product.variants?.find(v => v.id === variantId)
             if (variant && variant.pricing?.cost) {
                 baseCost = variant.pricing.cost
-                taxRate = variant.pricing.tax_rate ?? taxRate;
+                taxRate = normalizeTaxRate(variant.pricing.cost_tax_rate ?? variant.pricing.tax_rate ?? taxRate);
             }
         } else if (product.default_variant?.pricing?.cost) {
             baseCost = product.default_variant.pricing.cost
-            taxRate = product.default_variant.pricing.tax_rate ?? taxRate;
+            taxRate = normalizeTaxRate(product.default_variant.pricing.cost_tax_rate ?? product.default_variant.pricing.tax_rate ?? taxRate);
         }
 
         item.cost = baseCost;
-        item.tax_rate = taxRate;
+        item.tax_rate = normalizeTaxRate(taxRate);
         if (item.cost !== null) {
             item.final_cost = Number((item.cost * (1 + (item.tax_rate / 100))).toFixed(2))
         } else {
@@ -168,10 +176,13 @@ const handleProductSelect = (index: number, productId: number | null, variantId?
 }
 
 const applyDefaultsToAll = () => {
+    const normalizedDefaultTaxRate = normalizeTaxRate(batchDefaults.value.tax_rate)
+    batchDefaults.value.tax_rate = normalizedDefaultTaxRate
+
     items.value.forEach(item => {
         if (batchDefaults.value.batch_number) item.batch_number = batchDefaults.value.batch_number
         if (batchDefaults.value.cost !== null) item.cost = batchDefaults.value.cost
-        item.tax_rate = batchDefaults.value.tax_rate
+        item.tax_rate = normalizedDefaultTaxRate
         handlePriceChange(item, 'cost')
     })
 }
@@ -179,6 +190,10 @@ const applyDefaultsToAll = () => {
 // 3-way calculator logic (Price + Tax + Quantity)
 const handlePriceChange = (item: InboundItem, field: 'cost' | 'tax_rate' | 'final_cost' | 'quantity') => {
     const qty = item.quantity || 1
+
+    if (field === 'tax_rate') {
+        item.tax_rate = normalizeTaxRate(item.tax_rate)
+    }
 
     if (field === 'cost' || field === 'tax_rate' || field === 'quantity') {
         if (item.cost !== null && item.cost !== undefined) {
@@ -421,7 +436,7 @@ const cancel = () => {
                                     <input
                                         v-model.number="batchDefaults.tax_rate"
                                         type="number"
-                                        step="0.01"
+                                        step="1"
                                         class="mt-1 w-full rounded-md border-blue-200 text-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
                                     />
                                 </div>
@@ -543,7 +558,7 @@ const cancel = () => {
                                                             v-model.number="item.tax_rate"
                                                             @input="handlePriceChange(item, 'tax_rate')"
                                                             type="number"
-                                                            step="0.01"
+                                                            step="1"
                                                             placeholder="%"
                                                             class="w-full text-xs rounded-md border-gray-300 shadow-sm py-1 dark:bg-muted dark:border-border"
                                                         />

@@ -280,7 +280,11 @@ const getPrice = (p: Product): number =>
   p.pricing?.base_price ?? p.default_variant?.pricing?.base_price ?? 0
 
 const getTaxRate = (p: Product): number =>
-  p.pricing?.tax_rate ?? p.default_variant?.pricing?.tax_rate ?? 0
+  p.pricing?.sale_tax_rate
+  ?? p.pricing?.tax_rate
+  ?? p.default_variant?.pricing?.sale_tax_rate
+  ?? p.default_variant?.pricing?.tax_rate
+  ?? 0
 
 const getStock = (p: Product): number =>
   p.total_stock ?? p.default_variant?.total_stock ?? 0

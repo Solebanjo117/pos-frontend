@@ -8,9 +8,19 @@ interface FoundProduct {
     id: number
     name: string
     sku_base: string
-    default_variant?: { id: number; sku: string; pricing?: { base_price: number; tax_rate: number } }
-    variants?: { id: number; sku: string; brand?: { name: string }; pricing?: { base_price: number; tax_rate: number }; total_stock: number }[]
-    pricing?: { base_price: number; tax_rate: number }
+    default_variant?: {
+        id: number
+        sku: string
+        pricing?: { base_price: number; tax_rate?: number; sale_tax_rate?: number }
+    }
+    variants?: {
+        id: number
+        sku: string
+        brand?: { name: string }
+        pricing?: { base_price: number; tax_rate?: number; sale_tax_rate?: number }
+        total_stock: number
+    }[]
+    pricing?: { base_price: number; tax_rate?: number; sale_tax_rate?: number }
     image_url?: string | null
 }
 
@@ -45,6 +55,16 @@ const errorMsg = ref<string | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+const normalizeTaxPercent = (value: unknown): number => {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, Math.min(100, Math.round(parsed)))
+}
+
+const resolveSaleTaxRate = (pricing?: { tax_rate?: number; sale_tax_rate?: number }): number => {
+    return normalizeTaxPercent(pricing?.sale_tax_rate ?? pricing?.tax_rate ?? 0)
+}
 
 watch(() => props.show, (open) => {
     if (open) {
@@ -88,7 +108,7 @@ const addProduct = (product: FoundProduct) => {
         variant_id: product.default_variant?.id ?? null,
         quantity: 1,
         unit_price: pricing?.base_price ?? 0,
-        tax_percent: pricing?.tax_rate ?? 0,
+        tax_percent: resolveSaleTaxRate(pricing),
         seller_id: props.currentUserId ?? null,
     })
     searchQuery.value = ''
@@ -121,7 +141,7 @@ const handleSubmit = async () => {
                 warehouse_id: props.warehouseId,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
-                tax_percent: item.tax_percent,
+                tax_percent: normalizeTaxPercent(item.tax_percent),
                 seller_id: item.seller_id,
             })
         }

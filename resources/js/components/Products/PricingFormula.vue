@@ -36,6 +36,7 @@ const PRESETS = computed(() => activeFormulas.value.map((f: any) => ({
 // Use real cost; if 0, formulas resolving to 0 are still valid
 const effectiveCost = computed(() => Number(props.cost) || 0)
 const effectiveTax  = computed(() => props.taxRate ?? 7)
+const formulaUsesItbm = computed(() => /\bitbm\b/i.test(rawInput.value))
 
 /**
  * Detects if the input is likely a formula (not just a plain number).
@@ -112,11 +113,17 @@ async function fetchPreview() {
   }
   isLoadingPreview.value = true
   try {
-    const { data } = await apiClient.post('/pricing-formula/preview', {
+    const payload: Record<string, unknown> = {
       formula: rawInput.value,
       cost: effectiveCost.value,
-      tax_rate: effectiveTax.value,
-    })
+    }
+
+    // ITBM is only relevant when the formula explicitly references the ITBM variable.
+    if (formulaUsesItbm.value) {
+      payload.tax_rate = effectiveTax.value
+    }
+
+    const { data } = await apiClient.post('/pricing-formula/preview', payload)
     preview.value = data
     // NOTE: no emit here — price is only committed on blur/Enter via commitValue()
   } catch {
@@ -165,22 +172,15 @@ watch(() => props.cost, () => {
 })
 
 // Re-evalúa precio cuando cambia la tasa ITBM
-watch(() => props.taxRate, async (newRate) => {
-  if (isFormula.value) {
-    // En modo fórmula: re-fetch (la API ya usa taxRate para calcular ITBM)
-    await fetchPreview()
-    if (preview.value?.success && preview.value.result !== undefined) {
-      emit('update:price', preview.value.result)
-    }
-  } else {
-    // En modo número plano: aplicar ITBM al valor base
-    const base = parseFloat(rawInput.value)
-    if (!isNaN(base) && base > 0) {
-      const rate = Number(newRate) || 0
-      const withTax = Number((base * (1 + rate / 100)).toFixed(2))
-      emit('update:modelValue', '')
-      emit('update:price', withTax)
-    }
+watch(() => props.taxRate, async () => {
+  if (!isFormula.value) return
+
+  // Do not auto-apply sale ITBM unless the formula explicitly uses the ITBM variable.
+  if (!formulaUsesItbm.value) return
+
+  await fetchPreview()
+  if (preview.value?.success && preview.value.result !== undefined) {
+    emit('update:price', preview.value.result)
   }
 })
 

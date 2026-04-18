@@ -133,11 +133,21 @@ const supplierOptions = computed(() => {
     return opts
 })
 
+function normalizeTaxRate(value: unknown): number {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, Math.min(100, Math.round(parsed)))
+}
+
 async function loadItems() {
     loading.value = true
     error.value = null
     try {
-        items.value = await supplyListService.getItems()
+        const loadedItems = await supplyListService.getItems()
+        items.value = loadedItems.map(item => ({
+            ...item,
+            tax_rate: normalizeTaxRate(item.tax_rate),
+        }))
     } catch (e: any) {
         error.value = e.response?.data?.message || 'Error al cargar la lista'
     } finally {
@@ -148,11 +158,14 @@ async function loadItems() {
 async function handleUpdateItem(item: SupplyListItem) {
     savingItemId.value = item.id
     try {
+        const normalizedTaxRate = normalizeTaxRate(item.tax_rate)
+        item.tax_rate = normalizedTaxRate
+
         const updated = await supplyListService.updateItem(item.id, {
             supplier_id: item.supplier_id,
             quantity_needed: item.quantity_needed,
             unit_cost: item.unit_cost,
-            tax_rate: item.tax_rate,
+            tax_rate: normalizedTaxRate,
             sale_price: item.sale_price,
             notes: item.notes ?? undefined,
         })
@@ -510,7 +523,7 @@ onMounted(async () => {
                                     type="number"
                                     min="0"
                                     max="100"
-                                    step="0.5"
+                                    step="1"
                                     class="w-full px-2 py-1.5 text-sm text-right border border-gray-200 dark:border-border rounded bg-white dark:bg-muted dark:text-white"
                                 />
                             </td>

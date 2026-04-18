@@ -1,6 +1,12 @@
 import { ref } from 'vue'
 import apiClient from '@/services/api/client'
 
+const normalizeTaxRate = (value: unknown): number => {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return 7
+    return Math.max(0, Math.min(100, Math.round(parsed)))
+}
+
 export interface StoreSettings {
     store_name: string
     store_tagline: string
@@ -37,7 +43,7 @@ const settings = ref<StoreSettings>({
     sku_format: ['category', 'brand'],
     quote_expiration_days: 0,
     require_stock_for_quotes: false,
-    store_tax_rate: 7.0,
+    store_tax_rate: 7,
     modules_work_orders_enabled: false,
 })
 
@@ -57,6 +63,7 @@ export function useStoreSettings() {
         try {
             const res = await apiClient.get('/store-settings')
             Object.assign(settings.value, res.data.data)
+            settings.value.store_tax_rate = normalizeTaxRate(settings.value.store_tax_rate)
             fetched = true
         } catch (e: any) {
             error.value = e.response?.data?.message || 'Error al cargar configuración'
@@ -70,8 +77,14 @@ export function useStoreSettings() {
         saving.value = true
         error.value = null
         try {
-            const res = await apiClient.put('/store-settings', data)
+            const payload: Partial<StoreSettings> = { ...data }
+            if (payload.store_tax_rate !== undefined) {
+                payload.store_tax_rate = normalizeTaxRate(payload.store_tax_rate)
+            }
+
+            const res = await apiClient.put('/store-settings', payload)
             Object.assign(settings.value, res.data.data)
+            settings.value.store_tax_rate = normalizeTaxRate(settings.value.store_tax_rate)
             return true
         } catch (e: any) {
             error.value = e.response?.data?.message || 'Error al guardar configuración'

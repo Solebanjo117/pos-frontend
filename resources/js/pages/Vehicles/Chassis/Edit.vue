@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useVehicleChassis } from '@/composables/useVehicleChassis'
 import apiClient from '@/services/api/client'
 import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
+
+interface VehicleModelItem {
+    id: number
+    make_id?: number
+    name: string
+    year_from?: number | string | null
+    year_to?: number | string | null
+    make?: {
+        id: number
+        name: string
+    }
+}
 
 const props = defineProps<{
     chassisId: number
@@ -23,83 +35,156 @@ const { fetchChassisItem, updateChassis, loading, error } = useVehicleChassis()
 const form = ref({
     code: '',
     name: '',
-    model_id: null as number | null,
+    model_ids: [] as number[],
     year_from: '',
     year_to: '',
     notes: '',
 })
 
-// Vehicle makes/models for optional association
 const makes = ref<{ id: number; name: string }[]>([])
-const models = ref<{ id: number; name: string }[]>([])
-const selectedMakeId = ref<number | null>(null)
+const models = ref<VehicleModelItem[]>([])
+const selectedMakeFilterId = ref<number | null>(null)
+const modelSearch = ref('')
 const loadingData = ref(true)
+const loadingModels = ref(false)
 
 const makeOptions = computed<SelectOption[]>(() => [
-    { value: null, label: '— Sin asociar —' },
-    ...makes.value.map((m) => ({ value: m.id, label: m.name })),
+    { value: null, label: 'Todas las marcas' },
+    ...makes.value.map((make) => ({ value: make.id, label: make.name })),
 ])
 
-const modelOptions = computed<SelectOption[]>(() => [
-    { value: null, label: '— Sin modelo —' },
-    ...models.value.map((model) => ({ value: model.id, label: model.name })),
-])
+const modelsById = computed(() => {
+    return new Map(models.value.map((model) => [model.id, model]))
+})
+
+const normalizeYear = (year?: number | string | null): string => {
+    if (year === null || year === undefined) return ''
+    return String(year).trim()
+}
+
+const formatModelYears = (model: VehicleModelItem): string => {
+    const yearFrom = normalizeYear(model.year_from)
+    const yearTo = normalizeYear(model.year_to)
+
+    if (!yearFrom && !yearTo) return ''
+    return `${yearFrom || '?'}-${yearTo || '?'}`
+}
+
+const formatModelLabel = (model: VehicleModelItem): string => {
+    const makeName = model.make?.name?.trim()
+    return [makeName, model.name].filter(Boolean).join(' ')
+}
+
+const filteredModels = computed(() => {
+    const query = modelSearch.value.trim().toLowerCase()
+
+    const filtered = models.value.filter((model) => {
+        const matchesMake = !selectedMakeFilterId.value || model.make?.id === selectedMakeFilterId.value || model.make_id === selectedMakeFilterId.value
+        if (!matchesMake) return false
+
+        if (!query) return true
+
+        const haystack = [
+            model.name,
+            model.make?.name,
+            formatModelYears(model),
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+
+        return haystack.includes(query)
+    })
+
+    return filtered.sort((a, b) => formatModelLabel(a).localeCompare(formatModelLabel(b)))
+})
+
+const selectedModels = computed(() => {
+    return form.value.model_ids
+        .map((id) => modelsById.value.get(id))
+        .filter((model): model is VehicleModelItem => Boolean(model))
+})
 
 const fetchMakes = async () => {
     try {
         const { data } = await apiClient.get('/vehicle-makes')
-        makes.value = data.data
-    } catch { makes.value = [] }
+        makes.value = data.data ?? []
+    } catch {
+        makes.value = []
+    }
 }
 
-const fetchModels = async (makeId: number) => {
+const fetchAllModels = async () => {
+    loadingModels.value = true
+
     try {
-        const { data } = await apiClient.get(`/vehicle-makes/${makeId}/models`)
-        models.value = data.data
-    } catch { models.value = [] }
+        const collected: VehicleModelItem[] = []
+        let page = 1
+        let lastPage = 1
+
+        do {
+            const { data } = await apiClient.get('/vehicle-models', {
+                params: { page, per_page: 200 },
+            })
+
+            const pageItems = (data.data ?? []) as VehicleModelItem[]
+            collected.push(...pageItems)
+
+            lastPage = Number(data.meta?.last_page ?? 1)
+            page += 1
+        } while (page <= lastPage)
+
+        const uniqueById = new Map<number, VehicleModelItem>()
+        collected.forEach((model) => uniqueById.set(model.id, model))
+        models.value = Array.from(uniqueById.values())
+    } catch {
+        models.value = []
+    } finally {
+        loadingModels.value = false
+    }
 }
 
 onMounted(async () => {
-    await fetchMakes()
+    await Promise.all([fetchMakes(), fetchAllModels()])
+
     try {
         const chassis = await fetchChassisItem(props.chassisId)
+        const initialModelIds = Array.isArray(chassis.model_ids) && chassis.model_ids.length > 0
+            ? chassis.model_ids
+            : (chassis.model_id ? [chassis.model_id] : [])
+
         form.value = {
             code: chassis.code,
             name: chassis.name || '',
-            model_id: chassis.model_id || null,
+            model_ids: initialModelIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)),
             year_from: chassis.year_from || '',
             year_to: chassis.year_to || '',
             notes: chassis.notes || '',
         }
-        // If has model, load the make's models list
-        if (chassis.model?.make?.id) {
-            selectedMakeId.value = chassis.model.make.id
-            await fetchModels(chassis.model.make.id)
-        }
-    } catch { /* handled by composable */ }
-    loadingData.value = false
+    } catch {
+        // Error handled in composable
+    } finally {
+        loadingData.value = false
+    }
 })
 
-const onMakeChange = async () => {
-    form.value.model_id = null
-    models.value = []
-    if (selectedMakeId.value) {
-        await fetchModels(selectedMakeId.value)
-    }
-}
-
 const handleSubmit = async () => {
+    const uniqueModelIds = Array.from(new Set(form.value.model_ids.map((id) => Number(id)).filter((id) => Number.isFinite(id))))
+
     try {
         await updateChassis(props.chassisId, {
             code: form.value.code,
             name: form.value.name || undefined,
-            model_id: form.value.model_id,
+            model_id: uniqueModelIds[0] ?? null,
+            model_ids: uniqueModelIds,
             year_from: form.value.year_from || undefined,
             year_to: form.value.year_to || undefined,
             notes: form.value.notes || undefined,
         })
         router.visit('/vehicles/chassis')
-    } catch { /* Error handled in composable */ }
+    } catch {
+        // Error handled in composable
+    }
 }
 </script>
 
@@ -107,7 +192,7 @@ const handleSubmit = async () => {
     <Head title="Editar Chasis" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-xl space-y-6 p-6">
+        <div class="mx-auto max-w-3xl space-y-6 p-6">
             <div>
                 <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Editar Chasis</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -153,33 +238,89 @@ const handleSubmit = async () => {
                         />
                     </div>
 
-                    <!-- Vehículo asociado (opcional) -->
-                    <div class="grid grid-cols-2 gap-4">
+                    <!-- Modelos asociados (opcional) -->
+                    <div class="space-y-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Marca (opcional)
+                                Modelos asociados (opcional)
                             </label>
-                            <div class="mt-1">
-                                <SearchableSelect
-                                    v-model="selectedMakeId"
-                                    :options="makeOptions"
-                                    placeholder="— Sin asociar —"
-                                    @update:model-value="onMakeChange"
+                            <p class="mt-1 text-xs text-gray-500">Puedes asociar este chasis a uno o varios modelos, incluso de diferentes marcas.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <div>
+                                <label class="block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                    Filtro por marca
+                                </label>
+                                <div class="mt-1">
+                                    <SearchableSelect
+                                        v-model="selectedMakeFilterId"
+                                        :options="makeOptions"
+                                        placeholder="Todas las marcas"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                    Buscar modelo
+                                </label>
+                                <input
+                                    v-model="modelSearch"
+                                    type="text"
+                                    placeholder="Ej: Hilux, Corolla, Civic..."
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                                 />
                             </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Modelo (opcional)
-                            </label>
-                            <div class="mt-1">
-                                <SearchableSelect
-                                    v-model="form.model_id"
-                                    :options="modelOptions"
-                                    :disabled="!selectedMakeId"
-                                    placeholder="— Sin modelo —"
-                                />
+
+                        <div class="rounded-md border border-gray-200 dark:border-border">
+                            <div v-if="loadingModels" class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                Cargando modelos...
                             </div>
+
+                            <div v-else-if="filteredModels.length === 0" class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                No hay modelos para el filtro actual.
+                            </div>
+
+                            <div v-else class="max-h-56 divide-y divide-gray-100 overflow-y-auto dark:divide-border">
+                                <label
+                                    v-for="model in filteredModels"
+                                    :key="model.id"
+                                    class="flex cursor-pointer items-start gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-muted/40"
+                                >
+                                    <input
+                                        v-model="form.model_ids"
+                                        type="checkbox"
+                                        :value="model.id"
+                                        class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                            {{ formatModelLabel(model) }}
+                                        </p>
+                                        <p v-if="formatModelYears(model)" class="text-xs text-gray-500 dark:text-gray-400">
+                                            Años: {{ formatModelYears(model) }}
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            {{ form.model_ids.length }} modelo(s) seleccionado(s)
+                        </p>
+
+                        <div v-if="selectedModels.length > 0" class="flex flex-wrap gap-2">
+                            <span
+                                v-for="model in selectedModels"
+                                :key="`selected-model-${model.id}`"
+                                class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+                                :title="`${formatModelLabel(model)} ${formatModelYears(model)}`"
+                            >
+                                {{ formatModelLabel(model) }}
+                            </span>
                         </div>
                     </div>
 

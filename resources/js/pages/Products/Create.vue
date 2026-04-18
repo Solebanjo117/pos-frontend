@@ -59,6 +59,8 @@ const form = ref<CreateProductRequest>({
         msrp: 0,
         cost: 0,
         tax_rate: 7,
+        sale_tax_rate: 7,
+        cost_tax_rate: 7,
         tax_type: 'custom',
         max_discount_percentage: 0,
     },
@@ -80,7 +82,7 @@ const computed_total = computed(() => {
     }
     const p = form.value.pricing
     const base = Number(p.base_price) || 0
-    const rate = Number(p.tax_rate) || 0
+    const rate = Number((p as any).sale_tax_rate ?? p.tax_rate) || 0
     return Number((base * (1 + rate / 100)).toFixed(2))
 })
 
@@ -90,6 +92,7 @@ const onFormulaTotalChange = (newTotal: number) => {
 
 watch(() => form.value.pricing.base_price, () => { custom_total.value = null })
 watch(() => form.value.pricing.tax_rate, () => { custom_total.value = null })
+watch(() => (form.value.pricing as any).sale_tax_rate, () => { custom_total.value = null })
 watch(() => form.value.pricing_formula, (v) => { if(!v) custom_total.value = null })
 
 const validationErrors = ref<Record<string, string[]>>({})
@@ -244,45 +247,59 @@ const getModelChassis = (model?: VehicleModelItem | null): string => {
     return String(model?.generation ?? '').trim()
 }
 
-const makeAbbreviationMap: Record<string, string> = {
-    chevrolet: 'Chev',
-    chevy: 'Chev',
-    toyota: 'Toy',
-    volkswagen: 'VW',
-    'mercedes benz': 'Merc',
-    mercedes: 'Merc',
-    mitsubishi: 'Mits',
-    hyundai: 'Hyun',
-    nissan: 'Niss',
-    peugeot: 'Peug',
-    chrysler: 'Chry',
-    porsche: 'Pors',
-    landrover: 'LR',
-    'land rover': 'LR',
-}
+const engineCategoryKeywords = [
+    'motor',
+    'piston',
+    'pistón',
+    'biela',
+    'cigueñal',
+    'cigüeñal',
+    'culata',
+    'valvula',
+    'válvula',
+    'arbol de levas',
+    'árbol de levas',
+    'empaque',
+    'junta de culata',
+    'bomba de aceite',
+    'cadena',
+    'correa',
+    'timing',
+    'engine',
+    'piston ring',
+    'anillo',
+]
 
-const normalizeMakeKey = (make: string): string => {
-    return make
+const normalizeTextKey = (value: string): string => {
+    return value
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9 ]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
 }
 
-const abbreviateMakeName = (make?: string): string => {
-    const raw = String(make ?? '').trim()
+const isEngineCategory = (categoryName?: string): boolean => {
+    const normalizedCategory = normalizeTextKey(String(categoryName ?? ''))
+    if (!normalizedCategory) return false
+    return engineCategoryKeywords.some(keyword => normalizedCategory.includes(normalizeTextKey(keyword)))
+}
+
+const toTwoDigitYearRange = (yearValue?: string): string => {
+    const raw = String(yearValue ?? '').trim()
     if (!raw) return ''
 
-    const normalizedKey = normalizeMakeKey(raw)
-    if (makeAbbreviationMap[normalizedKey]) {
-        return makeAbbreviationMap[normalizedKey]
+    const years = Array.from(raw.matchAll(/\d{4}/g)).map(match => match[0].slice(-2))
+    if (years.length >= 2) {
+        return `${years[0]}-${years[1]}`
     }
 
-    // Fallback to keep labels compact when make names are very long.
-    if (raw.length > 7) {
-        return raw.slice(0, 4)
+    if (years.length === 1) {
+        if (raw.includes('+')) {
+            return `${years[0]}+`
+        }
+
+        return years[0]
     }
 
     return raw
@@ -294,10 +311,11 @@ const buildChassisLevelLabel = (entry: {
     year?: string
     chassis?: string
 }): string => {
-    return [abbreviateMakeName(entry.make), entry.model, entry.year, entry.chassis]
-        .map(v => String(v ?? '').trim())
-        .filter(Boolean)
-        .join(', ')
+    const make = String(entry.make ?? '').trim()
+    const model = String(entry.model ?? '').trim()
+    const year = toTwoDigitYearRange(entry.year)
+    if (!make || !model) return ''
+    return `${make} ${model}${year ? ` ${year}` : ''}`
 }
 
 const buildEngineLevelLabel = (entry: {
@@ -307,10 +325,18 @@ const buildEngineLevelLabel = (entry: {
     year?: string
     chassis?: string
 }): string => {
-    return [abbreviateMakeName(entry.make), entry.engine, entry.model, entry.year, entry.chassis]
-        .map(v => String(v ?? '').trim())
-        .filter(Boolean)
-        .join(', ')
+    const make = String(entry.make ?? '').trim()
+    const model = String(entry.model ?? '').trim()
+    const engine = String(entry.engine ?? '').trim()
+    const year = toTwoDigitYearRange(entry.year)
+
+    if (!make || !model) return ''
+
+    if (engine) {
+        return `${engine} ${make} ${model}${year ? ` ${year}` : ''}`
+    }
+
+    return `${make} ${model}${year ? ` ${year}` : ''}`
 }
 
 const addedEngines = ref<EngineCompatibilityEntry[]>([])
@@ -450,13 +476,14 @@ const compatibilitySummary = computed(() => {
 const namePreview = computed(() => {
     const catId = (form.value as any).category_id
     const categoryName = categories.value.find(c => c.id === catId)?.name || 'Producto sin nombre'
+    const engineCategory = isEngineCategory(categoryName)
 
     const chassisLabels = addedChassis.value
         .map(entry => buildChassisLevelLabel(entry))
         .filter(Boolean)
 
     const engineLabels = addedEngines.value
-        .map(entry => buildEngineLevelLabel(entry))
+        .map(entry => engineCategory ? buildEngineLevelLabel(entry) : buildChassisLevelLabel(entry))
         .filter(Boolean)
 
     const selectedMake = vehicleMakes.value.find(m => m.id === selectedMakeId.value)?.name || ''
@@ -478,13 +505,21 @@ const namePreview = computed(() => {
     }
 
     if (allEnginesFlag.value && selectedModelName) {
-        const allEnginesLabel = buildEngineLevelLabel({
-            make: selectedMake,
-            engine: 'todos los motores',
-            model: selectedModelName,
-            year: selectedYear,
-            chassis: selectedChassis || 'todos los chasis',
-        })
+        const allEnginesLabel = engineCategory
+            ? buildEngineLevelLabel({
+                make: selectedMake,
+                engine: 'todos los motores',
+                model: selectedModelName,
+                year: selectedYear,
+                chassis: selectedChassis || 'todos los chasis',
+            })
+            : buildChassisLevelLabel({
+                make: selectedMake,
+                model: selectedModelName,
+                year: selectedYear,
+                chassis: selectedChassis,
+            })
+
         if (allEnginesLabel) {
             engineLabels.push(allEnginesLabel)
         }
@@ -495,8 +530,8 @@ const namePreview = computed(() => {
         return categoryName
     }
 
-    const displayed = compatibilityLabels.slice(0, 3).join(' | ')
-    const suffix = compatibilityLabels.length > 3 ? ' y mas' : ''
+    const displayed = compatibilityLabels.slice(0, 3).join(', ')
+    const suffix = compatibilityLabels.length > 3 ? ' y más' : ''
     return `${categoryName} - ${displayed}${suffix}`
 })
 
@@ -926,8 +961,17 @@ const handleSubmit = async () => {
     }
     
     try {
+        const normalizedSaleTaxRate = Math.max(0, Math.min(100, Math.round(Number((form.value.pricing as any).sale_tax_rate ?? form.value.pricing.tax_rate ?? 7))))
+        const normalizedCostTaxRate = Math.max(0, Math.min(100, Math.round(Number((form.value.pricing as any).cost_tax_rate ?? normalizedSaleTaxRate))))
+
         const payload = {
             ...form.value,
+            pricing: {
+                ...form.value.pricing,
+                tax_rate: normalizedSaleTaxRate,
+                sale_tax_rate: normalizedSaleTaxRate,
+                cost_tax_rate: normalizedCostTaxRate,
+            },
             sku: form.value.sku || form.value.sku_base || '',
             attributes: variantAttributes.value
                 .map(a => ({
@@ -1406,7 +1450,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 </div>
                 <div v-else class="space-y-3">
                     <div v-for="(attr, index) in variantAttributes" :key="index" class="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end">
-                        <div class="sm:col-span-4">
+                        <div class="sm:col-span-5">
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
                                 Nombre del atributo
                                 <span v-if="attr.required" class="text-red-500">*</span>
@@ -1419,7 +1463,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                 placeholder="Ej: Amperaje"
                             />
                         </div>
-                        <div class="sm:col-span-5">
+                        <div class="sm:col-span-6">
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
                                 Valor
                                 <span v-if="attr.required" class="text-red-500">*</span>
@@ -1430,15 +1474,6 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                                 :required="attr.required"
                                 class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
                                 :placeholder="attr.name ? `${attr.name}...` : 'Valor'"
-                            />
-                        </div>
-                        <div class="sm:col-span-2">
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">Unidad</label>
-                            <input
-                                v-model="attr.unit"
-                                type="text"
-                                class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                placeholder="Ej: A"
                             />
                         </div>
                         <div class="sm:col-span-1">

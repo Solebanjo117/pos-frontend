@@ -230,17 +230,16 @@ const switchArchiveTab = async (tab: 'active' | 'archived') => {
 const sortField = ref<string>('created_at')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 
-type ProductsTableColumn = 'expander' | 'image' | 'sku' | 'product' | 'attributes' | 'variants' | 'stock' | 'actions'
+type ProductsTableColumn = 'expander' | 'image' | 'sku' | 'product' | 'attributes' | 'stock' | 'actions'
 
-const PRODUCTS_TABLE_WIDTH_STORAGE_KEY = 'products_index_table_column_widths_v1'
-const tableColumns: ProductsTableColumn[] = ['expander', 'image', 'sku', 'product', 'attributes', 'variants', 'stock', 'actions']
+const PRODUCTS_TABLE_WIDTH_STORAGE_KEY = 'products_index_table_column_widths_v2'
+const tableColumns: ProductsTableColumn[] = ['expander', 'image', 'sku', 'product', 'attributes', 'stock', 'actions']
 const defaultColumnWidths: Record<ProductsTableColumn, number> = {
     expander: 56,
     image: 72,
     sku: 170,
     product: 360,
     attributes: 280,
-    variants: 140,
     stock: 120,
     actions: 220,
 }
@@ -250,7 +249,6 @@ const minColumnWidths: Record<ProductsTableColumn, number> = {
     sku: 130,
     product: 240,
     attributes: 180,
-    variants: 110,
     stock: 96,
     actions: 170,
 }
@@ -457,7 +455,7 @@ const getVariants = (product: any) => {
     return []
 }
 
-const getTechnicalSpecsPreview = (product: any): string => {
+const collectTechnicalSpecs = (product: any): Array<{ name: string; value: string; unit?: string }> => {
     const attributeCandidates: any[] = []
 
     if (Array.isArray(product?.key_attributes) && product.key_attributes.length > 0) {
@@ -480,7 +478,7 @@ const getTechnicalSpecsPreview = (product: any): string => {
     }
 
     const seenNames = new Set<string>()
-    const attributesPreview: string[] = []
+    const normalizedAttributes: Array<{ name: string; value: string; unit?: string }> = []
 
     attributeCandidates.forEach((attr: any) => {
         const name = String(attr?.name ?? '').trim()
@@ -491,10 +489,25 @@ const getTechnicalSpecsPreview = (product: any): string => {
 
         seenNames.add(name)
         const unit = String(attr?.unit ?? '').trim()
-        attributesPreview.push(`${name}: ${value}${unit ? unit : ''}`)
+        normalizedAttributes.push({
+            name,
+            value,
+            unit: unit || undefined,
+        })
     })
 
-    return attributesPreview.slice(0, 3).join(' • ') + (attributesPreview.length > 3 ? '...' : '')
+    return normalizedAttributes
+}
+
+const getTechnicalSpecsPreview = (product: any): string => {
+    const attributes = collectTechnicalSpecs(product)
+    const valuePreview = attributes.map(attr => `${attr.value}${attr.unit ? attr.unit : ''}`)
+    return valuePreview.slice(0, 3).join(' • ') + (valuePreview.length > 3 ? '...' : '')
+}
+
+const getTechnicalSpecsTooltip = (product: any): string => {
+    const attributes = collectTechnicalSpecs(product)
+    return attributes.map(attr => `${attr.name}: ${attr.value}${attr.unit ? attr.unit : ''}`).join(' • ')
 }
 </script>
 
@@ -753,12 +766,6 @@ const getTechnicalSpecsPreview = (product: any): string => {
                                     <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'attributes')" @click.stop.prevent></span>
                                 </th>
                                 <th
-                                    :style="getColumnStyle('variants')"
-                                    class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                    Variantes
-                                    <span class="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none" @mousedown.stop.prevent="startColumnResize($event, 'variants')" @click.stop.prevent></span>
-                                </th>
-                                <th
                                     :style="getColumnStyle('stock')"
                                     class="relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
                                     Stock
@@ -821,19 +828,10 @@ const getTechnicalSpecsPreview = (product: any): string => {
                                         </div>
                                     </td>
                                     <td :style="getColumnStyle('attributes')" class="px-6 py-4">
-                                        <div v-if="getTechnicalSpecsPreview(product)" class="text-xs text-gray-600 dark:text-gray-300" :title="getTechnicalSpecsPreview(product)">
+                                        <div v-if="getTechnicalSpecsPreview(product)" class="text-xs text-gray-600 dark:text-gray-300" :title="getTechnicalSpecsTooltip(product)">
                                             {{ getTechnicalSpecsPreview(product) }}
                                         </div>
                                         <span v-else class="text-xs text-gray-400">—</span>
-                                    </td>
-                                    <td
-                                        :style="getColumnStyle('variants')"
-                                        class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                        <span
-                                            class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                            {{ product.variants_count || '1' }} marca{{ (product.variants_count
-                                                || 1) > 1 ? 's' : '' }}
-                                        </span>
                                     </td>
                                     <td
                                         :style="getColumnStyle('stock')"
@@ -871,7 +869,7 @@ const getTechnicalSpecsPreview = (product: any): string => {
                                 <!-- Expanded Variants Row -->
                                 <tr v-if="expandedRows.has(product.id)"
                                     class="bg-gray-50 dark:bg-muted">
-                                    <td colspan="8" class="px-6 py-4">
+                                    <td colspan="7" class="px-6 py-4">
                                         <div class="ml-12">
                                             <h4
                                                 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -914,11 +912,11 @@ const getTechnicalSpecsPreview = (product: any): string => {
                                                                 class="px-4 py-3 text-sm text-gray-900 dark:text-white">
                                                                 <PriceDisplay v-if="variant.pricing"
                                                                     :base-price="Number(variant.pricing.base_price)"
-                                                                    :tax-rate="Number(variant.pricing.tax_rate ?? product.pricing?.tax_rate ?? 0)"
+                                                                    :tax-rate="Number(variant.pricing.sale_tax_rate ?? variant.pricing.tax_rate ?? product.pricing?.sale_tax_rate ?? product.pricing?.tax_rate ?? 0)"
                                                                     size="sm" />
                                                                 <PriceDisplay v-else-if="product.pricing"
                                                                     :base-price="Number(product.pricing.base_price)"
-                                                                    :tax-rate="Number(product.pricing.tax_rate ?? 0)"
+                                                                    :tax-rate="Number(product.pricing.sale_tax_rate ?? product.pricing.tax_rate ?? 0)"
                                                                     size="sm" />
                                                                 <div v-else class="text-gray-400">—</div>
                                                             </td>

@@ -34,6 +34,10 @@ Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+Route::middleware(['auth'])->get('/changelog', function () {
+    return Inertia::render('Changelog/Index');
+})->name('changelog.index');
+
 // Product Routes
 Route::middleware(['auth'])->prefix('products')->name('products.')->group(function () {
     Route::get('/', [App\Http\Controllers\ProductController::class, 'index'])->name('index');

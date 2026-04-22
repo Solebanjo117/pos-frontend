@@ -12,7 +12,7 @@ import ProductFiltersComponent from '@/components/Products/ProductFilters.vue'
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue'
 import ProductSort from '@/components/Products/ProductSort.vue'
 import PriceDisplay from '@/components/ui/PriceDisplay.vue'
-import { ShoppingCart, Check, Info, Filter, Upload, Download, FileSpreadsheet } from 'lucide-vue-next'
+import { ShoppingCart, Check, Info, Filter } from 'lucide-vue-next'
 import { usePosSettings } from '@/composables/usePosSettings'
 import { useCategories } from '@/composables/useCategories'
 import { useBrands } from '@/composables/useBrands'
@@ -100,102 +100,6 @@ const addVariantToCart = (product: any, variant: any) => {
 }
 
 const addedFeedback = ref<number | null>(null)
-
-// ========== IMPORT STATE ==========
-const showImportModal = ref(false)
-const importFile = ref<File | null>(null)
-const importPreviewRows = ref<any[]>([])
-const importPreviewCount = ref(0)
-const importResult = ref<any | null>(null)
-const importError = ref<string | null>(null)
-const importPreviewLoading = ref(false)
-const importRunning = ref(false)
-
-const openImportModal = () => {
-    showImportModal.value = true
-    importError.value = null
-    importResult.value = null
-    importPreviewRows.value = []
-    importPreviewCount.value = 0
-}
-
-const closeImportModal = () => {
-    showImportModal.value = false
-    importFile.value = null
-    importPreviewRows.value = []
-    importPreviewCount.value = 0
-    importResult.value = null
-    importError.value = null
-}
-
-const handleImportFileChange = (e: Event) => {
-    const input = e.target as HTMLInputElement
-    importFile.value = input.files?.[0] ?? null
-    importPreviewRows.value = []
-    importPreviewCount.value = 0
-    importResult.value = null
-    importError.value = null
-}
-
-const downloadImportTemplate = async () => {
-    importError.value = null
-    try {
-        const blob = await productsApi.downloadImportTemplate()
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = 'plantilla_productos.xlsx'
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        window.URL.revokeObjectURL(url)
-    } catch (e: any) {
-        importError.value = e.response?.data?.message || 'No se pudo descargar la plantilla.'
-    }
-}
-
-const previewImportFile = async () => {
-    importError.value = null
-    importResult.value = null
-
-    if (!importFile.value) {
-        importError.value = 'Selecciona un archivo antes de previsualizar.'
-        return
-    }
-
-    importPreviewLoading.value = true
-    try {
-        const response = await productsApi.previewImport(importFile.value)
-        importPreviewRows.value = response.data?.rows ?? []
-        importPreviewCount.value = response.data?.count ?? importPreviewRows.value.length
-    } catch (e: any) {
-        importError.value = e.response?.data?.message || 'No se pudo generar la previsualizacion.'
-        importPreviewRows.value = []
-        importPreviewCount.value = 0
-    } finally {
-        importPreviewLoading.value = false
-    }
-}
-
-const runImport = async () => {
-    importError.value = null
-
-    if (!importFile.value) {
-        importError.value = 'Selecciona un archivo antes de importar.'
-        return
-    }
-
-    importRunning.value = true
-    try {
-        const response = await productsApi.importFromFile(importFile.value)
-        importResult.value = response.data ?? null
-        await applyFilters()
-    } catch (e: any) {
-        importError.value = e.response?.data?.message || 'Error al importar productos.'
-    } finally {
-        importRunning.value = false
-    }
-}
 
 // ========== VIEW MODE TOGGLE ==========
 const viewMode = ref<'table' | 'catalog'>('table')
@@ -559,13 +463,13 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                         <span class="bg-white text-green-700 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{{ cartItemCount }}</span>
                     </a>
 
-                    <button
-                        @click="openImportModal"
+                    <a
+                        href="/products/import"
                         class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
                     >
                         <Upload class="h-4 w-4" />
-                        Importar Excel
-                    </button>
+                        Importar
+                    </a>
 
                     <!-- New Product Button -->
                     <a href="/products/create"
@@ -828,8 +732,11 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                         </div>
                                     </td>
                                     <td :style="getColumnStyle('attributes')" class="px-6 py-4">
-                                        <div v-if="getTechnicalSpecsPreview(product)" class="text-xs text-gray-600 dark:text-gray-300" :title="getTechnicalSpecsTooltip(product)">
-                                            {{ getTechnicalSpecsPreview(product) }}
+                                        <div v-if="collectTechnicalSpecs(product).length" class="flex flex-wrap gap-1">
+                                            <span v-for="attr in collectTechnicalSpecs(product).slice(0, 4)" :key="attr.name + attr.value"
+                                                class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                                                {{ attr.value }}<span v-if="attr.unit" class="ml-0.5 text-green-600 dark:text-green-400">{{ attr.unit }}</span>
+                                            </span>
                                         </div>
                                         <span v-else class="text-xs text-gray-400">—</span>
                                     </td>
@@ -882,9 +789,6 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                         <tr>
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                                                                SKU Variante</th>
-                                                            <th
-                                                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
                                                                 Marca</th>
                                                             <th
                                                                 class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
@@ -902,9 +806,6 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                         <tr v-for="variant in getVariants(product)"
                                                             :key="variant.id"
                                                             class="hover:bg-gray-50 dark:hover:bg-muted/50">
-                                                            <td class="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
-                                                                {{ variant.sku || product.sku_base || '—' }}
-                                                            </td>
                                                             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                                                                 {{ variant.brand?.name || '—' }}
                                                             </td>
@@ -1027,126 +928,6 @@ const getTechnicalSpecsTooltip = (product: any): string => {
 
             <!-- Universal Product Detail Modal (accessible from both Table and Catalog views) -->
             <ProductDetailModal v-if="selectedProduct" :product="selectedProduct" @close="closeDetail" @view-alternative="(p: any) => selectedProduct = p" />
-
-            <!-- Product Import Modal -->
-            <Teleport to="body">
-                <div
-                    v-if="showImportModal"
-                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-                    @click.self="closeImportModal"
-                >
-                    <div class="w-full max-w-5xl rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border dark:bg-card">
-                        <div class="mb-4 flex items-start justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <FileSpreadsheet class="h-5 w-5 text-emerald-600" />
-                                    Importacion de productos
-                                </h3>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    Descarga la plantilla, sube tu archivo y valida filas antes de importar.
-                                </p>
-                            </div>
-                            <button
-                                class="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-muted"
-                                @click="closeImportModal"
-                            >
-                                Cerrar
-                            </button>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 border-b border-gray-200 pb-4 dark:border-border md:grid-cols-[1fr_auto_auto_auto]">
-                            <label class="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 dark:border-border dark:text-gray-300">
-                                <Upload class="h-4 w-4" />
-                                <span class="truncate">{{ importFile?.name || 'Selecciona archivo .xlsx, .xls o .csv' }}</span>
-                                <input type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="handleImportFileChange" />
-                            </label>
-
-                            <button
-                                type="button"
-                                class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
-                                @click="downloadImportTemplate"
-                            >
-                                <Download class="mr-1 inline h-4 w-4" /> Plantilla
-                            </button>
-
-                            <button
-                                type="button"
-                                class="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-700/40 dark:bg-indigo-900/20 dark:text-indigo-300"
-                                :disabled="!importFile || importPreviewLoading || importRunning"
-                                @click="previewImportFile"
-                            >
-                                {{ importPreviewLoading ? 'Previsualizando...' : 'Previsualizar' }}
-                            </button>
-
-                            <button
-                                type="button"
-                                class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                                :disabled="!importFile || importRunning || importPreviewLoading"
-                                @click="runImport"
-                            >
-                                {{ importRunning ? 'Importando...' : 'Importar' }}
-                            </button>
-                        </div>
-
-                        <div v-if="importError" class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
-                            {{ importError }}
-                        </div>
-
-                        <div v-if="importResult" class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-                            Importados: {{ importResult.success_count ?? 0 }} · Errores: {{ importResult.error_count ?? 0 }}
-                        </div>
-
-                        <div v-if="importResult?.errors?.length" class="mt-4 max-h-40 overflow-auto rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                            <p class="mb-2 font-semibold">Filas con error:</p>
-                            <p v-for="row in importResult.errors" :key="`err-${row.row}`" class="mb-1">
-                                Fila {{ row.row }}: {{ row.error }}
-                            </p>
-                        </div>
-
-                        <div v-if="importPreviewRows.length" class="mt-4">
-                            <div class="mb-2 flex items-center justify-between">
-                                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Previsualizacion ({{ importPreviewCount }} filas)</h4>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">Muestra primeras filas del archivo</p>
-                            </div>
-
-                            <div class="max-h-72 overflow-auto rounded-lg border border-gray-200 dark:border-border">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-border text-xs">
-                                    <thead class="bg-gray-50 dark:bg-background">
-                                        <tr>
-                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Fila</th>
-                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Nombre</th>
-                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">SKU</th>
-                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Marca</th>
-                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Categoria</th>
-                                            <th class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Estado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100 dark:divide-border">
-                                        <tr v-for="row in importPreviewRows" :key="`preview-${row.row}`">
-                                            <td class="px-3 py-2">{{ row.row }}</td>
-                                            <td class="px-3 py-2">{{ row.nombre }}</td>
-                                            <td class="px-3 py-2">{{ row.sku }}</td>
-                                            <td class="px-3 py-2">{{ row.marca }}</td>
-                                            <td class="px-3 py-2">{{ row.categoria }}</td>
-                                            <td class="px-3 py-2">
-                                                <span v-if="row.is_valid" class="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                                                    OK
-                                                </span>
-                                                <span v-else class="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                                                    Error
-                                                </span>
-                                                <p v-if="row.errors?.length" class="mt-1 text-[11px] text-red-600 dark:text-red-300">
-                                                    {{ row.errors.join(' ') }}
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </Teleport>
         </div>
     </AppLayout>
 </template>

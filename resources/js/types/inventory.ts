@@ -41,6 +41,7 @@ export interface UpdateInventoryRequest {
     stock_on_order?: number
     reorder_point?: number
     target_level?: number
+    variant_id?: number
 }
 
 export interface InventoryPaginatedResponse {

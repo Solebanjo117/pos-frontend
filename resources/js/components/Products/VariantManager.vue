@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useProducts } from '@/composables/useProducts'
 import { useStoreSettings } from '@/composables/useStoreSettings'
+import { usePosSettings } from '@/composables/usePosSettings'
 import apiClient from '@/services/api/client'
 import {
     Dialog,
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 
 const { fetchVariants, createVariant, updateVariant, deleteVariant, loading, error } = useProducts()
 const { settings: storeSettings, fetchSettings } = useStoreSettings()
+const { currentWarehouseId, initWarehouse } = usePosSettings()
 
 // === Rounding helper — respects LL-013: only applied on auto-calc, never on manual input ===
 const applyRounding = (price: number): number => {
@@ -173,6 +175,60 @@ const fetchWarehouses = async () => {
 
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+
+// === Editable stock per warehouse ===
+const getVariantStockForWarehouse = (variant: any, warehouseId: number | null): number => {
+    if (!warehouseId || !variant.inventory) return 0
+    const inv = variant.inventory.find((i: any) => i.warehouse?.id === warehouseId)
+    return inv?.quantity_available ?? 0
+}
+
+const getVariantTotalStock = (variant: any): number => {
+    if (!variant.inventory) return 0
+    return variant.inventory.reduce((sum: number, i: any) => sum + (i.quantity_available ?? 0), 0)
+}
+
+const currentWarehouseName = computed(() => {
+    if (!currentWarehouseId.value) return ''
+    const wh = warehouses.value.find(w => w.id === currentWarehouseId.value)
+    return wh?.name || `#${currentWarehouseId.value}`
+})
+
+const updatingStockVariantId = ref<number | null>(null)
+
+const updateVariantStock = async (variant: any, newStock: number) => {
+    if (isDraftMode.value || !props.productId || !currentWarehouseId.value) return
+    updatingStockVariantId.value = variant.id
+    try {
+        await apiClient.put(
+            `/inventory/products/${props.productId}/warehouses/${currentWarehouseId.value}`,
+            {
+                variant_id: variant.id,
+                stock_available: newStock,
+            }
+        )
+        // Refresh variants to get updated data
+        await loadVariants()
+    } catch (e) {
+        console.error('Error updating variant stock:', e)
+        alert('Error al actualizar el stock. Intenta de nuevo.')
+    } finally {
+        updatingStockVariantId.value = null
+    }
+}
+
+const onStockBlur = (variant: any, event: Event) => {
+    const input = event.target as HTMLInputElement
+    const newStock = parseInt(input.value, 10)
+    if (isNaN(newStock) || newStock < 0) {
+        input.value = String(getVariantStockForWarehouse(variant, currentWarehouseId.value))
+        return
+    }
+    const currentStock = getVariantStockForWarehouse(variant, currentWarehouseId.value)
+    if (newStock !== currentStock) {
+        updateVariantStock(variant, newStock)
+    }
+}
 
 const showSalePriceMode = ref(localStorage.getItem('variants_show_sale_price_mode') === 'true')
 const showPriceWithItbm = ref(localStorage.getItem('variants_show_price_with_itbm') === 'true')
@@ -536,6 +592,9 @@ onMounted(async () => {
         fetchWarehouses(),
         fetchSettings(),
     ])
+    if (!isDraftMode.value) {
+        initWarehouse().catch(() => {})
+    }
 })
 </script>
 
@@ -622,7 +681,12 @@ onMounted(async () => {
                         <th class="px-6 py-3">Nombre</th>
                         <th class="px-6 py-3">Marca</th>
                         <th class="px-6 py-3">{{ variantValueColumnTitle }}</th>
-                        <th class="px-6 py-3">Stock Total</th>
+                        <th class="px-6 py-3">
+                            <div class="flex items-center gap-1">
+                                Stock
+                                <span v-if="currentWarehouseName" class="text-[10px] text-gray-400 font-normal">({{ currentWarehouseName }})</span>
+                            </div>
+                        </th>
                         <th class="px-6 py-3 text-right">Acciones</th>
                     </tr>
                 </thead>
@@ -649,7 +713,25 @@ onMounted(async () => {
                             </div>
                         </td>
                         <td class="px-6 py-4">
-                            {{ variant.inventory?.reduce((sum: number, i: any) => sum + i.quantity_available, 0) || 0 }}
+                            <template v-if="isDraftMode">
+                                {{ getVariantTotalStock(variant) }}
+                            </template>
+                            <template v-else>
+                                <div class="flex items-center gap-1">
+                                    <input
+                                        type="number"
+                                        :value="getVariantStockForWarehouse(variant, currentWarehouseId)"
+                                        min="0"
+                                        class="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white"
+                                        :class="{ 'opacity-50 cursor-wait': updatingStockVariantId === variant.id }"
+                                        :disabled="updatingStockVariantId === variant.id"
+                                        @blur="onStockBlur(variant, $event)"
+                                    />
+                                    <span v-if="variant.inventory?.length > 1" class="text-[10px] text-gray-400">
+                                        (total: {{ getVariantTotalStock(variant) }})
+                                    </span>
+                                </div>
+                            </template>
                         </td>
                         <td class="px-6 py-4 text-right">
                             <button type="button" @click="openEditModal(variant)" class="font-medium text-blue-600 dark:text-primary hover:underline dark:text-blue-500 mr-3">Editar</button>

@@ -135,6 +135,7 @@ export interface Product {
     id: number
     system_id?: string
     sku_base: string  // Base SKU (e.g., "ALT-12V-90A")
+    alternate_code?: string | null // Alternate identifier
     name: string
     description?: string
     image_url?: string | null

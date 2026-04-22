@@ -2,7 +2,6 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import type { Product } from '@/types/product'
 import apiClient from '@/services/api/client'
-import { displayFormat } from '@/utils/formatters'
 import { usePOS } from '@/composables/usePOS'
 import { usePosSettings } from '@/composables/usePosSettings'
 
@@ -28,7 +27,7 @@ interface ProductImage   { id: number; url: string; original_filename: string; d
 interface ProductAttribute { id: number; name: string; value: string; unit?: string | null; variant_id?: number | null }
 interface OemReference   { id?: number; oem_code: string; manufacturer: string }
 interface AlternativeRecord { id: number; sku: string; name: string; relationship_type: string; pivot?: { relationship_type?: string; source?: string; shared_codes?: string } }
-interface VehicleRow     { id: number; make: string; model: string; year_from?: number; year_to?: number; engine: string; displacement?: string }
+interface VehicleRow     { id: number; make: string; model: string; year_from?: number; year_to?: number; engine: string; displacement?: string; chassis?: { id: number; code: string; name: string; full_description: string } | null; all_engines?: boolean; all_chassis?: boolean; notes?: string }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const deepLink = (param: string, value: string | number) =>
@@ -50,6 +49,13 @@ const resolveSaleTaxRate = (pricing: any): number => {
     return Math.max(0, Math.min(100, Math.round(parsed)))
 }
 
+const resolveCostTaxRate = (pricing: any): number => {
+    const raw = pricing?.cost_tax_rate
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed)) return 7
+    return Math.max(0, Math.min(100, Math.round(parsed)))
+}
+
 // Returns the best pricing object for a variant (variant-level first, then product-level fallback)
 const getVariantPricing = (variant: any) => {
     const vp = variant?.pricing
@@ -57,16 +63,30 @@ const getVariantPricing = (variant: any) => {
     return props.product.pricing ?? null
 }
 
+// Returns the unit price for blind mode (client view).
+// ITBM OFF: cost_base + cost_miscellaneous (sin ITBM)
+// ITBM ON: (cost_base + cost_miscellaneous) * (1 + cost_tax_rate/100)
+const blindModeClientPrice = (variant: any): number => {
+    const p = getVariantPricing(variant)
+    if (!p) return 0
+    const costBase = Number(p.cost_base ?? p.cost) || 0
+    const costMisc = Number(p.cost_miscellaneous) || 0
+    const base = costBase + costMisc
+    if (includeITBM.value) {
+        const rate = resolveCostTaxRate(p)
+        return base * (1 + rate / 100)
+    }
+    return base
+}
+
 const relationshipLabel = (type: string): string => ({
-    compatible: 'Compatible', substitute: 'Sustituto', upgrade: 'Mejora', cross_reference: 'Referencia Cruzada', same_category: 'Misma Categoría',
+    compatible: 'Compatible', substitute: 'Sustituto', upgrade: 'Mejora',
 }[type] ?? type)
 
 const relationshipClass = (type: string): string => ({
     compatible:       'bg-blue-100  text-blue-700  dark:bg-blue-900/40  dark:text-blue-300',
     substitute:       'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
     upgrade:          'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-    cross_reference:  'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-    same_category:    'bg-teal-100  text-teal-700  dark:bg-teal-900/40  dark:text-teal-300',
 }[type] ?? 'bg-gray-100 text-gray-700')
 
 // ── Variants ──────────────────────────────────────────────────────────────────
@@ -212,15 +232,30 @@ const fetchVehicleCompatibility = async (productId: number = props.product.id) =
         const res = await apiClient.get(`/products/${productId}/compatibility`)
         if (productId !== props.product.id) return
         const compat = res.data.data ?? []
-        vehicleRows.value = compat.map((c: any) => ({
-            id: c.id,
-            make: c.engine?.model?.make?.name ?? '—',
-            model: c.engine?.model?.name ?? '—',
-            year_from: c.engine?.model?.year_from,
-            year_to: c.engine?.model?.year_to,
-            engine: c.engine?.engine_code ?? 'Varios',
-            displacement: c.engine?.displacement
-        }))
+        vehicleRows.value = compat.map((c: any) => {
+            const modelData = c.model ?? c.engine?.model ?? c.chassis?.model ?? {}
+            const makeData = modelData.make ?? {}
+            const engineData = c.engine ?? {}
+            const chassisData = c.chassis ?? (modelData.generation ? {
+                id: 0,
+                code: modelData.generation,
+                name: modelData.generation,
+                full_description: modelData.generation,
+            } : null)
+            return {
+                id: c.id,
+                make: makeData.name ?? '—',
+                model: modelData.name ?? '—',
+                year_from: modelData.year_from ?? undefined,
+                year_to: modelData.year_to ?? undefined,
+                engine: engineData.engine_code ?? c.engine_code ?? (c.all_engines ? 'Todos' : '—'),
+                displacement: engineData.displacement ?? c.displacement,
+                chassis: chassisData,
+                all_engines: c.all_engines ?? false,
+                all_chassis: c.all_chassis ?? false,
+                notes: c.notes,
+            }
+        })
     } catch (e) {
         console.error(e)
         vehicleRows.value = []
@@ -232,13 +267,19 @@ const fetchVehicleCompatibility = async (productId: number = props.product.id) =
 
 // Group vehicles by Make + Model + Year range for prominent display
 const groupedVehicles = computed(() => {
-    const groups = new Map<string, { make: string; model: string; year_from?: number; year_to?: number; engines: Array<{ code: string; displacement?: string }> }>()
+    const groups = new Map<string, { make: string; model: string; year_from?: number; year_to?: number; engines: Array<{ code: string; displacement?: string }>; chassis: Array<{ code: string; name: string; full_description: string }> }>()
     for (const row of vehicleRows.value) {
         const key = `${row.make}|${row.model}|${row.year_from ?? ''}-${row.year_to ?? ''}`
         if (!groups.has(key)) {
-            groups.set(key, { make: row.make, model: row.model, year_from: row.year_from, year_to: row.year_to, engines: [] })
+            groups.set(key, { make: row.make, model: row.model, year_from: row.year_from, year_to: row.year_to, engines: [], chassis: [] })
         }
-        groups.get(key)!.engines.push({ code: row.engine, displacement: row.displacement })
+        const group = groups.get(key)!
+        if (row.engine && row.engine !== 'Todos' && row.engine !== '—') {
+            group.engines.push({ code: row.engine, displacement: row.displacement })
+        }
+        if (row.chassis) {
+            group.chassis.push({ code: row.chassis.code, name: row.chassis.name, full_description: row.chassis.full_description })
+        }
     }
     return Array.from(groups.values())
 })
@@ -341,7 +382,7 @@ const handleViewAlternative = async (altId: number) => {
                         <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ product.name }}</h2>
                         <span v-if="product.is_universal" class="flex-shrink-0 inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/20" title="Universal">🌐 Universal</span>
                     </div>
-                    <p v-if="product.sku_base && !blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ displayFormat(product.sku_base) }}</p>
+                    <p v-if="product.sku_base && !blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ product.sku_base }}</p>
                     <p v-else-if="blindMode" class="text-xs text-gray-400 font-mono mt-0.5">{{ (product as any).system_id || '#' + String(product.id).padStart(8, '0') }}</p>
                 </div>
                 <div class="flex items-center gap-3">
@@ -367,22 +408,20 @@ const handleViewAlternative = async (altId: number) => {
                     </button>
                     <span class="text-[10px] font-medium uppercase tracking-wider" :class="blindMode ? 'text-amber-500' : 'text-gray-400'">{{ blindMode ? 'Cliente' : 'Normal' }}</span>
 
-                    <!-- ITBM toggle (only in client mode) -->
-                    <template v-if="blindMode">
-                        <div class="flex items-center gap-1.5 ml-1">
-                            <button
-                                @click="toggleIncludeITBM"
-                                :class="[
-                                    'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none shrink-0',
-                                    includeITBM ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-                                ]"
-                                :title="includeITBM ? 'ITBM incluido en precio — clic para excluirlo' : 'ITBM NO incluido — clic para incluirlo'"
-                            >
-                                <span :class="['inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-200', includeITBM ? 'translate-x-4' : 'translate-x-0.5']" />
-                            </button>
-                            <span class="text-[10px] font-medium" :class="includeITBM ? 'text-green-500' : 'text-gray-400'">ITBM</span>
-                        </div>
-                    </template>
+                    <!-- ITBM toggle (available in both normal and client mode) -->
+                    <div class="flex items-center gap-1.5 ml-1">
+                        <button
+                            @click="toggleIncludeITBM"
+                            :class="[
+                                'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none shrink-0',
+                                includeITBM ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                            ]"
+                            :title="includeITBM ? 'ITBM incluido en precio — clic para excluirlo' : 'ITBM NO incluido — clic para incluirlo'"
+                        >
+                            <span :class="['inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-200', includeITBM ? 'translate-x-4' : 'translate-x-0.5']" />
+                        </button>
+                        <span class="text-[10px] font-medium" :class="includeITBM ? 'text-green-500' : 'text-gray-400'">ITBM</span>
+                    </div>
 
                     <!-- Close -->
                     <button @click="emit('close')"
@@ -425,7 +464,7 @@ const handleViewAlternative = async (altId: number) => {
                             <div class="text-center mb-6">
                                 <template v-if="!blindMode">
                                     <small class="text-gray-500 uppercase tracking-wide text-xs">Código Base / SKU</small>
-                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ displayFormat(product.sku_base || product.default_variant?.sku) || 'N/A' }}</h1>
+                                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ product.sku_base || product.default_variant?.sku || 'N/A' }}</h1>
                                 </template>
                                 <template v-else>
                                     <small class="text-gray-500 uppercase tracking-wide text-xs">Código</small>
@@ -476,18 +515,9 @@ const handleViewAlternative = async (altId: number) => {
                                         <!-- Info Marca -->
                                         <div class="flex flex-col flex-1">
                                             <div class="flex items-center gap-2">
-                                                <span v-if="!blindMode" class="font-bold text-gray-900 dark:text-white font-mono text-base">{{ displayFormat(variant.sku) }}</span>
-                                                <span v-else class="font-bold text-gray-900 dark:text-white text-base">
-                                                    {{ variant.brand?.name ?? 'Sin marca' }}
-                                                    <span v-if="(variant as any).system_id" class="text-xs font-mono text-gray-400 ml-1">({{ (variant as any).system_id }})</span>
-                                                </span>
+                                                <span class="font-bold text-gray-900 dark:text-white">{{ variant.brand?.name ?? 'Sin marca' }}</span>
+                                                <span v-if="blindMode && (variant as any).system_id" class="text-xs font-mono text-gray-400 ml-1">({{ (variant as any).system_id }})</span>
                                             </div>
-                                            <span v-if="!blindMode" class="text-xs text-gray-500 mt-1">
-                                                <span class="font-semibold text-gray-700 dark:text-gray-300">Marca:</span> {{ variant.brand?.name ?? 'Sin marca' }}
-                                                <span v-if="variant.attributes?.length" class="ml-2">
-                                                    | <span class="font-semibold text-gray-700 dark:text-gray-300">Atributos:</span> {{ variant.attributes.map(a => `${a.name}: ${a.value}${a.unit ? ' ' + a.unit : ''}`).join(', ') }}
-                                                </span>
-                                            </span>
                                         </div>
 
                                         <!-- Precio y Action -->
@@ -503,17 +533,22 @@ const handleViewAlternative = async (altId: number) => {
                                                 <div class="text-lg font-bold text-green-600 dark:text-green-400">
                                                     <template v-if="getVariantPricing(variant)">
                                                         <template v-if="blindMode">
-                                                            {{ formatCurrency((includeITBM ? priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), resolveSaleTaxRate(getVariantPricing(variant))) : Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
+                                                            {{ formatCurrency(blindModeClientPrice(variant) * (quantities[variant.id] ?? 1)) }}
                                                         </template>
                                                         <template v-else>
-                                                            {{ formatCurrency(Number(getVariantPricing(variant).base_price) * (quantities[variant.id] ?? 1)) }}
+                                                            {{ formatCurrency((includeITBM ? priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), resolveSaleTaxRate(getVariantPricing(variant))) : Number(getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
                                                         </template>
                                                     </template>
                                                     <template v-else>N/A</template>
                                                 </div>
-                                                <div v-if="blindMode" class="text-[10px] text-gray-400">
+                                                <div v-if="includeITBM || blindMode" class="text-[10px] text-gray-400">
                                                     <template v-if="includeITBM">
-                                                          Base {{ formatCurrency(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price) * (quantities[variant.id] ?? 1)) }} + ITBMS {{ formatCurrency((priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), resolveSaleTaxRate(getVariantPricing(variant))) - Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
+                                                        <template v-if="blindMode">
+                                                            Costo Base {{ formatCurrency((Number(getVariantPricing(variant).cost_base ?? getVariantPricing(variant).cost) || 0) * (quantities[variant.id] ?? 1)) }} + Misc {{ formatCurrency((Number(getVariantPricing(variant).cost_miscellaneous) || 0) * (quantities[variant.id] ?? 1)) }} + ITBMS {{ formatCurrency((blindModeClientPrice(variant) - (Number(getVariantPricing(variant).cost_base ?? getVariantPricing(variant).cost) || 0) - (Number(getVariantPricing(variant).cost_miscellaneous) || 0)) * (quantities[variant.id] ?? 1)) }}
+                                                        </template>
+                                                        <template v-else>
+                                                            Base {{ formatCurrency(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price) * (quantities[variant.id] ?? 1)) }} + ITBMS {{ formatCurrency((priceWithTax(Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price), resolveSaleTaxRate(getVariantPricing(variant))) - Number(getVariantPricing(variant).calculated_price ?? getVariantPricing(variant).base_price)) * (quantities[variant.id] ?? 1)) }}
+                                                        </template>
                                                     </template>
                                                     <template v-else>
                                                         Sin ITBM
@@ -595,11 +630,16 @@ const handleViewAlternative = async (altId: number) => {
                                                 {{ group.year_from }}{{ group.year_to ? '–' + group.year_to : '+' }}
                                             </span>
                                         </div>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            <span v-for="(eng, eIdx) in group.engines" :key="eIdx">
-                                                <span class="font-mono">{{ eng.code }}</span><span v-if="eng.displacement" class="text-[10px] text-gray-400"> ({{ eng.displacement }}L)</span><span v-if="eIdx < group.engines.length - 1">, </span>
-                                            </span>
-                                        </p>
+<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                <span v-for="(eng, eIdx) in group.engines" :key="eIdx">
+                                                    <span class="font-mono">{{ eng.code }}</span><span v-if="eng.displacement" class="text-[10px] text-gray-400"> ({{ eng.displacement }}L)</span><span v-if="eIdx < group.engines.length - 1">, </span>
+                                                </span>
+                                                <template v-if="group.chassis.length > 0">
+                                                    <span v-for="(ch, cIdx) in group.chassis" :key="cIdx" class="ml-2 inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                                                        Chasis: {{ ch.name || ch.code }}
+                                                    </span>
+                                                </template>
+                                            </p>
                                     </div>
                                 </div>
                             </div>
@@ -637,7 +677,7 @@ const handleViewAlternative = async (altId: number) => {
                         >
                             <div class="flex items-center gap-2">
                                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12M8 12h12M8 17h12M3 7h.01M3 12h.01M3 17h.01" /></svg>
-                                Alternativas y Ref. Cruzadas
+                                Upsales
                                 <span class="text-xs font-normal text-gray-500 bg-gray-200 dark:bg-muted px-2 py-0.5 rounded-full">
                                     {{ alternativesData.length }}
                                 </span>

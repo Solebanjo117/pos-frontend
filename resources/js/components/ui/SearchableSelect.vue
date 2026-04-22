@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, getCurrentInstance } from 'vue'
+import { useElementBounding, useEventListener } from '@vueuse/core'
 
 export interface SelectOption {
     value: number | string | null
@@ -39,9 +40,28 @@ const highlightedIndex = ref(-1)
 const containerRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)
+const dropdownRef = ref<HTMLElement | null>(null)
 const instanceUid = getCurrentInstance()?.uid ?? 0
 const dropdownId = `searchable-select-listbox-${instanceUid}`
 const searchInputId = `searchable-select-search-${instanceUid}`
+
+const { bottom, left, width, update: updateBounds } = useElementBounding(containerRef)
+
+const dropdownStyle = computed(() => {
+    return {
+        top: `${bottom.value + 4}px`,
+        left: `${left.value}px`,
+        width: `${width.value}px`,
+    }
+})
+
+useEventListener('scroll', () => {
+    if (isOpen.value) updateBounds()
+}, { capture: true, passive: true })
+
+useEventListener('resize', () => {
+    if (isOpen.value) updateBounds()
+}, { passive: true })
 
 const selectedLabel = computed(() => {
     if (props.modelValue === null || props.modelValue === undefined) return ''
@@ -77,6 +97,7 @@ const open = () => {
     isOpen.value = true
     searchQuery.value = ''
     highlightedIndex.value = -1
+    updateBounds()
     nextTick(() => inputRef.value?.focus())
 }
 
@@ -125,7 +146,11 @@ const scrollToHighlighted = () => {
 
 // Close on outside click
 const handleClickOutside = (e: MouseEvent) => {
-    if (containerRef.value && !containerRef.value.contains(e.target as Node)) {
+    const target = e.target as Node
+    if (
+        (containerRef.value && !containerRef.value.contains(target)) &&
+        (!dropdownRef.value || !dropdownRef.value.contains(target))
+    ) {
         close()
     }
 }
@@ -172,20 +197,25 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
         </svg>
 
         <!-- Dropdown -->
-        <Transition
-            enter-active-class="transition duration-100 ease-out"
-            enter-from-class="opacity-0 scale-95"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition duration-75 ease-in"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-95"
-        >
-            <div v-if="isOpen"
-                :id="dropdownId"
-                role="listbox"
-                :aria-label="ariaLabel"
-                class="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden"
+        <Teleport to="body">
+            <Transition
+                enter-active-class="transition duration-100 ease-out"
+                enter-from-class="opacity-0 scale-95"
+                enter-to-class="opacity-100 scale-100"
+                leave-active-class="transition duration-75 ease-in"
+                leave-from-class="opacity-100 scale-100"
+                leave-to-class="opacity-0 scale-95"
             >
+                <div v-if="isOpen"
+                    ref="dropdownRef"
+                    :id="dropdownId"
+                    role="listbox"
+                    :aria-label="ariaLabel"
+                    :style="dropdownStyle"
+                    @pointerdown.stop
+                    @mousedown.stop
+                    class="fixed z-[9999] pointer-events-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden"
+                >
                 <!-- Search input -->
                 <div class="p-2 border-b border-gray-100 dark:border-border">
                     <div class="relative">
@@ -233,6 +263,7 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
                     </li>
                 </ul>
             </div>
-        </Transition>
+            </Transition>
+        </Teleport>
     </div>
 </template>

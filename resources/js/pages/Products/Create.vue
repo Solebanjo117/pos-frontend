@@ -181,10 +181,9 @@ const checkingDuplicates = ref(false)
 let duplicateCheckTimeout: ReturnType<typeof setTimeout> | null = null
 
 const checkDuplicates = async () => {
-    const name = form.value.name?.trim()
     const sku = form.value.sku_base?.trim()
 
-    if (!name && !sku) {
+    if (!sku) {
         duplicates.value = []
         return
     }
@@ -192,7 +191,7 @@ const checkDuplicates = async () => {
     checkingDuplicates.value = true
     try {
         const response = await apiClient.get('/products/check-duplicate', {
-            params: { name, sku }
+            params: { sku }
         })
         duplicates.value = response.data.data || []
     } catch (e) {
@@ -204,7 +203,7 @@ const checkDuplicates = async () => {
 }
 
 // Debounced watcher for duplicate checking (600ms)
-watch([() => form.value.name, () => form.value.sku_base], () => {
+watch(() => form.value.sku_base, () => {
     if (duplicateCheckTimeout) {
         clearTimeout(duplicateCheckTimeout)
     }
@@ -1119,7 +1118,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                     <div class="flex-1">
                         <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300">Productos similares encontrados</h3>
                         <p class="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                            Existen productos con nombre o código similar. Verifica que no estés duplicando:
+                            Productos con código similar encontrados. Verifica que no estés duplicando:
                         </p>
                         <ul class="mt-2 space-y-1">
                             <li v-for="dup in duplicates" :key="dup.id" class="text-sm text-amber-700 dark:text-amber-400">

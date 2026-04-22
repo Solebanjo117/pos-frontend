@@ -84,12 +84,16 @@ const normalizeQuery = (value?: string) => (value ?? '').trim().toLowerCase()
 const searchMatchesProduct = (product: Product, query: string) => {
     const matchesName = product.name.toLowerCase().includes(query)
     const matchesSku = product.sku_base?.toLowerCase().includes(query)
+    const matchesAlternateCode = product.alternate_code?.toLowerCase().includes(query)
     const matchesVariantSku = product.variants?.some(v => v.sku?.toLowerCase().includes(query))
+    const matchesBrand = product.variants?.some(v => v.brand?.name?.toLowerCase().includes(query))
+        || product.default_variant?.brand?.name?.toLowerCase().includes(query)
+    const matchesCategory = product.category?.name?.toLowerCase().includes(query)
     const matchesSpecs = product.key_attributes?.some(a =>
         `${a.name} ${a.value} ${a.unit ?? ''}`.toLowerCase().includes(query)
     ) ?? false
 
-    return matchesName || matchesSku || matchesVariantSku || matchesSpecs
+    return matchesName || matchesSku || matchesAlternateCode || matchesVariantSku || matchesBrand || matchesCategory || matchesSpecs
 }
 
 const getComparablePrice = (product: Product): number | null => {

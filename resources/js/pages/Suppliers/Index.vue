@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useSuppliers } from '@/composables/useSuppliers'
-import { Search, Plus, Pencil, Trash2, Building2, Package } from 'lucide-vue-next'
+import { Search, Plus, Pencil, Trash2, Building2, Package, Upload } from 'lucide-vue-next'
 import Pagination from '@/components/Pagination.vue'
 import type { SupplierFilters } from '@/types/supplier'
 
@@ -65,6 +65,13 @@ onMounted(async () => {
                 >
                     <Plus :size="20" />
                     Nuevo Proveedor
+                </Link>
+                <Link
+                    href="/suppliers/import"
+                    class="inline-flex items-center gap-2 px-4 py-2 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30 text-emerald-700 rounded-lg transition"
+                >
+                    <Upload :size="20" />
+                    Importar
                 </Link>
             </div>
 

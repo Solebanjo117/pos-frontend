@@ -1,11 +1,17 @@
 import { ref } from 'vue'
 import { suppliersService } from '@/services/suppliers'
+import { brandsService } from '@/services/brands'
 import type { Supplier, SupplierFilters, CreateSupplierData, UpdateSupplierData } from '@/types/supplier'
+
+type BrandOption = { id: number; name: string; prefix?: string }
 
 export function useSuppliers() {
     const suppliers = ref<Supplier[]>([])
     const supplier = ref<Supplier | null>(null)
     const supplierProducts = ref<any[]>([])
+    const supplierBrands = ref<BrandOption[]>([])
+    const availableBrands = ref<BrandOption[]>([])
+    const loadingBrands = ref(false)
     const loading = ref(false)
     const error = ref<string | null>(null)
     const pagination = ref<any>(null)
@@ -104,10 +110,58 @@ export function useSuppliers() {
         }
     }
 
+    // Fetch brands associated with a supplier
+    async function fetchSupplierBrands(id: number) {
+        loadingBrands.value = true
+        try {
+            supplierBrands.value = await suppliersService.getBrands(id)
+        } catch (e: any) {
+            console.error('Error fetching supplier brands:', e)
+            supplierBrands.value = []
+        } finally {
+            loadingBrands.value = false
+        }
+    }
+
+    // Fetch all active brands for selection dropdown
+    async function fetchAvailableBrands() {
+        try {
+            availableBrands.value = await brandsService.getAllActive()
+        } catch (e: any) {
+            console.error('Error fetching available brands:', e)
+            availableBrands.value = []
+        }
+    }
+
+    // Attach a brand to a supplier
+    async function attachBrandToSupplier(supplierId: number, brandId: number) {
+        try {
+            await suppliersService.attachBrand(supplierId, brandId)
+            await fetchSupplierBrands(supplierId)
+        } catch (e: any) {
+            console.error('Error attaching brand:', e)
+            throw e
+        }
+    }
+
+    // Detach a brand from a supplier
+    async function detachBrandFromSupplier(supplierId: number, brandId: number) {
+        try {
+            await suppliersService.detachBrand(supplierId, brandId)
+            supplierBrands.value = supplierBrands.value.filter(b => b.id !== brandId)
+        } catch (e: any) {
+            console.error('Error detaching brand:', e)
+            throw e
+        }
+    }
+
     return {
         suppliers,
         supplier,
         supplierProducts,
+        supplierBrands,
+        availableBrands,
+        loadingBrands,
         loading,
         error,
         pagination,
@@ -117,5 +171,9 @@ export function useSuppliers() {
         createSupplier,
         updateSupplier,
         deleteSupplier,
+        fetchSupplierBrands,
+        fetchAvailableBrands,
+        attachBrandToSupplier,
+        detachBrandFromSupplier,
     }
 }

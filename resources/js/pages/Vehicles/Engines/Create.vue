@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import AppLayout from '@/layouts/AppLayout.vue'
-import { type BreadcrumbItem } from '@/types'
-import { useVehicleEngines } from '@/composables/useVehicleEngines'
-import { useVehicleVins } from '@/composables/useVehicleVins'
-import apiClient from '@/services/api/client'
+import { computed, onMounted, ref } from 'vue'
 import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
+import { useVehicleEngines, VEHICLE_ENGINE_FUEL_TYPE_OPTIONS, buildVehicleEnginePayload, hasWhitespaceInVehicleEngineCode, normalizeVehicleEngineCode, normalizeVehicleEngineFuelType } from '@/composables/useVehicleEngines'
+import { useVehicleVins } from '@/composables/useVehicleVins'
+import { useAuth } from '@/composables/useAuth'
+import AppLayout from '@/layouts/AppLayout.vue'
+import apiClient from '@/services/api/client'
+import { type BreadcrumbItem } from '@/types'
 
 interface VehicleModelItem {
     id: number
@@ -28,11 +29,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 ]
 
 const { engines, createEngine, fetchEngines, loading, error } = useVehicleEngines()
+const { hasRole } = useAuth()
+
+const FUEL_TYPE_OPTIONS = VEHICLE_ENGINE_FUEL_TYPE_OPTIONS
+const canManageVehicleCatalog = computed(() => hasRole(['admin', 'manager']))
 
 const form = ref({
     engine_code: '',
     displacement: '',
-    fuel_type: 'Gasoline',
+    fuel_type: normalizeVehicleEngineFuelType(null),
     model_ids: [] as number[],
 })
 
@@ -172,32 +177,77 @@ onMounted(() => {
 
 const duplicateConfirmed = ref(false)
 
-const checkDuplicate = (code: string): boolean => {
-    return engines.value.some((engine) =>
-        engine.engine_code.toLowerCase().trim() === code.toLowerCase().trim()
-    )
+const getEngineModelIds = (engine: { model_id?: number | null; model_ids?: number[] }): number[] => {
+    if (Array.isArray(engine.model_ids) && engine.model_ids.length > 0) {
+        return Array.from(
+            new Set(
+                engine.model_ids
+                    .map((id) => Number(id))
+                    .filter((id) => Number.isInteger(id) && id > 0),
+            ),
+        )
+    }
+
+    if (engine.model_id !== null && engine.model_id !== undefined) {
+        return [engine.model_id]
+    }
+
+    return []
+}
+
+const checkDuplicate = (code: string, selectedModelIds: number[]): boolean => {
+    const normalizedCode = normalizeVehicleEngineCode(code).toLowerCase()
+
+    return engines.value.some((engine) => {
+        if (normalizeVehicleEngineCode(engine.engine_code).toLowerCase() !== normalizedCode) {
+            return false
+        }
+
+        const existingModelIds = getEngineModelIds(engine)
+
+        // For independent engines (no model association), only collide with other independent engines.
+        if (selectedModelIds.length === 0) {
+            return existingModelIds.length === 0
+        }
+
+        return selectedModelIds.some((modelId) => existingModelIds.includes(modelId))
+    })
 }
 
 const handleSubmit = async () => {
-    if (!duplicateConfirmed.value && checkDuplicate(form.value.engine_code)) {
+    if (!canManageVehicleCatalog.value) {
+        error.value = 'No tienes permisos para crear motores. Solo admin y manager pueden hacerlo.'
+        return
+    }
+
+    const payload = buildVehicleEnginePayload({
+        engine_code: form.value.engine_code,
+        displacement: form.value.displacement,
+        fuel_type: form.value.fuel_type,
+        model_ids: form.value.model_ids,
+        aspiration: 'N/A',
+    })
+
+    if (!payload.engine_code) {
+        error.value = 'El codigo del motor es obligatorio.'
+        return
+    }
+
+    if (hasWhitespaceInVehicleEngineCode(payload.engine_code)) {
+        error.value = 'El codigo del motor no puede contener espacios.'
+        return
+    }
+
+    if (!duplicateConfirmed.value && checkDuplicate(payload.engine_code, payload.model_ids)) {
         const confirm = window.confirm(
-            `Ya existe un motor con el codigo "${form.value.engine_code}".\n\nDesea crear un motor duplicado?`
+            `Ya existe un motor con el codigo "${payload.engine_code}" para al menos uno de los modelos seleccionados.\n\nDesea crear un motor duplicado?`
         )
         if (!confirm) return
         duplicateConfirmed.value = true
     }
 
-    const uniqueModelIds = Array.from(new Set(form.value.model_ids.map((id) => Number(id)).filter((id) => Number.isFinite(id))))
-
     try {
-        const createdEngine = await createEngine({
-            engine_code: form.value.engine_code,
-            displacement: form.value.displacement || undefined,
-            fuel_type: form.value.fuel_type,
-            model_id: uniqueModelIds[0] ?? null,
-            model_ids: uniqueModelIds,
-            aspiration: 'N/A',
-        })
+        const createdEngine = await createEngine(payload)
 
         if (pendingVins.value.length > 0) {
             const vinApi = useVehicleVins({ engineId: createdEngine.id })
@@ -241,6 +291,10 @@ const handleSubmit = async () => {
                 {{ error }}
             </div>
 
+            <div v-if="!canManageVehicleCatalog" class="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-200">
+                Solo administradores y managers pueden crear motores. Este formulario esta en modo solo lectura para tu rol.
+            </div>
+
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-6">
                     <div>
@@ -277,10 +331,13 @@ const handleSubmit = async () => {
                             v-model="form.fuel_type"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         >
-                            <option value="Gasoline">Gasolina</option>
-                            <option value="Diesel">Diesel</option>
-                            <option value="Hybrid">Hibrido</option>
-                            <option value="Electric">Electrico</option>
+                            <option
+                                v-for="option in FUEL_TYPE_OPTIONS"
+                                :key="`create-fuel-${option.value}`"
+                                :value="option.value"
+                            >
+                                {{ option.label }}
+                            </option>
                         </select>
                     </div>
 
@@ -425,7 +482,7 @@ const handleSubmit = async () => {
                         </Link>
                         <button
                             type="submit"
-                            :disabled="loading || !form.engine_code"
+                            :disabled="loading || !canManageVehicleCatalog || !form.engine_code"
                             class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
                         >
                             {{ loading ? 'Guardando...' : 'Guardar Motor' }}
@@ -436,3 +493,5 @@ const handleSubmit = async () => {
         </div>
     </AppLayout>
 </template>
+
+

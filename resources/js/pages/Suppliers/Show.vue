@@ -1,17 +1,56 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useSuppliers } from '@/composables/useSuppliers'
-import { ArrowLeft, Pencil, Package, Mail, Phone, MapPin, Clock, CreditCard, Building2 } from 'lucide-vue-next'
+import { ArrowLeft, Pencil, Package, Mail, Phone, MapPin, Clock, CreditCard, Building2, Tag, Plus, X } from 'lucide-vue-next'
 
 const props = defineProps<{ supplierId: number }>()
 
-const { supplier, supplierProducts, loading, error, fetchSupplierById } = useSuppliers()
+const { supplier, supplierProducts, supplierBrands, availableBrands, loadingBrands, loading, error, fetchSupplierById, fetchSupplierBrands, fetchAvailableBrands, attachBrandToSupplier, detachBrandFromSupplier } = useSuppliers()
+
+const showBrandSelector = ref(false)
+const attachingBrand = ref(false)
+const selectedBrandId = ref<number | null>(null)
+
+const brandsNotYetLinked = computed(() => {
+    const linkedIds = new Set(supplierBrands.value.map(b => b.id))
+    return availableBrands.value.filter(b => !linkedIds.has(b.id))
+})
 
 onMounted(async () => {
     await fetchSupplierById(props.supplierId)
+    fetchSupplierBrands(props.supplierId).catch(() => {})
+    fetchAvailableBrands().catch(() => {})
 })
+
+const openBrandSelector = () => {
+    showBrandSelector.value = true
+    selectedBrandId.value = null
+}
+
+const attachSelectedBrand = async () => {
+    if (!selectedBrandId.value) return
+    attachingBrand.value = true
+    try {
+        await attachBrandToSupplier(props.supplierId, selectedBrandId.value)
+        showBrandSelector.value = false
+        selectedBrandId.value = null
+    } catch (e) {
+        console.error('Error attaching brand:', e)
+    } finally {
+        attachingBrand.value = false
+    }
+}
+
+const removeBrand = async (brandId: number) => {
+    if (!confirm('¿Desasociar esta marca del proveedor?')) return
+    try {
+        await detachBrandFromSupplier(props.supplierId, brandId)
+    } catch (e) {
+        console.error('Error detaching brand:', e)
+    }
+}
 </script>
 
 <template>
@@ -138,6 +177,86 @@ onMounted(async () => {
                         <div v-else class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                             <Package class="mx-auto mb-3 text-gray-300" :size="48" />
                             <p>Este proveedor no tiene productos asociados</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Brands Section -->
+                <div class="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-border flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <Tag :size="20" class="text-indigo-500" />
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Marcas Asociadas ({{ supplierBrands.length }})</h2>
+                        </div>
+                        <button
+                            type="button"
+                            @click="openBrandSelector"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-indigo-600 dark:bg-primary dark:text-primary-foreground hover:bg-indigo-700 dark:hover:bg-primary/90 text-white rounded-md transition"
+                        >
+                            <Plus :size="16" />
+                            Agregar Marca
+                        </button>
+                    </div>
+
+                    <!-- Add brand selector -->
+                    <div v-if="showBrandSelector" class="px-6 py-4 bg-gray-50 dark:bg-muted/30 border-b border-gray-200 dark:border-border">
+                        <div class="flex items-center gap-3">
+                            <select
+                                v-model="selectedBrandId"
+                                class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-muted dark:border-border dark:text-white text-sm"
+                            >
+                                <option :value="null" disabled>Seleccionar marca...</option>
+                                <option v-for="brand in brandsNotYetLinked" :key="brand.id" :value="brand.id">
+                                    {{ brand.name }}{{ brand.prefix ? ` (${brand.prefix})` : '' }}
+                                </option>
+                            </select>
+                            <button
+                                type="button"
+                                @click="attachSelectedBrand"
+                                :disabled="!selectedBrandId || attachingBrand"
+                                class="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {{ attachingBrand ? 'Asociando...' : 'Asociar' }}
+                            </button>
+                            <button
+                                type="button"
+                                @click="showBrandSelector = false"
+                                class="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                        <p v-if="brandsNotYetLinked.length === 0" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            Todas las marcas ya están asociadas a este proveedor.
+                        </p>
+                    </div>
+
+                    <div class="p-6">
+                        <div v-if="loadingBrands" class="flex justify-center py-4">
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 dark:border-primary"></div>
+                        </div>
+                        <div v-else-if="supplierBrands.length" class="flex flex-wrap gap-2">
+                            <span
+                                v-for="brand in supplierBrands"
+                                :key="brand.id"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium border border-blue-200 dark:border-blue-800"
+                            >
+                                <Link :href="`/brands/${brand.id}/edit`" class="hover:underline">
+                                    {{ brand.name }}{{ brand.prefix ? ` (${brand.prefix})` : '' }}
+                                </Link>
+                                <button
+                                    type="button"
+                                    @click="removeBrand(brand.id)"
+                                    class="text-blue-400 hover:text-red-500 transition ml-0.5"
+                                    title="Desasociar marca"
+                                >
+                                    <X :size="14" />
+                                </button>
+                            </span>
+                        </div>
+                        <div v-else class="text-center py-6 text-gray-500 dark:text-gray-400">
+                            <Tag class="mx-auto mb-2 text-gray-300" :size="36" />
+                            <p>No hay marcas asociadas a este proveedor</p>
                         </div>
                     </div>
                 </div>

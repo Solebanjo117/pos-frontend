@@ -63,4 +63,28 @@ export const suppliersService = {
         const { data } = await apiClient.get(`${BASE_URL}/${id}/purchase-orders`)
         return data
     },
+
+    /**
+     * Get brands associated with a supplier
+     */
+    async getBrands(id: number) {
+        const { data } = await apiClient.get(`${BASE_URL}/${id}/brands`)
+        return data.data
+    },
+
+    /**
+     * Attach a brand to a supplier
+     */
+    async attachBrand(id: number, brandId: number) {
+        const { data } = await apiClient.post(`${BASE_URL}/${id}/brands`, { brand_id: brandId })
+        return data.data
+    },
+
+    /**
+     * Detach a brand from a supplier
+     */
+    async detachBrand(id: number, brandId: number) {
+        const { data } = await apiClient.delete(`${BASE_URL}/${id}/brands/${brandId}`)
+        return data.data
+    },
 }

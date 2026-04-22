@@ -33,23 +33,21 @@ const getBrandNames = (product: Product): string => {
     return product.default_variant?.brand?.name ?? ''
 }
 
-const getTechnicalSpecsPreview = (product: Product): string => {
-    if (!product.variants?.length) return '';
-    
-    // Recopilar todos los atributos únicos de todas las variantes
-    const allAttrNames = new Set<string>();
-    const attributesHtml: string[] = [];
-
+const getAttributeBadges = (product: Product): Array<{ value: string; unit?: string | null }> => {
+    if (!product.variants?.length) return [];
+    const seen = new Set<string>()
+    const badges: Array<{ value: string; unit?: string | null }> = []
     product.variants.forEach(v => {
         v.attributes?.forEach(attr => {
-            if (!allAttrNames.has(attr.name)) {
-                allAttrNames.add(attr.name);
-                attributesHtml.push(`${attr.name}: ${attr.value}${attr.unit ? attr.unit : ''}`);
+            const val = String(attr.value ?? '')
+            const key = `${val}${attr.unit ?? ''}`
+            if (!seen.has(key) && val) {
+                seen.add(key)
+                badges.push({ value: val, unit: attr.unit })
             }
-        });
-    });
-
-    return attributesHtml.slice(0, 3).join(' • ') + (attributesHtml.length > 3 ? '...' : '');
+        })
+    })
+    return badges.slice(0, 4)
 }
 </script>
 
@@ -112,9 +110,12 @@ const getTechnicalSpecsPreview = (product: Product): string => {
                             </svg>
                             Marcas: {{ getBrandNames(product) }}
                         </p>
-                        <p v-if="getTechnicalSpecsPreview(product)" class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 max-w-[280px] truncate" :title="getTechnicalSpecsPreview(product)">
-                            📋 {{ getTechnicalSpecsPreview(product) }}
-                        </p>
+                        <div v-if="getAttributeBadges(product).length" class="flex flex-wrap gap-1 mt-0.5">
+                            <span v-for="badge in getAttributeBadges(product)" :key="badge.value"
+                                class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                                {{ badge.value }}<span v-if="badge.unit" class="ml-0.5 text-green-600 dark:text-green-400">{{ badge.unit }}</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="flex items-center gap-3">
                         <span v-if="getTotalStock(product) > 0"
@@ -187,9 +188,12 @@ const getTechnicalSpecsPreview = (product: Product): string => {
                     </svg>
                     {{ getBrandNames(product) }}
                 </p>
-                <p v-if="getTechnicalSpecsPreview(product)" class="text-[11px] text-gray-400 dark:text-gray-500 mt-1 truncate" :title="getTechnicalSpecsPreview(product)">
-                    📋 {{ getTechnicalSpecsPreview(product) }}
-                </p>
+                <div v-if="getAttributeBadges(product).length" class="flex flex-wrap gap-1 mt-1">
+                    <span v-for="badge in getAttributeBadges(product)" :key="badge.value"
+                        class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                        {{ badge.value }}<span v-if="badge.unit" class="ml-0.5 text-green-600 dark:text-green-400">{{ badge.unit }}</span>
+                    </span>
+                </div>
             </div>
 
             <!-- Price + CTA -->

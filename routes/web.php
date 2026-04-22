@@ -44,6 +44,9 @@ Route::middleware(['auth'])->prefix('products')->name('products.')->group(functi
     Route::get('/create', [App\Http\Controllers\ProductController::class, 'create'])
         ->name('create')
         ->middleware('role:admin,manager,buyer');
+    Route::get('/import', function () {
+        return Inertia::render('Products/Import');
+    })->name('import')->middleware('role:admin,manager');
     Route::get('/{product}', [App\Http\Controllers\ProductController::class, 'show'])->name('show');
     Route::get('/{product}/edit', [App\Http\Controllers\ProductController::class, 'edit'])
         ->name('edit')
@@ -206,10 +209,10 @@ Route::middleware(['auth'])->prefix('vehicles')->name('vehicles.')->group(functi
     })->name('engines.index');
     Route::get('/engines/create', function () {
         return Inertia::render('Vehicles/Engines/Create');
-    })->name('engines.create');
+    })->name('engines.create')->middleware('role:admin,manager');
     Route::get('/engines/{id}/edit', function ($id) {
         return Inertia::render('Vehicles/Engines/Edit', ['engineId' => (int) $id]);
-    })->name('engines.edit');
+    })->name('engines.edit')->middleware('role:admin,manager');
 
     // Chassis
     Route::get('/chassis', function () {
@@ -221,6 +224,10 @@ Route::middleware(['auth'])->prefix('vehicles')->name('vehicles.')->group(functi
     Route::get('/chassis/{id}/edit', function ($id) {
         return Inertia::render('Vehicles/Chassis/Edit', ['chassisId' => (int) $id]);
     })->name('chassis.edit');
+
+    Route::get('/import', function () {
+        return Inertia::render('Vehicles/Import');
+    })->name('import')->middleware('role:admin,manager');
 });
 
 // Work Orders
@@ -241,6 +248,10 @@ Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
     Route::get('/suppliers/create', function () {
         return Inertia::render('Suppliers/Create');
     })->name('suppliers.create');
+
+    Route::get('/suppliers/import', function () {
+        return Inertia::render('Suppliers/Import');
+    })->name('suppliers.import')->middleware('role:admin,manager');
 
     Route::get('/suppliers/{id}', function ($id) {
         return Inertia::render('Suppliers/Show', ['supplierId' => (int) $id]);
@@ -298,6 +309,10 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('brands')->name('brand
         return Inertia::render('Brands/Create');
     })->name('create');
 
+    Route::get('/import', function () {
+        return Inertia::render('Brands/Import');
+    })->name('import');
+
     Route::get('/{id}/edit', function ($id) {
         return Inertia::render('Brands/Edit', ['id' => (string) $id]);
     })->name('edit');
@@ -312,6 +327,10 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('categories')->name('c
     Route::get('/create', function () {
         return Inertia::render('Categories/Create');
     })->name('create');
+
+    Route::get('/import', function () {
+        return Inertia::render('Categories/Import');
+    })->name('import');
 
     Route::get('/{id}/edit', function ($id) {
         return Inertia::render('Categories/Edit', ['id' => (string) $id]);

@@ -3,7 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useCategories } from '@/composables/useCategories'
-import { Search, Plus, Trash2, Folder, CornerDownRight, ChevronRight, ChevronDown, ChevronLeft } from 'lucide-vue-next'
+import { Search, Plus, Trash2, Folder, CornerDownRight, ChevronRight, ChevronDown, ChevronLeft, Upload } from 'lucide-vue-next'
 import type { Category } from '@/types/category'
 
 const { loading, error, fetchCategoriesWithParent, deleteCategory } = useCategories()
@@ -193,6 +193,13 @@ onMounted(async () => {
                 >
                     <Plus :size="20" />
                     Nueva Categoría
+                </Link>
+                <Link
+                    href="/categories/import"
+                    class="inline-flex items-center gap-2 px-4 py-2 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30 text-emerald-700 rounded-lg transition"
+                >
+                    <Upload :size="20" />
+                    Importar
                 </Link>
             </div>
 

@@ -11,7 +11,6 @@ const importConfig: ImporterConfig = {
     templateFilename: 'plantilla_marcas.xlsx',
     columns: [
         { key: 'nombre', label: 'Nombre', type: 'text', required: true },
-        { key: 'prefijo', label: 'Prefijo', type: 'text' },
         { key: 'descripcion', label: 'Descripción', type: 'text' },
         { key: 'website', label: 'Website', type: 'text' },
         { key: 'estado', label: 'Estado', type: 'select', options: [{ label: 'Activo', value: 'active' }, { label: 'Inactivo', value: 'inactive' }] },

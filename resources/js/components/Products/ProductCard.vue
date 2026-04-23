@@ -33,17 +33,18 @@ const getBrandNames = (product: Product): string => {
     return product.default_variant?.brand?.name ?? ''
 }
 
-const getAttributeBadges = (product: Product): Array<{ value: string; unit?: string | null }> => {
+const getAttributeBadges = (product: Product): Array<{ name: string; value: string; unit?: string | null }> => {
     if (!product.variants?.length) return [];
     const seen = new Set<string>()
-    const badges: Array<{ value: string; unit?: string | null }> = []
+    const badges: Array<{ name: string; value: string; unit?: string | null }> = []
     product.variants.forEach(v => {
         v.attributes?.forEach(attr => {
+            const name = String(attr.name ?? '').trim()
             const val = String(attr.value ?? '')
-            const key = `${val}${attr.unit ?? ''}`
-            if (!seen.has(key) && val) {
+            const key = `${name}:${val}${attr.unit ?? ''}`
+            if (!seen.has(key) && name && val) {
                 seen.add(key)
-                badges.push({ value: val, unit: attr.unit })
+                badges.push({ name, value: val, unit: attr.unit })
             }
         })
     })
@@ -111,7 +112,8 @@ const getAttributeBadges = (product: Product): Array<{ value: string; unit?: str
                             Marcas: {{ getBrandNames(product) }}
                         </p>
                         <div v-if="getAttributeBadges(product).length" class="flex flex-wrap gap-1 mt-0.5">
-                            <span v-for="badge in getAttributeBadges(product)" :key="badge.value"
+                            <span v-for="badge in getAttributeBadges(product)" :key="`${badge.name}-${badge.value}`"
+                                :title="`${badge.name}: ${badge.value}${badge.unit ? ' ' + badge.unit : ''}`"
                                 class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
                                 {{ badge.value }}<span v-if="badge.unit" class="ml-0.5 text-green-600 dark:text-green-400">{{ badge.unit }}</span>
                             </span>
@@ -189,7 +191,8 @@ const getAttributeBadges = (product: Product): Array<{ value: string; unit?: str
                     {{ getBrandNames(product) }}
                 </p>
                 <div v-if="getAttributeBadges(product).length" class="flex flex-wrap gap-1 mt-1">
-                    <span v-for="badge in getAttributeBadges(product)" :key="badge.value"
+                    <span v-for="badge in getAttributeBadges(product)" :key="`${badge.name}-${badge.value}`"
+                        :title="`${badge.name}: ${badge.value}${badge.unit ? ' ' + badge.unit : ''}`"
                         class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
                         {{ badge.value }}<span v-if="badge.unit" class="ml-0.5 text-green-600 dark:text-green-400">{{ badge.unit }}</span>
                     </span>

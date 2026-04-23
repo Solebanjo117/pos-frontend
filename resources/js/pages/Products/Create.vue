@@ -5,7 +5,6 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { useProducts } from '@/composables/useProducts'
 import { useToast } from '@/composables/useToast'
-import { useVehicleEngines } from '@/composables/useVehicleEngines'
 import type { CreateProductRequest, Product } from '@/types/product'
 import type { Category } from '@/types/category'
 import type { Brand } from '@/types/brand'
@@ -14,6 +13,11 @@ import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue'
 import PricingFormula from '@/components/Products/PricingFormula.vue'
 import VariantManager from '@/components/Products/VariantManager.vue'
+import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue'
+import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue'
+import ProductImagesSection from '@/components/Products/ProductImagesSection.vue'
+import type { DraftCompatData } from '@/components/Products/VehicleCompatSection.vue'
+import type { PendingImage } from '@/components/Products/ProductImagesSection.vue'
 import { useStoreSettings } from '@/composables/useStoreSettings'
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -34,7 +38,6 @@ const { createProduct, loading, error } = useProducts()
 const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings()
 const toast = useToast()
 
-// === Rounding helper — respects LL-013: only applied on auto-calc, never on manual input ===
 const applyRounding = (price: number): number => {
     const increment = Number(storeSettings.value.price_rounding_increment) || 0
     if (increment <= 0) return price
@@ -47,7 +50,7 @@ const form = ref<CreateProductRequest>({
     description: '',
     product_line_id: undefined,
     category_id: undefined,
-    engine_id: undefined, // R21: motor as reusable entity
+    engine_id: undefined,
     status: 'active',
     alternate_code: '',
     pricing_formula: '',
@@ -167,7 +170,6 @@ const removeVariantAttribute = (index: number) => {
     variantAttributes.value.splice(index, 1)
 }
 
-// Category pricing — formula takes priority over margin (LL-013 compatibility)
 const categoryFormula = ref<string | null>(null)
 const categoryAppliesItbm = ref<boolean>(false)
 const categoryItbmPercent = ref<number | null>(null)
@@ -202,7 +204,6 @@ const checkDuplicates = async () => {
     }
 }
 
-// Debounced watcher for duplicate checking (600ms)
 watch(() => form.value.sku_base, () => {
     if (duplicateCheckTimeout) {
         clearTimeout(duplicateCheckTimeout)
@@ -215,6 +216,48 @@ watch(() => form.value.sku_base, () => {
 const nameManuallyEdited = ref(false)
 const onNameInput = () => { nameManuallyEdited.value = true }
 
+// === Vehicle compatibility (draft mode via component) ===
+const vehicleCompatRef = ref<InstanceType<typeof VehicleCompatSection> | null>(null)
+const vehicleModalsRef = ref<InstanceType<typeof VehicleInlineModals> | null>(null)
+const vehicleModalType = ref<'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null>(null)
+
+const vehicleCompat = ref<DraftCompatData>({
+    engines: [],
+    chassis: [],
+    allEngines: false,
+    allChassis: false,
+    isUniversal: false,
+})
+
+const openVehicleInline = (type: 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis') => {
+    vehicleModalType.value = type
+    vehicleModalsRef.value?.open(type)
+}
+
+const closeVehicleInline = () => {
+    vehicleModalType.value = null
+}
+
+const onMakeCreated = (make: { id: number; name: string }) => {
+    vehicleCompatRef.value?.addMake(make)
+    vehicleModalType.value = null
+}
+
+const onModelCreated = (model: any) => {
+    vehicleCompatRef.value?.addModel(model)
+    vehicleModalType.value = null
+}
+
+const onEngineCreated = (engine: any) => {
+    vehicleCompatRef.value?.addEngine(engine)
+    vehicleModalType.value = null
+}
+
+const onChassisCreated = (chassis: any) => {
+    vehicleCompatRef.value?.addChassisToList(chassis)
+}
+
+// === Name preview helpers ===
 type EngineCompatibilityEntry = {
     engine_id: number
     make: string
@@ -232,50 +275,28 @@ type ChassisCompatibilityEntry = {
     chassis: string
 }
 
-const formatYearRange = (model?: VehicleModelItem | null): string => {
+const formatYearRange = (model?: { year_from?: number; year_to?: number; generation?: string } | null): string => {
     const from = model?.year_from
     const to = model?.year_to
-
     if (from && to) return from === to ? `${from}` : `${from}-${to}`
     if (from) return `${from}`
     if (to) return `${to}`
     return ''
 }
 
-const getModelChassis = (model?: VehicleModelItem | null): string => {
+const getModelChassis = (model?: { generation?: string } | null): string => {
     return String(model?.generation ?? '').trim()
 }
 
 const engineCategoryKeywords = [
-    'motor',
-    'piston',
-    'pistón',
-    'biela',
-    'cigueñal',
-    'cigüeñal',
-    'culata',
-    'valvula',
-    'válvula',
-    'arbol de levas',
-    'árbol de levas',
-    'empaque',
-    'junta de culata',
-    'bomba de aceite',
-    'cadena',
-    'correa',
-    'timing',
-    'engine',
-    'piston ring',
-    'anillo',
+    'motor', 'piston', 'pistón', 'biela', 'cigueñal', 'cigüeñal', 'culata',
+    'valvula', 'válvula', 'arbol de levas', 'árbol de levas', 'empaque',
+    'junta de culata', 'bomba de aceite', 'cadena', 'correa', 'timing',
+    'engine', 'piston ring', 'anillo',
 ]
 
 const normalizeTextKey = (value: string): string => {
-    return value
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim()
+    return value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
 }
 
 const isEngineCategory = (categoryName?: string): boolean => {
@@ -287,29 +308,16 @@ const isEngineCategory = (categoryName?: string): boolean => {
 const toTwoDigitYearRange = (yearValue?: string): string => {
     const raw = String(yearValue ?? '').trim()
     if (!raw) return ''
-
     const years = Array.from(raw.matchAll(/\d{4}/g)).map(match => match[0].slice(-2))
-    if (years.length >= 2) {
-        return `${years[0]}-${years[1]}`
-    }
-
+    if (years.length >= 2) return `${years[0]}-${years[1]}`
     if (years.length === 1) {
-        if (raw.includes('+')) {
-            return `${years[0]}+`
-        }
-
+        if (raw.includes('+')) return `${years[0]}+`
         return years[0]
     }
-
     return raw
 }
 
-const buildChassisLevelLabel = (entry: {
-    make?: string
-    model?: string
-    year?: string
-    chassis?: string
-}): string => {
+const buildChassisLevelLabel = (entry: { make?: string; model?: string; year?: string; chassis?: string }): string => {
     const make = String(entry.make ?? '').trim()
     const model = String(entry.model ?? '').trim()
     const year = toTwoDigitYearRange(entry.year)
@@ -317,217 +325,57 @@ const buildChassisLevelLabel = (entry: {
     return `${make} ${model}${year ? ` ${year}` : ''}`
 }
 
-const buildEngineLevelLabel = (entry: {
-    make?: string
-    engine?: string
-    model?: string
-    year?: string
-    chassis?: string
-}): string => {
+const buildEngineLevelLabel = (entry: { make?: string; engine?: string; model?: string; year?: string; chassis?: string }): string => {
     const make = String(entry.make ?? '').trim()
     const model = String(entry.model ?? '').trim()
     const engine = String(entry.engine ?? '').trim()
     const year = toTwoDigitYearRange(entry.year)
-
     if (!make || !model) return ''
-
-    if (engine) {
-        return `${engine} ${make} ${model}${year ? ` ${year}` : ''}`
-    }
-
+    if (engine) return `${engine} ${make} ${model}${year ? ` ${year}` : ''}`
     return `${make} ${model}${year ? ` ${year}` : ''}`
 }
-
-const addedEngines = ref<EngineCompatibilityEntry[]>([])
-const vehicleChassisList = ref<any[]>([])
-const selectedChassisIds = ref<number[]>([])
-const addedChassis = ref<ChassisCompatibilityEntry[]>([])
-const allEnginesFlag = ref(false)
-const allChassisFlag = ref(false)
-const compatTab = ref<'engines' | 'chassis'>('engines')
-
-type PendingOemReference = {
-    oem_code: string
-    manufacturer: string | null
-}
-
-const addedRefs = ref<PendingOemReference[]>([])
-
-type UpsaleRelationship = 'compatible' | 'substitute' | 'upgrade'
-
-type PendingUpsale = {
-    id: number
-    sku_base: string
-    name: string
-    relationship_type: UpsaleRelationship
-}
-
-const selectedUpsaleProduct = ref<Product | null>(null)
-const upsaleRelationshipType = ref<UpsaleRelationship>('compatible')
-const pendingUpsales = ref<PendingUpsale[]>([])
-
-const addUpsale = () => {
-    if (!selectedUpsaleProduct.value) return
-
-    const selected = selectedUpsaleProduct.value
-    if (pendingUpsales.value.some(item => item.id === selected.id)) return
-
-    pendingUpsales.value.push({
-        id: selected.id,
-        sku_base: selected.sku_base,
-        name: selected.name,
-        relationship_type: upsaleRelationshipType.value,
-    })
-
-    selectedUpsaleProduct.value = null
-    upsaleRelationshipType.value = 'compatible'
-}
-
-const removeUpsale = (productId: number) => {
-    pendingUpsales.value = pendingUpsales.value.filter(item => item.id !== productId)
-}
-
-const getUpsaleRelationshipLabel = (type: UpsaleRelationship): string => {
-    const labels: Record<UpsaleRelationship, string> = {
-        compatible: 'Compatible',
-        substitute: 'Sustituto',
-        upgrade: 'Upgrade',
-    }
-    return labels[type]
-}
-
-type PendingImage = {
-    tempId: string
-    file: File
-    previewUrl: string
-}
-
-const pendingImages = ref<PendingImage[]>([])
-
-const handlePendingImageSelection = (event: Event) => {
-    const input = event.target as HTMLInputElement
-    if (!input.files?.length) return
-
-    for (const file of Array.from(input.files)) {
-        const alreadyAdded = pendingImages.value.some(item =>
-            item.file.name === file.name
-            && item.file.size === file.size
-            && item.file.lastModified === file.lastModified
-        )
-
-        if (alreadyAdded) continue
-
-        pendingImages.value.push({
-            tempId: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-            file,
-            previewUrl: URL.createObjectURL(file),
-        })
-    }
-
-    input.value = ''
-}
-
-const removePendingImage = (tempId: string) => {
-    const index = pendingImages.value.findIndex(item => item.tempId === tempId)
-    if (index === -1) return
-
-    URL.revokeObjectURL(pendingImages.value[index].previewUrl)
-    pendingImages.value.splice(index, 1)
-}
-
-interface VehicleMake { id: number; name: string }
-interface VehicleModelItem { id: number; name: string; year_from?: number; year_to?: number; generation?: string }
-interface VehicleEngineItem { id: number; engine_code: string; displacement?: string }
-
-const vehicleMakes = ref<VehicleMake[]>([])
-const vehicleModels = ref<VehicleModelItem[]>([])
-const vehicleEngines = ref<VehicleEngineItem[]>([])
-
-const selectedMakeId = ref<number | null>(null)
-const selectedModelId = ref<number | null>(null)
-// R39: Multi-select de motores
-const selectedEngineIds = ref<number[]>([])
-const isUniversal = ref(false)
-
-const selectedModelMeta = computed(() =>
-    vehicleModels.value.find(m => m.id === selectedModelId.value) || null
-)
-
-const compatibilitySummary = computed(() => {
-    if (isUniversal.value) return 'Universal'
-
-    const parts: string[] = []
-    if (allEnginesFlag.value) {
-        parts.push('todos los motores del modelo')
-    } else if (addedEngines.value.length > 0) {
-        parts.push(`${addedEngines.value.length} motor(es)`)
-    }
-
-    if (allChassisFlag.value) {
-        parts.push('todos los chasis del modelo')
-    } else if (addedChassis.value.length > 0) {
-        parts.push(`${addedChassis.value.length} chasis`)
-    }
-
-    return parts.join(' | ')
-})
 
 const namePreview = computed(() => {
     const catId = (form.value as any).category_id
     const categoryName = categories.value.find(c => c.id === catId)?.name || 'Producto sin nombre'
     const engineCategory = isEngineCategory(categoryName)
 
-    const chassisLabels = addedChassis.value
-        .map(entry => buildChassisLevelLabel(entry))
-        .filter(Boolean)
+    const addedEngines = vehicleCompat.value.engines
+    const addedChassis = vehicleCompat.value.chassis
+    const allEnginesFlag = vehicleCompat.value.allEngines
+    const allChassisFlag = vehicleCompat.value.allChassis
 
-    const engineLabels = addedEngines.value
-        .map(entry => engineCategory ? buildEngineLevelLabel(entry) : buildChassisLevelLabel(entry))
-        .filter(Boolean)
-
-    const selectedMake = vehicleMakes.value.find(m => m.id === selectedMakeId.value)?.name || ''
-    const selectedModel = vehicleModels.value.find(m => m.id === selectedModelId.value)
+    const selectedMake = vehicleCompatRef.value?.vehicleMakes?.find(m => m.id === vehicleCompatRef.value?.selectedMakeId)?.name || ''
+    const selectedModel = vehicleCompatRef.value?.vehicleModels?.find(m => m.id === vehicleCompatRef.value?.selectedModelId)
     const selectedModelName = selectedModel?.name || ''
     const selectedYear = formatYearRange(selectedModel)
     const selectedChassis = getModelChassis(selectedModel)
 
-    if (allChassisFlag.value && selectedModelName) {
+    const chassisLabels = addedChassis.map(entry => buildChassisLevelLabel(entry)).filter(Boolean)
+    const engineLabels = addedEngines.map(entry => engineCategory ? buildEngineLevelLabel(entry) : buildChassisLevelLabel(entry)).filter(Boolean)
+
+    if (allChassisFlag && selectedModelName) {
         const allChassisLabel = buildChassisLevelLabel({
-            make: selectedMake,
-            model: selectedModelName,
-            year: selectedYear,
+            make: selectedMake, model: selectedModelName, year: selectedYear,
             chassis: selectedChassis || 'todos los chasis',
         })
-        if (allChassisLabel) {
-            chassisLabels.push(allChassisLabel)
-        }
+        if (allChassisLabel) chassisLabels.push(allChassisLabel)
     }
 
-    if (allEnginesFlag.value && selectedModelName) {
+    if (allEnginesFlag && selectedModelName) {
         const allEnginesLabel = engineCategory
             ? buildEngineLevelLabel({
-                make: selectedMake,
-                engine: 'todos los motores',
-                model: selectedModelName,
-                year: selectedYear,
-                chassis: selectedChassis || 'todos los chasis',
+                make: selectedMake, engine: 'todos los motores', model: selectedModelName,
+                year: selectedYear, chassis: selectedChassis || 'todos los chasis',
             })
             : buildChassisLevelLabel({
-                make: selectedMake,
-                model: selectedModelName,
-                year: selectedYear,
-                chassis: selectedChassis,
+                make: selectedMake, model: selectedModelName, year: selectedYear, chassis: selectedChassis,
             })
-
-        if (allEnginesLabel) {
-            engineLabels.push(allEnginesLabel)
-        }
+        if (allEnginesLabel) engineLabels.push(allEnginesLabel)
     }
 
     const compatibilityLabels = [...new Set([...chassisLabels, ...engineLabels])]
-    if (compatibilityLabels.length === 0) {
-        return categoryName
-    }
+    if (compatibilityLabels.length === 0) return categoryName
 
     const displayed = compatibilityLabels.slice(0, 3).join(', ')
     const suffix = compatibilityLabels.length > 3 ? ' y más' : ''
@@ -559,7 +407,6 @@ watch(
             } else {
                 keepOnlyCustomAttributes()
             }
-            // R23: capture formula and ITBM flag + percent (LL-013 fallback: margin)
             categoryFormula.value = cat.pricing_formula ?? null
             categoryAppliesItbm.value = cat.applies_itbm ?? false
             categoryItbmPercent.value = cat.itbm_percent ?? 7
@@ -574,7 +421,6 @@ watch(
     }
 )
 
-// Auto-calculate base_price from category formula (priority) or margin (fallback)
 watch(
     () => form.value.pricing.cost,
     async (newCost) => {
@@ -583,7 +429,6 @@ watch(
         if (cost <= 0) return
 
         if (categoryFormula.value) {
-            // Formula takes priority
             try {
                 const { data } = await apiClient.post('/categories/preview-price', {
                     formula: categoryFormula.value,
@@ -596,189 +441,81 @@ watch(
                 }
             } catch { /* silencioso */ }
         } else if (categoryMargin.value != null && categoryMargin.value > 0) {
-            // Fallback: simple margin (LL-013)
             form.value.pricing.base_price = applyRounding(Number((cost * (1 + categoryMargin.value / 100)).toFixed(2)))
         }
     }
 )
 
-const getChassisOptionDetail = (chassis: any): string => {
-    const modelContext = (chassis?.model ?? selectedModelMeta.value) as VehicleModelItem | null
-    const modelName = String(chassis?.model?.name ?? selectedModelMeta.value?.name ?? '').trim()
-    const years = formatYearRange(modelContext)
-    const code = String(chassis?.code ?? getModelChassis(modelContext)).trim()
-    const base = [modelName, years].filter(Boolean).join(' ')
-
-    if (!base && !code) return 'Chasis sin detalle'
-    return code ? `${base || 'Modelo'} - Chasis: ${code}` : base
-}
-
-const loadingMakes = ref(false)
-const loadingModelsV = ref(false)
-const loadingEnginesV = ref(false)
-
-const fetchMakes = async () => {
-    loadingMakes.value = true
-    try {
-        const { data } = await apiClient.get('/vehicle-makes')
-        vehicleMakes.value = data.data ?? data
-    } catch { vehicleMakes.value = [] }
-    finally { loadingMakes.value = false }
-}
-
-watch(selectedMakeId, async (makeId) => {
-    vehicleModels.value = []; vehicleEngines.value = []
-    selectedModelId.value = null; selectedEngineIds.value = []
-    if (!makeId) return
-    loadingModelsV.value = true
-    try {
-        const { data } = await apiClient.get(`/vehicle-makes/${makeId}/models`)
-        vehicleModels.value = data.data ?? data
-    } catch { vehicleModels.value = [] }
-    finally { loadingModelsV.value = false }
-})
-
-watch(selectedModelId, async (modelId) => {
-    vehicleEngines.value = []; selectedEngineIds.value = []
-    vehicleChassisList.value = []; selectedChassisIds.value = []
-    if (!modelId) return
-    
-    loadingEnginesV.value = true
-    try {
-        const { data } = await apiClient.get(`/vehicle-models/${modelId}/engines`)
-        vehicleEngines.value = data.data ?? data
-    } catch { vehicleEngines.value = [] }
-    finally { loadingEnginesV.value = false }
-
-    try {
-        const { data } = await apiClient.get(`/vehicle-models/${modelId}/chassis`)
-        vehicleChassisList.value = data.data ?? data
-    } catch { vehicleChassisList.value = [] }
-})
-
-const toggleUniversal = () => {
-    isUniversal.value = !isUniversal.value
-    if (isUniversal.value) {
-        addedEngines.value = []
-        selectedMakeId.value = null
-    }
-}
-
-// R39: Agregar múltiples motores de una vez
-const addEngines = () => {
-    if (selectedEngineIds.value.length === 0) return
-    const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
-    const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
-    const modelName = model?.name || ''
-    const year = formatYearRange(model)
-    const chassis = getModelChassis(model)
-    
-    selectedEngineIds.value.forEach(engineId => {
-        if (addedEngines.value.some(e => e.engine_id === engineId)) return
-        const engine = vehicleEngines.value.find(e => e.id === engineId)
-        addedEngines.value.push({
-            engine_id: engineId,
-            make: make?.name || '',
-            model: modelName,
-            engine: engine?.engine_code || '',
-            year,
-            chassis,
-        })
-    })
-    selectedEngineIds.value = []
-}
-const removeEngine = (idx: number) => addedEngines.value.splice(idx, 1)
-
-const addChassis = () => {
-    if (selectedChassisIds.value.length === 0) return
-    const make = vehicleMakes.value.find(m => m.id === selectedMakeId.value)
-    const model = vehicleModels.value.find(m => m.id === selectedModelId.value)
-    const modelName = model?.name || ''
-    const year = formatYearRange(model)
-    const modelChassis = getModelChassis(model)
-    
-    selectedChassisIds.value.forEach(chId => {
-        if (addedChassis.value.some(c => c.chassis_id === chId)) return
-        const ch = vehicleChassisList.value.find(c => c.id === chId)
-        addedChassis.value.push({
-            chassis_id: chId,
-            make: make?.name || '',
-            model: modelName,
-            year,
-            chassis: String(ch?.code || '').trim() || modelChassis,
-        })
-    })
-    selectedChassisIds.value = []
-}
-const removeChassis = (idx: number) => addedChassis.value.splice(idx, 1)
-
+// === OEM refs (draft) ===
+type PendingOemReference = { oem_code: string; manufacturer: string | null }
+const addedRefs = ref<PendingOemReference[]>([])
 const refInput = ref('')
 const refManufacturerInput = ref<string | null>(null)
+
 const addRef = () => {
     const code = refInput.value.trim()
     const manufacturer = (refManufacturerInput.value || '').trim() || null
     if (!code) return
-
     const exists = addedRefs.value.some(ref =>
         ref.oem_code.toLowerCase() === code.toLowerCase()
         && (ref.manufacturer ?? '') === (manufacturer ?? '')
     )
     if (exists) return
-
-    addedRefs.value.push({
-        oem_code: code,
-        manufacturer,
-    })
+    addedRefs.value.push({ oem_code: code, manufacturer })
     refInput.value = ''
     refManufacturerInput.value = null
 }
 const removeRef = (idx: number) => addedRefs.value.splice(idx, 1)
 
-const inlineModal = ref<'category' | 'brand' | 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null>(null)
+// === Upsales (draft) ===
+type UpsaleRelationship = 'compatible' | 'substitute' | 'upgrade'
+type PendingUpsale = { id: number; sku_base: string; name: string; relationship_type: UpsaleRelationship }
+
+const selectedUpsaleProduct = ref<Product | null>(null)
+const upsaleRelationshipType = ref<UpsaleRelationship>('compatible')
+const pendingUpsales = ref<PendingUpsale[]>([])
+
+const addUpsale = () => {
+    if (!selectedUpsaleProduct.value) return
+    const selected = selectedUpsaleProduct.value
+    if (pendingUpsales.value.some(item => item.id === selected.id)) return
+    pendingUpsales.value.push({
+        id: selected.id, sku_base: selected.sku_base,
+        name: selected.name, relationship_type: upsaleRelationshipType.value,
+    })
+    selectedUpsaleProduct.value = null
+    upsaleRelationshipType.value = 'compatible'
+}
+
+const removeUpsale = (productId: number) => {
+    pendingUpsales.value = pendingUpsales.value.filter(item => item.id !== productId)
+}
+
+const getUpsaleRelationshipLabel = (type: UpsaleRelationship): string => {
+    const labels: Record<UpsaleRelationship, string> = {
+        compatible: 'Compatible', substitute: 'Sustituto', upgrade: 'Upgrade',
+    }
+    return labels[type]
+}
+
+// === Images (draft via component) ===
+const pendingImages = ref<PendingImage[]>([])
+
+// === Inline modals for Category & Brand (Create-only) ===
+const inlineModal = ref<'category' | 'brand' | null>(null)
 const inlineForm = ref<Record<string, any>>({})
 const inlineProcessing = ref(false)
 const inlineError = ref<string | null>(null)
-const vehicleModelDraftBeforeChassis = ref<Record<string, any> | null>(null)
 
-const openModelChassisQuickCreate = () => {
-    vehicleModelDraftBeforeChassis.value = { ...inlineForm.value }
-    inlineModal.value = 'vehicleChassis'
-    inlineError.value = null
-    inlineProcessing.value = false
-    inlineForm.value = { code: '', name: '' }
-}
-
-const openInline = (type: typeof inlineModal.value) => {
-    if (type !== 'vehicleChassis') {
-        vehicleModelDraftBeforeChassis.value = null
-    }
-
+const openInline = (type: 'category' | 'brand') => {
     inlineModal.value = type
     inlineError.value = null
     inlineProcessing.value = false
     if (type === 'category') inlineForm.value = { name: '', parent_id: null }
     else if (type === 'brand') inlineForm.value = { name: '' }
-    else if (type === 'vehicleMake') inlineForm.value = { name: '' }
-    else if (type === 'vehicleModel') {
-        inlineForm.value = { name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear() }
-        selectedModelGenerationChassisId.value = null
-        fetchVehicleChassisCatalog()
-    }
-    else if (type === 'vehicleEngine') inlineForm.value = { engine_code: '', displacement: '' }
-    else if (type === 'vehicleChassis') inlineForm.value = { code: '', name: '' }
 }
 
-const closeInline = () => {
-    if (inlineModal.value === 'vehicleChassis' && vehicleModelDraftBeforeChassis.value) {
-        inlineModal.value = 'vehicleModel'
-        inlineForm.value = { ...vehicleModelDraftBeforeChassis.value }
-        vehicleModelDraftBeforeChassis.value = null
-        return
-    }
-
-    inlineModal.value = null
-    vehicleModelDraftBeforeChassis.value = null
-}
+const closeInline = () => { inlineModal.value = null }
 
 const submitInline = async () => {
     inlineProcessing.value = true
@@ -793,55 +530,6 @@ const submitInline = async () => {
             const newBrand = data.data ?? data
             brands.value.push(newBrand)
             form.value.brand_id = newBrand.id
-        } else if (inlineModal.value === 'vehicleMake') {
-            const { data } = await apiClient.post('/vehicle-makes', inlineForm.value)
-            const newMake = data.data ?? data
-            vehicleMakes.value.push(newMake)
-            selectedMakeId.value = newMake.id
-        } else if (inlineModal.value === 'vehicleModel') {
-            const selectedGeneration = vehicleChassisCatalog.value
-                .find(chassis => chassis.id === selectedModelGenerationChassisId.value)
-                ?.code?.trim() || null
-
-            if (selectedGeneration && selectedGeneration.length > 20) {
-                inlineError.value = 'El código de chasis seleccionado supera 20 caracteres y no puede guardarse como generación del modelo.'
-                return
-            }
-
-            const payload = {
-                ...inlineForm.value,
-                make_id: selectedMakeId.value,
-                generation: selectedGeneration,
-            }
-
-            const { data } = await apiClient.post('/vehicle-models', payload)
-            const newModel = data.data ?? data
-            vehicleModels.value.push(newModel)
-            selectedModelId.value = newModel.id
-        } else if (inlineModal.value === 'vehicleEngine') {
-            const { data } = await apiClient.post('/vehicle-engines', { ...inlineForm.value, model_id: selectedModelId.value, fuel_type: 'N/A', aspiration: 'N/A' })
-            const newEngine = data.data ?? data
-            vehicleEngines.value.push(newEngine)
-            // R39: Agregar el nuevo motor a la selección múltiple
-            selectedEngineIds.value.push(newEngine.id)
-        } else if (inlineModal.value === 'vehicleChassis') {
-            const { data } = await apiClient.post('/vehicle-chassis', { ...inlineForm.value, model_id: selectedModelId.value })
-            const newChassis = data.data ?? data
-            vehicleChassisList.value.push(newChassis)
-            selectedChassisIds.value.push(newChassis.id)
-
-            if (!vehicleChassisCatalog.value.some(chassis => chassis.id === newChassis.id)) {
-                vehicleChassisCatalog.value.push(newChassis)
-            }
-
-            if (vehicleModelDraftBeforeChassis.value) {
-                const modelDraft = { ...vehicleModelDraftBeforeChassis.value }
-                vehicleModelDraftBeforeChassis.value = null
-                selectedModelGenerationChassisId.value = newChassis.id
-                inlineModal.value = 'vehicleModel'
-                inlineForm.value = modelDraft
-                return
-            }
         }
         closeInline()
     } catch (e: any) {
@@ -850,69 +538,10 @@ const submitInline = async () => {
 }
 
 const categoryOptions = computed(() => categories.value.flatMap(c => ({
-    value: c.id, 
+    value: c.id,
     label: c.name
 })))
 const oemBrandOptions = computed(() => brands.value.map(b => ({ value: b.name, label: b.name })))
-const makeOptions = computed(() => vehicleMakes.value.map(m => ({ value: m.id, label: m.name })))
-const modelOptions = computed(() => vehicleModels.value.map(m => {
-    const years = m.year_from ? `${m.year_from}-${m.year_to || '...'}` : ''
-    const gen = m.generation ? `Chasis: ${m.generation}` : ''
-    const parts = [years, gen].filter(Boolean)
-    return { value: m.id, label: m.name, sublabel: parts.join(' - ') }
-}))
-const engineOptions = computed(() => vehicleEngines.value.map(e => ({
-    value: e.id, label: e.engine_code, sublabel: e.displacement || '',
-})))
-
-interface VehicleChassisCatalogItem {
-    id: number
-    code: string
-    name?: string | null
-    model?: {
-        id?: number
-        name?: string
-        make?: {
-            id?: number
-            name?: string
-        }
-    } | null
-}
-
-const vehicleChassisCatalog = ref<VehicleChassisCatalogItem[]>([])
-const loadingVehicleChassisCatalog = ref(false)
-const selectedModelGenerationChassisId = ref<number | null>(null)
-
-const vehicleChassisCatalogOptions = computed(() =>
-    vehicleChassisCatalog.value.map(chassis => {
-        const details = [
-            chassis.name,
-            chassis.model?.make?.name,
-            chassis.model?.name,
-        ].filter(Boolean).join(' - ')
-
-        return {
-            value: chassis.id,
-            label: chassis.code,
-            sublabel: details || undefined,
-        }
-    })
-)
-
-const fetchVehicleChassisCatalog = async () => {
-    loadingVehicleChassisCatalog.value = true
-    try {
-        const { data } = await apiClient.get('/vehicle-chassis', {
-            params: { per_page: 300 }
-        })
-        vehicleChassisCatalog.value = data?.data ?? []
-    } catch (e) {
-        console.error('Error loading vehicle chassis catalog:', e)
-        vehicleChassisCatalog.value = []
-    } finally {
-        loadingVehicleChassisCatalog.value = false
-    }
-}
 
 onMounted(async () => {
     fetchStoreSettings()
@@ -930,7 +559,6 @@ onMounted(async () => {
     } catch (e) { console.error('Error loading brands:', e) }
     finally { loadingBrands.value = false }
 
-    // Load warehouses and set first one as default
     try {
         const response = await apiClient.get('/warehouses')
         const warehouses = response.data.data || response.data
@@ -938,9 +566,6 @@ onMounted(async () => {
             form.value.initial_inventory[0].warehouse_id = warehouses[0].id
         }
     } catch (e) { console.error('Error loading warehouses:', e) }
-
-    fetchMakes()
-    fetchVehicleChassisCatalog()
 })
 
 // Draft variants from VariantManager in draft mode
@@ -953,12 +578,11 @@ const handleSubmit = async () => {
     validationErrors.value = {}
     successMessage.value = ''
 
-    // Validate required fields (only if creating default variant with brand)
     if (form.value.brand_id && !form.value.initial_inventory?.[0]?.warehouse_id) {
         toast.error('Debes seleccionar un almacén cuando creas una variante con marca')
         return
     }
-    
+
     try {
         const normalizedSaleTaxRate = Math.max(0, Math.min(100, Math.round(Number((form.value.pricing as any).sale_tax_rate ?? form.value.pricing.tax_rate ?? 7))))
         const normalizedCostTaxRate = Math.max(0, Math.min(100, Math.round(Number((form.value.pricing as any).cost_tax_rate ?? normalizedSaleTaxRate))))
@@ -979,18 +603,17 @@ const handleSubmit = async () => {
                     unit: (a.unit ?? '').trim(),
                 }))
                 .filter(a => a.name && a.value),
-            vehicle_compatibility: addedEngines.value.map(e => e.engine_id),
-            vehicle_chassis: addedChassis.value.map(c => c.chassis_id),
-            all_engines: allEnginesFlag.value,
-            all_chassis: allChassisFlag.value,
-            is_universal: isUniversal.value,
+            vehicle_compatibility: vehicleCompat.value.engines.map(e => e.engine_id),
+            vehicle_chassis: vehicleCompat.value.chassis.map(c => c.chassis_id),
+            all_engines: vehicleCompat.value.allEngines,
+            all_chassis: vehicleCompat.value.allChassis,
+            is_universal: vehicleCompat.value.isUniversal,
         }
         const result = await createProduct(payload)
         const productId = (result as any)?.data?.id ?? (result as any)?.id
 
         if (productId && addedRefs.value.length > 0) {
             const failedReferences: string[] = []
-
             for (const ref of addedRefs.value) {
                 try {
                     await apiClient.post(`/products/${productId}/oem-references`, {
@@ -1002,20 +625,18 @@ const handleSubmit = async () => {
                     failedReferences.push(ref.oem_code)
                 }
             }
-
             if (failedReferences.length > 0) {
                 toast.error(`Producto creado, pero fallaron códigos alternos: ${failedReferences.join(', ')}`)
             }
         }
 
-        // Create pending draft variants sequentially
         if (productId && pendingVariants.value.length > 0) {
             const failedVariants: string[] = []
             for (const variant of pendingVariants.value) {
                 try {
                     await apiClient.post(`/products/${productId}/variants`, {
                         brand_id: variant.brand_id,
-                        sku: variant.sku || '', // Backend auto-generates if empty
+                        sku: variant.sku || '',
                         upc: variant.upc || null,
                         status: variant.status || 'active',
                         pricing: variant.pricing,
@@ -1044,7 +665,6 @@ const handleSubmit = async () => {
                     failedUpsales.push(`${upsale.sku_base} - ${upsale.name}`)
                 }
             }
-
             if (failedUpsales.length > 0) {
                 toast.error(`Producto creado, pero fallaron upsales: ${failedUpsales.join(', ')}`)
             }
@@ -1053,7 +673,6 @@ const handleSubmit = async () => {
         if (productId && pendingImages.value.length > 0) {
             const formData = new FormData()
             pendingImages.value.forEach(item => formData.append('images[]', item.file))
-
             try {
                 await apiClient.post(`/products/${productId}/images`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
@@ -1134,7 +753,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
 
         <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-4">
 
-            <!-- ══ SECTION 1: Descripcion ══ -->
+            <!-- SECTION 1: Descripcion -->
             <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border space-y-4">
                 <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Descripción</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1167,7 +786,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 </div>
             </div>
 
-            <!-- ══ SECTION 2: Codigo + Estado ══ -->
+            <!-- SECTION 2: Codigo + Estado -->
             <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border">
                 <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Código y Estado</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1191,7 +810,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 </div>
             </div>
 
-            <!-- ══ SECTION 3: Codigos alternos ══ -->
+            <!-- SECTION 3: Codigos alternos -->
             <div class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-border dark:bg-card">
                 <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Códigos alternos</h2>
                 <div class="grid gap-3 sm:grid-cols-12 items-end">
@@ -1246,191 +865,44 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 </div>
             </div>
 
-            <!-- ══ Compatibilidad Vehicular (colapsable) ══ -->
-            <div class="rounded-xl bg-white shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-teal-500">
-                <button type="button" @click="(form as any)._showVehicle = !(form as any)._showVehicle"
-                    class="w-full flex items-center justify-between px-5 py-4 text-left">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Compatibilidad Vehicular</span>
-                        <span v-if="addedEngines.length > 0 || addedChassis.length > 0 || allEnginesFlag || allChassisFlag || isUniversal" class="text-xs px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300">
-                            {{ compatibilitySummary }}
-                        </span>
-                    </div>
-                    <span class="text-xs text-gray-400">{{ (form as any)._showVehicle ? '▲ Ocultar' : '▼ Expandir' }}</span>
-                </button>
+            <!-- SECTION 4: Compatibilidad Vehicular -->
+            <VehicleCompatSection
+                ref="vehicleCompatRef"
+                mode="draft"
+                v-model="vehicleCompat"
+                @open-inline="openVehicleInline"
+            />
 
-                <div v-show="(form as any)._showVehicle" class="px-5 pb-5 space-y-4 border-t border-gray-100 dark:border-border pt-4">
-
-                    <button type="button" @click="toggleUniversal"
-                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors"
-                        :class="isUniversal ? 'border-teal-500 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:border-teal-400'">
-                        <Globe class="h-4 w-4" />
-                        {{ isUniversal ? '✓ Compatible con TODOS los vehículos' : 'Marcar como Universal (TODOS)' }}
-                    </button>
-
-                    <div v-if="!isUniversal">
-                        <!-- Tabs -->
-                        <div class="flex border-b border-gray-200 dark:border-border mb-4">
-                            <button type="button" @click="compatTab = 'engines'"
-                                :class="compatTab === 'engines' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                                class="w-1/2 py-2 px-1 text-center border-b-2 font-medium text-sm flex items-center justify-center gap-2">
-                                🔧 Motores
-                            </button>
-                            <button type="button" @click="compatTab = 'chassis'"
-                                :class="compatTab === 'chassis' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                                class="w-1/2 py-2 px-1 text-center border-b-2 font-medium text-sm flex items-center justify-center gap-2">
-                                🚗 Chasis
-                            </button>
-                        </div>
-
-                        <!-- Fila 1: Marca y Modelo -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                            <div>
-                                <div class="flex items-center justify-between mb-1">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">Marca Vehículo</label>
-                                    <button type="button" @click="openInline('vehicleMake')" class="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
-                                        <Plus class="h-3 w-3" />
-                                    </button>
-                                </div>
-                                <SearchableSelect :options="makeOptions" :model-value="selectedMakeId"
-                                    @update:model-value="v => selectedMakeId = v as number | null"
-                                    placeholder="Marca" :loading="loadingMakes" />
-                            </div>
-                            <div>
-                                <div class="flex items-center justify-between mb-1">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">Modelo</label>
-                                    <button v-if="selectedMakeId" type="button" @click="openInline('vehicleModel')" class="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
-                                        <Plus class="h-3 w-3" />
-                                    </button>
-                                </div>
-                                <SearchableSelect :options="modelOptions" :model-value="selectedModelId"
-                                    @update:model-value="v => selectedModelId = v as number | null"
-                                    placeholder="Modelo" :disabled="!selectedMakeId" :loading="loadingModelsV" />
-                            </div>
-                        </div>
-
-                        <!-- Panel Motores -->
-                        <div v-show="compatTab === 'engines'">
-                            <div class="mb-3 flex items-center">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" v-model="allEnginesFlag" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                                    <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Compatible con TODOS los motores de este modelo</span>
-                                </label>
-                            </div>
-                            <!-- Multi-select de motores -->
-                            <div v-if="!allEnginesFlag" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-                                <div class="md:col-span-3">
-                                    <div class="flex items-center justify-between mb-1">
-                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                                            Motores
-                                            <span v-if="selectedEngineIds.length > 0" class="ml-1 text-teal-600">({{ selectedEngineIds.length }} seleccionados)</span>
-                                        </label>
-                                        <button v-if="selectedModelId" type="button" @click="openInline('vehicleEngine')" class="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
-                                            <Plus class="h-3 w-3" />
-                                        </button>
-                                    </div>
-                                    <div v-if="loadingEnginesV" class="text-center py-4 text-gray-400 text-sm">Cargando motores...</div>
-                                    <div v-else-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">Selecciona un modelo primero</div>
-                                    <div v-else-if="vehicleEngines.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">No hay motores disponibles</div>
-                                    <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
-                                        <label v-for="engine in vehicleEngines" :key="engine.id" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border" :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedEngineIds.includes(engine.id), 'opacity-50': addedEngines.some(e => e.engine_id === engine.id) }">
-                                            <input type="checkbox" :value="engine.id" v-model="selectedEngineIds" :disabled="addedEngines.some(e => e.engine_id === engine.id)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                                            <span class="font-mono text-sm text-gray-900 dark:text-white">{{ engine.engine_code }}</span>
-                                            <span v-if="engine.displacement" class="text-xs text-gray-500">{{ engine.displacement }}</span>
-                                            <span v-if="addedEngines.some(e => e.engine_id === engine.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="flex items-end">
-                                    <button type="button" @click="addEngines" :disabled="selectedEngineIds.length === 0"
-                                        class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40">
-                                        + Agregar {{ selectedEngineIds.length > 0 ? `(${selectedEngineIds.length})` : '' }}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Panel Chasis -->
-                        <div v-show="compatTab === 'chassis'">
-                            <div class="mb-3 flex items-center">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" v-model="allChassisFlag" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                                    <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Compatible con TODOS los chasis de este modelo</span>
-                                </label>
-                            </div>
-                            <!-- Multi-select de chasis -->
-                            <div v-if="!allChassisFlag" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-                                <div class="md:col-span-3">
-                                    <div class="flex items-center justify-between mb-1">
-                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
-                                            Chasis
-                                            <span v-if="selectedChassisIds.length > 0" class="ml-1 text-teal-600">({{ selectedChassisIds.length }} seleccionados)</span>
-                                        </label>
-                                        <button v-if="selectedModelId" type="button" @click="openInline('vehicleChassis')" class="text-xs font-medium text-teal-600 hover:text-teal-700 hover:underline underline-offset-2">
-                                            No aparece el VIN/chasis? Agrégalo aquí
-                                        </button>
-                                    </div>
-                                    <div v-if="!selectedModelId" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">Selecciona un modelo primero</div>
-                                    <div v-else-if="vehicleChassisList.length === 0" class="text-center py-4 text-gray-400 text-sm border rounded-md dark:border-border">No hay chasis disponibles</div>
-                                    <div v-else class="max-h-40 overflow-y-auto border rounded-md dark:border-border bg-white dark:bg-muted">
-                                        <label v-for="chassis in vehicleChassisList" :key="chassis.id" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-background/50 cursor-pointer border-b last:border-b-0 dark:border-border" :class="{ 'bg-teal-50 dark:bg-teal-900/20': selectedChassisIds.includes(chassis.id), 'opacity-50': addedChassis.some(c => c.chassis_id === chassis.id) }">
-                                            <input type="checkbox" :value="chassis.id" v-model="selectedChassisIds" :disabled="addedChassis.some(c => c.chassis_id === chassis.id)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                                            <div class="min-w-0 flex-1">
-                                                <p class="text-sm font-semibold text-gray-900 dark:text-white truncate">{{ getChassisOptionDetail(chassis) }}</p>
-                                                <p v-if="chassis.name" class="text-xs text-gray-500 truncate">{{ chassis.name }}</p>
-                                            </div>
-                                            <span v-if="addedChassis.some(c => c.chassis_id === chassis.id)" class="ml-auto text-xs text-teal-600">✓ Agregado</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="flex items-end">
-                                    <button type="button" @click="addChassis" :disabled="selectedChassisIds.length === 0"
-                                        class="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40">
-                                        + Agregar {{ selectedChassisIds.length > 0 ? `(${selectedChassisIds.length})` : '' }}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tabla Combinada -->
-                        <div v-if="addedEngines.length > 0 || addedChassis.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border mt-4">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-gray-50 dark:bg-background/50">
-                                    <tr>
-                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Tipo</th>
-                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Vehículo</th>
-                                        <th class="px-3 py-2 font-semibold text-gray-500 uppercase">Especificación</th>
-                                        <th class="w-10 px-2 py-2"></th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                                    <!-- Listado de Motores -->
-                                    <tr v-for="(eng, idx) in addedEngines" :key="'eng'+eng.engine_id" class="bg-white dark:bg-card">
-                                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">🔧 Motor</td>
-                                        <td class="px-3 py-2 text-gray-900 dark:text-white">{{ eng.make }} {{ eng.model }}</td>
-                                        <td class="px-3 py-2 font-mono text-gray-600 dark:text-gray-400">{{ eng.engine }}</td>
-                                        <td class="px-2 py-2 text-center">
-                                            <button type="button" @click="removeEngine(idx)" class="text-red-400 hover:text-red-600">✕</button>
-                                        </td>
-                                    </tr>
-                                    <!-- Listado de Chasis -->
-                                    <tr v-for="(ch, idx) in addedChassis" :key="'ch'+ch.chassis_id" class="bg-white dark:bg-card">
-                                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">🚗 Chasis</td>
-                                        <td class="px-3 py-2 text-gray-900 dark:text-white">{{ ch.make }} {{ ch.model }}</td>
-                                        <td class="px-3 py-2 font-mono text-gray-600 dark:text-gray-400">{{ ch.chassis }}</td>
-                                        <td class="px-2 py-2 text-center">
-                                            <button type="button" @click="removeChassis(idx)" class="text-red-400 hover:text-red-600">✕</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+            <!-- SECTION 5: Variantes -->
+            <div class="rounded-xl bg-white shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-indigo-500">
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">
+                                Variantes del Producto
+                                <span class="text-gray-400 font-normal text-xs">(opcional)</span>
+                                <span v-if="pendingVariants.length > 0" class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                    {{ pendingVariants.length }} pendiente{{ pendingVariants.length > 1 ? 's' : '' }}
+                                </span>
+                            </h2>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Agrega variantes adicionales con su propia marca, precios e inventario. Se guardarán junto con el producto.</p>
                         </div>
                     </div>
-
+                </div>
+                <div class="px-5 pb-5">
+                    <VariantManager
+                        :category-id="form.category_id"
+                        :sku-base="form.sku_base || undefined"
+                        :product-name="form.name"
+                        :category-formula="categoryFormula"
+                        :category-applies-itbm="categoryAppliesItbm"
+                        :category-itbm-percent="categoryItbmPercent"
+                        @draft-variants-changed="onDraftVariantsChanged"
+                    />
                 </div>
             </div>
 
-            <!-- ══ SECTION 5: Atributos ══ -->
+            <!-- SECTION 6: Atributos -->
             <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-indigo-500">
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-1">
@@ -1489,7 +961,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 </div>
             </div>
 
-            <!-- ══ SECTION 6: Upsales ══ -->
+            <!-- SECTION 7: Upsales -->
             <div class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-border dark:bg-card border-l-4 border-l-violet-500">
                 <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Upsales</h2>
 
@@ -1545,7 +1017,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                 </div>
             </div>
 
-            <!-- ══ SECTION 7: Notas ══ -->
+            <!-- SECTION 8: Notas -->
             <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-slate-400">
                 <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">Notas</h2>
                 <textarea v-model="form.description" rows="3"
@@ -1553,78 +1025,21 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                     placeholder="Notas internas del producto..."></textarea>
             </div>
 
-            <!-- ══ SECTION 8: Imagen del Producto ══ -->
-            <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border">
-                <div class="flex items-center justify-between gap-3 mb-3">
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Imagen del Producto</h2>
-                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90">
-                        Seleccionar imágenes
-                        <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden" @change="handlePendingImageSelection" />
-                    </label>
-                </div>
-
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                    Las imágenes se cargarán automáticamente al crear el producto.
-                </p>
-
-                <div v-if="pendingImages.length === 0" class="rounded-md border border-dashed border-gray-300 dark:border-border px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                    No hay imágenes seleccionadas.
-                </div>
-                <div v-else class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div v-for="item in pendingImages" :key="item.tempId" class="relative rounded-lg overflow-hidden border border-gray-200 dark:border-border bg-gray-50 dark:bg-muted">
-                        <img :src="item.previewUrl" :alt="item.file.name" class="h-28 w-full object-cover" />
-                        <button type="button" @click="removePendingImage(item.tempId)"
-                            class="absolute top-1 right-1 rounded-full bg-black/60 text-white p-1 hover:bg-black/80" title="Quitar imagen">
-                            <X class="h-3 w-3" />
-                        </button>
-                        <p class="px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 truncate" :title="item.file.name">{{ item.file.name }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ══ Variantes del Producto (Opcional) ══ -->
-            <div class="rounded-xl bg-white shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-indigo-500">
-                <div class="px-5 py-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">
-                                Variantes del Producto
-                                <span class="text-gray-400 font-normal text-xs">(opcional)</span>
-                                <span v-if="pendingVariants.length > 0" class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                    {{ pendingVariants.length }} pendiente{{ pendingVariants.length > 1 ? 's' : '' }}
-                                </span>
-                            </h2>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Agrega variantes adicionales con su propia marca, precios e inventario. Se guardarán junto con el producto.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="px-5 pb-5">
-                    <VariantManager
-                        :category-id="form.category_id"
-                        :sku-base="form.sku_base || undefined"
-                        :product-name="form.name"
-                        :category-formula="categoryFormula"
-                        :category-applies-itbm="categoryAppliesItbm"
-                        :category-itbm-percent="categoryItbmPercent"
-                        @draft-variants-changed="onDraftVariantsChanged"
-                    />
-                </div>
-            </div>
+            <!-- SECTION 9: Imagen del Producto -->
+            <ProductImagesSection
+                mode="pending"
+                v-model="pendingImages"
+            />
 
         </form>
     </div>
 
-    <!-- Inline Creation Modal -->
+    <!-- Inline Creation Modal (Category & Brand only — vehicle modals use VehicleInlineModals) -->
     <Dialog :open="inlineModal !== null" @update:open="v => { if (!v) closeInline() }">
         <DialogContent class="sm:max-w-sm">
             <DialogHeader>
                 <DialogTitle>
-                    {{ inlineModal === 'category' ? 'Nueva Categoría' :
-                       inlineModal === 'brand' ? 'Nueva Marca de Artículo' :
-                       inlineModal === 'vehicleMake' ? 'Nueva Marca Vehicular' :
-                       inlineModal === 'vehicleModel' ? 'Nuevo Modelo' :
-                       inlineModal === 'vehicleEngine' ? 'Nuevo Motor' :
-                              inlineModal === 'vehicleChassis' ? 'Nuevo VIN/Chasis' : '' }}
+                    {{ inlineModal === 'category' ? 'Nueva Categoría' : inlineModal === 'brand' ? 'Nueva Marca de Artículo' : '' }}
                 </DialogTitle>
             </DialogHeader>
             <form @submit.prevent="submitInline" class="space-y-4 py-2">
@@ -1651,75 +1066,6 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         <Input v-model="inlineForm.name" required placeholder="Ej: KYB, Bosch, Monroe" />
                     </div>
                 </template>
-                <template v-if="inlineModal === 'vehicleMake'">
-                    <div class="space-y-2">
-                        <Label>Nombre de la Marca <span class="text-red-500">*</span></Label>
-                        <Input v-model="inlineForm.name" required placeholder="Ej: Toyota, Honda, Ford" />
-                    </div>
-                </template>
-                <template v-if="inlineModal === 'vehicleModel'">
-                    <div class="space-y-2">
-                        <Label>Nombre del Modelo <span class="text-red-500">*</span></Label>
-                        <Input v-model="inlineForm.name" required placeholder="Ej: Corolla, Civic" />
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <Label>Año Desde</Label>
-                            <Input v-model.number="inlineForm.year_from" type="number" placeholder="2005" />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Año Hasta</Label>
-                            <Input v-model.number="inlineForm.year_to" type="number" placeholder="2024" />
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between">
-                            <Label>Chasis (Opcional)</Label>
-                            <button
-                                type="button"
-                                @click="openModelChassisQuickCreate"
-                                class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
-                                title="Crear nuevo chasis"
-                            >
-                                <Plus class="h-3 w-3" />
-                                Crear
-                            </button>
-                        </div>
-                        <SearchableSelect
-                            :options="vehicleChassisCatalogOptions"
-                            :model-value="selectedModelGenerationChassisId"
-                            @update:model-value="v => selectedModelGenerationChassisId = v as number | null"
-                            :loading="loadingVehicleChassisCatalog"
-                            placeholder="-- Selecciona chasis --"
-                            search-placeholder="Buscar chasis..."
-                            :clearable="true"
-                        />
-                    </div>
-                </template>
-                <template v-if="inlineModal === 'vehicleEngine'">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <Label>Motor <span class="text-red-500">*</span></Label>
-                            <Input v-model="inlineForm.engine_code" required placeholder="Ej: 2AZ-FE" />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Desplazamiento</Label>
-                            <Input v-model="inlineForm.displacement" placeholder="Ej: 2.4L" />
-                        </div>
-                    </div>
-                </template>
-                <template v-if="inlineModal === 'vehicleChassis'">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <Label>VIN / Código de Chasis <span class="text-red-500">*</span></Label>
-                            <Input v-model="inlineForm.code" required placeholder="Ej: P90 o JTDBR32E..." />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Descripción Adicional</Label>
-                            <Input v-model="inlineForm.name" placeholder="Ej: Serie P90 o generación" />
-                        </div>
-                    </div>
-                </template>
 
                 <div v-if="inlineError" class="text-sm text-red-600">{{ inlineError }}</div>
                 <div class="flex justify-end gap-2">
@@ -1729,6 +1075,19 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
             </form>
         </DialogContent>
     </Dialog>
+
+    <!-- Vehicle Inline Modals -->
+    <VehicleInlineModals
+        ref="vehicleModalsRef"
+        :current-modal="vehicleModalType"
+        :selected-make-id="vehicleCompatRef?.selectedMakeId ?? null"
+        :selected-model-id="vehicleCompatRef?.selectedModelId ?? null"
+        @close="closeVehicleInline"
+        @make-created="onMakeCreated"
+        @model-created="onModelCreated"
+        @engine-created="onEngineCreated"
+        @chassis-created="onChassisCreated"
+    />
 
     </AppLayout>
 </template>

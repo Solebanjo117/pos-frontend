@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { Plus, Trash2 } from 'lucide-vue-next'
+import { Trash2 } from 'lucide-vue-next'
 import apiClient from '@/services/api/client'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 
@@ -108,85 +108,69 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="space-y-6">
+    <div class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-border dark:bg-card">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Códigos alternos</h2>
+
         <!-- Add Form -->
-        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-card">
-            <h3 class="mb-4 text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                <Plus class="h-4 w-4" />
-                Códigos alternos
-            </h3>
-            
-            <div class="grid gap-4 sm:grid-cols-12 items-end">
-                <div class="sm:col-span-4">
-                    <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Código <span class="text-red-500">*</span></label>
-                    <input 
-                        v-model="newCode"
-                        type="text" 
-                        placeholder="Ej. 123-456-ABC"
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white sm:text-sm"
-                        @keyup.enter="addReference"
-                    >
-                </div>
-                <div class="sm:col-span-5">
-                    <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Marca</label>
-                    <SearchableSelect
-                        :options="brandSearchOptions"
-                        :model-value="newManufacturer"
-                        @update:model-value="value => newManufacturer = (value as string | null)"
-                        :loading="loadingBrands"
-                        placeholder="Sin marca"
-                        search-placeholder="Buscar marca..."
-                        :clearable="true"
-                    />
-                </div>
-                <div class="sm:col-span-3">
-                    <button
-                        @click="addReference"
-                        :disabled="!newCode || adding"
-                        class="flex w-full items-center justify-center rounded-md bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 dark:hover:bg-primary/90 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                        <span v-if="adding">...</span>
-                        <span v-else>Agregar</span>
-                    </button>
-                </div>
+        <div class="grid gap-3 sm:grid-cols-12 items-end">
+            <div class="sm:col-span-5">
+                <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Código <span class="text-red-500">*</span></label>
+                <input
+                    v-model="newCode"
+                    type="text"
+                    placeholder="Ej: 123-456-ABC"
+                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
+                    @keyup.enter="addReference"
+                >
             </div>
-            <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
+            <div class="sm:col-span-4">
+                <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Marca</label>
+                <SearchableSelect
+                    :options="brandSearchOptions"
+                    :model-value="newManufacturer"
+                    @update:model-value="value => newManufacturer = (value as string | null)"
+                    :loading="loadingBrands"
+                    placeholder="Sin marca"
+                    search-placeholder="Buscar marca..."
+                    :clearable="true"
+                />
+            </div>
+            <div class="sm:col-span-3">
+                <button
+                    @click="addReference"
+                    :disabled="!newCode || adding"
+                    class="w-full rounded-md bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-40"
+                >
+                    {{ adding ? '...' : 'Agregar' }}
+                </button>
+            </div>
         </div>
+        <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
         <!-- List -->
-        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-background">
-            <div class="border-b border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
-                <h3 class="text-base font-semibold text-gray-900 dark:text-white">Códigos alternos vinculados</h3>
-            </div>
-            
-            <div v-if="loading && references.length === 0" class="p-8 text-center text-gray-500">
+        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background">
+            <div v-if="loading && references.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
                 Cargando referencias...
             </div>
 
-            <div v-else-if="references.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
-                No hay códigos alternos vinculados todavía.
+            <div v-else-if="references.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                No hay códigos alternos vinculados.
             </div>
 
-            <table v-else class="min-w-full divide-y divide-gray-200 dark:divide-border">
+            <table v-else class="w-full text-left text-sm">
                 <thead class="bg-gray-50 dark:bg-card">
                     <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Código</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Marca</th>
-                        <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
+                        <th class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Código</th>
+                        <th class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Marca</th>
+                        <th class="w-12 px-4 py-2"></th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-background">
+                <tbody class="divide-y divide-gray-100 dark:divide-border/50">
                     <tr v-for="ref in references" :key="ref.id">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
-                            {{ ref.oem_code }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                            {{ ref.manufacturer || '-' }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button @click="removeReference(ref.id)" class="text-red-600 hover:text-red-900 transition" title="Eliminar referencia">
-                                <Trash2 class="h-4 w-4" />
-                            </button>
+                        <td class="px-4 py-2 font-mono text-gray-900 dark:text-white">{{ ref.oem_code }}</td>
+                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ ref.manufacturer || '-' }}</td>
+                        <td class="px-4 py-2 text-right">
+                            <button @click="removeReference(ref.id)" class="text-red-500 hover:text-red-700 text-xs font-semibold" title="Eliminar referencia">Eliminar</button>
                         </td>
                     </tr>
                 </tbody>

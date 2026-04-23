@@ -734,6 +734,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                     <td :style="getColumnStyle('attributes')" class="px-6 py-4">
                                         <div v-if="collectTechnicalSpecs(product).length" class="flex flex-wrap gap-1">
                                             <span v-for="attr in collectTechnicalSpecs(product).slice(0, 4)" :key="attr.name + attr.value"
+                                                :title="`${attr.name}: ${attr.value}${attr.unit ? ' ' + attr.unit : ''}`"
                                                 class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
                                                 {{ attr.value }}<span v-if="attr.unit" class="ml-0.5 text-green-600 dark:text-green-400">{{ attr.unit }}</span>
                                             </span>

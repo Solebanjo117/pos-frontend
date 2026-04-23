@@ -85,6 +85,16 @@ export const productsApi = {
     },
 
     /**
+     * Regenerate auto-generated product name from category + vehicle compatibility
+     */
+    async regenerateName(id: number): Promise<ApiResponse<Product>> {
+        const response = await apiClient.post<ApiResponse<Product>>(
+            `/products/${id}/regenerate-name`,
+        )
+        return response.data
+    },
+
+    /**
      * Delete product (soft delete / archive)
      */
     async deleteProduct(id: number): Promise<ApiResponse<void>> {

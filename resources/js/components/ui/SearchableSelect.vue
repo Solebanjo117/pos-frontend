@@ -45,9 +45,19 @@ const instanceUid = getCurrentInstance()?.uid ?? 0
 const dropdownId = `searchable-select-listbox-${instanceUid}`
 const searchInputId = `searchable-select-search-${instanceUid}`
 
+// Detect if this component is inside a Radix Dialog (focus trap)
+const insideDialog = ref(false)
+onMounted(() => {
+    insideDialog.value = !!containerRef.value?.closest('[role="dialog"]')
+})
+
 const { bottom, left, width, update: updateBounds } = useElementBounding(containerRef)
 
 const dropdownStyle = computed(() => {
+    if (insideDialog.value) {
+        // When inside a dialog, don't teleport — use absolute positioning
+        return { width: `${width.value}px` }
+    }
     return {
         top: `${bottom.value + 4}px`,
         left: `${left.value}px`,
@@ -197,7 +207,7 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
         </svg>
 
         <!-- Dropdown -->
-        <Teleport to="body">
+        <Teleport to="body" :disabled="insideDialog">
             <Transition
                 enter-active-class="transition duration-100 ease-out"
                 enter-from-class="opacity-0 scale-95"
@@ -214,7 +224,10 @@ watch(searchQuery, () => { highlightedIndex.value = 0 })
                     :style="dropdownStyle"
                     @pointerdown.stop
                     @mousedown.stop
-                    class="fixed z-[9999] pointer-events-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden"
+                    :class="insideDialog
+                        ? 'absolute left-0 top-full mt-1 z-[9999] rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden'
+                        : 'fixed z-[9999] pointer-events-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden'
+                    "
                 >
                 <!-- Search input -->
                 <div class="p-2 border-b border-gray-100 dark:border-border">

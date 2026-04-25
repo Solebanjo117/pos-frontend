@@ -4,30 +4,21 @@ import apiClient from '@/services/api/client'
 export interface ProductAttribute {
     id: number
     product_id: number
-    variant_id?: number | null
     name: string
     value: string
     unit?: string | null
 }
 
-export function useProductAttributes(productId: number, initialVariantId?: number | null) {
+export function useProductAttributes(productId: number) {
     const attributes = ref<ProductAttribute[]>([])
     const loading = ref(false)
     const error = ref<string | null>(null)
-    const currentVariantId = ref<number | null>(initialVariantId ?? null)
-
-    const setVariantId = (variantId: number | null | undefined) => {
-        currentVariantId.value = variantId ?? null
-    }
-
-    // Fetch attributes — scoped to product-level OR variant-level
+    // Fetch product-level attributes.
     const fetchAttributes = async () => {
         loading.value = true
         error.value = null
         try {
-            const params: Record<string, any> = {}
-            if (currentVariantId.value) params.variant_id = currentVariantId.value
-            const response = await apiClient.get(`/products/${productId}/attributes`, { params })
+            const response = await apiClient.get(`/products/${productId}/attributes`)
             attributes.value = response.data.data
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Error loading attributes'
@@ -36,13 +27,12 @@ export function useProductAttributes(productId: number, initialVariantId?: numbe
         }
     }
 
-    // Add a new attribute, optionally scoped to a variant
+    // Add a new product-level attribute.
     const addAttribute = async (name: string, value: string, unit?: string) => {
         loading.value = true
         error.value = null
         try {
             const payload: Record<string, any> = { product_id: productId, name, value, unit }
-            if (currentVariantId.value) payload.variant_id = currentVariantId.value
             const response = await apiClient.post('/product-attributes', payload)
 
             attributes.value.push(response.data.data)
@@ -94,6 +84,5 @@ export function useProductAttributes(productId: number, initialVariantId?: numbe
         addAttribute,
         updateAttribute,
         removeAttribute,
-        setVariantId,
     }
 }

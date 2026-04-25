@@ -1,18 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { Trash2, Lock } from 'lucide-vue-next'
+import { ref, onMounted } from 'vue'
+import { Trash2 } from 'lucide-vue-next'
 import { useProductAttributes, type ProductAttribute } from '@/composables/useProductAttributes'
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
     productId: number
-    variantId?: number | null
-    showVariantContext?: boolean
-}>(), {
-    variantId: null,
-    showVariantContext: true,
-})
-
-const scopedVariantId = computed(() => props.variantId ?? null)
+}>()
 
 const {
     attributes,
@@ -22,13 +15,7 @@ const {
     addAttribute,
     updateAttribute,
     removeAttribute,
-    setVariantId,
-} = useProductAttributes(props.productId, scopedVariantId.value)
-
-const {
-    attributes: productAttrs,
-    fetchAttributes: fetchProductAttrs
-} = useProductAttributes(props.productId, null)
+} = useProductAttributes(props.productId)
 
 const adding = ref(false)
 const newName = ref('')
@@ -36,20 +23,8 @@ const newValue = ref('')
 const actionError = ref('')
 const savingIds = ref<Set<number>>(new Set())
 
-watch(scopedVariantId, async (newVariantId) => {
-    setVariantId(newVariantId)
-    await fetchAttributes()
-    if (newVariantId) {
-        await fetchProductAttrs()
-    }
-})
-
 onMounted(async () => {
-    setVariantId(scopedVariantId.value)
     await fetchAttributes()
-    if (scopedVariantId.value) {
-        await fetchProductAttrs()
-    }
 })
 
 defineExpose({ refresh: fetchAttributes })
@@ -102,12 +77,6 @@ const flushAndSave = (attr: ProductAttribute, field: 'name' | 'value', newVal: s
 
 <template>
     <div class="space-y-4">
-        <!-- Variant context banner -->
-        <div v-if="scopedVariantId && showVariantContext" class="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2.5 text-sm text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            Editando especificaciones <strong>propias de esta variante</strong>. Los valores aquí <span class="font-semibold">sobreescriben</span> los del producto base al mostrar el detalle.
-        </div>
-
         <!-- Add Attribute Bar -->
         <div class="grid gap-3 sm:grid-cols-12 items-end">
             <div class="sm:col-span-5">
@@ -138,7 +107,7 @@ const flushAndSave = (attr: ProductAttribute, field: 'name' | 'value', newVal: s
             </div>
 
             <div v-else-if="attributes.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                {{ scopedVariantId ? 'Sin especificaciones propias. Las del producto base aplican por defecto.' : 'No hay especificaciones definidas.' }}
+                No hay especificaciones definidas.
             </div>
 
             <table v-else class="w-full text-left text-sm">
@@ -177,22 +146,6 @@ const flushAndSave = (attr: ProductAttribute, field: 'name' | 'value', newVal: s
                                 <Trash2 class="h-4 w-4" />
                             </button>
                         </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Product-level specs (read-only reference) — visible only when editing a variant -->
-        <div v-if="scopedVariantId && productAttrs.length > 0" class="overflow-hidden rounded-lg border border-gray-200 dark:border-border">
-            <div class="border-b border-gray-200 bg-gray-50 px-4 py-2 dark:border-border dark:bg-card flex items-center gap-2">
-                <Lock class="h-3.5 w-3.5 text-gray-400" />
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Especificaciones del producto base (solo referencia)</span>
-            </div>
-            <table class="w-full text-left text-sm">
-                <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                    <tr v-for="attr in productAttrs" :key="attr.id" class="opacity-60">
-                        <td class="px-4 py-2 font-medium text-gray-700 dark:text-gray-300 w-1/3">{{ attr.name }}</td>
-                        <td class="px-4 py-2 text-gray-500 dark:text-gray-400">{{ attr.value }}</td>
                     </tr>
                 </tbody>
             </table>

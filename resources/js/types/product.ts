@@ -186,7 +186,6 @@ export interface ProductVariant {
     created_at: string
     updated_at: string
     inventory?: VariantInventory[]
-    attributes?: ProductAttribute[]   // Variant-specific spec overrides
 }
 
 export interface ProductVin {

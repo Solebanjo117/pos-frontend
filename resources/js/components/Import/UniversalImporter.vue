@@ -216,7 +216,7 @@ const runImport = async () => {
     error.value = null
     importRunning.value = true
     try {
-        const rows = editedRows.value.map(row => {
+        const rows = editedRows.value.filter(row => row.__valid).map(row => {
             const clean: any = { __row: row.__row }
             props.config.columns.forEach(col => {
                 if (col.actionType) return // skip action columns

@@ -367,18 +367,7 @@ const collectTechnicalSpecs = (product: any): Array<{ name: string; value: strin
     }
 
     if (Array.isArray(product?.attributes) && product.attributes.length > 0) {
-        attributeCandidates.push(
-            ...product.attributes.filter((attr: any) => attr && (attr.variant_id === null || attr.variant_id === undefined))
-        )
-    }
-
-    if (attributeCandidates.length === 0) {
-        const variants = getVariants(product)
-        variants.forEach((v: any) => {
-            if (Array.isArray(v?.attributes)) {
-                attributeCandidates.push(...v.attributes)
-            }
-        })
+        attributeCandidates.push(...product.attributes.filter((attr: any) => attr))
     }
 
     const seenNames = new Set<string>()

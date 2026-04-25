@@ -24,7 +24,7 @@ const toggleIncludeITBM = () => {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ProductImage   { id: number; url: string; original_filename: string; display_order: number }
-interface ProductAttribute { id: number; name: string; value: string; unit?: string | null; variant_id?: number | null }
+interface ProductAttribute { id: number; name: string; value: string; unit?: string | null }
 interface OemReference   { id?: number; oem_code: string; manufacturer: string }
 interface AlternativeRecord { id: number; sku: string; name: string; relationship_type: string; pivot?: { relationship_type?: string; source?: string; shared_codes?: string } }
 interface VehicleRow     { id: number; make: string; model: string; year_from?: number; year_to?: number; engine: string; displacement?: string; chassis?: { id: number; code: string; name: string; full_description: string } | null; all_engines?: boolean; all_chassis?: boolean; notes?: string }
@@ -179,47 +179,12 @@ const handleDeleteImage = async (imageId: number) => {
     } catch (e) { console.error(e) }
 }
 
-// ── Specs (variant-aware) ─────────────────────────────────────────────────────
+// ── Specs (product-level) ────────────────────────────────────────────────────
 const attributesData      = ref<ProductAttribute[]>([])
 const loadingAttrs        = ref(false)
-const variantAttrsCache   = ref<Map<number, ProductAttribute[]>>(new Map())
-const loadingVariantAttrs = ref(false)
-
-const fetchVariantAttrs = async (variantId: number) => {
-    const productId = props.product.id
-    if (variantAttrsCache.value.has(variantId)) return
-    loadingVariantAttrs.value = true
-    try {
-        const res = await apiClient.get(`/products/${productId}/attributes`, { params: { variant_id: variantId } })
-        if (productId !== props.product.id) return
-        variantAttrsCache.value.set(variantId, res.data.data ?? [])
-        variantAttrsCache.value = new Map(variantAttrsCache.value)
-    } catch (e) { console.error(e) }
-    finally { loadingVariantAttrs.value = false }
-}
-
-watch(activeVariantId, (id) => { if (id !== null) fetchVariantAttrs(id) }, { immediate: true })
 
 const mergedSpecs = computed(() => {
-    const productLevel = attributesData.value.filter((a: any) => !a.variant_id)
-    if (!activeVariantId.value) return productLevel.map((a: any) => ({ ...a, isInherited: true }))
-    const variantLevel: ProductAttribute[] = variantAttrsCache.value.get(activeVariantId.value) ?? []
-    const map = new Map<string, any>()
-    productLevel.forEach(a => map.set(a.name, { ...a, isInherited: true }))
-    variantLevel.forEach(a => map.set(a.name, { ...a, isInherited: false }))
-
-    // Fallback: if neither productLevel nor this variant's own attrs exist,
-    // inherit from any other variant that has attributes (Henry: specs are "product-level")
-    if (map.size === 0) {
-        const fallbackVariant = variants.value.find(
-            (v: any) => v.id !== activeVariantId.value && v.attributes && v.attributes.length > 0
-        )
-        if (fallbackVariant) {
-            fallbackVariant.attributes?.forEach((a: any) => map.set(a.name, { ...a, isInherited: true }))
-        }
-    }
-
-    return Array.from(map.values())
+    return attributesData.value
 })
 
 // ── Vehicle Compatibility (via VINs) ──────────────────────────────────────────
@@ -294,7 +259,6 @@ const resetModalStateForProduct = () => {
     productImages.value = []
     currentImageIdx.value = 0
     attributesData.value = []
-    variantAttrsCache.value = new Map()
     vehicleRows.value = []
     oemData.value = []
     alternativesData.value = []
@@ -478,7 +442,6 @@ const handleViewAlternative = async (altId: number) => {
                             <div v-if="!blindMode">
                                 <h6 class="font-bold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-border pb-2 mb-3">
                                     Especificaciones Técnicas
-                                    <span v-if="loadingVariantAttrs" class="text-xs font-normal text-gray-400 animate-pulse ml-2">cargando...</span>
                                 </h6>
                                 <div v-if="loadingAttrs" class="text-sm text-gray-400 animate-pulse py-2">Cargando especificaciones...</div>
                                 <div v-else-if="mergedSpecs.length === 0" class="text-sm text-gray-400 italic py-2">Sin especificaciones registradas.</div>

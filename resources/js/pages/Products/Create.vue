@@ -113,13 +113,13 @@ type DraftProductAttribute = {
     fromCategory?: boolean
 }
 
-const variantAttributes = ref<DraftProductAttribute[]>([])
+const productAttributes = ref<DraftProductAttribute[]>([])
 
 const attributeNameKey = (name: string) => name.trim().toLowerCase()
 
 const mergeCategoryDefaultAttributes = (defaults: any[]) => {
     const existingByName = new Map<string, DraftProductAttribute>()
-    variantAttributes.value.forEach(attr => {
+    productAttributes.value.forEach(attr => {
         const key = attributeNameKey(attr.name)
         if (key) existingByName.set(key, attr)
     })
@@ -143,21 +143,21 @@ const mergeCategoryDefaultAttributes = (defaults: any[]) => {
         .filter(Boolean) as DraftProductAttribute[]
 
     const defaultKeys = new Set(normalizedDefaults.map(attr => attributeNameKey(attr.name)))
-    const customAttributes = variantAttributes.value
+    const customAttributes = productAttributes.value
         .filter(attr => !defaultKeys.has(attributeNameKey(attr.name)))
         .map(attr => ({ ...attr, fromCategory: false }))
 
-    variantAttributes.value = [...normalizedDefaults, ...customAttributes]
+    productAttributes.value = [...normalizedDefaults, ...customAttributes]
 }
 
 const keepOnlyCustomAttributes = () => {
-    variantAttributes.value = variantAttributes.value
+    productAttributes.value = productAttributes.value
         .filter(attr => !attr.fromCategory)
         .map(attr => ({ ...attr, fromCategory: false }))
 }
 
 const addCustomAttribute = () => {
-    variantAttributes.value.push({
+    productAttributes.value.push({
         name: '',
         value: '',
         unit: '',
@@ -166,8 +166,8 @@ const addCustomAttribute = () => {
     })
 }
 
-const removeVariantAttribute = (index: number) => {
-    variantAttributes.value.splice(index, 1)
+const removeProductAttribute = (index: number) => {
+    productAttributes.value.splice(index, 1)
 }
 
 const categoryFormula = ref<string | null>(null)
@@ -596,7 +596,7 @@ const handleSubmit = async () => {
                 cost_tax_rate: normalizedCostTaxRate,
             },
             sku: form.value.sku || form.value.sku_base || '',
-            attributes: variantAttributes.value
+            attributes: productAttributes.value
                 .map(a => ({
                     name: a.name.trim(),
                     value: a.value.trim(),
@@ -916,11 +916,11 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         <Plus class="h-3.5 w-3.5" /> Agregar atributo
                     </button>
                 </div>
-                <div v-if="variantAttributes.length === 0" class="rounded-md border border-dashed border-gray-300 dark:border-border px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                <div v-if="productAttributes.length === 0" class="rounded-md border border-dashed border-gray-300 dark:border-border px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                     Puedes agregar atributos manualmente o seleccionar una categoría con atributos por defecto.
                 </div>
                 <div v-else class="space-y-3">
-                    <div v-for="(attr, index) in variantAttributes" :key="index" class="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end">
+                    <div v-for="(attr, index) in productAttributes" :key="index" class="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end">
                         <div class="sm:col-span-5">
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400">
                                 Nombre del atributo
@@ -950,7 +950,7 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                         <div class="sm:col-span-1">
                             <button
                                 type="button"
-                                @click="removeVariantAttribute(index)"
+                                @click="removeProductAttribute(index)"
                                 class="w-full rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
                                 title="Quitar atributo"
                             >

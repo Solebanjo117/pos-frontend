@@ -1,10 +1,19 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { Trash2 } from 'lucide-vue-next'
 import { useProductAttributes, type ProductAttribute } from '@/composables/useProductAttributes'
 
-const props = defineProps<{
-    productId: number
+const props = withDefaults(defineProps<{
+    productId?: number
+    mode?: 'live' | 'draft'
+    modelValue?: ProductAttribute[]
+}>(), {
+    mode: 'live',
+    modelValue: () => [],
+})
+
+const emit = defineEmits<{
+    'update:modelValue': [value: ProductAttribute[]]
 }>()
 
 const {
@@ -15,25 +24,57 @@ const {
     addAttribute,
     updateAttribute,
     removeAttribute,
-} = useProductAttributes(props.productId)
+} = useProductAttributes(props.productId ?? 0)
 
 const adding = ref(false)
 const newName = ref('')
 const newValue = ref('')
 const actionError = ref('')
 const savingIds = ref<Set<number>>(new Set())
+const nextDraftId = ref(-1)
+
+const isDraftMode = computed(() => props.mode === 'draft')
+const displayedAttributes = computed(() => isDraftMode.value ? props.modelValue : attributes.value)
+
+const emitDraftAttributes = (value: ProductAttribute[]) => {
+    emit('update:modelValue', value)
+}
 
 onMounted(async () => {
-    await fetchAttributes()
+    if (!isDraftMode.value && props.productId) {
+        await fetchAttributes()
+    }
 })
 
-defineExpose({ refresh: fetchAttributes })
+defineExpose({
+    refresh: async () => {
+        if (!isDraftMode.value && props.productId) {
+            await fetchAttributes()
+        }
+    },
+})
 
 const handleAdd = async () => {
     if (!newName.value.trim() || !newValue.value.trim()) return
     adding.value = true
     actionError.value = ''
     try {
+        if (isDraftMode.value) {
+            emitDraftAttributes([
+                ...displayedAttributes.value,
+                {
+                    id: nextDraftId.value--,
+                    product_id: props.productId ?? 0,
+                    name: newName.value.trim(),
+                    value: newValue.value.trim(),
+                    unit: null,
+                },
+            ])
+            newName.value = ''
+            newValue.value = ''
+            return
+        }
+
         await addAttribute(newName.value.trim(), newValue.value.trim())
         newName.value = ''
         newValue.value = ''
@@ -47,15 +88,32 @@ const handleAdd = async () => {
 let debounceTimers: Record<number, ReturnType<typeof setTimeout>> = {}
 
 const debouncedSave = (attr: ProductAttribute, field: 'name' | 'value', newVal: string) => {
+    if (isDraftMode.value) {
+        updateDraftField(attr, field, newVal)
+        return
+    }
+
     if (debounceTimers[attr.id]) clearTimeout(debounceTimers[attr.id])
     debounceTimers[attr.id] = setTimeout(() => {
         saveField(attr, field, newVal)
     }, 600)
 }
 
+const updateDraftField = (attr: ProductAttribute, field: 'name' | 'value', newVal: string) => {
+    emitDraftAttributes(displayedAttributes.value.map(item => (
+        item.id === attr.id ? { ...item, [field]: newVal } : item
+    )))
+}
+
 const saveField = async (attr: ProductAttribute, field: 'name' | 'value', newVal: string) => {
     const trimmed = newVal.trim()
     if (!trimmed) return
+
+    if (isDraftMode.value) {
+        updateDraftField(attr, field, trimmed)
+        return
+    }
+
     if (attr[field] === trimmed) return
 
     savingIds.value.add(attr.id)
@@ -72,6 +130,15 @@ const saveField = async (attr: ProductAttribute, field: 'name' | 'value', newVal
 const flushAndSave = (attr: ProductAttribute, field: 'name' | 'value', newVal: string) => {
     if (debounceTimers[attr.id]) clearTimeout(debounceTimers[attr.id])
     saveField(attr, field, newVal)
+}
+
+const handleRemoveAttribute = async (attributeId: number) => {
+    if (isDraftMode.value) {
+        emitDraftAttributes(displayedAttributes.value.filter(attribute => attribute.id !== attributeId))
+        return
+    }
+
+    await removeAttribute(attributeId)
 }
 </script>
 
@@ -102,11 +169,11 @@ const flushAndSave = (attr: ProductAttribute, field: 'name' | 'value', newVal: s
 
         <!-- Inline-editable specs table -->
         <div class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background">
-            <div v-if="loading && attributes.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+            <div v-if="loading && displayedAttributes.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
                 Cargando especificaciones...
             </div>
 
-            <div v-else-if="attributes.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <div v-else-if="displayedAttributes.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                 No hay especificaciones definidas.
             </div>
 
@@ -119,7 +186,7 @@ const flushAndSave = (attr: ProductAttribute, field: 'name' | 'value', newVal: s
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                    <tr v-for="attr in attributes" :key="attr.id" class="group">
+                    <tr v-for="attr in displayedAttributes" :key="attr.id" class="group">
                         <td class="px-4 py-1.5">
                             <input
                                 :value="attr.name"
@@ -142,7 +209,7 @@ const flushAndSave = (attr: ProductAttribute, field: 'name' | 'value', newVal: s
                             </div>
                         </td>
                         <td class="px-2 py-1.5 text-right">
-                            <button @click="removeAttribute(attr.id)" class="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity" title="Eliminar">
+                            <button @click="handleRemoveAttribute(attr.id)" class="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity" title="Eliminar">
                                 <Trash2 class="h-4 w-4" />
                             </button>
                         </td>

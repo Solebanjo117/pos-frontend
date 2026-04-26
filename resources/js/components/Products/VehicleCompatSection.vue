@@ -60,11 +60,13 @@ interface CompatibleChassis {
     model?: { id: number; name: string; year_from?: number; year_to?: number; make?: { id: number; name: string }; generation?: string }
 }
 
-const props = defineProps<{
-    mode: 'draft' | 'live'
+const props = withDefaults(defineProps<{
+    mode?: 'draft' | 'live'
     productId?: number
     modelValue?: DraftCompatData
-}>()
+}>(), {
+    mode: 'live',
+})
 
 const emit = defineEmits<{
     'update:modelValue': [value: DraftCompatData]

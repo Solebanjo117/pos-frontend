@@ -87,9 +87,27 @@ export const productsApi = {
     /**
      * Regenerate auto-generated product name from category + vehicle compatibility
      */
-    async regenerateName(id: number): Promise<ApiResponse<Product>> {
+    async regenerateName(
+        id: number,
+        data?: Pick<UpdateProductRequest, 'category_id' | 'extra_category_ids' | 'vehicle_compatibility'>,
+    ): Promise<ApiResponse<Product>> {
         const response = await apiClient.post<ApiResponse<Product>>(
             `/products/${id}/regenerate-name`,
+            data ?? {},
+        )
+        return response.data
+    },
+
+    /**
+     * Preview generated product name without persisting changes
+     */
+    async previewName(
+        id: number,
+        data: Pick<UpdateProductRequest, 'category_id' | 'extra_category_ids' | 'vehicle_compatibility'>,
+    ): Promise<ApiResponse<{ name: string }>> {
+        const response = await apiClient.post<ApiResponse<{ name: string }>>(
+            `/products/${id}/preview-name`,
+            data,
         )
         return response.data
     },

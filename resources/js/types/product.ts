@@ -36,10 +36,12 @@ export interface AttributeDefinition {
 }
 
 export interface ProductAttribute {
+    id?: number
+    product_id?: number
     name: string
     value: number | string
     unit?: string
-    data_type: string
+    data_type?: string
 }
 
 export interface Supplier {
@@ -110,15 +112,27 @@ export interface ProductMedia {
 }
 
 export interface OemReference {
+    id?: number
     oem_code: string
-    manufacturer: string
+    manufacturer: string | null
 }
 
 export interface VehicleCompatibility {
-    make: string
-    model: string
-    year_range: string
-    engine: string
+    id?: number
+    engine_id?: number | null
+    chassis_id?: number | null
+    make?: string | null
+    model?: string | null
+    year_range?: string | null
+    engine?: string | null
+    chassis?: {
+        id: number
+        code: string
+        name?: string | null
+        full_description?: string | null
+    } | null
+    all_engines?: boolean
+    all_chassis?: boolean
     notes?: string
 }
 
@@ -149,6 +163,11 @@ export interface Product {
         name: string
         name_en?: string
     }
+    extra_category_ids?: number[]
+    extra_categories?: Array<{
+        id: number
+        name: string
+    }>
     pricing?: ProductPricing
     // Variant information
     default_variant?: ProductVariant
@@ -219,7 +238,8 @@ export interface CreateProductRequest {
     name: string
     description?: string
     product_line_id?: number
-    category_id?: number
+    category_id?: number | null
+    extra_category_ids?: number[]
     engine_id?: number // R21: motor as reusable entity
     status?: 'active' | 'discontinued' | 'pending'
     batch_tracking?: boolean
@@ -261,7 +281,8 @@ export interface UpdateProductRequest {
     alternate_code?: string      // alternate identifier
     pricing_formula?: string     // Excel-like pricing formula
     product_line_id?: number
-    category_id?: number
+    category_id?: number | null
+    extra_category_ids?: number[]
     engine_id?: number // R21: motor as reusable entity
     name?: string
     description?: string
@@ -285,6 +306,22 @@ export interface UpdateProductRequest {
         value: number | string
         unit?: string
     }>
+    oem_references?: Array<{
+        oem_code: string
+        manufacturer?: string | null
+    }>
+    alternatives?: Array<{
+        id?: number
+        alternative_product_id?: number
+        relationship_type?: 'compatible' | 'substitute' | 'upgrade'
+    }>
+    vehicle_compatibility?: {
+        engines: Array<{ engine_id: number }>
+        chassis: Array<{ chassis_id: number }>
+        allEngines: boolean
+        allChassis: boolean
+        isUniversal: boolean
+    }
 }
 
 export interface ProductFilters {

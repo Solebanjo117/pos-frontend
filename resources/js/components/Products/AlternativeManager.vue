@@ -1,12 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Trash2 } from 'lucide-vue-next'
+import { computed, ref, onMounted } from 'vue'
 import apiClient from '@/services/api/client'
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue'
-
-const props = defineProps<{
-    productId: number
-}>()
 
 interface Alternative {
     id: number // This is the PRODUCT ID of the alternative
@@ -14,6 +9,19 @@ interface Alternative {
     name: string
     relationship_type: string
 }
+
+const props = withDefaults(defineProps<{
+    productId?: number
+    mode?: 'live' | 'draft'
+    modelValue?: Alternative[]
+}>(), {
+    mode: 'live',
+    modelValue: () => [],
+})
+
+const emit = defineEmits<{
+    'update:modelValue': [value: Alternative[]]
+}>()
 
 const alternatives = ref<Alternative[]>([])
 const loading = ref(false)
@@ -23,8 +31,16 @@ const error = ref('')
 // Form
 const selectedProduct = ref<any>(null)
 const relationshipType = ref('compatible') // compatible, substitute, upgrade
+const isDraftMode = computed(() => props.mode === 'draft')
+const displayedAlternatives = computed(() => isDraftMode.value ? props.modelValue : alternatives.value)
+
+const emitDraftAlternatives = (value: Alternative[]) => {
+    emit('update:modelValue', value)
+}
 
 const fetchAlternatives = async () => {
+    if (isDraftMode.value || !props.productId) return
+
     loading.value = true
     try {
         const res = await apiClient.get(`/products/${props.productId}/alternatives`)
@@ -48,6 +64,26 @@ const addAlternative = async () => {
     adding.value = true
     error.value = ''
     try {
+        if (isDraftMode.value) {
+            if (displayedAlternatives.value.some(alternative => alternative.id === selectedProduct.value.id)) {
+                error.value = 'Este producto ya esta agregado'
+                return
+            }
+
+            emitDraftAlternatives([
+                ...displayedAlternatives.value,
+                {
+                    id: selectedProduct.value.id,
+                    sku: selectedProduct.value.sku ?? selectedProduct.value.sku_base ?? '',
+                    name: selectedProduct.value.name,
+                    relationship_type: relationshipType.value,
+                },
+            ])
+            selectedProduct.value = null
+            relationshipType.value = 'compatible'
+            return
+        }
+
         await apiClient.post(`/products/${props.productId}/alternatives`, {
             alternative_product_id: selectedProduct.value.id,
             relationship_type: relationshipType.value
@@ -65,6 +101,11 @@ const addAlternative = async () => {
 }
 
 const removeAlternative = async (altProductId: number) => {
+    if (isDraftMode.value) {
+        emitDraftAlternatives(displayedAlternatives.value.filter(alternative => alternative.id !== altProductId))
+        return
+    }
+
     if (!confirm('¿Eliminar esta alternativa?')) return
     
     try {
@@ -94,7 +135,9 @@ const getTypeColor = (type: string) => {
 }
 
 onMounted(() => {
-    fetchAlternatives()
+    if (!isDraftMode.value) {
+        fetchAlternatives()
+    }
 })
 </script>
 
@@ -131,11 +174,11 @@ onMounted(() => {
 
         <!-- List -->
         <div class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background">
-            <div v-if="loading && alternatives.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+            <div v-if="loading && displayedAlternatives.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
                 Cargando upsales...
             </div>
 
-            <div v-else-if="alternatives.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <div v-else-if="displayedAlternatives.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                 No hay upsales pendientes por vincular.
             </div>
 
@@ -148,7 +191,7 @@ onMounted(() => {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                    <tr v-for="alt in alternatives" :key="alt.id">
+                    <tr v-for="alt in displayedAlternatives" :key="alt.id">
                         <td class="px-4 py-2 text-gray-900 dark:text-white">
                             <span class="font-mono">{{ alt.sku }}</span>
                             <span class="text-gray-500"> - {{ alt.name }}</span>

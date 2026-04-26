@@ -1,18 +1,26 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { Trash2 } from 'lucide-vue-next'
 import apiClient from '@/services/api/client'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
-
-const props = defineProps<{
-    productId: number
-}>()
 
 interface OemReference {
     id: number
     oem_code: string
     manufacturer: string | null
 }
+
+const props = withDefaults(defineProps<{
+    productId?: number
+    mode?: 'live' | 'draft'
+    modelValue?: OemReference[]
+}>(), {
+    mode: 'live',
+    modelValue: () => [],
+})
+
+const emit = defineEmits<{
+    'update:modelValue': [value: OemReference[]]
+}>()
 
 interface BrandOption {
     id: number
@@ -25,10 +33,18 @@ const adding = ref(false)
 const loadingBrands = ref(false)
 const error = ref('')
 const brands = ref<BrandOption[]>([])
+const nextDraftId = ref(-1)
 
 // Form
 const newCode = ref('')
 const newManufacturer = ref<string | null>(null)
+
+const isDraftMode = computed(() => props.mode === 'draft')
+const displayedReferences = computed(() => isDraftMode.value ? props.modelValue : references.value)
+
+const emitDraftReferences = (value: OemReference[]) => {
+    emit('update:modelValue', value)
+}
 
 const brandSearchOptions = computed(() =>
     brands.value.map(brand => ({
@@ -51,6 +67,8 @@ const fetchBrands = async () => {
 }
 
 const fetchReferences = async () => {
+    if (isDraftMode.value || !props.productId) return
+
     loading.value = true
     try {
         const res = await apiClient.get(`/products/${props.productId}/oem-references`)
@@ -68,6 +86,26 @@ const addReference = async () => {
     adding.value = true
     error.value = ''
     try {
+        if (isDraftMode.value) {
+            const code = newCode.value.trim()
+            if (displayedReferences.value.some(reference => reference.oem_code.toLowerCase() === code.toLowerCase())) {
+                error.value = 'Este codigo ya esta agregado'
+                return
+            }
+
+            emitDraftReferences([
+                ...displayedReferences.value,
+                {
+                    id: nextDraftId.value--,
+                    oem_code: code,
+                    manufacturer: newManufacturer.value || null,
+                },
+            ])
+            newCode.value = ''
+            newManufacturer.value = null
+            return
+        }
+
         await apiClient.post(`/products/${props.productId}/oem-references`, {
             oem_code: newCode.value,
             manufacturer: newManufacturer.value || null
@@ -91,6 +129,11 @@ const addReference = async () => {
 }
 
 const removeReference = async (id: number) => {
+    if (isDraftMode.value) {
+        emitDraftReferences(displayedReferences.value.filter(reference => reference.id !== id))
+        return
+    }
+
     if (!confirm('¿Eliminar esta referencia?')) return
     
     try {
@@ -102,7 +145,9 @@ const removeReference = async (id: number) => {
 }
 
 onMounted(() => {
-    fetchReferences()
+    if (!isDraftMode.value) {
+        fetchReferences()
+    }
     fetchBrands()
 })
 </script>
@@ -149,11 +194,11 @@ onMounted(() => {
 
         <!-- List -->
         <div class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background">
-            <div v-if="loading && references.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+            <div v-if="loading && displayedReferences.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
                 Cargando referencias...
             </div>
 
-            <div v-else-if="references.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <div v-else-if="displayedReferences.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                 No hay códigos alternos vinculados.
             </div>
 
@@ -166,7 +211,7 @@ onMounted(() => {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                    <tr v-for="ref in references" :key="ref.id">
+                    <tr v-for="ref in displayedReferences" :key="ref.id">
                         <td class="px-4 py-2 font-mono text-gray-900 dark:text-white">{{ ref.oem_code }}</td>
                         <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ ref.manufacturer || '-' }}</td>
                         <td class="px-4 py-2 text-right">

@@ -11,6 +11,8 @@ export interface Category {
     priority: number
     default_attributes?: Array<{
         name: string
+        value?: string
+        default_value?: string
         required?: boolean
         unit?: string
     }>

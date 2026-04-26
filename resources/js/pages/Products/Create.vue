@@ -104,6 +104,9 @@ const categories = ref<Category[]>([])
 const brands = ref<Brand[]>([])
 const loadingCategories = ref(false)
 const loadingBrands = ref(false)
+const extraCategoryIds = ref<number[]>([])
+const selectedExtraCategoryId = ref<number | null>(null)
+const categoryDetailCache = ref<Record<number, Category>>({})
 
 type DraftProductAttribute = {
     name: string
@@ -117,6 +120,37 @@ const productAttributes = ref<DraftProductAttribute[]>([])
 
 const attributeNameKey = (name: string) => name.trim().toLowerCase()
 
+const categoryNameById = (categoryId: number | undefined | null): string => {
+    if (!categoryId) return ''
+    return categories.value.find(category => category.id === categoryId)?.name ?? ''
+}
+
+const sortCategoryIdsByName = (categoryIds: number[]): number[] => {
+    return [...new Set(categoryIds)]
+        .filter(Boolean)
+        .sort((left, right) => categoryNameById(left).localeCompare(categoryNameById(right), 'es'))
+}
+
+const effectiveCategoryIdsForName = computed(() => {
+    const primaryCategoryId = (form.value as any).category_id as number | undefined
+    return sortCategoryIdsByName([
+        ...(primaryCategoryId ? [primaryCategoryId] : []),
+        ...extraCategoryIds.value,
+    ])
+})
+
+const effectiveCategoryNames = computed(() => {
+    return effectiveCategoryIdsForName.value
+        .map(categoryNameById)
+        .filter(Boolean)
+})
+
+const effectiveCategoryBaseName = computed(() => {
+    return effectiveCategoryNames.value.length > 0
+        ? effectiveCategoryNames.value.join(' ')
+        : 'Producto sin nombre'
+})
+
 const mergeCategoryDefaultAttributes = (defaults: any[]) => {
     const existingByName = new Map<string, DraftProductAttribute>()
     productAttributes.value.forEach(attr => {
@@ -124,12 +158,16 @@ const mergeCategoryDefaultAttributes = (defaults: any[]) => {
         if (key) existingByName.set(key, attr)
     })
 
+    const seenDefaultNames = new Set<string>()
     const normalizedDefaults = defaults
         .map((attr: any) => {
             const name = String(attr?.name ?? '').trim()
             if (!name) return null
 
             const key = attributeNameKey(name)
+            if (seenDefaultNames.has(key)) return null
+            seenDefaultNames.add(key)
+
             const existing = existingByName.get(key)
 
             return {
@@ -168,6 +206,71 @@ const addCustomAttribute = () => {
 
 const removeProductAttribute = (index: number) => {
     productAttributes.value.splice(index, 1)
+}
+
+const fetchCategoryDetail = async (categoryId: number): Promise<Category | null> => {
+    if (categoryDetailCache.value[categoryId]) {
+        return categoryDetailCache.value[categoryId]
+    }
+
+    const categoryFromList = categories.value.find(category => category.id === categoryId)
+    if (categoryFromList?.default_attributes || categoryFromList?.pricing_formula !== undefined) {
+        categoryDetailCache.value[categoryId] = categoryFromList
+        return categoryFromList
+    }
+
+    try {
+        const response = await apiClient.get(`/categories/${categoryId}`)
+        categoryDetailCache.value[categoryId] = response.data
+        return response.data
+    } catch {
+        return null
+    }
+}
+
+const refreshCategoryDerivedState = async () => {
+    const primaryCategoryId = (form.value as any).category_id as number | undefined
+    if (primaryCategoryId && extraCategoryIds.value.includes(primaryCategoryId)) {
+        extraCategoryIds.value = extraCategoryIds.value.filter(categoryId => categoryId !== primaryCategoryId)
+    }
+
+    const defaultsCategoryIds = [
+        ...(primaryCategoryId ? [primaryCategoryId] : []),
+        ...sortCategoryIdsByName(extraCategoryIds.value),
+    ]
+
+    const categoryDetails = (await Promise.all(defaultsCategoryIds.map(fetchCategoryDetail)))
+        .filter(Boolean) as Category[]
+
+    const mergedDefaults = categoryDetails.flatMap(category => category.default_attributes ?? [])
+    if (mergedDefaults.length > 0) {
+        mergeCategoryDefaultAttributes(mergedDefaults)
+    } else {
+        keepOnlyCustomAttributes()
+    }
+
+    const primaryCategory = primaryCategoryId ? categoryDetails.find(category => category.id === primaryCategoryId) ?? await fetchCategoryDetail(primaryCategoryId) : null
+    categoryFormula.value = primaryCategory?.pricing_formula ?? null
+    categoryAppliesItbm.value = primaryCategory?.applies_itbm ?? false
+    categoryItbmPercent.value = primaryCategory ? primaryCategory.itbm_percent ?? 7 : null
+    categoryMargin.value = primaryCategory?.default_margin_percent ?? null
+}
+
+const addExtraCategory = () => {
+    const categoryId = selectedExtraCategoryId.value
+    const primaryCategoryId = (form.value as any).category_id
+
+    if (!categoryId || categoryId === primaryCategoryId || extraCategoryIds.value.includes(categoryId)) {
+        selectedExtraCategoryId.value = null
+        return
+    }
+
+    extraCategoryIds.value = sortCategoryIdsByName([...extraCategoryIds.value, categoryId])
+    selectedExtraCategoryId.value = null
+}
+
+const removeExtraCategory = (categoryId: number) => {
+    extraCategoryIds.value = extraCategoryIds.value.filter(id => id !== categoryId)
 }
 
 const categoryFormula = ref<string | null>(null)
@@ -336,9 +439,8 @@ const buildEngineLevelLabel = (entry: { make?: string; engine?: string; model?: 
 }
 
 const namePreview = computed(() => {
-    const catId = (form.value as any).category_id
-    const categoryName = categories.value.find(c => c.id === catId)?.name || 'Producto sin nombre'
-    const engineCategory = isEngineCategory(categoryName)
+    const categoryName = effectiveCategoryBaseName.value
+    const engineCategory = effectiveCategoryNames.value.some(name => isEngineCategory(name))
 
     const addedEngines = vehicleCompat.value.engines
     const addedChassis = vehicleCompat.value.chassis
@@ -389,36 +491,8 @@ watch(namePreview, (newVal) => {
 })
 
 watch(
-    () => (form.value as any).category_id,
-    async (newCategoryId: number | undefined) => {
-        if (!newCategoryId) {
-            keepOnlyCustomAttributes()
-            categoryFormula.value = null
-            categoryAppliesItbm.value = false
-            categoryItbmPercent.value = null
-            categoryMargin.value = null
-            return
-        }
-        try {
-            const resp = await apiClient.get(`/categories/${newCategoryId}`)
-            const cat = resp.data
-            if (cat.default_attributes && Array.isArray(cat.default_attributes)) {
-                mergeCategoryDefaultAttributes(cat.default_attributes)
-            } else {
-                keepOnlyCustomAttributes()
-            }
-            categoryFormula.value = cat.pricing_formula ?? null
-            categoryAppliesItbm.value = cat.applies_itbm ?? false
-            categoryItbmPercent.value = cat.itbm_percent ?? 7
-            categoryMargin.value = cat.default_margin_percent ?? null
-        } catch {
-            keepOnlyCustomAttributes()
-            categoryFormula.value = null
-            categoryAppliesItbm.value = false
-            categoryItbmPercent.value = null
-            categoryMargin.value = null
-        }
-    }
+    [() => (form.value as any).category_id, () => [...extraCategoryIds.value]],
+    refreshCategoryDerivedState
 )
 
 watch(
@@ -541,6 +615,21 @@ const categoryOptions = computed(() => categories.value.flatMap(c => ({
     value: c.id,
     label: c.name
 })))
+const extraCategoryOptions = computed(() => {
+    const primaryCategoryId = (form.value as any).category_id
+
+    return categories.value
+        .filter(category => category.id !== primaryCategoryId && !extraCategoryIds.value.includes(category.id))
+        .map(category => ({
+            value: category.id,
+            label: category.name,
+        }))
+})
+const selectedExtraCategories = computed(() => {
+    return sortCategoryIdsByName(extraCategoryIds.value)
+        .map(categoryId => categories.value.find(category => category.id === categoryId))
+        .filter(Boolean) as Category[]
+})
 const oemBrandOptions = computed(() => brands.value.map(b => ({ value: b.name, label: b.name })))
 
 onMounted(async () => {
@@ -549,6 +638,7 @@ onMounted(async () => {
     try {
         const response = await apiClient.get('/categories')
         categories.value = response.data
+        categoryDetailCache.value = Object.fromEntries(categories.value.map(category => [category.id, category]))
     } catch (e) { console.error('Error loading categories:', e) }
     finally { loadingCategories.value = false }
 
@@ -589,6 +679,7 @@ const handleSubmit = async () => {
 
         const payload = {
             ...form.value,
+            extra_category_ids: extraCategoryIds.value,
             pricing: {
                 ...form.value.pricing,
                 tax_rate: normalizedSaleTaxRate,
@@ -782,6 +873,39 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || ''
                             placeholder="-- Selecciona categoría --"
                             :loading="loadingCategories"
                         />
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Categorías extra</label>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                        <SearchableSelect
+                            :options="extraCategoryOptions"
+                            :model-value="selectedExtraCategoryId"
+                            @update:model-value="v => selectedExtraCategoryId = (v as number | null)"
+                            placeholder="-- Selecciona categoría extra --"
+                            :loading="loadingCategories"
+                            :clearable="true"
+                        />
+                        <button
+                            type="button"
+                            @click="addExtraCategory"
+                            :disabled="!selectedExtraCategoryId"
+                            class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                        >
+                            <Plus class="h-4 w-4" /> Agregar
+                        </button>
+                    </div>
+                    <div v-if="selectedExtraCategories.length > 0" class="flex flex-wrap gap-2">
+                        <span
+                            v-for="category in selectedExtraCategories"
+                            :key="category.id"
+                            class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
+                        >
+                            {{ category.name }}
+                            <button type="button" @click="removeExtraCategory(category.id)" class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800" :aria-label="`Quitar ${category.name}`">
+                                <X class="h-3 w-3" />
+                            </button>
+                        </span>
                     </div>
                 </div>
             </div>

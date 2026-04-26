@@ -9,6 +9,7 @@ import type { UpdateProductRequest } from '@/types/product'
 import type { Category } from '@/types/category'
 import apiClient from '@/services/api/client'
 import { productsApi } from '@/services/api/products'
+import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import VariantManager from '@/components/Products/VariantManager.vue'
 import OemReferenceManager from '@/components/Products/OemReferenceManager.vue'
@@ -17,11 +18,45 @@ import AttributeManager from '@/components/Products/AttributeManager.vue'
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue'
 import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue'
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue'
-import { Wrench, Copy, RefreshCw } from 'lucide-vue-next'
+import { Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next'
 
 const props = defineProps<{
     productId: number
 }>()
+
+interface DraftOemReference {
+    id: number
+    oem_code: string
+    manufacturer: string | null
+}
+
+interface DraftAlternative {
+    id: number
+    sku: string
+    name: string
+    relationship_type: 'compatible' | 'substitute' | 'upgrade'
+}
+
+interface DraftCompatData {
+    engines: Array<{
+        engine_id: number
+        make: string
+        model: string
+        engine: string
+        year: string
+        chassis: string
+    }>
+    chassis: Array<{
+        chassis_id: number
+        make: string
+        model: string
+        year: string
+        chassis: string
+    }>
+    allEngines: boolean
+    allChassis: boolean
+    isUniversal: boolean
+}
 
 const { currentProduct, updateProduct, fetchProduct, loading, error } = useProducts()
 const toast = useToast()
@@ -56,92 +91,327 @@ const categoryItbmPercent = ref<number | null>(null)
 const categoryMargin = ref<number | null>(null)
 const regenerating = ref(false)
 const selectedCategoryId = ref<number | null>(null)
+const extraCategoryIds = ref<number[]>([])
+const selectedExtraCategoryId = ref<number | null>(null)
+const categoryDetailCache = ref<Record<number, Category>>({})
 const attributeManagerRef = ref<InstanceType<typeof AttributeManager> | null>(null)
+const metadataInitialized = ref(false)
+const draftIdCounter = ref(-1000)
+const draftAttributes = ref<EditableProductAttribute[]>([])
+const draftOemReferences = ref<DraftOemReference[]>([])
+const draftAlternatives = ref<DraftAlternative[]>([])
+const draftCompatibility = ref<DraftCompatData>({
+    engines: [],
+    chassis: [],
+    allEngines: false,
+    allChassis: false,
+    isUniversal: false,
+})
 
 const categoryOptions = computed(() => categories.value.map(c => ({
     value: c.id,
     label: c.name,
 })))
 
+const categoryNameById = (categoryId: number | undefined | null): string => {
+    if (!categoryId) return ''
+    return categories.value.find(category => category.id === categoryId)?.name ?? ''
+}
+
+const toCategoryId = (value: number | string | null | undefined): number | null => {
+    if (value === null || value === undefined || value === '') return null
+    const categoryId = Number(value)
+    return Number.isInteger(categoryId) && categoryId > 0 ? categoryId : null
+}
+
+const sortCategoryIdsByName = (categoryIds: Array<number | string | null | undefined>): number[] => {
+    return [...new Set(categoryIds)]
+        .map(toCategoryId)
+        .filter((categoryId): categoryId is number => categoryId !== null)
+        .sort((left, right) => categoryNameById(left).localeCompare(categoryNameById(right), 'es'))
+}
+
+const categoryPayload = () => ({
+    category_id: toCategoryId(selectedCategoryId.value),
+    extra_category_ids: sortCategoryIdsByName(extraCategoryIds.value),
+})
+
+const nextDraftId = () => draftIdCounter.value--
+
+const attributeNameKey = (name: string): string => name.trim().toLowerCase()
+
+const formatYearRange = (yearRange: string | null | undefined): string => {
+    if (!yearRange) return ''
+    return yearRange
+}
+
+const normalizeDraftAttributes = (attributes: any[] = []): EditableProductAttribute[] => {
+    return attributes.map(attribute => ({
+        id: Number(attribute.id ?? nextDraftId()),
+        product_id: props.productId,
+        name: String(attribute.name ?? ''),
+        value: String(attribute.value ?? ''),
+        unit: attribute.unit ?? null,
+    }))
+}
+
+const normalizeDraftOemReferences = (references: any[] = []): DraftOemReference[] => {
+    return references.map(reference => ({
+        id: Number(reference.id ?? nextDraftId()),
+        oem_code: String(reference.oem_code ?? ''),
+        manufacturer: reference.manufacturer ?? null,
+    }))
+}
+
+const normalizeDraftAlternatives = (alternatives: any[] = []): DraftAlternative[] => {
+    const allowedTypes = ['compatible', 'substitute', 'upgrade'] as const
+
+    return alternatives
+        .filter(alternative => allowedTypes.includes(alternative.relationship_type as any))
+        .map(alternative => ({
+            id: Number(alternative.id),
+            sku: String(alternative.sku ?? alternative.sku_base ?? ''),
+            name: String(alternative.name ?? ''),
+            relationship_type: alternative.relationship_type as DraftAlternative['relationship_type'],
+        }))
+}
+
+const normalizeDraftCompatibility = (compatibility: any[] = [], isUniversal = false): DraftCompatData => {
+    return {
+        engines: compatibility
+            .filter(item => item.engine_id)
+            .map(item => ({
+                engine_id: Number(item.engine_id),
+                make: String(item.make ?? ''),
+                model: String(item.model ?? ''),
+                engine: String(item.engine ?? ''),
+                year: formatYearRange(item.year_range),
+                chassis: String(item.chassis?.code ?? item.chassis ?? ''),
+            })),
+        chassis: compatibility
+            .filter(item => item.chassis_id)
+            .map(item => ({
+                chassis_id: Number(item.chassis_id),
+                make: String(item.make ?? ''),
+                model: String(item.model ?? ''),
+                year: formatYearRange(item.year_range),
+                chassis: String(item.chassis?.code ?? item.chassis ?? ''),
+            })),
+        allEngines: compatibility.some(item => item.all_engines),
+        allChassis: compatibility.some(item => item.all_chassis),
+        isUniversal,
+    }
+}
+
+const extraCategoryOptions = computed(() => {
+    return categories.value
+        .filter(category => category.id !== selectedCategoryId.value && !extraCategoryIds.value.includes(category.id))
+        .map(category => ({
+            value: category.id,
+            label: category.name,
+        }))
+})
+
+const selectedExtraCategories = computed(() => {
+    return sortCategoryIdsByName(extraCategoryIds.value)
+        .map(categoryId => categories.value.find(category => category.id === categoryId))
+        .filter(Boolean) as Category[]
+})
+
+const fetchCategoryDetail = async (categoryId: number): Promise<Category | null> => {
+    if (categoryDetailCache.value[categoryId]) {
+        return categoryDetailCache.value[categoryId]
+    }
+
+    const categoryFromList = categories.value.find(category => category.id === categoryId)
+    if (categoryFromList?.pricing_formula !== undefined || categoryFromList?.default_attributes) {
+        categoryDetailCache.value[categoryId] = categoryFromList
+        return categoryFromList
+    }
+
+    try {
+        const response = await apiClient.get(`/categories/${categoryId}`)
+        categoryDetailCache.value[categoryId] = response.data
+        return response.data
+    } catch {
+        return null
+    }
+}
+
+const applyPrimaryCategorySettings = async (categoryId: number | null) => {
+    const category = categoryId ? await fetchCategoryDetail(categoryId) : null
+
+    categoryFormula.value = category?.pricing_formula ?? null
+    categoryAppliesItbm.value = category?.applies_itbm ?? false
+    categoryItbmPercent.value = category ? category.itbm_percent ?? 7 : null
+    categoryMargin.value = category?.default_margin_percent ?? null
+}
+
+const categoryDefaultAttributeValue = (attribute: { value?: string; default_value?: string }): string => {
+    return String(attribute.value ?? attribute.default_value ?? '')
+}
+
+const recalculateDraftAttributesFromCategories = async () => {
+    const primaryCategoryId = toCategoryId(selectedCategoryId.value)
+    const orderedExtraIds = sortCategoryIdsByName(extraCategoryIds.value).filter(categoryId => categoryId !== primaryCategoryId)
+    const categoryIds = [primaryCategoryId, ...orderedExtraIds].filter((categoryId): categoryId is number => categoryId !== null)
+    const categoryDetails = (await Promise.all(categoryIds.map(categoryId => fetchCategoryDetail(categoryId)))).filter(Boolean) as Category[]
+    const existingByName = new Map<string, EditableProductAttribute>()
+
+    draftAttributes.value.forEach(attribute => {
+        const key = attributeNameKey(attribute.name)
+        if (key && !existingByName.has(key)) {
+            existingByName.set(key, attribute)
+        }
+    })
+
+    const seenDefaultNames = new Set<string>()
+    const defaultAttributes: EditableProductAttribute[] = []
+
+    categoryDetails.forEach(category => {
+        ;(category.default_attributes ?? []).forEach(attribute => {
+            const name = String(attribute.name ?? '').trim()
+            const key = attributeNameKey(name)
+
+            if (!key || seenDefaultNames.has(key)) return
+
+            const existing = existingByName.get(key)
+            defaultAttributes.push({
+                id: existing?.id ?? nextDraftId(),
+                product_id: props.productId,
+                name,
+                value: String(existing?.value ?? categoryDefaultAttributeValue(attribute)),
+                unit: existing?.unit ?? attribute.unit ?? null,
+            })
+            seenDefaultNames.add(key)
+        })
+    })
+
+    const customAttributes = draftAttributes.value.filter(attribute => !seenDefaultNames.has(attributeNameKey(attribute.name)))
+    draftAttributes.value = [...defaultAttributes, ...customAttributes]
+}
+
+const addExtraCategory = () => {
+    const categoryId = toCategoryId(selectedExtraCategoryId.value)
+
+    if (!categoryId || categoryId === selectedCategoryId.value || extraCategoryIds.value.includes(categoryId)) {
+        selectedExtraCategoryId.value = null
+        return
+    }
+
+    extraCategoryIds.value = sortCategoryIdsByName([...extraCategoryIds.value, categoryId])
+    selectedExtraCategoryId.value = null
+}
+
+const removeExtraCategory = (categoryId: number) => {
+    extraCategoryIds.value = extraCategoryIds.value.filter(id => id !== categoryId)
+}
+
+const initializeProductDraft = async () => {
+    if (!currentProduct.value) return
+
+    metadataInitialized.value = false
+
+    const categoryId = toCategoryId(currentProduct.value.category_id ?? (currentProduct.value.category as any)?.id ?? null)
+    selectedCategoryId.value = categoryId
+    extraCategoryIds.value = sortCategoryIdsByName(
+        currentProduct.value.extra_category_ids
+            ?? currentProduct.value.extra_categories?.map(category => category.id)
+            ?? []
+    ).filter(extraCategoryId => extraCategoryId !== categoryId)
+
+    form.value = {
+        sku_base: currentProduct.value.sku_base || '',
+        upc: currentProduct.value.default_variant?.upc || '',
+        alternate_code: (currentProduct.value as any).alternate_code || '',
+        category_id: categoryId ?? undefined,
+        name: currentProduct.value.name,
+        description: currentProduct.value.description || '',
+        status: currentProduct.value.status,
+        is_universal: currentProduct.value.is_universal ?? false,
+        batch_tracking: currentProduct.value.batch_tracking,
+        extra_category_ids: extraCategoryIds.value,
+    }
+
+    draftAttributes.value = normalizeDraftAttributes(currentProduct.value.attributes ?? [])
+    draftOemReferences.value = normalizeDraftOemReferences(currentProduct.value.oem_references ?? [])
+    draftAlternatives.value = normalizeDraftAlternatives(currentProduct.value.alternatives ?? [])
+    draftCompatibility.value = normalizeDraftCompatibility(
+        currentProduct.value.compatibility ?? [],
+        currentProduct.value.is_universal ?? false,
+    )
+
+    await applyPrimaryCategorySettings(categoryId)
+    metadataInitialized.value = true
+}
+
 onMounted(async () => {
     loadingCategories.value = true
     try {
         const response = await apiClient.get('/categories')
         categories.value = response.data
+        categoryDetailCache.value = Object.fromEntries(categories.value.map(category => [category.id, category]))
     } catch { /* ignore */ }
     finally { loadingCategories.value = false }
 
     await fetchProduct(props.productId)
+    await initializeProductDraft()
+})
 
-    if (currentProduct.value) {
-        const categoryId = currentProduct.value.category_id ?? (currentProduct.value.category as any)?.id ?? null
-        selectedCategoryId.value = categoryId
+watch(selectedCategoryId, async (newCategoryId) => {
+    const categoryId = toCategoryId(newCategoryId)
+    form.value.category_id = categoryId ?? undefined
+    if (categoryId && extraCategoryIds.value.includes(categoryId)) {
+        extraCategoryIds.value = extraCategoryIds.value.filter(extraCategoryId => extraCategoryId !== categoryId)
+    }
 
-        form.value = {
-            sku_base: currentProduct.value.sku_base || '',
-            upc: currentProduct.value.default_variant?.upc || '',
-            alternate_code: (currentProduct.value as any).alternate_code || '',
-            category_id: categoryId ?? undefined,
-            name: currentProduct.value.name,
-            description: currentProduct.value.description || '',
-            status: currentProduct.value.status,
-            is_universal: currentProduct.value.is_universal ?? false,
-            batch_tracking: currentProduct.value.batch_tracking,
-        }
+    await applyPrimaryCategorySettings(categoryId)
 
-        if (categoryId) {
-            try {
-                const resp = await apiClient.get(`/categories/${categoryId}`)
-                const cat = resp.data
-                categoryFormula.value = cat.pricing_formula ?? null
-                categoryAppliesItbm.value = cat.applies_itbm ?? false
-                categoryItbmPercent.value = cat.itbm_percent ?? 7
-                categoryMargin.value = cat.default_margin_percent ?? null
-            } catch {
-                // Silently fail - variants will work without auto-pricing
-            }
-        }
+    if (metadataInitialized.value) {
+        await recalculateDraftAttributesFromCategories()
     }
 })
 
-const initialCategoryLoaded = ref(false)
+watch(extraCategoryIds, async () => {
+    form.value.extra_category_ids = sortCategoryIdsByName(extraCategoryIds.value)
 
-watch(selectedCategoryId, async (newCategoryId) => {
-    form.value.category_id = newCategoryId ?? undefined
-
-    if (newCategoryId) {
-        try {
-            const resp = await apiClient.get(`/categories/${newCategoryId}`)
-            const cat = resp.data
-            categoryFormula.value = cat.pricing_formula ?? null
-            categoryAppliesItbm.value = cat.applies_itbm ?? false
-            categoryItbmPercent.value = cat.itbm_percent ?? 7
-            categoryMargin.value = cat.default_margin_percent ?? null
-        } catch {
-            categoryFormula.value = null
-            categoryAppliesItbm.value = false
-            categoryItbmPercent.value = null
-            categoryMargin.value = null
-        }
-    } else {
-        categoryFormula.value = null
-        categoryAppliesItbm.value = false
-        categoryItbmPercent.value = null
-        categoryMargin.value = null
+    if (metadataInitialized.value) {
+        await recalculateDraftAttributesFromCategories()
     }
+})
 
-    // Save category change to backend so attributes get replaced, then refresh the UI
-    if (initialCategoryLoaded.value) {
-        try {
-            await updateProduct(props.productId, { category_id: newCategoryId ?? null })
-            attributeManagerRef.value?.refresh()
-            toast.success('Categoría actualizada — atributos por defecto aplicados')
-        } catch {
-            toast.error('Error al actualizar la categoría')
-        }
-    } else {
-        initialCategoryLoaded.value = true
-    }
+const metadataPayload = (): UpdateProductRequest => ({
+    ...form.value,
+    ...categoryPayload(),
+    is_universal: draftCompatibility.value.isUniversal,
+    attributes: draftAttributes.value
+        .filter(attribute => attribute.name.trim() && String(attribute.value).trim())
+        .map(attribute => ({
+            name: attribute.name.trim(),
+            value: String(attribute.value).trim(),
+            unit: attribute.unit ?? undefined,
+        })),
+    oem_references: draftOemReferences.value
+        .filter(reference => reference.oem_code.trim())
+        .map(reference => ({
+            oem_code: reference.oem_code.trim(),
+            manufacturer: reference.manufacturer?.trim() || null,
+        })),
+    alternatives: draftAlternatives.value.map(alternative => ({
+        alternative_product_id: alternative.id,
+        relationship_type: alternative.relationship_type,
+    })),
+    vehicle_compatibility: {
+        engines: draftCompatibility.value.engines.map(engine => ({
+            engine_id: engine.engine_id,
+        })),
+        chassis: draftCompatibility.value.chassis.map(chassis => ({
+            chassis_id: chassis.chassis_id,
+        })),
+        allEngines: draftCompatibility.value.allEngines,
+        allChassis: draftCompatibility.value.allChassis,
+        isUniversal: draftCompatibility.value.isUniversal,
+    },
 })
 
 const handleSubmit = async () => {
@@ -149,7 +419,9 @@ const handleSubmit = async () => {
     successMessage.value = ''
 
     try {
-        await updateProduct(props.productId, form.value)
+        await updateProduct(props.productId, metadataPayload())
+        await fetchProduct(props.productId)
+        await initializeProductDraft()
         successMessage.value = 'Producto actualizado exitosamente'
         toast.success('Producto actualizado exitosamente')
     } catch (err: any) {
@@ -188,7 +460,20 @@ const handleRegenerateName = async () => {
     if (regenerating.value) return
     regenerating.value = true
     try {
-        const response = await productsApi.regenerateName(props.productId)
+        const response = await productsApi.previewName(props.productId, {
+            ...categoryPayload(),
+            vehicle_compatibility: {
+                engines: draftCompatibility.value.engines.map(engine => ({
+                    engine_id: engine.engine_id,
+                })),
+                chassis: draftCompatibility.value.chassis.map(chassis => ({
+                    chassis_id: chassis.chassis_id,
+                })),
+                allEngines: draftCompatibility.value.allEngines,
+                allChassis: draftCompatibility.value.allChassis,
+                isUniversal: draftCompatibility.value.isUniversal,
+            },
+        })
         const newName = response.data?.name
         if (newName) {
             form.value.name = newName
@@ -315,10 +600,43 @@ const onChassisCreated = (chassis: any) => {
                             <SearchableSelect
                                 :options="categoryOptions"
                                 :model-value="selectedCategoryId"
-                                @update:model-value="v => selectedCategoryId = (v as number | null)"
+                                @update:model-value="v => selectedCategoryId = toCategoryId(v)"
                                 placeholder="-- Selecciona categoría --"
                                 :loading="loadingCategories"
                             />
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Categorías extra</label>
+                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                            <SearchableSelect
+                                :options="extraCategoryOptions"
+                                :model-value="selectedExtraCategoryId"
+                                @update:model-value="v => selectedExtraCategoryId = toCategoryId(v)"
+                                placeholder="-- Selecciona categoría extra --"
+                                :loading="loadingCategories"
+                                :clearable="true"
+                            />
+                            <button
+                                type="button"
+                                @click="addExtraCategory"
+                                :disabled="!selectedExtraCategoryId"
+                                class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                            >
+                                <Plus class="h-4 w-4" /> Agregar
+                            </button>
+                        </div>
+                        <div v-if="selectedExtraCategories.length > 0" class="flex flex-wrap gap-2">
+                            <span
+                                v-for="category in selectedExtraCategories"
+                                :key="category.id"
+                                class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
+                            >
+                                {{ category.name }}
+                                <button type="button" @click="removeExtraCategory(category.id)" class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800" :aria-label="`Quitar ${category.name}`">
+                                    <X class="h-3 w-3" />
+                                </button>
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -351,12 +669,17 @@ const onChassisCreated = (chassis: any) => {
                 </form>
 
                 <!-- SECTION 3: Códigos Alternos -->
-                <OemReferenceManager :product-id="props.productId" />
+                <OemReferenceManager
+                    v-model="draftOemReferences"
+                    mode="draft"
+                    :product-id="props.productId"
+                />
 
                 <!-- SECTION 4: Compatibilidad Vehicular -->
                 <VehicleCompatSection
                     ref="vehicleCompatRef"
-                    mode="live"
+                    v-model="draftCompatibility"
+                    mode="draft"
                     :product-id="props.productId"
                     @open-inline="openVehicleInline"
                 />
@@ -383,13 +706,22 @@ const onChassisCreated = (chassis: any) => {
                     <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
                         Agrega o edita atributos del producto a nivel base.
                     </p>
-                    <AttributeManager ref="attributeManagerRef" :product-id="props.productId" />
+                    <AttributeManager
+                        ref="attributeManagerRef"
+                        v-model="draftAttributes"
+                        mode="draft"
+                        :product-id="props.productId"
+                    />
                 </div>
 
                 <!-- SECTION 7: Upsales -->
                 <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-violet-500">
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">Upsales</h2>
-                    <AlternativeManager :product-id="props.productId" />
+                    <AlternativeManager
+                        v-model="draftAlternatives"
+                        mode="draft"
+                        :product-id="props.productId"
+                    />
                 </div>
 
                 <!-- SECTION 8: Notas -->

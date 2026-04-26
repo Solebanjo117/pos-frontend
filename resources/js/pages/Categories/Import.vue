@@ -30,7 +30,8 @@ const importConfig: ImporterConfig = {
         { key: 'aplica_itbm',    label: 'Aplica ITBM',      type: 'select', options: [{ label: 'Sí', value: 'si' }, { label: 'No', value: 'no' }] },
         { key: 'itbm_porcentaje',label: 'ITBM %',           type: 'number' },
         { key: 'prioridad',      label: 'Prioridad',        type: 'number' },
-        // "atributos_default" is now managed via action modal, not raw text
+        { key: 'precio_minimo_sugerido', label: 'Precio Min.', type: 'number' },
+        { key: 'atributos_default', label: 'Atributos Texto', type: 'text', placeholder: 'color,largo o color:rojo' },
         { key: '__attributes',   label: 'Atributos',        actionType: 'attributes' },
     ],
 }

@@ -14,7 +14,7 @@ const importConfig: ImporterConfig = {
         { key: 'descripcion', label: 'Descripción', type: 'text' },
         { key: 'website', label: 'Website', type: 'text' },
         { key: 'estado', label: 'Estado', type: 'select', options: [{ label: 'Activo', value: 'active' }, { label: 'Inactivo', value: 'inactive' }] },
-        { key: 'proveedores', label: 'Proveedores', type: 'searchable', searchableEndpoint: '/suppliers/all', placeholder: 'Nombres separados por coma' },
+        { key: 'proveedores', label: 'Proveedores', type: 'text', placeholder: 'Nombres separados por coma' },
     ],
 }
 </script>

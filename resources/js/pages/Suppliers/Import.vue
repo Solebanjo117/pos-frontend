@@ -21,6 +21,7 @@ const importConfig: ImporterConfig = {
         { key: 'dias_entrega', label: 'Días de Entrega', type: 'number' },
         { key: 'notas', label: 'Notas', type: 'text' },
         { key: 'estado', label: 'Estado', type: 'select', options: [{ label: 'Activo', value: 'active' }, { label: 'Inactivo', value: 'inactive' }] },
+        { key: 'marcas', label: 'Marcas', type: 'text', placeholder: 'Nombres separados por coma' },
     ],
 }
 </script>

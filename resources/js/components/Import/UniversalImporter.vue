@@ -404,10 +404,14 @@ const formatFileSize = (bytes: number) => {
 
                             <!-- Status -->
                             <td class="px-3 py-2">
-                                <span v-if="row.__valid" class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">OK</span>
+                                <template v-if="row.__valid">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">OK</span>
+                                    <p v-if="row.__warnings?.length" class="mt-1 text-[11px] text-amber-600 dark:text-amber-300 leading-tight">{{ row.__warnings.join(' ') }}</p>
+                                </template>
                                 <template v-else>
                                     <span class="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">Error</span>
                                     <p v-if="row.__errors?.length" class="mt-1 text-[11px] text-red-600 dark:text-red-300 leading-tight">{{ row.__errors.join(' ') }}</p>
+                                    <p v-if="row.__warnings?.length" class="mt-1 text-[11px] text-amber-600 dark:text-amber-300 leading-tight">{{ row.__warnings.join(' ') }}</p>
                                 </template>
                             </td>
                         </tr>

@@ -100,6 +100,7 @@ export function useProducts() {
             'compatibility',
             'oem',
             'alternatives',
+            'inherited_images',
         ],
     ) {
         loading.value = true

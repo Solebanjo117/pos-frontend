@@ -8,6 +8,7 @@ export interface Category {
     parent_id?: number | null
     description?: string
     icon?: string
+    image_url?: string | null
     priority: number
     default_attributes?: Array<{
         name: string
@@ -47,6 +48,7 @@ export interface CreateCategoryData {
     parent_id?: number | null
     description?: string
     icon?: string
+    image_url?: string | null
     priority?: number
     default_margin_percent?: number | null
     pricing_formula?: string | null

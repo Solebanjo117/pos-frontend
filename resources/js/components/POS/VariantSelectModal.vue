@@ -20,7 +20,11 @@ const variants = computed(() => props.product?.variants ?? [])
 
 // Helpers
 const getStock = (v: ProductVariant): number => v.total_stock ?? 0
-const canSelectVariant = (variant: ProductVariant): boolean => getStock(variant) > 0
+
+const hasLowStock = (v: ProductVariant): boolean => {
+    const stock = getStock(v)
+    return stock > 0 && stock <= 5
+}
 
 // Multi-select state: variantId -> quantity chosen (0 = not selected)
 const selected = ref<Record<number, number>>({})
@@ -35,16 +39,11 @@ watch(() => props.show, (isOpen) => {
 
 // Computed: array of selected variant ids that have qty > 0
 const selectedCount = computed(() =>
-    variants.value.filter(v => canSelectVariant(v) && (selected.value[v.id] ?? 0) > 0).length
+    variants.value.filter(v => (selected.value[v.id] ?? 0) > 0).length
 )
 
 // Toggle checkbox (sets qty to 1 if unchecked, or removes selection)
 const toggleVariant = (variantId: number) => {
-    const variant = variants.value.find(v => v.id === variantId)
-    if (!variant || !canSelectVariant(variant)) {
-        return
-    }
-
     if (selected.value[variantId] > 0) {
         delete selected.value[variantId]
     } else {
@@ -59,11 +58,7 @@ const setQty = (variantId: number, qty: number) => {
     const variant = variants.value.find(v => v.id === variantId)
     if (!variant) return
 
-    const stock = getStock(variant)
-    if (stock <= 0) return
-
     if (qty < 1) qty = 1
-    if (qty > stock) qty = stock
 
     if (isSelected(variantId)) {
         selected.value[variantId] = qty
@@ -73,13 +68,13 @@ const setQty = (variantId: number, qty: number) => {
 // Confirm and emit all selected variants
 const confirmSelection = () => {
     const selections = variants.value
-        .filter(v => isSelected(v.id) && canSelectVariant(v))
+        .filter(v => isSelected(v.id))
         .map(v => {
             const stock = getStock(v)
             const requested = selected.value[v.id] ?? 1
             return {
                 variant: v,
-                quantity: Math.max(1, Math.min(stock, requested)),
+                quantity: Math.max(1, requested),
             }
         })
 
@@ -217,8 +212,8 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                                         :key="variant.id"
                                         @click="toggleVariant(variant.id)"
                                         class="group transition-colors"
-                                        :class="!canSelectVariant(variant)
-                                            ? 'cursor-not-allowed opacity-60 bg-gray-50/40 dark:bg-muted/20'
+                                        :class="getStock(variant) <= 0 && !isSelected(variant.id)
+                                            ? 'cursor-default opacity-40 bg-gray-50/40 dark:bg-muted/20'
                                             : isSelected(variant.id)
                                                 ? 'cursor-pointer bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/30'
                                                 : 'cursor-pointer hover:bg-gray-50/70 dark:hover:bg-muted/30'"
@@ -228,7 +223,7 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                                             <div class="flex items-center justify-center">
                                                 <div
                                                     class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0"
-                                                    :class="!canSelectVariant(variant)
+                                                    :class="getStock(variant) <= 0 && !isSelected(variant.id)
                                                         ? 'border-gray-200 dark:border-border/60 bg-gray-100 dark:bg-muted/50'
                                                         : isSelected(variant.id)
                                                             ? 'bg-indigo-600 border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500'
@@ -253,7 +248,7 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                                                     </span>
                                                 </div>
                                                 <span class="text-sm font-semibold text-gray-900 dark:text-white transition-colors"
-                                                    :class="isSelected(variant.id) ? 'text-indigo-700 dark:text-indigo-300' : (canSelectVariant(variant) ? 'group-hover:text-indigo-600' : '')">
+                                                    :class="isSelected(variant.id) ? 'text-indigo-700 dark:text-indigo-300' : (getStock(variant) > 0 ? 'group-hover:text-indigo-600' : '')">
                                                     {{ variant.brand?.name ?? 'Sin marca' }}
                                                 </span>
                                             </div>
@@ -303,12 +298,11 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                                                 @input="setQty(variant.id, Number(($event.target as HTMLInputElement).value))"
                                                 type="number"
                                                 min="1"
-                                                :max="getStock(variant)"
                                                 class="w-20 text-center rounded-lg border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-muted px-2 py-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-300 focus:ring-2 focus:ring-indigo-400 focus:outline-none"
                                                 @click.stop
                                             />
-                                            <span v-else class="text-xs" :class="canSelectVariant(variant) ? 'text-gray-300 dark:text-gray-600' : 'text-red-400 dark:text-red-500'">
-                                                {{ canSelectVariant(variant) ? '—' : 'Sin stock' }}
+                                            <span v-else class="text-xs" :class="getStock(variant) > 0 ? 'text-gray-300 dark:text-gray-600' : 'text-amber-500 dark:text-amber-400 font-semibold'">
+                                                {{ getStock(variant) > 0 ? '—' : 'Sin stock' }}
                                             </span>
                                         </td>
                                     </tr>
@@ -319,7 +313,7 @@ const handlePurchaseSuccess = (result: { productId: number; variantId: number | 
                         <!-- ═══════════ FOOTER ═══════════ -->
                         <div class="shrink-0 px-6 py-3 border-t border-gray-200 dark:border-border flex items-center justify-between bg-white dark:bg-card gap-3">
                             <p class="text-xs text-gray-400 flex-1">
-                                <span v-if="selectedCount === 0">Haz clic en una fila para seleccionar variantes con stock</span>
+                                <span v-if="selectedCount === 0">Haz clic en una fila para seleccionar variantes</span>
                                 <span v-else class="text-indigo-600 dark:text-indigo-400 font-medium">{{ selectedCount }} variante{{ selectedCount !== 1 ? 's' : '' }} seleccionada{{ selectedCount !== 1 ? 's' : '' }}</span>
                             </p>
                             <button

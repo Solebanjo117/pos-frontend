@@ -10,6 +10,23 @@ import type {
     SalesOrderItem,
 } from '@/types/sales-order'
 
+export interface StockWarning {
+    type: string
+    product_id: number | null
+    variant_id: number | null
+    warehouse_id: number
+    product_name: string
+    requested_quantity: number
+    available_quantity: number
+    missing_quantity: number
+    message: string
+}
+
+export interface SalesOrderResult {
+    data: SalesOrder
+    warnings?: StockWarning[]
+}
+
 const BASE_URL = '/sales-orders'
 
 export const salesOrdersService = {
@@ -32,9 +49,12 @@ export const salesOrdersService = {
     /**
      * Create new sales order
      */
-    async create(orderData: CreateSalesOrderData): Promise<SalesOrder> {
+    async create(orderData: CreateSalesOrderData): Promise<SalesOrderResult> {
         const { data } = await apiClient.post(BASE_URL, orderData)
-        return data.data
+        return {
+            data: data.data,
+            warnings: data.warnings,
+        }
     },
 
     /**
@@ -55,9 +75,12 @@ export const salesOrdersService = {
     /**
      * Confirm order and deduct inventory
      */
-    async confirm(id: number): Promise<SalesOrder> {
+    async confirm(id: number): Promise<SalesOrderResult> {
         const { data } = await apiClient.post(`${BASE_URL}/${id}/confirm`)
-        return data.data
+        return {
+            data: data.data,
+            warnings: data.warnings,
+        }
     },
 
     /**

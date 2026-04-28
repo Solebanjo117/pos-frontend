@@ -16,7 +16,6 @@ const availableSuppliers = ref<Supplier[]>([])
 
 const form = ref<CreateBrandData>({
     name: '',
-    prefix: '',
     description: '',
     logo_url: '',
     website: '',
@@ -83,20 +82,6 @@ function goBack() {
                     />
                 </div>
 
-                <!-- Prefix -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Prefijo (System ID)
-                    </label>
-                    <input
-                        v-model="form.prefix"
-                        type="text"
-                        maxlength="5"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white uppercase font-mono"
-                        placeholder="Ej: BOS, DEN, NGK"
-                    />
-                    <p class="mt-1 text-xs text-gray-500">Se genera automáticamente si se deja vacío (primeras 3 letras del nombre)</p>
-                </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Descripción

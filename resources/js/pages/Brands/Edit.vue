@@ -22,7 +22,6 @@ const availableSuppliers = ref<Supplier[]>([])
 
 const form = ref<UpdateBrandData>({
     name: '',
-    prefix: '',
     description: '',
     logo_url: '',
     website: '',
@@ -39,7 +38,6 @@ onMounted(async () => {
     if (brand.value) {
         form.value = {
             name: brand.value.name,
-            prefix: brand.value.prefix || '',
             description: brand.value.description || '',
             logo_url: brand.value.logo_url || '',
             website: brand.value.website || '',
@@ -107,21 +105,6 @@ function goBack() {
                         class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white"
                         placeholder="Ej: Bosch, Denso, NGK..."
                     />
-                </div>
-
-                <!-- Prefix -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Prefijo (System ID)
-                    </label>
-                    <input
-                        v-model="form.prefix"
-                        type="text"
-                        maxlength="5"
-                        class="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-white uppercase font-mono"
-                        placeholder="Ej: BOS, DEN, NGK"
-                    />
-                    <p class="mt-1 text-xs text-gray-500">Prefijo usado para System ID de variantes</p>
                 </div>
 
                 <!-- Description -->

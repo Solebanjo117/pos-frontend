@@ -124,7 +124,7 @@ watch(() => props.sellerId, (val) => {
           <span class="font-medium">-{{ formatCurrency(discountAmount) }}</span>
         </div>
         <div class="flex justify-between text-gray-600 dark:text-gray-300 text-sm">
-          <span>IVA</span>
+          <span>ITBMS</span>
           <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(taxAmount) }}</span>
         </div>
 

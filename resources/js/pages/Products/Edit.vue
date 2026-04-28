@@ -1,73 +1,75 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
-import { Head } from '@inertiajs/vue3'
-import AppLayout from '@/layouts/AppLayout.vue'
-import { type BreadcrumbItem } from '@/types'
-import { useProducts } from '@/composables/useProducts'
-import { useToast } from '@/composables/useToast'
-import type { UpdateProductRequest } from '@/types/product'
-import type { Category } from '@/types/category'
-import apiClient from '@/services/api/client'
-import { productsApi } from '@/services/api/products'
-import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes'
-import SearchableSelect from '@/components/ui/SearchableSelect.vue'
-import VariantManager from '@/components/Products/VariantManager.vue'
-import OemReferenceManager from '@/components/Products/OemReferenceManager.vue'
-import AlternativeManager from '@/components/Products/AlternativeManager.vue'
-import AttributeManager from '@/components/Products/AttributeManager.vue'
-import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue'
-import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue'
-import ProductImagesSection from '@/components/Products/ProductImagesSection.vue'
-import { Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next'
+import { ref, onMounted, watch, computed } from 'vue';
+import { Head } from '@inertiajs/vue3';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import { useProducts } from '@/composables/useProducts';
+import { useToast } from '@/composables/useToast';
+import type { UpdateProductRequest } from '@/types/product';
+import type { Category } from '@/types/category';
+import apiClient from '@/services/api/client';
+import { productsApi } from '@/services/api/products';
+import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import VariantManager from '@/components/Products/VariantManager.vue';
+import OemReferenceManager from '@/components/Products/OemReferenceManager.vue';
+import AlternativeManager from '@/components/Products/AlternativeManager.vue';
+import AttributeManager from '@/components/Products/AttributeManager.vue';
+import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
+import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
+import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
+import { Archive, Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next';
 
 const props = defineProps<{
-    productId: number
-}>()
+    productId: number;
+}>();
 
 interface DraftOemReference {
-    id: number
-    oem_code: string
-    manufacturer: string | null
+    id: number;
+    oem_code: string;
+    manufacturer: string | null;
 }
 
 interface DraftAlternative {
-    id: number
-    sku: string
-    name: string
-    relationship_type: 'compatible' | 'substitute' | 'upgrade'
+    id: number;
+    sku: string;
+    name: string;
+    relationship_type: 'compatible' | 'substitute' | 'upgrade';
 }
 
 interface DraftCompatData {
     engines: Array<{
-        engine_id: number
-        make: string
-        model: string
-        engine: string
-        year: string
-        chassis: string
-    }>
+        engine_id: number;
+        make: string;
+        model: string;
+        engine: string;
+        year: string;
+        chassis: string;
+    }>;
     chassis: Array<{
-        chassis_id: number
-        make: string
-        model: string
-        year: string
-        chassis: string
-    }>
-    allEngines: boolean
-    allChassis: boolean
-    isUniversal: boolean
+        chassis_id: number;
+        make: string;
+        model: string;
+        year: string;
+        chassis: string;
+    }>;
+    allEngines: boolean;
+    allChassis: boolean;
+    isUniversal: boolean;
 }
 
-const { currentProduct, updateProduct, fetchProduct, loading, error } = useProducts()
-const toast = useToast()
-const duplicating = ref(false)
+const { currentProduct, updateProduct, fetchProduct, loading, error } =
+    useProducts();
+const toast = useToast();
+const duplicating = ref(false);
+const archiving = ref(false);
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
     { title: 'Productos', href: '/products' },
     { title: 'Editar', href: `/products/${props.productId}/edit` },
-]
+];
 
 const form = ref<UpdateProductRequest>({
     sku_base: '',
@@ -78,109 +80,134 @@ const form = ref<UpdateProductRequest>({
     description: '',
     status: 'active',
     is_universal: false,
-})
+});
 
-const validationErrors = ref<Record<string, string[]>>({})
-const successMessage = ref('')
+const validationErrors = ref<Record<string, string[]>>({});
+const successMessage = ref('');
 
-const categories = ref<Category[]>([])
-const loadingCategories = ref(false)
-const categoryFormula = ref<string | null>(null)
-const categoryAppliesItbm = ref<boolean>(false)
-const categoryItbmPercent = ref<number | null>(null)
-const categoryMargin = ref<number | null>(null)
-const regenerating = ref(false)
-const selectedCategoryId = ref<number | null>(null)
-const extraCategoryIds = ref<number[]>([])
-const selectedExtraCategoryId = ref<number | null>(null)
-const categoryDetailCache = ref<Record<number, Category>>({})
-const attributeManagerRef = ref<InstanceType<typeof AttributeManager> | null>(null)
-const metadataInitialized = ref(false)
-const draftIdCounter = ref(-1000)
-const draftAttributes = ref<EditableProductAttribute[]>([])
-const draftOemReferences = ref<DraftOemReference[]>([])
-const draftAlternatives = ref<DraftAlternative[]>([])
+const categories = ref<Category[]>([]);
+const loadingCategories = ref(false);
+const categoryFormula = ref<string | null>(null);
+const categoryAppliesItbm = ref<boolean>(false);
+const categoryItbmPercent = ref<number | null>(null);
+const categoryMargin = ref<number | null>(null);
+const regenerating = ref(false);
+const selectedCategoryId = ref<number | null>(null);
+const extraCategoryIds = ref<number[]>([]);
+const selectedExtraCategoryId = ref<number | null>(null);
+const categoryDetailCache = ref<Record<number, Category>>({});
+const attributeManagerRef = ref<InstanceType<typeof AttributeManager> | null>(
+    null,
+);
+const metadataInitialized = ref(false);
+const draftIdCounter = ref(-1000);
+const draftAttributes = ref<EditableProductAttribute[]>([]);
+const draftOemReferences = ref<DraftOemReference[]>([]);
+const draftAlternatives = ref<DraftAlternative[]>([]);
 const draftCompatibility = ref<DraftCompatData>({
     engines: [],
     chassis: [],
     allEngines: false,
     allChassis: false,
     isUniversal: false,
-})
+});
 
-const categoryOptions = computed(() => categories.value.map(c => ({
-    value: c.id,
-    label: c.name,
-})))
+const categoryOptions = computed(() =>
+    categories.value.map((c) => ({
+        value: c.id,
+        label: c.name,
+    })),
+);
 
 const categoryNameById = (categoryId: number | undefined | null): string => {
-    if (!categoryId) return ''
-    return categories.value.find(category => category.id === categoryId)?.name ?? ''
-}
+    if (!categoryId) return '';
+    return (
+        categories.value.find((category) => category.id === categoryId)?.name ??
+        ''
+    );
+};
 
-const toCategoryId = (value: number | string | null | undefined): number | null => {
-    if (value === null || value === undefined || value === '') return null
-    const categoryId = Number(value)
-    return Number.isInteger(categoryId) && categoryId > 0 ? categoryId : null
-}
+const toCategoryId = (
+    value: number | string | null | undefined,
+): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const categoryId = Number(value);
+    return Number.isInteger(categoryId) && categoryId > 0 ? categoryId : null;
+};
 
-const sortCategoryIdsByName = (categoryIds: Array<number | string | null | undefined>): number[] => {
+const sortCategoryIdsByName = (
+    categoryIds: Array<number | string | null | undefined>,
+): number[] => {
     return [...new Set(categoryIds)]
         .map(toCategoryId)
         .filter((categoryId): categoryId is number => categoryId !== null)
-        .sort((left, right) => categoryNameById(left).localeCompare(categoryNameById(right), 'es'))
-}
+        .sort((left, right) =>
+            categoryNameById(left).localeCompare(categoryNameById(right), 'es'),
+        );
+};
 
 const categoryPayload = () => ({
     category_id: toCategoryId(selectedCategoryId.value),
     extra_category_ids: sortCategoryIdsByName(extraCategoryIds.value),
-})
+});
 
-const nextDraftId = () => draftIdCounter.value--
+const nextDraftId = () => draftIdCounter.value--;
 
-const attributeNameKey = (name: string): string => name.trim().toLowerCase()
+const attributeNameKey = (name: string): string => name.trim().toLowerCase();
 
 const formatYearRange = (yearRange: string | null | undefined): string => {
-    if (!yearRange) return ''
-    return yearRange
-}
+    if (!yearRange) return '';
+    return yearRange;
+};
 
-const normalizeDraftAttributes = (attributes: any[] = []): EditableProductAttribute[] => {
-    return attributes.map(attribute => ({
+const normalizeDraftAttributes = (
+    attributes: any[] = [],
+): EditableProductAttribute[] => {
+    return attributes.map((attribute) => ({
         id: Number(attribute.id ?? nextDraftId()),
         product_id: props.productId,
         name: String(attribute.name ?? ''),
         value: String(attribute.value ?? ''),
         unit: attribute.unit ?? null,
-    }))
-}
+    }));
+};
 
-const normalizeDraftOemReferences = (references: any[] = []): DraftOemReference[] => {
-    return references.map(reference => ({
+const normalizeDraftOemReferences = (
+    references: any[] = [],
+): DraftOemReference[] => {
+    return references.map((reference) => ({
         id: Number(reference.id ?? nextDraftId()),
         oem_code: String(reference.oem_code ?? ''),
         manufacturer: reference.manufacturer ?? null,
-    }))
-}
+    }));
+};
 
-const normalizeDraftAlternatives = (alternatives: any[] = []): DraftAlternative[] => {
-    const allowedTypes = ['compatible', 'substitute', 'upgrade'] as const
+const normalizeDraftAlternatives = (
+    alternatives: any[] = [],
+): DraftAlternative[] => {
+    const allowedTypes = ['compatible', 'substitute', 'upgrade'] as const;
 
     return alternatives
-        .filter(alternative => allowedTypes.includes(alternative.relationship_type as any))
-        .map(alternative => ({
+        .filter((alternative) =>
+            allowedTypes.includes(alternative.relationship_type as any),
+        )
+        .map((alternative) => ({
             id: Number(alternative.id),
             sku: String(alternative.sku ?? alternative.sku_base ?? ''),
             name: String(alternative.name ?? ''),
-            relationship_type: alternative.relationship_type as DraftAlternative['relationship_type'],
-        }))
-}
+            relationship_type:
+                alternative.relationship_type as DraftAlternative['relationship_type'],
+        }));
+};
 
-const normalizeDraftCompatibility = (compatibility: any[] = [], isUniversal = false): DraftCompatData => {
+const normalizeDraftCompatibility = (
+    compatibility: any[] = [],
+    isUniversal = false,
+): DraftCompatData => {
     return {
         engines: compatibility
-            .filter(item => item.engine_id)
-            .map(item => ({
+            .filter((item) => item.engine_id)
+            .map((item) => ({
                 engine_id: Number(item.engine_id),
                 make: String(item.make ?? ''),
                 model: String(item.model ?? ''),
@@ -189,136 +216,202 @@ const normalizeDraftCompatibility = (compatibility: any[] = [], isUniversal = fa
                 chassis: String(item.chassis?.code ?? item.chassis ?? ''),
             })),
         chassis: compatibility
-            .filter(item => item.chassis_id)
-            .map(item => ({
+            .filter((item) => item.chassis_id)
+            .map((item) => ({
                 chassis_id: Number(item.chassis_id),
                 make: String(item.make ?? ''),
                 model: String(item.model ?? ''),
                 year: formatYearRange(item.year_range),
                 chassis: String(item.chassis?.code ?? item.chassis ?? ''),
             })),
-        allEngines: compatibility.some(item => item.all_engines),
-        allChassis: compatibility.some(item => item.all_chassis),
+        allEngines: compatibility.some((item) => item.all_engines),
+        allChassis: compatibility.some((item) => item.all_chassis),
         isUniversal,
-    }
-}
+    };
+};
 
 const extraCategoryOptions = computed(() => {
     return categories.value
-        .filter(category => category.id !== selectedCategoryId.value && !extraCategoryIds.value.includes(category.id))
-        .map(category => ({
+        .filter(
+            (category) =>
+                category.id !== selectedCategoryId.value &&
+                !extraCategoryIds.value.includes(category.id),
+        )
+        .map((category) => ({
             value: category.id,
             label: category.name,
-        }))
-})
+        }));
+});
 
 const selectedExtraCategories = computed(() => {
     return sortCategoryIdsByName(extraCategoryIds.value)
-        .map(categoryId => categories.value.find(category => category.id === categoryId))
-        .filter(Boolean) as Category[]
+        .map((categoryId) =>
+            categories.value.find((category) => category.id === categoryId),
+        )
+        .filter(Boolean) as Category[];
+});
+
+const selectedCategoryIdsForImages = computed(() => {
+    const ids: number[] = []
+    if (selectedCategoryId.value) ids.push(selectedCategoryId.value)
+    for (const id of extraCategoryIds.value) {
+        if (!ids.includes(id)) ids.push(id)
+    }
+    return ids
 })
 
-const fetchCategoryDetail = async (categoryId: number): Promise<Category | null> => {
+const categoryNameMapForImages = computed(() => {
+    const map: Record<number, string> = {}
+    for (const c of categories.value) {
+        map[c.id] = c.name
+    }
+    return map
+})
+
+const fetchCategoryDetail = async (
+    categoryId: number,
+): Promise<Category | null> => {
     if (categoryDetailCache.value[categoryId]) {
-        return categoryDetailCache.value[categoryId]
+        return categoryDetailCache.value[categoryId];
     }
 
-    const categoryFromList = categories.value.find(category => category.id === categoryId)
-    if (categoryFromList?.pricing_formula !== undefined || categoryFromList?.default_attributes) {
-        categoryDetailCache.value[categoryId] = categoryFromList
-        return categoryFromList
+    const categoryFromList = categories.value.find(
+        (category) => category.id === categoryId,
+    );
+    if (
+        categoryFromList?.pricing_formula !== undefined ||
+        categoryFromList?.default_attributes
+    ) {
+        categoryDetailCache.value[categoryId] = categoryFromList;
+        return categoryFromList;
     }
 
     try {
-        const response = await apiClient.get(`/categories/${categoryId}`)
-        categoryDetailCache.value[categoryId] = response.data
-        return response.data
+        const response = await apiClient.get(`/categories/${categoryId}`);
+        categoryDetailCache.value[categoryId] = response.data;
+        return response.data;
     } catch {
-        return null
+        return null;
     }
-}
+};
 
 const applyPrimaryCategorySettings = async (categoryId: number | null) => {
-    const category = categoryId ? await fetchCategoryDetail(categoryId) : null
+    const category = categoryId ? await fetchCategoryDetail(categoryId) : null;
 
-    categoryFormula.value = category?.pricing_formula ?? null
-    categoryAppliesItbm.value = category?.applies_itbm ?? false
-    categoryItbmPercent.value = category ? category.itbm_percent ?? 7 : null
-    categoryMargin.value = category?.default_margin_percent ?? null
-}
+    categoryFormula.value = category?.pricing_formula ?? null;
+    categoryAppliesItbm.value = category?.applies_itbm ?? false;
+    categoryItbmPercent.value = category ? (category.itbm_percent ?? 7) : null;
+    categoryMargin.value = category?.default_margin_percent ?? null;
+};
 
-const categoryDefaultAttributeValue = (attribute: { value?: string; default_value?: string }): string => {
-    return String(attribute.value ?? attribute.default_value ?? '')
-}
+const categoryDefaultAttributeValue = (attribute: {
+    value?: string;
+    default_value?: string;
+}): string => {
+    return String(attribute.value ?? attribute.default_value ?? '');
+};
 
 const recalculateDraftAttributesFromCategories = async () => {
-    const primaryCategoryId = toCategoryId(selectedCategoryId.value)
-    const orderedExtraIds = sortCategoryIdsByName(extraCategoryIds.value).filter(categoryId => categoryId !== primaryCategoryId)
-    const categoryIds = [primaryCategoryId, ...orderedExtraIds].filter((categoryId): categoryId is number => categoryId !== null)
-    const categoryDetails = (await Promise.all(categoryIds.map(categoryId => fetchCategoryDetail(categoryId)))).filter(Boolean) as Category[]
-    const existingByName = new Map<string, EditableProductAttribute>()
+    const primaryCategoryId = toCategoryId(selectedCategoryId.value);
+    const orderedExtraIds = sortCategoryIdsByName(
+        extraCategoryIds.value,
+    ).filter((categoryId) => categoryId !== primaryCategoryId);
+    const categoryIds = [primaryCategoryId, ...orderedExtraIds].filter(
+        (categoryId): categoryId is number => categoryId !== null,
+    );
+    const categoryDetails = (
+        await Promise.all(
+            categoryIds.map((categoryId) => fetchCategoryDetail(categoryId)),
+        )
+    ).filter(Boolean) as Category[];
+    const existingByName = new Map<string, EditableProductAttribute>();
 
-    draftAttributes.value.forEach(attribute => {
-        const key = attributeNameKey(attribute.name)
+    draftAttributes.value.forEach((attribute) => {
+        const key = attributeNameKey(attribute.name);
         if (key && !existingByName.has(key)) {
-            existingByName.set(key, attribute)
+            existingByName.set(key, attribute);
         }
-    })
+    });
 
-    const seenDefaultNames = new Set<string>()
-    const defaultAttributes: EditableProductAttribute[] = []
+    const seenDefaultNames = new Set<string>();
+    const defaultAttributes: EditableProductAttribute[] = [];
 
-    categoryDetails.forEach(category => {
-        ;(category.default_attributes ?? []).forEach(attribute => {
-            const name = String(attribute.name ?? '').trim()
-            const key = attributeNameKey(name)
+    categoryDetails.forEach((category) => {
+        (category.default_attributes ?? []).forEach((attribute) => {
+            const name = String(attribute.name ?? '').trim();
+            const key = attributeNameKey(name);
 
-            if (!key || seenDefaultNames.has(key)) return
+            if (!key || seenDefaultNames.has(key)) return;
 
-            const existing = existingByName.get(key)
+            const existing = existingByName.get(key);
             defaultAttributes.push({
                 id: existing?.id ?? nextDraftId(),
                 product_id: props.productId,
                 name,
-                value: String(existing?.value ?? categoryDefaultAttributeValue(attribute)),
+                value: String(
+                    existing?.value ?? categoryDefaultAttributeValue(attribute),
+                ),
                 unit: existing?.unit ?? attribute.unit ?? null,
-            })
-            seenDefaultNames.add(key)
-        })
-    })
+                source: 'category' as const,
+                source_category_id: category.id,
+            });
+            seenDefaultNames.add(key);
+        });
+    });
 
-    const customAttributes = draftAttributes.value.filter(attribute => !seenDefaultNames.has(attributeNameKey(attribute.name)))
-    draftAttributes.value = [...defaultAttributes, ...customAttributes]
-}
+    const customAttributes = draftAttributes.value.filter(
+        (attribute) => !seenDefaultNames.has(attributeNameKey(attribute.name)),
+    ).map((attribute) => ({
+        ...attribute,
+        source: 'custom' as const,
+        source_category_id: null as number | null,
+    }));
+    draftAttributes.value = [...defaultAttributes, ...customAttributes];
+};
 
 const addExtraCategory = () => {
-    const categoryId = toCategoryId(selectedExtraCategoryId.value)
+    const categoryId = toCategoryId(selectedExtraCategoryId.value);
 
-    if (!categoryId || categoryId === selectedCategoryId.value || extraCategoryIds.value.includes(categoryId)) {
-        selectedExtraCategoryId.value = null
-        return
+    if (
+        !categoryId ||
+        categoryId === selectedCategoryId.value ||
+        extraCategoryIds.value.includes(categoryId)
+    ) {
+        selectedExtraCategoryId.value = null;
+        return;
     }
 
-    extraCategoryIds.value = sortCategoryIdsByName([...extraCategoryIds.value, categoryId])
-    selectedExtraCategoryId.value = null
-}
+    extraCategoryIds.value = sortCategoryIdsByName([
+        ...extraCategoryIds.value,
+        categoryId,
+    ]);
+    selectedExtraCategoryId.value = null;
+};
 
 const removeExtraCategory = (categoryId: number) => {
-    extraCategoryIds.value = extraCategoryIds.value.filter(id => id !== categoryId)
-}
+    extraCategoryIds.value = extraCategoryIds.value.filter(
+        (id) => id !== categoryId,
+    );
+};
 
 const initializeProductDraft = async () => {
-    if (!currentProduct.value) return
+    if (!currentProduct.value) return;
 
-    metadataInitialized.value = false
+    metadataInitialized.value = false;
 
-    const categoryId = toCategoryId(currentProduct.value.category_id ?? (currentProduct.value.category as any)?.id ?? null)
-    selectedCategoryId.value = categoryId
+    const categoryId = toCategoryId(
+        currentProduct.value.category_id ??
+            (currentProduct.value.category as any)?.id ??
+            null,
+    );
+    selectedCategoryId.value = categoryId;
     extraCategoryIds.value = sortCategoryIdsByName(
-        currentProduct.value.extra_category_ids
-            ?? currentProduct.value.extra_categories?.map(category => category.id)
-            ?? []
-    ).filter(extraCategoryId => extraCategoryId !== categoryId)
+        currentProduct.value.extra_category_ids ??
+            currentProduct.value.extra_categories?.map(
+                (category) => category.id,
+            ) ??
+            [],
+    ).filter((extraCategoryId) => extraCategoryId !== categoryId);
 
     form.value = {
         sku_base: currentProduct.value.sku_base || '',
@@ -331,193 +424,247 @@ const initializeProductDraft = async () => {
         is_universal: currentProduct.value.is_universal ?? false,
         batch_tracking: currentProduct.value.batch_tracking,
         extra_category_ids: extraCategoryIds.value,
-    }
+    };
 
-    draftAttributes.value = normalizeDraftAttributes(currentProduct.value.attributes ?? [])
-    draftOemReferences.value = normalizeDraftOemReferences(currentProduct.value.oem_references ?? [])
-    draftAlternatives.value = normalizeDraftAlternatives(currentProduct.value.alternatives ?? [])
+    draftAttributes.value = normalizeDraftAttributes(
+        currentProduct.value.attributes ?? [],
+    );
+    draftOemReferences.value = normalizeDraftOemReferences(
+        currentProduct.value.oem_references ?? [],
+    );
+    draftAlternatives.value = normalizeDraftAlternatives(
+        currentProduct.value.alternatives ?? [],
+    );
     draftCompatibility.value = normalizeDraftCompatibility(
         currentProduct.value.compatibility ?? [],
         currentProduct.value.is_universal ?? false,
-    )
+    );
 
-    await applyPrimaryCategorySettings(categoryId)
-    metadataInitialized.value = true
-}
+    await applyPrimaryCategorySettings(categoryId);
+    metadataInitialized.value = true;
+};
 
 onMounted(async () => {
-    loadingCategories.value = true
+    loadingCategories.value = true;
     try {
-        const response = await apiClient.get('/categories')
-        categories.value = response.data
-        categoryDetailCache.value = Object.fromEntries(categories.value.map(category => [category.id, category]))
-    } catch { /* ignore */ }
-    finally { loadingCategories.value = false }
+        const response = await apiClient.get('/categories');
+        categories.value = response.data;
+        categoryDetailCache.value = Object.fromEntries(
+            categories.value.map((category) => [category.id, category]),
+        );
+    } catch {
+        /* ignore */
+    } finally {
+        loadingCategories.value = false;
+    }
 
-    await fetchProduct(props.productId)
-    await initializeProductDraft()
-})
+    await fetchProduct(props.productId);
+    await initializeProductDraft();
+});
 
 watch(selectedCategoryId, async (newCategoryId) => {
-    const categoryId = toCategoryId(newCategoryId)
-    form.value.category_id = categoryId ?? undefined
+    const categoryId = toCategoryId(newCategoryId);
+    form.value.category_id = categoryId ?? undefined;
     if (categoryId && extraCategoryIds.value.includes(categoryId)) {
-        extraCategoryIds.value = extraCategoryIds.value.filter(extraCategoryId => extraCategoryId !== categoryId)
+        extraCategoryIds.value = extraCategoryIds.value.filter(
+            (extraCategoryId) => extraCategoryId !== categoryId,
+        );
     }
 
-    await applyPrimaryCategorySettings(categoryId)
+    await applyPrimaryCategorySettings(categoryId);
 
     if (metadataInitialized.value) {
-        await recalculateDraftAttributesFromCategories()
+        await recalculateDraftAttributesFromCategories();
     }
-})
+});
 
 watch(extraCategoryIds, async () => {
-    form.value.extra_category_ids = sortCategoryIdsByName(extraCategoryIds.value)
+    form.value.extra_category_ids = sortCategoryIdsByName(
+        extraCategoryIds.value,
+    );
 
     if (metadataInitialized.value) {
-        await recalculateDraftAttributesFromCategories()
+        await recalculateDraftAttributesFromCategories();
     }
-})
+});
 
 const metadataPayload = (): UpdateProductRequest => ({
     ...form.value,
     ...categoryPayload(),
     is_universal: draftCompatibility.value.isUniversal,
     attributes: draftAttributes.value
-        .filter(attribute => attribute.name.trim() && String(attribute.value).trim())
-        .map(attribute => ({
+        .filter(
+            (attribute) =>
+                attribute.name.trim() && String(attribute.value).trim(),
+        )
+        .map((attribute) => ({
             name: attribute.name.trim(),
             value: String(attribute.value).trim(),
             unit: attribute.unit ?? undefined,
         })),
     oem_references: draftOemReferences.value
-        .filter(reference => reference.oem_code.trim())
-        .map(reference => ({
+        .filter((reference) => reference.oem_code.trim())
+        .map((reference) => ({
             oem_code: reference.oem_code.trim(),
             manufacturer: reference.manufacturer?.trim() || null,
         })),
-    alternatives: draftAlternatives.value.map(alternative => ({
+    alternatives: draftAlternatives.value.map((alternative) => ({
         alternative_product_id: alternative.id,
         relationship_type: alternative.relationship_type,
     })),
     vehicle_compatibility: {
-        engines: draftCompatibility.value.engines.map(engine => ({
+        engines: draftCompatibility.value.engines.map((engine) => ({
             engine_id: engine.engine_id,
         })),
-        chassis: draftCompatibility.value.chassis.map(chassis => ({
+        chassis: draftCompatibility.value.chassis.map((chassis) => ({
             chassis_id: chassis.chassis_id,
         })),
         allEngines: draftCompatibility.value.allEngines,
         allChassis: draftCompatibility.value.allChassis,
         isUniversal: draftCompatibility.value.isUniversal,
     },
-})
+});
 
 const handleSubmit = async () => {
-    validationErrors.value = {}
-    successMessage.value = ''
+    validationErrors.value = {};
+    successMessage.value = '';
 
     try {
-        await updateProduct(props.productId, metadataPayload())
-        await fetchProduct(props.productId)
-        await initializeProductDraft()
-        successMessage.value = 'Producto actualizado exitosamente'
-        toast.success('Producto actualizado exitosamente')
+        await updateProduct(props.productId, metadataPayload());
+        await fetchProduct(props.productId);
+        await initializeProductDraft();
+        successMessage.value = 'Producto actualizado exitosamente';
+        toast.success('Producto actualizado exitosamente');
     } catch (err: any) {
         if (err.response?.data?.errors) {
-            validationErrors.value = err.response.data.errors
+            validationErrors.value = err.response.data.errors;
         }
     }
-}
+};
+
+const handleArchive = async () => {
+    const productName =
+        currentProduct.value?.name || form.value.name || 'este producto';
+    if (
+        !confirm(
+            `¿Desea archivar "${productName}"? Desaparecerá del Punto de Venta, pero las facturas históricas lo conservarán.`,
+        )
+    )
+        return;
+
+    archiving.value = true;
+    try {
+        await productsApi.deleteProduct(props.productId);
+        toast.success('Producto archivado correctamente');
+        window.location.href = '/products';
+    } catch (err: any) {
+        toast.error(
+            err.response?.data?.message || 'Error al archivar producto',
+        );
+    } finally {
+        archiving.value = false;
+    }
+};
 
 const cancel = () => {
-    window.location.href = '/products'
-}
+    window.location.href = '/products';
+};
 
 const handleDuplicate = async () => {
-    if (duplicating.value) return
+    if (duplicating.value) return;
 
-    duplicating.value = true
+    duplicating.value = true;
     try {
-        const response = await productsApi.duplicateProduct(props.productId)
-        const duplicatedProductId = response?.data?.id
+        const response = await productsApi.duplicateProduct(props.productId);
+        const duplicatedProductId = response?.data?.id;
 
         if (!duplicatedProductId) {
-            throw new Error('No se recibio el ID del producto duplicado')
+            throw new Error('No se recibio el ID del producto duplicado');
         }
 
-        toast.success('Producto duplicado. Ajusta los campos necesarios.')
-        window.location.href = `/products/${duplicatedProductId}/edit`
+        toast.success('Producto duplicado. Ajusta los campos necesarios.');
+        window.location.href = `/products/${duplicatedProductId}/edit`;
     } catch (err: any) {
-        toast.error(err.response?.data?.message || 'Error al duplicar producto')
+        toast.error(
+            err.response?.data?.message || 'Error al duplicar producto',
+        );
     } finally {
-        duplicating.value = false
+        duplicating.value = false;
     }
-}
+};
 
 const handleRegenerateName = async () => {
-    if (regenerating.value) return
-    regenerating.value = true
+    if (regenerating.value) return;
+    regenerating.value = true;
     try {
         const response = await productsApi.previewName(props.productId, {
             ...categoryPayload(),
             vehicle_compatibility: {
-                engines: draftCompatibility.value.engines.map(engine => ({
+                engines: draftCompatibility.value.engines.map((engine) => ({
                     engine_id: engine.engine_id,
                 })),
-                chassis: draftCompatibility.value.chassis.map(chassis => ({
+                chassis: draftCompatibility.value.chassis.map((chassis) => ({
                     chassis_id: chassis.chassis_id,
                 })),
                 allEngines: draftCompatibility.value.allEngines,
                 allChassis: draftCompatibility.value.allChassis,
                 isUniversal: draftCompatibility.value.isUniversal,
             },
-        })
-        const newName = response.data?.name
+        });
+        const newName = response.data?.name;
         if (newName) {
-            form.value.name = newName
-            toast.success('Descripción regenerada correctamente')
+            form.value.name = newName;
+            toast.success('Descripción regenerada correctamente');
         }
     } catch (err: any) {
-        toast.error(err.response?.data?.message || 'Error al regenerar la descripción')
+        toast.error(
+            err.response?.data?.message || 'Error al regenerar la descripción',
+        );
     } finally {
-        regenerating.value = false
+        regenerating.value = false;
     }
-}
+};
 
 // === Vehicle Inline Modals ===
-const vehicleCompatRef = ref<InstanceType<typeof VehicleCompatSection> | null>(null)
-const vehicleModalsRef = ref<InstanceType<typeof VehicleInlineModals> | null>(null)
-const vehicleModalType = ref<'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null>(null)
+const vehicleCompatRef = ref<InstanceType<typeof VehicleCompatSection> | null>(
+    null,
+);
+const vehicleModalsRef = ref<InstanceType<typeof VehicleInlineModals> | null>(
+    null,
+);
+const vehicleModalType = ref<
+    'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null
+>(null);
 
-const openVehicleInline = (type: 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis') => {
-    vehicleModalType.value = type
-    vehicleModalsRef.value?.open(type)
-}
+const openVehicleInline = (
+    type: 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis',
+) => {
+    vehicleModalType.value = type;
+    vehicleModalsRef.value?.open(type);
+};
 
 const closeVehicleInline = () => {
-    vehicleModalType.value = null
-}
+    vehicleModalType.value = null;
+};
 
 const onMakeCreated = (make: { id: number; name: string }) => {
-    vehicleCompatRef.value?.addMake(make)
-    vehicleModalType.value = null
-}
+    vehicleCompatRef.value?.addMake(make);
+    vehicleModalType.value = null;
+};
 
 const onModelCreated = (model: any) => {
-    vehicleCompatRef.value?.addModel(model)
-    vehicleModalType.value = null
-}
+    vehicleCompatRef.value?.addModel(model);
+    vehicleModalType.value = null;
+};
 
 const onEngineCreated = (engine: any) => {
-    vehicleCompatRef.value?.addEngine(engine)
-    vehicleModalType.value = null
-}
+    vehicleCompatRef.value?.addEngine(engine);
+    vehicleModalType.value = null;
+};
 
 const onChassisCreated = (chassis: any) => {
-    vehicleCompatRef.value?.addChassisToList(chassis)
-}
+    vehicleCompatRef.value?.addChassisToList(chassis);
+};
 </script>
 
 <template>
@@ -528,8 +675,14 @@ const onChassisCreated = (chassis: any) => {
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Editar Producto</h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Modifica los datos del producto y sus secciones</p>
+                    <h1
+                        class="text-2xl font-bold text-gray-900 dark:text-white"
+                    >
+                        Editar Producto
+                    </h1>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                        Modifica los datos del producto y sus secciones
+                    </p>
                 </div>
                 <div class="flex gap-3">
                     <button
@@ -541,131 +694,230 @@ const onChassisCreated = (chassis: any) => {
                         <Copy class="h-4 w-4" />
                         {{ duplicating ? 'Duplicando...' : 'Duplicar' }}
                     </button>
-                    <button type="button" @click="cancel"
-                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-white">
+                    <button
+                        type="button"
+                        @click="cancel"
+                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-white"
+                    >
                         Cancelar
                     </button>
-                    <button type="button" @click="handleSubmit" :disabled="loading"
-                        class="rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-primary/90 disabled:opacity-50">
+                    <button
+                        type="button"
+                        @click="handleSubmit"
+                        :disabled="loading"
+                        class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    >
                         {{ loading ? 'Guardando...' : 'Guardar Cambios' }}
                     </button>
                 </div>
             </div>
 
             <!-- Loading -->
-            <div v-if="loading && !currentProduct" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
+            <div v-if="loading && !currentProduct" class="py-12 text-center">
+                <div
+                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
+                ></div>
                 <p class="mt-2 text-gray-600">Cargando producto...</p>
             </div>
 
             <div v-else class="space-y-4">
                 <!-- Success Message -->
-                <div v-if="successMessage" class="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                <div
+                    v-if="successMessage"
+                    class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
+                >
                     {{ successMessage }}
                 </div>
 
                 <!-- Error Message -->
-                <div v-if="error" class="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                <div
+                    v-if="error"
+                    class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                >
                     {{ error }}
                 </div>
 
                 <!-- SECTION 1: Descripcion -->
-                <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-4">
-
-                <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border space-y-4">
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Descripción</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Descripción <span class="text-red-500">*</span>
-                            </label>
-                            <div class="mt-1 flex gap-2">
-                                <input v-model="form.name" type="text" required
-                                    class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white" />
+                <form
+                    @submit.prevent="handleSubmit"
+                    @keydown.enter="
+                        (e: KeyboardEvent) => {
+                            if ((e.target as HTMLElement)?.tagName === 'INPUT')
+                                e.preventDefault();
+                        }
+                    "
+                    class="space-y-4"
+                >
+                    <div
+                        class="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <h2
+                            class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                        >
+                            Descripción
+                        </h2>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div>
+                                <label
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >
+                                    Descripción
+                                    <span class="text-red-500">*</span>
+                                </label>
+                                <div class="mt-1 flex gap-2">
+                                    <input
+                                        v-model="form.name"
+                                        type="text"
+                                        required
+                                        class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        :disabled="regenerating"
+                                        @click="handleRegenerateName"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted"
+                                        title="Regenerar descripción automática desde categoría + compatibilidad vehicular"
+                                    >
+                                        <RefreshCw
+                                            class="h-3.5 w-3.5"
+                                            :class="{
+                                                'animate-spin': regenerating,
+                                            }"
+                                        />
+                                        Auto
+                                    </button>
+                                </div>
+                                <p
+                                    v-if="validationErrors.name"
+                                    class="mt-1 text-sm text-red-600"
+                                >
+                                    {{ validationErrors.name[0] }}
+                                </p>
+                            </div>
+                            <div>
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Categoría</label
+                                >
+                                <SearchableSelect
+                                    :options="categoryOptions"
+                                    :model-value="selectedCategoryId"
+                                    @update:model-value="
+                                        (v) =>
+                                            (selectedCategoryId =
+                                                toCategoryId(v))
+                                    "
+                                    placeholder="-- Selecciona categoría --"
+                                    :loading="loadingCategories"
+                                />
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Categorías extra</label
+                            >
+                            <div
+                                class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]"
+                            >
+                                <SearchableSelect
+                                    :options="extraCategoryOptions"
+                                    :model-value="selectedExtraCategoryId"
+                                    @update:model-value="
+                                        (v) =>
+                                            (selectedExtraCategoryId =
+                                                toCategoryId(v))
+                                    "
+                                    placeholder="-- Selecciona categoría extra --"
+                                    :loading="loadingCategories"
+                                    :clearable="true"
+                                />
                                 <button
                                     type="button"
-                                    :disabled="regenerating"
-                                    @click="handleRegenerateName"
-                                    class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted"
-                                    title="Regenerar descripción automática desde categoría + compatibilidad vehicular"
+                                    @click="addExtraCategory"
+                                    :disabled="!selectedExtraCategoryId"
+                                    class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
                                 >
-                                    <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': regenerating }" />
-                                    Auto
+                                    <Plus class="h-4 w-4" /> Agregar
                                 </button>
                             </div>
-                            <p v-if="validationErrors.name" class="mt-1 text-sm text-red-600">{{ validationErrors.name[0] }}</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoría</label>
-                            <SearchableSelect
-                                :options="categoryOptions"
-                                :model-value="selectedCategoryId"
-                                @update:model-value="v => selectedCategoryId = toCategoryId(v)"
-                                placeholder="-- Selecciona categoría --"
-                                :loading="loadingCategories"
-                            />
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Categorías extra</label>
-                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                            <SearchableSelect
-                                :options="extraCategoryOptions"
-                                :model-value="selectedExtraCategoryId"
-                                @update:model-value="v => selectedExtraCategoryId = toCategoryId(v)"
-                                placeholder="-- Selecciona categoría extra --"
-                                :loading="loadingCategories"
-                                :clearable="true"
-                            />
-                            <button
-                                type="button"
-                                @click="addExtraCategory"
-                                :disabled="!selectedExtraCategoryId"
-                                class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                            <div
+                                v-if="selectedExtraCategories.length > 0"
+                                class="flex flex-wrap gap-2"
                             >
-                                <Plus class="h-4 w-4" /> Agregar
-                            </button>
-                        </div>
-                        <div v-if="selectedExtraCategories.length > 0" class="flex flex-wrap gap-2">
-                            <span
-                                v-for="category in selectedExtraCategories"
-                                :key="category.id"
-                                class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
-                            >
-                                {{ category.name }}
-                                <button type="button" @click="removeExtraCategory(category.id)" class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800" :aria-label="`Quitar ${category.name}`">
-                                    <X class="h-3 w-3" />
-                                </button>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SECTION 2: Código y Estado -->
-                <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border">
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Código y Estado</h2>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Código <span class="text-gray-400 font-normal text-xs">(opcional)</span>
-                            </label>
-                            <input v-model="form.sku_base" type="text"
-                                class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white font-mono"
-                                placeholder="Ej: ALT-0012" />
-                            <p v-if="validationErrors.sku_base" class="mt-1 text-sm text-red-600">{{ validationErrors.sku_base[0] }}</p>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
-                            <select v-model="form.status"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white">
-                                <option value="active">Activo</option>
-                                <option value="discontinued">Discontinuado</option>
-                                <option value="pending">Pendiente</option>
-                            </select>
+                                <span
+                                    v-for="category in selectedExtraCategories"
+                                    :key="category.id"
+                                    class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
+                                >
+                                    {{ category.name }}
+                                    <button
+                                        type="button"
+                                        @click="
+                                            removeExtraCategory(category.id)
+                                        "
+                                        class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
+                                        :aria-label="`Quitar ${category.name}`"
+                                    >
+                                        <X class="h-3 w-3" />
+                                    </button>
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </div>
+
+                    <!-- SECTION 2: Código y Estado -->
+                    <div
+                        class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <h2
+                            class="mb-4 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                        >
+                            Código y Estado
+                        </h2>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div>
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >
+                                    Código
+                                    <span
+                                        class="text-xs font-normal text-gray-400"
+                                        >(opcional)</span
+                                    >
+                                </label>
+                                <input
+                                    v-model="form.sku_base"
+                                    type="text"
+                                    class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
+                                    placeholder="Ej: ALT-0012"
+                                />
+                                <p
+                                    v-if="validationErrors.sku_base"
+                                    class="mt-1 text-sm text-red-600"
+                                >
+                                    {{ validationErrors.sku_base[0] }}
+                                </p>
+                            </div>
+
+                            <div>
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Estado</label
+                                >
+                                <select
+                                    v-model="form.status"
+                                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                >
+                                    <option value="active">Activo</option>
+                                    <option value="discontinued">
+                                        Discontinuado
+                                    </option>
+                                    <option value="pending">Pendiente</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </form>
 
                 <!-- SECTION 3: Códigos Alternos -->
@@ -687,7 +939,11 @@ const onChassisCreated = (chassis: any) => {
                 <!-- SECTION 5: Variantes -->
                 <VariantManager
                     :product-id="props.productId"
-                    :category-id="selectedCategoryId ?? currentProduct?.category_id ?? currentProduct?.category?.id"
+                    :category-id="
+                        selectedCategoryId ??
+                        currentProduct?.category_id ??
+                        currentProduct?.category?.id
+                    "
                     :sku-base="currentProduct?.sku_base || ''"
                     :product-name="currentProduct?.name || ''"
                     :category-formula="categoryFormula"
@@ -697,13 +953,17 @@ const onChassisCreated = (chassis: any) => {
                 />
 
                 <!-- SECTION 6: Atributos -->
-                <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-indigo-500">
+                <div
+                    class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                >
                     <div class="mb-3 flex items-center justify-between gap-3">
-                        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-1">
-                            <Wrench class="w-4 h-4" /> Atributos
+                        <h2
+                            class="flex items-center gap-1 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                        >
+                            <Wrench class="h-4 w-4" /> Atributos
                         </h2>
                     </div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
                         Agrega o edita atributos del producto a nivel base.
                     </p>
                     <AttributeManager
@@ -715,8 +975,14 @@ const onChassisCreated = (chassis: any) => {
                 </div>
 
                 <!-- SECTION 7: Upsales -->
-                <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-violet-500">
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">Upsales</h2>
+                <div
+                    class="rounded-xl border border-l-4 border-gray-100 border-l-violet-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                >
+                    <h2
+                        class="mb-3 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                    >
+                        Upsales
+                    </h2>
                     <AlternativeManager
                         v-model="draftAlternatives"
                         mode="draft"
@@ -725,12 +991,18 @@ const onChassisCreated = (chassis: any) => {
                 </div>
 
                 <!-- SECTION 8: Notas -->
-                <div class="rounded-xl bg-white p-5 shadow-sm dark:bg-card border border-gray-100 dark:border-border border-l-4 border-l-slate-400">
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">Notas</h2>
+                <div
+                    class="rounded-xl border border-l-4 border-gray-100 border-l-slate-400 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                >
+                    <h2
+                        class="mb-2 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                    >
+                        Notas
+                    </h2>
                     <textarea
                         v-model="form.description"
                         rows="3"
-                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white resize-none"
+                        class="mt-1 w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                         placeholder="Notas internas del producto..."
                     ></textarea>
                 </div>
@@ -740,8 +1012,44 @@ const onChassisCreated = (chassis: any) => {
                     mode="gallery"
                     :product-id="props.productId"
                     :product-name="currentProduct?.name"
+                    :category-ids="selectedCategoryIdsForImages"
+                    :category-name-map="categoryNameMapForImages"
                 />
 
+                <div
+                    class="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/20"
+                >
+                    <div
+                        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <div>
+                            <h2
+                                class="text-sm font-semibold tracking-wider text-amber-800 uppercase dark:text-amber-300"
+                            >
+                                Archivo
+                            </h2>
+                            <p
+                                class="mt-1 text-sm text-amber-700 dark:text-amber-200"
+                            >
+                                Archivar oculta el producto del Punto de Venta
+                                sin afectar facturas históricas.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            :disabled="archiving"
+                            @click="handleArchive"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-card dark:text-amber-300 dark:hover:bg-amber-950/40"
+                        >
+                            <Archive class="h-4 w-4" />
+                            {{
+                                archiving
+                                    ? 'Archivando...'
+                                    : 'Archivar producto'
+                            }}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </AppLayout>

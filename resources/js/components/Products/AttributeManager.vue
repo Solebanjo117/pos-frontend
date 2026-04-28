@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { Trash2 } from 'lucide-vue-next'
+import { Trash2, Lock } from 'lucide-vue-next'
 import { useProductAttributes, type ProductAttribute } from '@/composables/useProductAttributes'
 
 const props = withDefaults(defineProps<{
@@ -36,6 +36,10 @@ const nextDraftId = ref(-1)
 const isDraftMode = computed(() => props.mode === 'draft')
 const displayedAttributes = computed(() => isDraftMode.value ? props.modelValue : attributes.value)
 
+const isInherited = (attr: ProductAttribute): boolean => {
+    return (attr as any).source === 'category'
+}
+
 const emitDraftAttributes = (value: ProductAttribute[]) => {
     emit('update:modelValue', value)
 }
@@ -68,7 +72,8 @@ const handleAdd = async () => {
                     name: newName.value.trim(),
                     value: newValue.value.trim(),
                     unit: null,
-                },
+                    source: 'custom',
+                } as ProductAttribute,
             ])
             newName.value = ''
             newValue.value = ''
@@ -138,7 +143,11 @@ const handleRemoveAttribute = async (attributeId: number) => {
         return
     }
 
-    await removeAttribute(attributeId)
+    try {
+        await removeAttribute(attributeId)
+    } catch (e: any) {
+        actionError.value = e.response?.data?.message || 'No se pudo eliminar el atributo.'
+    }
 }
 </script>
 
@@ -186,15 +195,24 @@ const handleRemoveAttribute = async (attributeId: number) => {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-border/50">
-                    <tr v-for="attr in displayedAttributes" :key="attr.id" class="group">
+                    <tr v-for="attr in displayedAttributes" :key="attr.id" class="group"
+                        :class="{ 'bg-amber-50/50 dark:bg-amber-900/10': isInherited(attr) }">
                         <td class="px-4 py-1.5">
-                            <input
-                                :value="attr.name"
-                                @input="debouncedSave(attr, 'name', ($event.target as HTMLInputElement).value)"
-                                @blur="flushAndSave(attr, 'name', ($event.target as HTMLInputElement).value)"
-                                @keyup.enter="($event.target as HTMLInputElement).blur()"
-                                class="w-full rounded border border-transparent bg-transparent px-2 py-1.5 text-sm font-medium text-gray-900 hover:border-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none dark:text-white dark:hover:border-border dark:focus:border-primary dark:focus:bg-muted"
-                            />
+                            <div class="flex items-center gap-1.5">
+                                <Lock v-if="isInherited(attr)" class="h-3.5 w-3.5 shrink-0 text-amber-500" title="Atributo heredado de categoría" />
+                                <input
+                                    :value="attr.name"
+                                    @input="debouncedSave(attr, 'name', ($event.target as HTMLInputElement).value)"
+                                    @blur="flushAndSave(attr, 'name', ($event.target as HTMLInputElement).value)"
+                                    @keyup.enter="($event.target as HTMLInputElement).blur()"
+                                    :readonly="isInherited(attr) && !isDraftMode"
+                                    :class="[
+                                        'w-full rounded border border-transparent bg-transparent px-2 py-1.5 text-sm font-medium hover:border-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none dark:hover:border-border dark:focus:border-primary dark:focus:bg-muted',
+                                        isInherited(attr) ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white',
+                                        isInherited(attr) && !isDraftMode ? 'cursor-not-allowed opacity-75' : ''
+                                    ]"
+                                />
+                            </div>
                         </td>
                         <td class="px-4 py-1.5">
                             <div class="flex items-center gap-1.5">
@@ -209,9 +227,12 @@ const handleRemoveAttribute = async (attributeId: number) => {
                             </div>
                         </td>
                         <td class="px-2 py-1.5 text-right">
-                            <button @click="handleRemoveAttribute(attr.id)" class="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity" title="Eliminar">
+                            <button v-if="!isInherited(attr)" @click="handleRemoveAttribute(attr.id)" class="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity" title="Eliminar">
                                 <Trash2 class="h-4 w-4" />
                             </button>
+                            <span v-else class="text-xs text-amber-500 dark:text-amber-400" title="Heredado de categoría">
+                                Heredado
+                            </span>
                         </td>
                     </tr>
                 </tbody>

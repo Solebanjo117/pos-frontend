@@ -12,7 +12,7 @@ export interface Supplier {
     notes?: string
     status: 'active' | 'inactive'
     products_count?: number
-    brands?: Pick<Brand, 'id' | 'name' | 'prefix'>[]
+    brands?: Pick<Brand, 'id' | 'name'>[]
     created_at: string
     updated_at: string
     deleted_at?: string
@@ -21,7 +21,6 @@ export interface Supplier {
 interface Brand {
     id: number
     name: string
-    prefix?: string
 }
 
 export interface SupplierFilters {

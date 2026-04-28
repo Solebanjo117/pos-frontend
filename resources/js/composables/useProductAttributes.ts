@@ -7,6 +7,8 @@ export interface ProductAttribute {
     name: string
     value: string
     unit?: string | null
+    source?: 'category' | 'custom'
+    source_category_id?: number | null
 }
 
 export function useProductAttributes(productId: number) {

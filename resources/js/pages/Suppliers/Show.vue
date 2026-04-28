@@ -207,7 +207,7 @@ const removeBrand = async (brandId: number) => {
                             >
                                 <option :value="null" disabled>Seleccionar marca...</option>
                                 <option v-for="brand in brandsNotYetLinked" :key="brand.id" :value="brand.id">
-                                    {{ brand.name }}{{ brand.prefix ? ` (${brand.prefix})` : '' }}
+                                    {{ brand.name }}
                                 </option>
                             </select>
                             <button
@@ -242,7 +242,7 @@ const removeBrand = async (brandId: number) => {
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm font-medium border border-blue-200 dark:border-blue-800"
                             >
                                 <Link :href="`/brands/${brand.id}/edit`" class="hover:underline">
-                                    {{ brand.name }}{{ brand.prefix ? ` (${brand.prefix})` : '' }}
+                                    {{ brand.name }}
                                 </Link>
                                 <button
                                     type="button"

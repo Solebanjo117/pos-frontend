@@ -69,9 +69,10 @@ export function useSalesOrders() {
         error.value = null
 
         try {
-            const newOrder = await salesOrdersService.create(orderData)
+            const result = await salesOrdersService.create(orderData)
+            const newOrder = result.data
             salesOrders.value.unshift(newOrder)
-            return newOrder
+            return result
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Error al crear orden'
             console.error('Error creating sales order:', err)
@@ -134,7 +135,8 @@ export function useSalesOrders() {
         error.value = null
 
         try {
-            const confirmedOrder = await salesOrdersService.confirm(id)
+            const result = await salesOrdersService.confirm(id)
+            const confirmedOrder = result.data
             const index = salesOrders.value.findIndex(o => o.id === id)
             if (index !== -1) {
                 salesOrders.value[index] = confirmedOrder
@@ -142,7 +144,7 @@ export function useSalesOrders() {
             if (currentSalesOrder.value?.id === id) {
                 currentSalesOrder.value = confirmedOrder
             }
-            return confirmedOrder
+            return result
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Error al confirmar orden'
             console.error('Error confirming sales order:', err)

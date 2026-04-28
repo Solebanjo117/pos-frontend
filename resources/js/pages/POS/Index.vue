@@ -77,6 +77,7 @@ const {
   reorderCart,
   clearCart,
   validateCartStock,
+  getStockWarnings,
   processSale,
   saveDraft,
   shippingCost,
@@ -1261,9 +1262,11 @@ const handleSaveQuoteChanges = async () => {
     alert('El carrito está vacío, agrega productos antes de guardar.')
     return
   }
-  if (!validateCartStock('quote')) {
-    alert(error.value || 'Stock insuficiente para actualizar la cotización.')
-    return
+  // Collect stock warnings but do NOT block — show as advisory
+  const stockIssues = getStockWarnings('quote')
+  if (stockIssues.length > 0) {
+    const proceed = confirm(`Advertencia de stock:\n- ${stockIssues.join('\n- ')}\n\n¿Deseas continuar?`)
+    if (!proceed) return
   }
   saveQuoteChangesLoading.value = true
   try {
@@ -1279,13 +1282,19 @@ const handleSaveQuoteChanges = async () => {
       custom_description: item.is_custom_line ? (item.custom_description || item.product_name) : null,
     }))
 
-    await apiClient.put(`/sales-quotes/${quoteId}`, {
+    const res = await apiClient.put(`/sales-quotes/${quoteId}`, {
       customer_id:  customer_id.value ?? null,
       warehouse_id: currentWarehouseId.value ?? null,
       items,
     })
 
-    alert('✅ Cotización actualizada exitosamente.')
+    const apiWarnings = res.data?.warnings
+    if (apiWarnings && Array.isArray(apiWarnings) && apiWarnings.length > 0) {
+      const warningMsgs = apiWarnings.map((w: any) => w.message || JSON.stringify(w)).join('\n- ')
+      alert(`Cotización actualizada correctamente.\n\nAdvertencias de stock:\n- ${warningMsgs}`)
+    } else {
+      alert('Cotización actualizada correctamente.')
+    }
     searchInput.value?.focus()
   } catch (e: any) {
     alert(extractApiErrorMessage(e, 'Error al actualizar la cotización'))
@@ -1302,9 +1311,11 @@ const handleSaveQuote = async () => {
     alert('Agrega productos al carrito antes de guardar una cotización.')
     return
   }
-  if (!validateCartStock('quote')) {
-    alert(error.value || 'Stock insuficiente para guardar la cotización.')
-    return
+  // Collect stock warnings but do NOT block — show as advisory
+  const stockIssues = getStockWarnings('quote')
+  if (stockIssues.length > 0) {
+    const proceed = confirm(`Advertencia de stock:\n- ${stockIssues.join('\n- ')}\n\n¿Deseas continuar?`)
+    if (!proceed) return
   }
   saveQuoteLoading.value = true
   try {
@@ -1326,11 +1337,19 @@ const handleSaveQuote = async () => {
       items,
     })
 
-    const quoteNumber = res.data.data?.quote_number ?? ''
+    const quoteNumber = res.data?.data?.quote_number ?? ''
+    const apiWarnings = res.data?.warnings || res.data?.data?.warnings
+
     clearCart()
 
-    const msg = `📄 Cotización ${quoteNumber} guardada exitosamente.\n\n¿Deseas ir a Cotizaciones?`
-    if (confirm(msg)) {
+    let alertMsg = `Cotización ${quoteNumber} guardada correctamente.`
+    if (apiWarnings && Array.isArray(apiWarnings) && apiWarnings.length > 0) {
+      const warningMsgs = apiWarnings.map((w: any) => w.message || JSON.stringify(w)).join('\n- ')
+      alertMsg += `\n\nAdvertencias de stock:\n- ${warningMsgs}`
+    }
+
+    const shouldNavigate = confirm(`${alertMsg}\n\n¿Deseas ir al listado de cotizaciones?`)
+    if (shouldNavigate) {
       window.location.href = '/sales-quotes'
     }
   } catch (e: any) {

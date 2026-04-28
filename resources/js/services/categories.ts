@@ -58,6 +58,42 @@ export const categoriesService = {
     },
 
     /**
+     * Get category images.
+     */
+    async getImages(id: number) {
+        const { data } = await apiClient.get(`${BASE_URL}/${id}/images`)
+        return data.data ?? []
+    },
+
+    /**
+     * Upload category images.
+     */
+    async uploadImages(id: number, images: File[]) {
+        const formData = new FormData()
+        images.forEach((image) => formData.append('images[]', image))
+
+        const { data } = await apiClient.post(`${BASE_URL}/${id}/images`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+
+        return data.data ?? []
+    },
+
+    /**
+     * Upload a single category image.
+     */
+    async uploadImage(id: number, image: File) {
+        return this.uploadImages(id, [image])
+    },
+
+    /**
+     * Delete category image by media ID.
+     */
+    async deleteImage(id: number, mediaId: number) {
+        await apiClient.delete(`${BASE_URL}/${id}/images/${mediaId}`)
+    },
+
+    /**
      * Delete category
      */
     async delete(id: number): Promise<void> {

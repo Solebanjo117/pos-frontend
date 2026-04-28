@@ -25,6 +25,7 @@ const importConfig: ImporterConfig = {
         { key: 'slug',           label: 'Slug',             type: 'text' },
         { key: 'categoria_padre',label: 'Categoría Padre',  type: 'searchable', searchableEndpoint: '/categories/all' },
         { key: 'descripcion',    label: 'Descripción',      type: 'text' },
+        { key: 'imagen_url',     label: 'Imagen URL',       type: 'text' },
         { key: 'margen_default', label: 'Margen %',         type: 'number' },
         { key: 'formula_precio', label: 'Fórmula Precio',   type: 'text' },
         { key: 'aplica_itbm',    label: 'Aplica ITBM',      type: 'select', options: [{ label: 'Sí', value: 'si' }, { label: 'No', value: 'no' }] },

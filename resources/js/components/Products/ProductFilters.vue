@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from 'vue'
-import { X, Layers, Tag, DollarSign, Search, Package, RotateCcw } from 'lucide-vue-next'
+import { ref, watch, computed } from 'vue'
+import { X, Layers, Tag, DollarSign, Package, RotateCcw } from 'lucide-vue-next'
 
 interface Category { id: number; name: string }
 interface Brand { id: number; name: string }
@@ -30,12 +30,10 @@ const emit = defineEmits<{
 
 // Local deep copy of filters (use JSON for safe deep-clone, unwrapping Vue proxies)
 const local = ref<ProductFilterValues>(JSON.parse(JSON.stringify(props.modelValue)))
-const searchDraft = ref(local.value.sku ?? '')
 
 // Sync from parent when the full modelValue changes identity
 watch(() => props.modelValue, (v) => {
   local.value = JSON.parse(JSON.stringify(v))
-  searchDraft.value = local.value.sku ?? ''
 }, { deep: true })
 
 // Debounce timer for text/number inputs
@@ -51,11 +49,6 @@ const emitDebounced = () => {
 const emitImmediate = () => {
   if (debounceTimer) clearTimeout(debounceTimer)
   emit('update:modelValue', { ...local.value })
-}
-
-const applySearch = () => {
-  local.value.sku = (searchDraft.value ?? '').trim()
-  emitImmediate()
 }
 
 // Category multi-select
@@ -82,7 +75,6 @@ const toggleBrand = (id: number) => {
 
 const activeFilterCount = computed(() => {
   let count = 0
-  if (local.value.sku) count++
   if (local.value.category_ids.length > 0) count++
   if (local.value.brand_ids.length > 0) count++
   if (local.value.min_price != null) count++
@@ -93,14 +85,12 @@ const activeFilterCount = computed(() => {
 
 const clearFilters = () => {
   local.value = {
-    sku: '',
     category_ids: [],
     brand_ids: [],
     min_price: undefined,
     max_price: undefined,
     in_stock: false,
   }
-  searchDraft.value = ''
   emitImmediate()
 }
 
@@ -156,28 +146,6 @@ const filteredBrands = computed(() => {
 
     <!-- Scrollable body -->
     <div class="flex-1 overflow-y-auto p-3 space-y-5">
-
-      <!-- SKU Filter -->
-      <div>
-        <h4 class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
-          <Search class="w-3 h-3" />
-          Busqueda Global
-        </h4>
-        <input
-          v-model="searchDraft"
-          @keyup.enter.prevent="applySearch"
-          type="text"
-          placeholder="Nombre, SKU, VIN, OEM, categoria..."
-          class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-border bg-gray-50 dark:bg-muted text-gray-700 dark:text-foreground placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-shadow"
-        />
-        <button
-          @click="applySearch"
-          class="mt-2 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700"
-        >
-          <Search class="h-3 w-3" />
-          Buscar
-        </button>
-      </div>
 
       <!-- Categories -->
       <div>
@@ -301,7 +269,7 @@ const filteredBrands = computed(() => {
     <!-- Footer -->
     <div class="px-3 py-2 border-t border-gray-100 dark:border-border">
       <p class="text-[10px] text-gray-400 text-center">
-        Filtros automáticos. Búsqueda con Enter o Buscar.
+        Filtros automáticos del panel lateral.
       </p>
     </div>
   </aside>

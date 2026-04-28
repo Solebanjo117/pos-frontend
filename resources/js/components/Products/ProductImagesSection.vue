@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import apiClient from '@/services/api/client'
+import { categoriesService } from '@/services/categories'
 import { X } from 'lucide-vue-next'
 
 interface ProductImage {
@@ -8,6 +9,20 @@ interface ProductImage {
     url: string
     original_filename: string
     display_order: number
+}
+
+interface InheritedImage {
+    id: number
+    url: string
+    display_order: number
+    category_name: string
+    category_id: number
+}
+
+interface GroupedInheritedImages {
+    categoryId: number
+    categoryName: string
+    images: InheritedImage[]
 }
 
 export interface PendingImage {
@@ -21,6 +36,8 @@ const props = defineProps<{
     productId?: number
     productName?: string
     modelValue?: PendingImage[]
+    categoryIds?: number[]
+    categoryNameMap?: Record<number, string>
 }>()
 
 const emit = defineEmits<{
@@ -142,8 +159,59 @@ const removePendingImage = (tempId: string) => {
     pendingImages.value = updated
 }
 
+// === Inherited images from categories ===
+const groupedInheritedImages = ref<GroupedInheritedImages[]>([])
+const inheritedImagesLoading = ref(false)
+
+const allInheritedImages = computed(() =>
+    groupedInheritedImages.value.flatMap(group => group.images)
+)
+
+const hasInheritedImages = computed(() => allInheritedImages.value.length > 0)
+
+const fetchInheritedImages = async () => {
+    const ids = props.categoryIds ?? []
+    if (ids.length === 0) {
+        groupedInheritedImages.value = []
+        return
+    }
+
+    inheritedImagesLoading.value = true
+    const results: GroupedInheritedImages[] = []
+
+    await Promise.all(
+        ids.map(async (categoryId) => {
+            try {
+                const images = await categoriesService.getImages(categoryId)
+                if (images && images.length > 0) {
+                    results.push({
+                        categoryId,
+                        categoryName: props.categoryNameMap?.[categoryId] ?? `Categoría ${categoryId}`,
+                        images: images.map((img: InheritedImage) => ({
+                            ...img,
+                            category_id: categoryId,
+                        })),
+                    })
+                }
+            } catch {
+                // skip categories with errors
+            }
+        }),
+    )
+
+    groupedInheritedImages.value = results
+    inheritedImagesLoading.value = false
+}
+
+watch(
+    () => props.categoryIds,
+    () => fetchInheritedImages(),
+    { deep: true },
+)
+
 onMounted(() => {
     if (props.mode === 'gallery') fetchImages()
+    fetchInheritedImages()
 })
 </script>
 
@@ -173,6 +241,41 @@ onMounted(() => {
                     <X class="h-3 w-3" />
                 </button>
                 <p class="px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 truncate" :title="item.file.name">{{ item.file.name }}</p>
+            </div>
+        </div>
+
+        <!-- Inherited category images -->
+        <div v-if="categoryIds && categoryIds.length > 0" class="mt-5 pt-5 border-t border-gray-200 dark:border-border">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-3">
+                Imágenes Heredadas de Categorías
+            </h3>
+            <p class="mb-3 text-xs text-blue-600 dark:text-blue-400">
+                Estas imágenes se heredan automáticamente de las categorías seleccionadas.
+            </p>
+
+            <div v-if="inheritedImagesLoading" class="flex items-center justify-center py-4">
+                <div class="h-5 w-5 animate-spin rounded-full border-2 border-blue-400 border-r-transparent"></div>
+                <span class="ml-2 text-sm text-blue-600 dark:text-blue-400">Cargando...</span>
+            </div>
+
+            <div v-else-if="!hasInheritedImages" class="py-3 text-center text-sm text-gray-400">
+                Las categorías seleccionadas no tienen imágenes
+            </div>
+
+            <div v-else class="space-y-3">
+                <div v-for="group in groupedInheritedImages" :key="group.categoryId" class="space-y-1.5">
+                    <p class="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        {{ group.categoryName }}
+                        <span class="text-gray-400 dark:text-gray-500">({{ group.images.length }})</span>
+                    </p>
+                    <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                        <div v-for="img in group.images" :key="img.id"
+                            class="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-border dark:bg-muted">
+                            <img :src="img.url" :alt="group.categoryName"
+                                class="h-20 w-full object-cover" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -230,6 +333,41 @@ onMounted(() => {
                 :class="idx === currentImageIndex ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400 dark:border-border'">
                 <img :src="img.url" class="h-full w-full object-cover" />
             </button>
+        </div>
+
+        <!-- Inherited category images in gallery mode -->
+        <div v-if="categoryIds && categoryIds.length > 0" class="mt-6 pt-6 border-t border-gray-200 dark:border-border">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-3">
+                Imágenes Heredadas de Categorías
+            </h3>
+            <p class="mb-3 text-xs text-blue-600 dark:text-blue-400">
+                Estas imágenes se heredan automáticamente de las categorías seleccionadas.
+            </p>
+
+            <div v-if="inheritedImagesLoading" class="flex items-center justify-center py-4">
+                <div class="h-5 w-5 animate-spin rounded-full border-2 border-blue-400 border-r-transparent"></div>
+                <span class="ml-2 text-sm text-blue-600 dark:text-blue-400">Cargando...</span>
+            </div>
+
+            <div v-else-if="!hasInheritedImages" class="py-3 text-center text-sm text-gray-400">
+                Las categorías seleccionadas no tienen imágenes
+            </div>
+
+            <div v-else class="space-y-3">
+                <div v-for="group in groupedInheritedImages" :key="group.categoryId" class="space-y-1.5">
+                    <p class="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        {{ group.categoryName }}
+                        <span class="text-gray-400 dark:text-gray-500">({{ group.images.length }})</span>
+                    </p>
+                    <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                        <div v-for="img in group.images" :key="img.id"
+                            class="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-border dark:bg-muted">
+                            <img :src="img.url" :alt="group.categoryName"
+                                class="h-20 w-full object-cover" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>

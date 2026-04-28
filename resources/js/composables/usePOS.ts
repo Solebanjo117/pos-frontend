@@ -277,7 +277,7 @@ export function usePOS() {
         return `${item.product_name}${sku}: disponible ${available}, solicitado ${requested}.`
     }
 
-    const validateCartStock = (context: StockValidationContext = 'sale'): boolean => {
+    const getStockWarnings = (context: StockValidationContext = 'sale'): string[] => {
         const issues: string[] = []
 
         for (const item of cart.value) {
@@ -292,10 +292,16 @@ export function usePOS() {
             }
         }
 
+        return issues
+    }
+
+    const validateCartStock = (context: StockValidationContext = 'sale'): boolean => {
+        const issues = getStockWarnings(context)
+
         if (issues.length > 0) {
+            // No longer blocking — just set a non-blocking warning message
             const actionLabel = context === 'quote' ? 'cotizar' : 'cobrar'
-            error.value = `Stock insuficiente. Ajusta cantidades antes de ${actionLabel}:\n- ${issues.join('\n- ')}`
-            return false
+            error.value = `Advertencia de stock antes de ${actionLabel}:\n- ${issues.join('\n- ')}\n\nSe procederá de todas formas.`
         }
 
         return true
@@ -323,8 +329,9 @@ export function usePOS() {
                 existingItem.available_stock = availableStock
                 const targetQty = existingItem.quantity + quantity
                 if (availableStock <= 0 || targetQty > availableStock) {
-                    error.value = formatStockIssue(existingItem, availableStock, targetQty)
-                    return false
+                    // Warn but do NOT block — allow adding with stock warning
+                    const msg = formatStockIssue(existingItem, availableStock, targetQty)
+                    console.warn(`[POS] Stock warning: ${msg}`)
                 }
             }
 
@@ -364,8 +371,8 @@ export function usePOS() {
 
             const newItemStock = getAvailableStock(newItem)
             if (newItemStock !== null && (newItemStock <= 0 || quantity > newItemStock)) {
-                error.value = formatStockIssue(newItem, newItemStock, quantity)
-                return false
+                // Warn but do NOT block — allow adding with stock warning
+                console.warn(`[POS] Stock warning: ${formatStockIssue(newItem, newItemStock, quantity)}`)
             }
 
             recalculateItem(newItem)
@@ -430,8 +437,8 @@ export function usePOS() {
         if (item && quantity > 0) {
             const available = getAvailableStock(item)
             if (available !== null && (available <= 0 || quantity > available)) {
-                error.value = formatStockIssue(item, available, quantity)
-                return false
+                // Warn but do NOT block
+                console.warn(`[POS] Stock warning: ${formatStockIssue(item, available, quantity)}`)
             }
 
             const oldQty = item.quantity
@@ -704,7 +711,16 @@ export function usePOS() {
                 })),
             }
 
-            const createdOrder = await salesOrdersService.create(orderData)
+            const createdOrderResult = await salesOrdersService.create(orderData)
+
+            // Show stock warnings from API as visible alert
+            const apiWarnings = createdOrderResult?.warnings
+            if (apiWarnings && Array.isArray(apiWarnings) && apiWarnings.length > 0) {
+                const warningMsgs = apiWarnings.map((w: any) => w.message || JSON.stringify(w)).join('\n- ')
+                alert(`Venta procesada con advertencias de stock:\n\n- ${warningMsgs}`)
+            }
+
+            const createdOrder = createdOrderResult?.data || createdOrderResult
 
             // After successful sale: remove the completed session and switch
             const completedId = activeSessionId.value
@@ -922,6 +938,7 @@ export function usePOS() {
         reorderCart,
         clearCart,
         validateCartStock,
+        getStockWarnings,
         processSale,
         saveDraft,
         loadQuoteAsSession,

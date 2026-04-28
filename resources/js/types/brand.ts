@@ -3,14 +3,13 @@ import type { Supplier } from './supplier'
 export interface Brand {
     id: number
     name: string
-    prefix?: string
     description?: string
     logo_url?: string
     website?: string
     status?: string
     product_variants_count?: number
     suppliers_count?: number
-    suppliers?: Pick<Supplier, 'id' | 'name'>[]
+    suppliers?: Pick<Supplier, 'id' | 'name' | 'contact_name' | 'phone'>[]
     created_at?: string
     updated_at?: string
 }
@@ -25,7 +24,6 @@ export interface BrandFilters {
 
 export interface CreateBrandData {
     name: string
-    prefix?: string
     description?: string
     logo_url?: string
     website?: string

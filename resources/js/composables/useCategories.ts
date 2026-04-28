@@ -115,6 +115,37 @@ export function useCategories() {
         }
     }
 
+    // Upload category images
+    async function uploadCategoryImages(categoryId: number, files: File[]) {
+        try {
+            const result = await categoriesService.uploadImages(categoryId, files)
+            return result
+        } catch (e: any) {
+            error.value = e.response?.data?.message || 'Error al subir imagen'
+            throw e
+        }
+    }
+
+    // Delete category image
+    async function deleteCategoryImage(categoryId: number, mediaId: number) {
+        try {
+            await categoriesService.deleteImage(categoryId, mediaId)
+        } catch (e: any) {
+            error.value = e.response?.data?.message || 'Error al eliminar imagen'
+            throw e
+        }
+    }
+
+    // Get category images
+    async function getCategoryImages(categoryId: number) {
+        try {
+            return await categoriesService.getImages(categoryId)
+        } catch (e: any) {
+            error.value = e.response?.data?.message || 'Error al cargar imágenes'
+            return []
+        }
+    }
+
     return {
         categories,
         category,
@@ -127,5 +158,8 @@ export function useCategories() {
         createCategory,
         updateCategory,
         deleteCategory,
+        uploadCategoryImages,
+        deleteCategoryImage,
+        getCategoryImages,
     }
 }

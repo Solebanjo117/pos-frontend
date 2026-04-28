@@ -3,7 +3,7 @@ import { suppliersService } from '@/services/suppliers'
 import { brandsService } from '@/services/brands'
 import type { Supplier, SupplierFilters, CreateSupplierData, UpdateSupplierData } from '@/types/supplier'
 
-type BrandOption = { id: number; name: string; prefix?: string }
+type BrandOption = { id: number; name: string }
 
 export function useSuppliers() {
     const suppliers = ref<Supplier[]>([])

@@ -230,22 +230,22 @@ const handlePurchaseSuccess = (result: {
                   <input 
                     type="number"
                     min="1"
-                    :max="getQtyInputMax(item)"
                     :value="item.quantity"
-                    :disabled="isOutOfStock(item)"
                     @change="emit('update-quantity', index, parseInt(($event.target as HTMLInputElement).value) || item.quantity)"
                     class="font-semibold text-gray-900 dark:text-white w-12 text-center text-sm bg-transparent border-0 focus:ring-0 p-0"
                   />
                   <button 
                     @click="emit('update-quantity', index, item.quantity + 1)"
-                    :disabled="isOutOfStock(item) || isAtStockLimit(item)"
-                    class="p-0.5 rounded-md hover:bg-gray-200 dark:hover:bg-muted/50 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                    class="p-0.5 rounded-md hover:bg-gray-200 dark:hover:bg-muted/50 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   >
                     <Plus class="w-3.5 h-3.5" />
                   </button>
                   </div>
-                  <span v-if="getStockLimit(item) !== null" class="text-[10px] font-medium" :class="isOutOfStock(item) ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'">
+                  <span v-if="getStockLimit(item) !== null" class="text-[10px] font-medium" :class="isOutOfStock(item) ? 'text-red-500' : isAtStockLimit(item) ? 'text-amber-500' : 'text-gray-400 dark:text-gray-500'">
                     {{ isOutOfStock(item) ? 'Sin stock' : `Stock: ${getStockLimit(item)}` }}
+                  </span>
+                  <span v-if="isOutOfStock(item)" class="text-[10px] font-semibold text-red-500 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded">
+                    Se venderá sin descontar
                   </span>
                 </div>
               </td>

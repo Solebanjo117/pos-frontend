@@ -1,336 +1,549 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
-import AppLayout from '@/layouts/AppLayout.vue'
-import SalesChart from '@/components/dashboard/SalesChart.vue'
-import CategorySalesChart from '@/components/dashboard/CategorySalesChart.vue'
-import TopCashiers from '@/components/dashboard/TopCashiers.vue'
-import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed.vue'
-import { dashboard } from '@/routes'
-import { type BreadcrumbItem } from '@/types'
-import { useDashboard } from '@/composables/useDashboard'
-import { usePosSettings } from '@/composables/usePosSettings'
+import { computed, onMounted, ref, watch } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import {
+    AlertTriangle,
+    ClipboardList,
+    DollarSign,
+    Package,
+    PackageSearch,
+    Plus,
+    Search,
+    ShoppingCart,
+    TrendingUp,
+    Warehouse,
+} from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
+import PageShell from '@/components/PageShell.vue';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import SalesChart from '@/components/dashboard/SalesChart.vue';
+import CategorySalesChart from '@/components/dashboard/CategorySalesChart.vue';
+import TopCashiers from '@/components/dashboard/TopCashiers.vue';
+import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed.vue';
+import DashboardMetricCard from '@/components/dashboard/DashboardMetricCard.vue';
+import DashboardPanel from '@/components/dashboard/DashboardPanel.vue';
+import ChangelogQuickEntry from '@/components/dashboard/ChangelogQuickEntry.vue';
+import { dashboard } from '@/routes';
+import { type BreadcrumbItem } from '@/types';
+import { useDashboard } from '@/composables/useDashboard';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useAuth } from '@/composables/useAuth';
+import { changelogApi, type ChangelogRelease } from '@/services/api/changelog';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Dashboard',
         href: dashboard().url,
     },
-]
+];
 
-const { 
-    stats, topProducts, lowStockProducts, chartData, profitByBrand, 
-    salesByCategory, topCashiers, recentActivity,
-    loading, error, fetchDashboardData 
-} = useDashboard()
-const { currentWarehouseId, initWarehouse } = usePosSettings()
+const {
+    stats,
+    topProducts,
+    lowStockProducts,
+    chartData,
+    profitByBrand,
+    salesByCategory,
+    topCashiers,
+    recentActivity,
+    loading,
+    error,
+    fetchDashboardData,
+} = useDashboard();
 
-const selectedPeriod = ref<string>('7d')
+const { currentWarehouseId, initWarehouse } = usePosSettings();
+const { hasRole } = useAuth();
+
+const selectedPeriod = ref<string>('7d');
+const dashboardInitialized = ref(false);
+const initializing = ref(true);
+const releases = ref<ChangelogRelease[]>([]);
+const releaseNotesLoading = ref(false);
+const releaseNotesError = ref<string | null>(null);
 
 const periodOptions = [
-    { value: '7d', label: 'Últimos 7 Días' },
-    { value: '30d', label: 'Últimos 30 Días' },
-    { value: '90d', label: 'Últimos 90 Días' },
-]
+    { value: '7d', label: '7 dias' },
+    { value: '30d', label: '30 dias' },
+    { value: '90d', label: '90 dias' },
+];
 
-// Load dashboard data on mount — init warehouse first so currentWarehouseId is populated
-onMounted(async () => {
-    await initWarehouse()
-    await fetchDashboardData(currentWarehouseId.value, selectedPeriod.value)
-})
+const canAccessPOS = computed(() => hasRole(['admin', 'manager', 'cashier']));
 
-// Watch warehouse changes and refetch data
-watch(currentWarehouseId, async (newWarehouseId) => {
-    await fetchDashboardData(newWarehouseId, selectedPeriod.value)
-})
+const latestReleases = computed(() => releases.value.slice(0, 3));
 
-// Watch period changes and refetch data
-watch(selectedPeriod, async (newPeriod) => {
-    await fetchDashboardData(currentWarehouseId.value, newPeriod)
-})
+const todayMargin = computed(() => {
+    if (stats.value.today_sales <= 0) return null;
 
+    return `${((stats.value.today_profit / stats.value.today_sales) * 100).toFixed(1)}% margen`;
+});
+
+const quickActions = computed(() => [
+    {
+        label: 'Nuevo producto',
+        href: '/products/create',
+        icon: Plus,
+    },
+    {
+        label: 'Buscar productos',
+        href: '/products',
+        icon: Search,
+    },
+    {
+        label: 'Inventario',
+        href: '/inventory',
+        icon: Package,
+    },
+    ...(canAccessPOS.value
+        ? [
+              {
+                  label: 'Abrir POS',
+                  href: '/pos',
+                  icon: ShoppingCart,
+              },
+          ]
+        : []),
+]);
+
+const formatCurrency = (value: number, digits = 2): string =>
+    value.toLocaleString('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+    });
+
+const formatInteger = (value: number): string =>
+    value.toLocaleString('es-MX', {
+        maximumFractionDigits: 0,
+    });
+
+const formatDate = (value: string): string => {
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) return value;
+
+    return parsed.toLocaleDateString('es-MX', {
+        month: 'short',
+        day: '2-digit',
+    });
+};
 
 const navigateTo = (path: string) => {
-    router.visit(path)
-}
-</script>
+    router.visit(path);
+};
 
+const loadDashboard = async () => {
+    await fetchDashboardData(currentWarehouseId.value, selectedPeriod.value);
+};
+
+const loadReleaseNotes = async () => {
+    releaseNotesLoading.value = true;
+    releaseNotesError.value = null;
+
+    try {
+        const response = await changelogApi.getChangelog();
+        releases.value = Array.isArray(response.data) ? response.data : [];
+    } catch (err: any) {
+        releaseNotesError.value =
+            err?.response?.data?.message || 'No se pudieron cargar las notas.';
+        releases.value = [];
+    } finally {
+        releaseNotesLoading.value = false;
+    }
+};
+
+onMounted(async () => {
+    try {
+        await Promise.all([initWarehouse(), loadReleaseNotes()]);
+        dashboardInitialized.value = true;
+        await loadDashboard();
+    } finally {
+        initializing.value = false;
+    }
+});
+
+watch([currentWarehouseId, selectedPeriod], async () => {
+    if (!dashboardInitialized.value) return;
+
+    await loadDashboard();
+});
+</script>
 
 <template>
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
-            <!-- Loading State -->
-            <div v-if="loading" class="flex items-center justify-center py-12">
-                <div class="text-center">
-                    <div class="text-gray-600 dark:text-gray-400">Cargando datos del dashboard...</div>
+        <PageShell
+            title="Dashboard operativo"
+            description="Ventas, inventario, alertas y notas recientes en un solo lugar."
+            content-class="mx-auto max-w-[1600px]"
+        >
+            <template #actions>
+                <div class="inline-flex rounded-md border bg-background p-1">
+                    <button
+                        v-for="option in periodOptions"
+                        :key="option.value"
+                        type="button"
+                        :class="[
+                            'h-8 rounded px-3 text-sm font-medium transition-colors',
+                            selectedPeriod === option.value
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                        ]"
+                        @click="selectedPeriod = option.value"
+                    >
+                        {{ option.label }}
+                    </button>
                 </div>
-            </div>
+            </template>
 
-            <!-- Error State -->
-            <div v-else-if="error" class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200">
+            <section
+                v-if="initializing || loading"
+                class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"
+            >
+                <Skeleton
+                    v-for="item in 6"
+                    :key="item"
+                    class="h-32 rounded-lg"
+                />
+            </section>
+
+            <section
+                v-else-if="error"
+                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+            >
                 {{ error }}
-            </div>
+            </section>
 
-            <!-- Dashboard Content -->
-            <div v-else>
-                <!-- Stats Cards -->
-                <div class="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
-                    <!-- Ventas del Día -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Ventas del Día</p>
-                                <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                                    ${{ stats.today_sales.toLocaleString('es-MX', { minimumFractionDigits: 2 }) }}
-                                </p>
-                            </div>
-                            <div class="rounded-full bg-green-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
-                                <svg class="h-8 w-8 text-green-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
+            <template v-else>
+                <section
+                    class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"
+                >
+                    <DashboardMetricCard
+                        label="Ventas del dia"
+                        :value="formatCurrency(stats.today_sales)"
+                        tone="green"
+                        :icon="DollarSign"
+                    />
+                    <DashboardMetricCard
+                        label="Utilidad del dia"
+                        :value="formatCurrency(stats.today_profit)"
+                        :helper="todayMargin || 'Sin ventas hoy'"
+                        tone="emerald"
+                        :icon="TrendingUp"
+                    />
+                    <DashboardMetricCard
+                        label="Ordenes pendientes"
+                        :value="stats.pending_orders"
+                        tone="blue"
+                        :icon="ClipboardList"
+                    />
+                    <DashboardMetricCard
+                        label="Stock bajo"
+                        :value="stats.low_stock_items"
+                        tone="yellow"
+                        :icon="PackageSearch"
+                    />
+                    <DashboardMetricCard
+                        label="Alertas activas"
+                        :value="stats.active_alerts"
+                        tone="red"
+                        :icon="AlertTriangle"
+                    />
+                    <DashboardMetricCard
+                        label="Valor inventario"
+                        :value="
+                            formatCurrency(stats.total_inventory_value || 0, 0)
+                        "
+                        tone="indigo"
+                        :icon="Warehouse"
+                    />
+                </section>
 
-                    <!-- Utilidad del Día -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Utilidad del Día</p>
-                                <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                                    ${{ stats.today_profit.toLocaleString('es-MX', { minimumFractionDigits: 2 }) }}
-                                </p>
-                                <p class="text-xs mt-1" :class="stats.today_sales > 0 ? 'text-emerald-600' : 'text-gray-400'">
-                                    {{ stats.today_sales > 0 ? ((stats.today_profit / stats.today_sales) * 100).toFixed(1) + '% margen' : '—' }}
-                                </p>
-                            </div>
-                            <div class="rounded-full bg-emerald-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
-                                <svg class="h-8 w-8 text-emerald-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
+                <section
+                    class="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]"
+                >
+                    <DashboardPanel
+                        title="Tendencia de ventas"
+                        description="Ingresos y utilidad segun el periodo seleccionado."
+                        content-class="h-80"
+                    >
+                        <SalesChart
+                            :data="chartData"
+                            :period="selectedPeriod"
+                        />
+                    </DashboardPanel>
 
-                    <!-- Órdenes Pendientes -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Órdenes Pendientes</p>
-                                <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.pending_orders }}</p>
-                            </div>
-                            <div class="rounded-full bg-blue-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
-                                <svg class="h-8 w-8 text-blue-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
+                    <DashboardPanel
+                        title="Notas de release"
+                        description="Cambios recientes y captura rapida para el changelog."
+                    >
+                        <div class="space-y-4">
+                            <ChangelogQuickEntry @saved="loadReleaseNotes" />
 
-                    <!-- Stock Bajo -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Stock Bajo</p>
-                                <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.low_stock_items }}</p>
+                            <div v-if="releaseNotesLoading" class="space-y-2">
+                                <Skeleton
+                                    v-for="item in 3"
+                                    :key="item"
+                                    class="h-14 rounded-md"
+                                />
                             </div>
-                            <div class="rounded-full bg-yellow-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
-                                <svg class="h-8 w-8 text-yellow-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Alertas -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Alertas Activas</p>
-                                <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ stats.active_alerts }}</p>
-                            </div>
-                            <div class="rounded-full bg-red-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
-                                <svg class="h-8 w-8 text-red-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Inventario Valorado -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card group hover:-translate-y-1 transition-all duration-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Valor Inventario</p>
-                                <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                                    ${{ (stats.total_inventory_value || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) }}
-                                </p>
-                            </div>
-                            <div class="rounded-full bg-indigo-100 p-3 dark:bg-primary/10 dark:border dark:border-primary/20 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group-hover:scale-110">
-                                <svg class="h-8 w-8 text-indigo-600 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sales Chart Section -->
-                <div class="mb-8 rounded-lg bg-white p-6 shadow dark:bg-card">
-                    <div class="mb-4 flex items-center justify-between">
-                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Tendencia de Ventas</h2>
-                        <div class="flex gap-2">
-                            <button
-                                v-for="option in periodOptions"
-                                :key="option.value"
-                                @click="selectedPeriod = option.value"
-                                :class="[
-                                    'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-                                    selectedPeriod === option.value
-                                        ? 'bg-blue-600 dark:bg-primary text-white dark:text-primary-foreground'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted/80'
-                                ]"
+                            <p
+                                v-else-if="releaseNotesError"
+                                class="text-sm text-red-600 dark:text-red-400"
                             >
-                                {{ option.label }}
-                            </button>
-                        </div>
-                    </div>
-                    <div class="h-80">
-                        <SalesChart :data="chartData" :period="selectedPeriod" />
-                    </div>
-                </div>
+                                {{ releaseNotesError }}
+                            </p>
 
-                <!-- Secondary Charts Grid -->
-                <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <!-- Categorías Doughnut -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Ventas por Categoría</h2>
-                        <div class="h-64">
-                            <CategorySalesChart :data="salesByCategory || []" />
+                            <div
+                                v-else-if="latestReleases.length === 0"
+                                class="rounded-md border border-dashed p-4 text-sm text-muted-foreground"
+                            >
+                                No hay notas publicadas todavia.
+                            </div>
+
+                            <div v-else class="space-y-3">
+                                <article
+                                    v-for="release in latestReleases"
+                                    :key="`${release.version}-${release.date}`"
+                                    class="rounded-md border p-3"
+                                >
+                                    <div
+                                        class="mb-1 flex min-w-0 items-center justify-between gap-2"
+                                    >
+                                        <p
+                                            class="truncate text-sm font-medium text-foreground"
+                                        >
+                                            {{ release.title }}
+                                        </p>
+                                        <span
+                                            class="shrink-0 text-xs text-muted-foreground"
+                                        >
+                                            {{ formatDate(release.date) }}
+                                        </span>
+                                    </div>
+                                    <p
+                                        class="line-clamp-2 text-sm text-muted-foreground"
+                                    >
+                                        {{ release.changes[0] }}
+                                    </p>
+                                </article>
+                            </div>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                class="w-full"
+                                @click="navigateTo('/changelog')"
+                            >
+                                Ver changelog completo
+                            </Button>
                         </div>
-                    </div>
-                    
-                    <!-- Mejores Cajeros -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Desempeño del Personal</h2>
+                    </DashboardPanel>
+                </section>
+
+                <section class="grid gap-6 lg:grid-cols-2">
+                    <DashboardPanel
+                        title="Ventas por categoria"
+                        content-class="h-72"
+                    >
+                        <CategorySalesChart :data="salesByCategory || []" />
+                    </DashboardPanel>
+
+                    <DashboardPanel title="Desempeno del personal">
                         <TopCashiers :cashiers="topCashiers || []" />
-                    </div>
-                </div>
+                    </DashboardPanel>
+                </section>
 
-                <!-- Content Grid -->
-                <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <!-- Productos Más Vendidos -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Productos Más Vendidos</h2>
+                <section class="grid gap-6 xl:grid-cols-3">
+                    <DashboardPanel title="Productos mas vendidos">
                         <div class="space-y-3">
-                            <div v-for="(product, index) in topProducts" :key="index" class="flex items-center justify-between">
-                                <span class="text-sm text-gray-900 dark:text-white">{{ product.name }}</span>
-                                <span class="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200">
+                            <div
+                                v-for="(product, index) in topProducts"
+                                :key="index"
+                                class="flex min-w-0 items-center justify-between gap-3"
+                            >
+                                <span
+                                    class="min-w-0 text-sm break-words text-foreground"
+                                    >{{ product.name }}</span
+                                >
+                                <span
+                                    class="shrink-0 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 dark:bg-green-500/10 dark:text-green-300"
+                                >
                                     {{ product.sales }} vendidos
                                 </span>
                             </div>
-                            <div v-if="topProducts.length === 0" class="text-sm text-center text-gray-500 py-4">
+                            <div
+                                v-if="topProducts.length === 0"
+                                class="py-4 text-center text-sm text-muted-foreground"
+                            >
                                 No hay datos de ventas.
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Actividad Reciente -->
-                    <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Actividad Reciente</h2>
-                        <RecentActivityFeed :activities="recentActivity || []" />
-                    </div>
+                    </DashboardPanel>
 
-                    <div class="flex flex-col gap-6">
-                        <!-- Stock Bajo -->
-                        <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                            <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Stock Bajo</h2>
+                    <DashboardPanel title="Actividad reciente">
+                        <RecentActivityFeed
+                            :activities="recentActivity || []"
+                        />
+                    </DashboardPanel>
+
+                    <div class="flex min-w-0 flex-col gap-6">
+                        <DashboardPanel title="Stock bajo">
                             <div class="space-y-3">
-                                <div v-for="(product, index) in lowStockProducts" :key="index" class="flex items-center justify-between">
-                                    <span class="text-sm text-gray-900 dark:text-white">{{ product.name }}</span>
-                                    <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
+                                <div
+                                    v-for="(product, index) in lowStockProducts"
+                                    :key="index"
+                                    class="flex min-w-0 items-center justify-between gap-3"
+                                >
+                                    <span
+                                        class="min-w-0 text-sm break-words text-foreground"
+                                        >{{ product.name }}</span
+                                    >
+                                    <span
+                                        class="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                                    >
                                         {{ product.stock }} uds
                                     </span>
                                 </div>
-                                <div v-if="lowStockProducts.length === 0" class="text-sm text-center text-gray-500 py-4">
+                                <div
+                                    v-if="lowStockProducts.length === 0"
+                                    class="py-4 text-center text-sm text-muted-foreground"
+                                >
                                     Inventario saludable.
                                 </div>
                             </div>
-                            <button @click="navigateTo('/inventory')" class="mt-4 w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
-                                Ver Inventario
-                            </button>
-                        </div>
-    
-                        <!-- Accesos Rápidos -->
-                        <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                            <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Accesos Rápidos</h2>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                class="mt-4 w-full"
+                                @click="navigateTo('/inventory')"
+                            >
+                                Ver inventario
+                            </Button>
+                        </DashboardPanel>
+
+                        <DashboardPanel title="Accesos rapidos">
                             <div class="grid grid-cols-2 gap-3">
-                                <button @click="navigateTo('/products/create')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-primary hover:bg-primary/10 dark:border-border dark:hover:border-primary dark:hover:bg-primary/10">
-                                    <svg class="h-6 w-6 text-blue-600 dark:text-primary mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                    </svg>
-                                    <span class="mt-2 text-xs font-medium text-gray-900 dark:text-white">Nuevo</span>
-                                </button>
-    
-                                <button @click="navigateTo('/products')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-green-500 hover:bg-green-50 dark:border-border dark:hover:border-primary dark:hover:bg-primary/10">
-                                    <svg class="h-6 w-6 text-green-600 dark:text-primary mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                    </svg>
-                                    <span class="mt-2 text-xs font-medium text-gray-900 dark:text-white">Buscar</span>
-                                </button>
-    
-                                <button @click="navigateTo('/inventory')" class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 hover:border-purple-500 hover:bg-purple-50 dark:border-border dark:hover:border-primary dark:hover:bg-primary/10">
-                                    <svg class="h-6 w-6 text-purple-600 dark:text-primary mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                    </svg>
-                                    <span class="mt-2 text-xs font-medium text-gray-900 dark:text-white">Stock</span>
-                                </button>
-    
-                                <button class="flex flex-col items-center rounded-lg border-2 border-gray-200 p-4 opacity-50 cursor-not-allowed dark:border-border">
-                                    <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                                    </svg>
-                                    <span class="mt-2 text-xs font-medium text-gray-400 opacity-50">POS</span>
+                                <button
+                                    v-for="action in quickActions"
+                                    :key="action.href"
+                                    type="button"
+                                    class="flex min-h-24 min-w-0 flex-col items-center justify-center gap-2 rounded-lg border bg-background p-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                                    @click="navigateTo(action.href)"
+                                >
+                                    <component
+                                        :is="action.icon"
+                                        class="size-5 text-muted-foreground"
+                                    />
+                                    <span class="text-center leading-tight">{{
+                                        action.label
+                                    }}</span>
                                 </button>
                             </div>
-                        </div>
+                        </DashboardPanel>
                     </div>
-                </div>
-                    <!-- Rentabilidad por Marca -->
-                    <div v-if="profitByBrand.length > 0" class="lg:col-span-3 rounded-lg bg-white p-6 shadow dark:bg-card">
-                        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Rentabilidad por Marca</h2>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="border-b border-gray-200 dark:border-border">
-                                        <th class="py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Marca</th>
-                                        <th class="py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Ingresos</th>
-                                        <th class="py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Costo</th>
-                                        <th class="py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Utilidad</th>
-                                        <th class="py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Margen</th>
-                                        <th class="py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Uds.</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(brand, idx) in profitByBrand" :key="idx" class="border-b border-gray-100 dark:border-border/50 hover:bg-gray-50 dark:hover:bg-muted/50">
-                                        <td class="py-3 font-medium text-gray-900 dark:text-white">{{ brand.brand }}</td>
-                                        <td class="py-3 text-right text-gray-700 dark:text-gray-300">${{ brand.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</td>
-                                        <td class="py-3 text-right text-gray-500 dark:text-gray-400">${{ brand.cost.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</td>
-                                        <td class="py-3 text-right font-semibold" :class="brand.profit >= 0 ? 'text-emerald-600' : 'text-red-600'">${{ brand.profit.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</td>
-                                        <td class="py-3 text-right">
-                                            <span class="rounded-full px-2 py-0.5 text-xs font-bold" :class="brand.margin >= 20 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300' : brand.margin >= 10 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'">
-                                                {{ brand.margin }}%
-                                            </span>
-                                        </td>
-                                        <td class="py-3 text-right text-gray-600 dark:text-gray-400">{{ brand.units_sold }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                </section>
+
+                <DashboardPanel
+                    v-if="profitByBrand.length > 0"
+                    title="Rentabilidad por marca"
+                >
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[720px] text-sm">
+                            <thead>
+                                <tr class="border-b">
+                                    <th
+                                        class="py-3 text-left font-semibold text-muted-foreground"
+                                    >
+                                        Marca
+                                    </th>
+                                    <th
+                                        class="py-3 text-right font-semibold text-muted-foreground"
+                                    >
+                                        Ingresos
+                                    </th>
+                                    <th
+                                        class="py-3 text-right font-semibold text-muted-foreground"
+                                    >
+                                        Costo
+                                    </th>
+                                    <th
+                                        class="py-3 text-right font-semibold text-muted-foreground"
+                                    >
+                                        Utilidad
+                                    </th>
+                                    <th
+                                        class="py-3 text-right font-semibold text-muted-foreground"
+                                    >
+                                        Margen
+                                    </th>
+                                    <th
+                                        class="py-3 text-right font-semibold text-muted-foreground"
+                                    >
+                                        Uds.
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="(brand, idx) in profitByBrand"
+                                    :key="idx"
+                                    class="border-b last:border-0 hover:bg-muted/40"
+                                >
+                                    <td
+                                        class="py-3 font-medium text-foreground"
+                                    >
+                                        {{ brand.brand }}
+                                    </td>
+                                    <td
+                                        class="py-3 text-right text-muted-foreground"
+                                    >
+                                        {{ formatCurrency(brand.revenue) }}
+                                    </td>
+                                    <td
+                                        class="py-3 text-right text-muted-foreground"
+                                    >
+                                        {{ formatCurrency(brand.cost) }}
+                                    </td>
+                                    <td
+                                        class="py-3 text-right font-semibold"
+                                        :class="
+                                            brand.profit >= 0
+                                                ? 'text-emerald-600 dark:text-emerald-400'
+                                                : 'text-red-600 dark:text-red-400'
+                                        "
+                                    >
+                                        {{ formatCurrency(brand.profit) }}
+                                    </td>
+                                    <td class="py-3 text-right">
+                                        <span
+                                            class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                                            :class="
+                                                brand.margin >= 20
+                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                                    : brand.margin >= 10
+                                                      ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-300'
+                                                      : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'
+                                            "
+                                        >
+                                            {{ brand.margin }}%
+                                        </span>
+                                    </td>
+                                    <td
+                                        class="py-3 text-right text-muted-foreground"
+                                    >
+                                        {{ formatInteger(brand.units_sold) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-            </div>
-        </div>
+                </DashboardPanel>
+            </template>
+        </PageShell>
     </AppLayout>
 </template>

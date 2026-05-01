@@ -113,7 +113,7 @@ const getAttributeBadges = (product: Product): Array<{ name: string; value: stri
                         </p>
                         <div v-if="getAttributeBadges(product).length" class="flex flex-wrap gap-1 mt-0.5">
                             <span v-for="badge in getAttributeBadges(product)" :key="`${badge.name}-${badge.value}`"
-                                :title="`${badge.name}: ${badge.value}${badge.unit ? ' ' + badge.unit : ''}`"
+                                :title="badge.name"
                                 class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
                                 {{ badge.value }}<span v-if="badge.unit" class="ml-0.5 text-green-600 dark:text-green-400">{{ badge.unit }}</span>
                             </span>
@@ -192,7 +192,7 @@ const getAttributeBadges = (product: Product): Array<{ name: string; value: stri
                 </p>
                 <div v-if="getAttributeBadges(product).length" class="flex flex-wrap gap-1 mt-1">
                     <span v-for="badge in getAttributeBadges(product)" :key="`${badge.name}-${badge.value}`"
-                        :title="`${badge.name}: ${badge.value}${badge.unit ? ' ' + badge.unit : ''}`"
+                        :title="badge.name"
                         class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
                         {{ badge.value }}<span v-if="badge.unit" class="ml-0.5 text-green-600 dark:text-green-400">{{ badge.unit }}</span>
                     </span>

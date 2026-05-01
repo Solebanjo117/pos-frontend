@@ -20,7 +20,7 @@ const toggleBlindMode = () => {
     blindMode.value = !blindMode.value;
     localStorage.setItem('product_blind_mode', String(blindMode.value));
 };
-// Whether to apply ITBM on top of base_price in client view
+// Whether to apply ITBM on top of the active view amount
 const includeITBM = ref(
     localStorage.getItem('product_include_itbm') !== 'false',
 ); // default true
@@ -116,20 +116,53 @@ const getVariantPricing = (variant: any) => {
     return props.product.pricing ?? null;
 };
 
-// Returns the unit price for blind mode (client view).
-// ITBM OFF: cost_base + cost_miscellaneous (sin ITBM)
-// ITBM ON: (cost_base + cost_miscellaneous) * (1 + cost_tax_rate/100)
-const blindModeClientPrice = (variant: any): number => {
+const getQuantity = (variant: any): number => quantities[variant.id] ?? 1;
+
+const saleBasePrice = (pricing: any): number =>
+    Number(pricing?.calculated_price ?? pricing?.base_price) || 0;
+
+const saleDisplayPrice = (variant: any): number => {
     const p = getVariantPricing(variant);
     if (!p) return 0;
+    const base = saleBasePrice(p);
+    return includeITBM.value ? priceWithTax(base, resolveSaleTaxRate(p)) : base;
+};
+
+const costBaseAmount = (pricing: any): number =>
+    Number(pricing?.cost_base ?? pricing?.cost) || 0;
+
+const costMiscAmount = (pricing: any): number =>
+    Number(pricing?.cost_miscellaneous) || 0;
+
+const costSubtotal = (pricing: any): number =>
+    costBaseAmount(pricing) + costMiscAmount(pricing);
+
+const costDisplayPrice = (variant: any): number => {
+    const p = getVariantPricing(variant);
+    if (!p) return 0;
+    if (!includeITBM.value) return costSubtotal(p);
+
+    const costTotal = Number(p.cost_total ?? p.cost);
+    if (Number.isFinite(costTotal) && costTotal > 0) return costTotal;
+
     const costBase = Number(p.cost_base ?? p.cost) || 0;
     const costMisc = Number(p.cost_miscellaneous) || 0;
-    const base = costBase + costMisc;
-    if (includeITBM.value) {
-        const rate = resolveCostTaxRate(p);
-        return base * (1 + rate / 100);
-    }
-    return base;
+    return costBase * (1 + resolveCostTaxRate(p) / 100) + costMisc;
+};
+
+const variantDisplayPrice = (variant: any): number =>
+    blindMode.value ? saleDisplayPrice(variant) : costDisplayPrice(variant);
+
+const saleTaxAmount = (variant: any): number => {
+    const p = getVariantPricing(variant);
+    if (!p) return 0;
+    return Math.max(0, saleDisplayPrice(variant) - saleBasePrice(p));
+};
+
+const costTaxAmount = (variant: any): number => {
+    const p = getVariantPricing(variant);
+    if (!p) return 0;
+    return Math.max(0, costDisplayPrice(variant) - costSubtotal(p));
 };
 
 const relationshipLabel = (type: string): string =>
@@ -552,7 +585,7 @@ const handleViewAlternative = async (altId: number) => {
                         ]"
                         :title="
                             blindMode
-                                ? 'Modo Cliente activo — oculta SKU y muestra precio con ITBM'
+                                ? 'Modo Cliente activo — muestra precio de venta'
                                 : 'Modo Normal — muestra toda la información'
                         "
                     >
@@ -1024,55 +1057,16 @@ const handleViewAlternative = async (altId: number) => {
                                                             )
                                                         "
                                                     >
-                                                        <template
-                                                            v-if="blindMode"
-                                                        >
-                                                            {{
-                                                                formatCurrency(
-                                                                    blindModeClientPrice(
+                                                        {{
+                                                            formatCurrency(
+                                                                variantDisplayPrice(
+                                                                    variant,
+                                                                ) *
+                                                                    getQuantity(
                                                                         variant,
-                                                                    ) *
-                                                                        (quantities[
-                                                                            variant
-                                                                                .id
-                                                                        ] ?? 1),
-                                                                )
-                                                            }}
-                                                        </template>
-                                                        <template v-else>
-                                                            {{
-                                                                formatCurrency(
-                                                                    (includeITBM
-                                                                        ? priceWithTax(
-                                                                              Number(
-                                                                                  getVariantPricing(
-                                                                                      variant,
-                                                                                  )
-                                                                                      .calculated_price ??
-                                                                                      getVariantPricing(
-                                                                                          variant,
-                                                                                      )
-                                                                                          .base_price,
-                                                                              ),
-                                                                              resolveSaleTaxRate(
-                                                                                  getVariantPricing(
-                                                                                      variant,
-                                                                                  ),
-                                                                              ),
-                                                                          )
-                                                                        : Number(
-                                                                              getVariantPricing(
-                                                                                  variant,
-                                                                              )
-                                                                                  .base_price,
-                                                                          )) *
-                                                                        (quantities[
-                                                                            variant
-                                                                                .id
-                                                                        ] ?? 1),
-                                                                )
-                                                            }}
-                                                        </template>
+                                                                    ),
+                                                            )
+                                                        }}
                                                     </template>
                                                     <template v-else
                                                         >N/A</template
@@ -1090,125 +1084,67 @@ const handleViewAlternative = async (altId: number) => {
                                                         <template
                                                             v-if="blindMode"
                                                         >
+                                                            Venta
+                                                            {{
+                                                                formatCurrency(
+                                                                    saleBasePrice(
+                                                                        getVariantPricing(
+                                                                            variant,
+                                                                        ),
+                                                                    ) *
+                                                                        getQuantity(
+                                                                            variant,
+                                                                        ),
+                                                                )
+                                                            }}
+                                                            + ITBM
+                                                            {{
+                                                                formatCurrency(
+                                                                    saleTaxAmount(
+                                                                        variant,
+                                                                    ) *
+                                                                        getQuantity(
+                                                                            variant,
+                                                                        ),
+                                                                )
+                                                            }}
+                                                        </template>
+                                                        <template v-else>
                                                             Costo Base
                                                             {{
                                                                 formatCurrency(
-                                                                    (Number(
+                                                                    costBaseAmount(
                                                                         getVariantPricing(
                                                                             variant,
-                                                                        )
-                                                                            .cost_base ??
-                                                                            getVariantPricing(
-                                                                                variant,
-                                                                            )
-                                                                                .cost,
-                                                                    ) || 0) *
-                                                                        (quantities[
-                                                                            variant
-                                                                                .id
-                                                                        ] ?? 1),
+                                                                        ),
+                                                                    ) *
+                                                                        getQuantity(
+                                                                            variant,
+                                                                        ),
                                                                 )
                                                             }}
                                                             + Misc
                                                             {{
                                                                 formatCurrency(
-                                                                    (Number(
+                                                                    costMiscAmount(
                                                                         getVariantPricing(
                                                                             variant,
-                                                                        )
-                                                                            .cost_miscellaneous,
-                                                                    ) || 0) *
-                                                                        (quantities[
-                                                                            variant
-                                                                                .id
-                                                                        ] ?? 1),
-                                                                )
-                                                            }}
-                                                            + ITBMS
-                                                            {{
-                                                                formatCurrency(
-                                                                    (blindModeClientPrice(
-                                                                        variant,
-                                                                    ) -
-                                                                        (Number(
-                                                                            getVariantPricing(
-                                                                                variant,
-                                                                            )
-                                                                                .cost_base ??
-                                                                                getVariantPricing(
-                                                                                    variant,
-                                                                                )
-                                                                                    .cost,
-                                                                        ) ||
-                                                                            0) -
-                                                                        (Number(
-                                                                            getVariantPricing(
-                                                                                variant,
-                                                                            )
-                                                                                .cost_miscellaneous,
-                                                                        ) ||
-                                                                            0)) *
-                                                                        (quantities[
-                                                                            variant
-                                                                                .id
-                                                                        ] ?? 1),
-                                                                )
-                                                            }}
-                                                        </template>
-                                                        <template v-else>
-                                                            Base
-                                                            {{
-                                                                formatCurrency(
-                                                                    Number(
-                                                                        getVariantPricing(
-                                                                            variant,
-                                                                        )
-                                                                            .calculated_price ??
-                                                                            getVariantPricing(
-                                                                                variant,
-                                                                            )
-                                                                                .base_price,
+                                                                        ),
                                                                     ) *
-                                                                        (quantities[
-                                                                            variant
-                                                                                .id
-                                                                        ] ?? 1),
+                                                                        getQuantity(
+                                                                            variant,
+                                                                        ),
                                                                 )
                                                             }}
-                                                            + ITBMS
+                                                            + ITBM
                                                             {{
                                                                 formatCurrency(
-                                                                    (priceWithTax(
-                                                                        Number(
-                                                                            getVariantPricing(
-                                                                                variant,
-                                                                            )
-                                                                                .calculated_price ??
-                                                                                getVariantPricing(
-                                                                                    variant,
-                                                                                )
-                                                                                    .base_price,
+                                                                    costTaxAmount(
+                                                                        variant,
+                                                                    ) *
+                                                                        getQuantity(
+                                                                            variant,
                                                                         ),
-                                                                        resolveSaleTaxRate(
-                                                                            getVariantPricing(
-                                                                                variant,
-                                                                            ),
-                                                                        ),
-                                                                    ) -
-                                                                        Number(
-                                                                            getVariantPricing(
-                                                                                variant,
-                                                                            )
-                                                                                .calculated_price ??
-                                                                                getVariantPricing(
-                                                                                    variant,
-                                                                                )
-                                                                                    .base_price,
-                                                                        )) *
-                                                                        (quantities[
-                                                                            variant
-                                                                                .id
-                                                                        ] ?? 1),
                                                                 )
                                                             }}
                                                         </template>
@@ -1216,26 +1152,6 @@ const handleViewAlternative = async (altId: number) => {
                                                     <template v-else>
                                                         Sin ITBM
                                                     </template>
-                                                </div>
-                                                <div
-                                                    v-if="
-                                                        !blindMode &&
-                                                        getVariantPricing(
-                                                            variant,
-                                                        )?.cost > 0
-                                                    "
-                                                    class="text-[10px] text-gray-400"
-                                                >
-                                                    Costo:
-                                                    {{
-                                                        formatCurrency(
-                                                            Number(
-                                                                getVariantPricing(
-                                                                    variant,
-                                                                ).cost,
-                                                            ),
-                                                        )
-                                                    }}
                                                 </div>
                                                 <div
                                                     v-if="!blindMode"

@@ -31,7 +31,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'product-selected': [product: Product]
   'product-needs-variant': [product: Product]
-  'open-full-search': []
+  'open-full-search': [filters?: { query: string; category_id?: number; brand_id?: number }]
 }>()
 
 // State
@@ -122,6 +122,22 @@ const selectProduct = (product: Product) => {
 
 // Keyboard navigation
 const onKeyDown = (e: KeyboardEvent) => {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+
+    if (showDropdown.value && searchResults.value.length > 0 && focusedIndex.value >= 0) {
+      selectProduct(searchResults.value[focusedIndex.value])
+      return
+    }
+
+    emit('open-full-search', {
+      query: searchQuery.value,
+      category_id: selectedCategoryId.value ?? undefined,
+      brand_id: selectedBrandId.value ?? undefined,
+    })
+    return
+  }
+
   if (!showDropdown.value || searchResults.value.length === 0) return
 
   if (e.key === 'ArrowDown') {
@@ -130,9 +146,6 @@ const onKeyDown = (e: KeyboardEvent) => {
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
     focusedIndex.value = Math.max(focusedIndex.value - 1, -1)
-  } else if (e.key === 'Enter' && focusedIndex.value >= 0) {
-    e.preventDefault()
-    selectProduct(searchResults.value[focusedIndex.value])
   } else if (e.key === 'Escape') {
     e.preventDefault()
     showDropdown.value = false
@@ -253,7 +266,11 @@ defineExpose({ focusSearch })
 
           <!-- "Search all" link -->
           <div
-            @click="emit('open-full-search')"
+            @click="emit('open-full-search', {
+              query: searchQuery,
+              category_id: selectedCategoryId ?? undefined,
+              brand_id: selectedBrandId ?? undefined,
+            })"
             class="border-t border-gray-200 dark:border-border px-4 py-3 text-center text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer font-medium"
           >
             🔍 Buscar todos los productos

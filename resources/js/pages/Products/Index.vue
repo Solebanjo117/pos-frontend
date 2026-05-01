@@ -518,7 +518,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
     return attributes
         .map(
             (attr) =>
-                `${attr.name}: ${attr.value}${attr.unit ? attr.unit : ''}`,
+                attr.name,
         )
         .join(' • ');
 };
@@ -1261,7 +1261,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                             attr.name +
                                                             attr.value
                                                         "
-                                                        :title="`${attr.name}: ${attr.value}${attr.unit ? ' ' + attr.unit : ''}`"
+                                                        :title="attr.name"
                                                         class="inline-flex rounded-md bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300"
                                                     >
                                                         {{ attr.value

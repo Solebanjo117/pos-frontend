@@ -1094,8 +1094,11 @@ const handleInlineVariantNeeded = (product: any) => {
   }
 }
 
-const handleOpenFullSearch = () => {
-  showProductsModal.value = true
+const handleOpenFullSearch = (filters?: { query?: string; category_id?: number; brand_id?: number }) => {
+  searchQuery.value = filters?.query ?? ''
+  selectedCategoryId.value = filters?.category_id
+  selectedBrandId.value = filters?.brand_id
+  performSearch(searchQuery.value, quantity.value)
 }
 
 // Fetch categories and brands

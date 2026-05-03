@@ -7,6 +7,9 @@ export interface ProductAttribute {
     name: string
     value: string
     unit?: string | null
+    required?: boolean
+    type?: 'string' | 'select'
+    options?: string[] | null
     source?: 'category' | 'custom'
     source_category_id?: number | null
 }

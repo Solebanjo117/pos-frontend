@@ -137,6 +137,8 @@ type DraftProductAttribute = {
     value: string;
     unit: string;
     required: boolean;
+    type: 'string' | 'select';
+    options?: string[] | null;
     fromCategory?: boolean;
     source_category_id?: number | null;
 };
@@ -144,6 +146,20 @@ type DraftProductAttribute = {
 const productAttributes = ref<DraftProductAttribute[]>([]);
 
 const attributeNameKey = (name: string) => name.trim().toLowerCase();
+const normalizeAttributeType = (value: unknown): 'string' | 'select' =>
+    value === 'select' ? 'select' : 'string';
+const normalizeAttributeOptions = (options: unknown): string[] => {
+    if (!Array.isArray(options)) return [];
+
+    return options
+        .map((option) => String(option ?? '').trim())
+        .filter((option) => option !== '');
+};
+const hasSelectOptions = (attribute: DraftProductAttribute): boolean =>
+    attribute.type === 'select' &&
+    attribute.fromCategory === true &&
+    Array.isArray(attribute.options) &&
+    attribute.options.length > 0;
 
 const categoryNameById = (categoryId: number | undefined | null): string => {
     if (!categoryId) return '';
@@ -201,12 +217,22 @@ const mergeCategoryDefaultAttributes = (defaults: any[]) => {
             seenDefaultNames.add(key);
 
             const existing = existingByName.get(key);
+            const type = normalizeAttributeType(attr?.type);
+            const options =
+                type === 'select'
+                    ? normalizeAttributeOptions(attr?.options)
+                    : null;
+            const defaultValue = String(
+                attr?.default_value ?? attr?.value ?? '',
+            );
 
             return {
                 name,
-                value: existing?.value ?? '',
+                value: existing?.value ?? defaultValue,
                 unit: String(attr?.unit ?? existing?.unit ?? '').trim(),
                 required: Boolean(attr?.required),
+                type,
+                options,
                 fromCategory: true,
                 source_category_id: attr?.source_category_id ?? null,
             } as DraftProductAttribute;
@@ -221,6 +247,8 @@ const mergeCategoryDefaultAttributes = (defaults: any[]) => {
         .map((attr) => ({
             ...attr,
             fromCategory: false,
+            type: 'string' as const,
+            options: null,
             source_category_id: null as number | null,
         }));
 
@@ -233,6 +261,8 @@ const keepOnlyCustomAttributes = () => {
         .map((attr) => ({
             ...attr,
             fromCategory: false,
+            type: 'string' as const,
+            options: null,
             source_category_id: null,
         }));
 };
@@ -243,6 +273,8 @@ const addCustomAttribute = () => {
         value: '',
         unit: '',
         required: false,
+        type: 'string',
+        options: null,
         fromCategory: false,
         source_category_id: null,
     });
@@ -1584,7 +1616,13 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || '';
                                     v-model="attr.name"
                                     type="text"
                                     :required="attr.required"
+                                    :readonly="attr.fromCategory"
                                     class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                    :class="
+                                        attr.fromCategory
+                                            ? 'cursor-not-allowed opacity-75'
+                                            : ''
+                                    "
                                     placeholder="Ej: Amperaje"
                                 />
                             </div>
@@ -1599,7 +1637,23 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || '';
                                         >*</span
                                     >
                                 </label>
+                                <select
+                                    v-if="hasSelectOptions(attr)"
+                                    v-model="attr.value"
+                                    :required="attr.required"
+                                    class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    <option
+                                        v-for="option in attr.options"
+                                        :key="option"
+                                        :value="option"
+                                    >
+                                        {{ option }}
+                                    </option>
+                                </select>
                                 <input
+                                    v-else
                                     v-model="attr.value"
                                     type="text"
                                     :required="attr.required"
@@ -1613,7 +1667,13 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || '';
                                 <button
                                     type="button"
                                     @click="removeProductAttribute(index)"
+                                    :disabled="attr.fromCategory"
                                     class="w-full rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                    :class="
+                                        attr.fromCategory
+                                            ? 'cursor-not-allowed opacity-50'
+                                            : ''
+                                    "
                                     title="Quitar atributo"
                                 >
                                     <X class="mx-auto h-3.5 w-3.5" />

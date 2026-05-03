@@ -10,6 +10,7 @@ import type {
     CreatePurchaseOrderData,
     PurchaseOrderCandidateItem,
     PurchaseOrderCandidateSource,
+    PurchaseOrderWarning,
 } from '@/types/purchase-order';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
@@ -58,6 +59,7 @@ const candidateRows = ref<
 >([]);
 const loadingCandidates = ref(false);
 const candidateError = ref<string | null>(null);
+const supplierWarnings = ref<PurchaseOrderWarning[]>([]);
 
 const form = ref<CreatePurchaseOrderData>({
     supplier_id: 0,
@@ -126,6 +128,17 @@ const canLoadCandidates = computed(
     () => !!form.value.supplier_id && !!form.value.warehouse_id,
 );
 
+function supplierRelationFor(row: any) {
+    const supplierId = Number(form.value.supplier_id);
+    if (!supplierId || !Array.isArray(row.suppliers)) {
+        return null;
+    }
+
+    return row.suppliers.find(
+        (supplier: any) => Number(supplier.id) === supplierId,
+    );
+}
+
 function preselectCurrentWarehouse() {
     if (isEditing.value || form.value.warehouse_id) {
         return;
@@ -181,6 +194,7 @@ async function searchProducts() {
                 const brandName =
                     variant.brand?.name || product.brand?.name || '';
                 const sku = variant.sku || product.sku || '';
+                const supplierRelation = supplierRelationFor(variant);
 
                 // Only include this variant if it directly matches the query
                 const matches =
@@ -196,7 +210,17 @@ async function searchProducts() {
                     product_name: product.name,
                     sku,
                     brand_name: brandName,
-                    cost: variant.pricing?.cost ?? product.pricing?.cost ?? 0,
+                    suppliers: variant.suppliers ?? [],
+                    is_supplied_by_selected_supplier: !!supplierRelation,
+                    supplier_lead_time_days:
+                        supplierRelation?.lead_time_days ?? null,
+                    supplier_minimum_order_quantity:
+                        supplierRelation?.minimum_order_quantity ?? null,
+                    cost:
+                        supplierRelation?.supplier_cost ??
+                        variant.pricing?.cost ??
+                        product.pricing?.cost ??
+                        0,
                 });
             }
         }
@@ -215,10 +239,20 @@ function addProduct(row: any) {
     )
         return;
 
+    if (
+        form.value.supplier_id &&
+        !row.is_supplied_by_selected_supplier &&
+        !confirm(
+            'Esta variante no está vinculada al proveedor seleccionado. Puedes continuar, pero la OC quedará con una advertencia. ¿Deseas agregarla?',
+        )
+    ) {
+        return;
+    }
+
     form.value.items.push({
         product_id: row.product_id,
         variant_id: row.variant_id,
-        quantity_ordered: 1,
+        quantity_ordered: row.supplier_minimum_order_quantity || 1,
         units_per_package: 1,
         unit_cost: row.cost || 0,
         notes: '',
@@ -346,6 +380,8 @@ function addSelectedCandidates() {
 }
 
 async function handleSubmit() {
+    supplierWarnings.value = [];
+
     if (!form.value.supplier_id || !form.value.warehouse_id) {
         alert('Selecciona proveedor y almacén');
         return;
@@ -376,7 +412,17 @@ async function handleSubmit() {
             router.visit(`/purchase-orders/${updated.id}`);
         } else {
             const created = await createPurchaseOrder(payload);
-            router.visit(`/purchase-orders/${created.id}`);
+            supplierWarnings.value = created.warnings ?? [];
+
+            if (supplierWarnings.value.length) {
+                alert(
+                    supplierWarnings.value
+                        .map((warning) => warning.message)
+                        .join('\n'),
+                );
+            }
+
+            router.visit(`/purchase-orders/${created.data.id}`);
         }
     } catch (e) {}
 }
@@ -657,6 +703,21 @@ onMounted(async () => {
                                             <span class="font-mono">{{
                                                 row.sku
                                             }}</span>
+                                            <span
+                                                v-if="
+                                                    form.supplier_id &&
+                                                    row.is_supplied_by_selected_supplier
+                                                "
+                                                class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+                                            >
+                                                Suministrado
+                                            </span>
+                                            <span
+                                                v-else-if="form.supplier_id"
+                                                class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700"
+                                            >
+                                                No vinculado
+                                            </span>
                                         </p>
                                     </div>
                                     <span

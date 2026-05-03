@@ -8,6 +8,7 @@ import type {
     ReceiveItemsData,
     PurchaseOrderCandidateItem,
     PurchaseOrderCandidateSource,
+    PurchaseOrderWarning,
 } from '@/types/purchase-order';
 
 const BASE_URL = '/purchase-orders';
@@ -32,9 +33,15 @@ export const purchaseOrdersService = {
     /**
      * Create new purchase order
      */
-    async create(orderData: CreatePurchaseOrderData): Promise<PurchaseOrder> {
+    async create(orderData: CreatePurchaseOrderData): Promise<{
+        data: PurchaseOrder;
+        warnings?: PurchaseOrderWarning[];
+    }> {
         const { data } = await apiClient.post(BASE_URL, orderData);
-        return data.data;
+        return {
+            data: data.data,
+            warnings: data.warnings ?? [],
+        };
     },
 
     /**

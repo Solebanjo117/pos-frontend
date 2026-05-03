@@ -1,5 +1,17 @@
 import type { Product } from './product'
 
+export type CategoryAttributeType = 'string' | 'select'
+
+export interface CategoryDefaultAttribute {
+    name: string
+    value?: string
+    default_value?: string
+    required?: boolean
+    unit?: string
+    type?: CategoryAttributeType
+    options?: string[] | null
+}
+
 // Category Type
 export interface Category {
     id: number
@@ -10,13 +22,7 @@ export interface Category {
     icon?: string
     image_url?: string | null
     priority: number
-    default_attributes?: Array<{
-        name: string
-        value?: string
-        default_value?: string
-        required?: boolean
-        unit?: string
-    }>
+    default_attributes?: CategoryDefaultAttribute[]
     default_margin_percent?: number | null
     pricing_formula?: string | null
     min_suggested_price?: number | null
@@ -50,6 +56,7 @@ export interface CreateCategoryData {
     icon?: string
     image_url?: string | null
     priority?: number
+    default_attributes?: CategoryDefaultAttribute[]
     default_margin_percent?: number | null
     pricing_formula?: string | null
     min_suggested_price?: number | null

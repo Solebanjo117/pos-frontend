@@ -154,6 +154,15 @@ const categoryPayload = () => ({
 const nextDraftId = () => draftIdCounter.value--;
 
 const attributeNameKey = (name: string): string => name.trim().toLowerCase();
+const normalizeAttributeType = (value: unknown): 'string' | 'select' =>
+    value === 'select' ? 'select' : 'string';
+const normalizeAttributeOptions = (options: unknown): string[] => {
+    if (!Array.isArray(options)) return [];
+
+    return options
+        .map((option) => String(option ?? '').trim())
+        .filter((option) => option !== '');
+};
 
 const formatYearRange = (yearRange: string | null | undefined): string => {
     if (!yearRange) return '';
@@ -164,6 +173,19 @@ const normalizeDraftAttributes = (
     attributes: any[] = [],
 ): EditableProductAttribute[] => {
     return attributes.map((attribute) => ({
+        source:
+            attribute?.source === 'category'
+                ? ('category' as const)
+                : ('custom' as const),
+        source_category_id:
+            attribute?.source === 'category'
+                ? toCategoryId(attribute?.source_category_id)
+                : null,
+        type: normalizeAttributeType(attribute?.type),
+        options:
+            normalizeAttributeType(attribute?.type) === 'select'
+                ? normalizeAttributeOptions(attribute?.options)
+                : null,
         id: Number(attribute.id ?? nextDraftId()),
         product_id: props.productId,
         name: String(attribute.name ?? ''),
@@ -340,6 +362,11 @@ const recalculateDraftAttributesFromCategories = async () => {
         (category.default_attributes ?? []).forEach((attribute) => {
             const name = String(attribute.name ?? '').trim();
             const key = attributeNameKey(name);
+            const type = normalizeAttributeType(attribute.type);
+            const options =
+                type === 'select'
+                    ? normalizeAttributeOptions(attribute.options)
+                    : null;
 
             if (!key || seenDefaultNames.has(key)) return;
 
@@ -354,6 +381,8 @@ const recalculateDraftAttributesFromCategories = async () => {
                 unit: existing?.unit ?? attribute.unit ?? null,
                 source: 'category' as const,
                 source_category_id: category.id,
+                type,
+                options,
             });
             seenDefaultNames.add(key);
         });
@@ -365,6 +394,8 @@ const recalculateDraftAttributesFromCategories = async () => {
         ...attribute,
         source: 'custom' as const,
         source_category_id: null as number | null,
+        type: 'string' as const,
+        options: null,
     }));
     draftAttributes.value = [...defaultAttributes, ...customAttributes];
 };
@@ -501,6 +532,14 @@ const metadataPayload = (): UpdateProductRequest => ({
             name: attribute.name.trim(),
             value: String(attribute.value).trim(),
             unit: attribute.unit ?? undefined,
+            source:
+                attribute.source === 'category'
+                    ? ('category' as const)
+                    : ('custom' as const),
+            source_category_id:
+                attribute.source === 'category'
+                    ? (attribute.source_category_id ?? null)
+                    : null,
         })),
     oem_references: draftOemReferences.value
         .filter((reference) => reference.oem_code.trim())

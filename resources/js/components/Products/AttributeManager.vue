@@ -40,6 +40,10 @@ const isInherited = (attr: ProductAttribute): boolean => {
     return (attr as any).source === 'category'
 }
 
+const isSelectInherited = (attr: ProductAttribute): boolean => {
+    return isInherited(attr) && attr.type === 'select' && Array.isArray(attr.options) && attr.options.length > 0
+}
+
 const emitDraftAttributes = (value: ProductAttribute[]) => {
     emit('update:modelValue', value)
 }
@@ -72,6 +76,8 @@ const handleAdd = async () => {
                     name: newName.value.trim(),
                     value: newValue.value.trim(),
                     unit: null,
+                    type: 'string',
+                    options: null,
                     source: 'custom',
                 } as ProductAttribute,
             ])
@@ -205,18 +211,34 @@ const handleRemoveAttribute = async (attributeId: number) => {
                                     @input="debouncedSave(attr, 'name', ($event.target as HTMLInputElement).value)"
                                     @blur="flushAndSave(attr, 'name', ($event.target as HTMLInputElement).value)"
                                     @keyup.enter="($event.target as HTMLInputElement).blur()"
-                                    :readonly="isInherited(attr) && !isDraftMode"
+                                    :readonly="isInherited(attr)"
                                     :class="[
                                         'w-full rounded border border-transparent bg-transparent px-2 py-1.5 text-sm font-medium hover:border-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none dark:hover:border-border dark:focus:border-primary dark:focus:bg-muted',
                                         isInherited(attr) ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white',
-                                        isInherited(attr) && !isDraftMode ? 'cursor-not-allowed opacity-75' : ''
+                                        isInherited(attr) ? 'cursor-not-allowed opacity-75' : ''
                                     ]"
                                 />
                             </div>
                         </td>
                         <td class="px-4 py-1.5">
                             <div class="flex items-center gap-1.5">
+                                <select
+                                    v-if="isSelectInherited(attr)"
+                                    :value="attr.value"
+                                    @change="flushAndSave(attr, 'value', ($event.target as HTMLSelectElement).value)"
+                                    class="w-full rounded border border-transparent bg-transparent px-2 py-1.5 text-sm text-gray-700 hover:border-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none dark:text-gray-300 dark:hover:border-border dark:focus:border-primary dark:focus:bg-muted"
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    <option
+                                        v-for="option in attr.options"
+                                        :key="option"
+                                        :value="option"
+                                    >
+                                        {{ option }}
+                                    </option>
+                                </select>
                                 <input
+                                    v-else
                                     :value="attr.value"
                                     @input="debouncedSave(attr, 'value', ($event.target as HTMLInputElement).value)"
                                     @blur="flushAndSave(attr, 'value', ($event.target as HTMLInputElement).value)"

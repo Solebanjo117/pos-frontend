@@ -35,12 +35,17 @@ export interface AttributeDefinition {
     unit?: string;
 }
 
+export type ProductAttributeType = 'string' | 'select';
+
 export interface ProductAttribute {
     id?: number;
     product_id?: number;
     name: string;
     value: number | string;
     unit?: string;
+    required?: boolean;
+    type?: ProductAttributeType;
+    options?: string[] | null;
     data_type?: string;
     source?: 'category' | 'custom';
     source_category_id?: number | null;
@@ -303,6 +308,10 @@ export interface CreateProductRequest {
         name: string;
         value: number | string;
         unit?: string;
+        source?: 'category' | 'custom';
+        source_category_id?: number | null;
+        type?: ProductAttributeType;
+        options?: string[] | null;
     }>;
     vins?: string[];
 }
@@ -337,6 +346,10 @@ export interface UpdateProductRequest {
         name: string;
         value: number | string;
         unit?: string;
+        source?: 'category' | 'custom';
+        source_category_id?: number | null;
+        type?: ProductAttributeType;
+        options?: string[] | null;
     }>;
     oem_references?: Array<{
         oem_code: string;

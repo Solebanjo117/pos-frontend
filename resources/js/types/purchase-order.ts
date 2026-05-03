@@ -136,6 +136,16 @@ export interface PurchaseOrderCandidateItem {
     notes?: string | null;
 }
 
+export interface PurchaseOrderWarning {
+    type: 'supplier_variant_missing' | string;
+    variant_id?: number;
+    product_id?: number;
+    sku?: string | null;
+    product_name?: string | null;
+    brand_name?: string | null;
+    message: string;
+}
+
 export interface UpdatePurchaseOrderData extends Partial<
     Omit<CreatePurchaseOrderData, 'items'>
 > {

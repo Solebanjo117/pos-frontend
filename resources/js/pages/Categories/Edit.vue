@@ -4,7 +4,11 @@ import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useCategories } from '@/composables/useCategories';
 import { ArrowLeft, Save } from 'lucide-vue-next';
-import type { UpdateCategoryData, Category } from '@/types/category';
+import type {
+    UpdateCategoryData,
+    Category,
+    CategoryDefaultAttribute,
+} from '@/types/category';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -27,9 +31,16 @@ const {
 
 const parentCategories = ref<Category[]>([]);
 
+type CategoryAttributeDraft = {
+    name: string;
+    required: boolean;
+    type: 'string' | 'select';
+    options_text: string;
+};
+
 const form = ref<
     UpdateCategoryData & {
-        default_attributes: { name: string; required: boolean }[];
+        default_attributes: CategoryAttributeDraft[];
     }
 >({
     name: '',
@@ -47,11 +58,64 @@ const form = ref<
 });
 
 function addAttribute() {
-    form.value.default_attributes.push({ name: '', required: false });
+    form.value.default_attributes.push({
+        name: '',
+        required: false,
+        type: 'string',
+        options_text: '',
+    });
 }
 
 function removeAttribute(index: number) {
     form.value.default_attributes.splice(index, 1);
+}
+
+function parseSelectOptions(optionsText: string): string[] {
+    return optionsText
+        .split('\n')
+        .map((option) => option.trim())
+        .filter((option) => option !== '');
+}
+
+function mapToDraftAttribute(attribute: CategoryDefaultAttribute): CategoryAttributeDraft {
+    const type = attribute.type === 'select' ? 'select' : 'string';
+
+    return {
+        name: String(attribute.name ?? ''),
+        required: Boolean(attribute.required),
+        type,
+        options_text:
+            type === 'select'
+                ? (attribute.options ?? []).join('\n')
+                : '',
+    };
+}
+
+function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
+    return form.value.default_attributes
+        .map((attribute) => {
+            const name = attribute.name.trim();
+            const type = attribute.type === 'select' ? 'select' : 'string';
+            const options =
+                type === 'select'
+                    ? parseSelectOptions(attribute.options_text)
+                    : null;
+
+            if (name === '') {
+                return null;
+            }
+
+            return {
+                name,
+                required: Boolean(attribute.required),
+                type,
+                options,
+            } satisfies CategoryDefaultAttribute;
+        })
+        .filter(
+            (attribute): attribute is CategoryDefaultAttribute =>
+                attribute !== null,
+        );
 }
 
 function normalizeItbmPercent() {
@@ -75,8 +139,9 @@ onMounted(async () => {
             name: category.value.name,
             parent_id: category.value.parent_id ?? null,
             description: category.value.description || '',
-            default_attributes:
-                (category.value as any).default_attributes || [],
+            default_attributes: (category.value.default_attributes ?? []).map(
+                mapToDraftAttribute,
+            ),
             icon: category.value.icon || '',
             image_url: category.value.image_url ?? null,
             priority: category.value.priority ?? 0,
@@ -93,7 +158,10 @@ onMounted(async () => {
 async function handleSubmit() {
     try {
         normalizeItbmPercent();
-        const categoryPayload = { ...form.value };
+        const categoryPayload = {
+            ...form.value,
+            default_attributes: toPayloadDefaultAttributes(),
+        };
         delete categoryPayload.image_url;
 
         await updateCategory(Number(props.id), {
@@ -251,32 +319,77 @@ const parentCategoryOptions = computed<SelectOption[]>(() => [
                     <div
                         v-for="(attr, index) in form.default_attributes"
                         :key="index"
-                        class="mb-2 flex items-center gap-3"
+                        class="mb-3 rounded-lg border border-gray-200 p-3 dark:border-border"
                     >
-                        <input
-                            v-model="attr.name"
-                            type="text"
-                            @keydown.enter.prevent
-                            class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="Ej: Largo, Ancho, Material..."
-                        />
-                        <label
-                            class="flex items-center gap-1 text-xs whitespace-nowrap text-gray-600 dark:text-gray-400"
-                        >
-                            <input
-                                type="checkbox"
-                                v-model="attr.required"
-                                class="rounded"
-                            />
-                            Obligatorio
-                        </label>
-                        <button
-                            type="button"
-                            @click="removeAttribute(index)"
-                            class="p-1 text-red-500 transition hover:text-red-700"
-                        >
-                            ✕
-                        </button>
+                        <div class="grid gap-3 sm:grid-cols-12">
+                            <div class="sm:col-span-6">
+                                <label
+                                    class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                                >
+                                    Nombre
+                                </label>
+                                <input
+                                    v-model="attr.name"
+                                    type="text"
+                                    @keydown.enter.prevent
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                    placeholder="Ej: Largo, Ancho, Material..."
+                                />
+                            </div>
+                            <div class="sm:col-span-3">
+                                <label
+                                    class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                                >
+                                    Tipo
+                                </label>
+                                <select
+                                    v-model="attr.type"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                >
+                                    <option value="string">Texto</option>
+                                    <option value="select">Lista</option>
+                                </select>
+                            </div>
+                            <div
+                                class="sm:col-span-2 flex items-end sm:pb-2"
+                            >
+                                <label
+                                    class="flex items-center gap-1 text-xs whitespace-nowrap text-gray-600 dark:text-gray-400"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        v-model="attr.required"
+                                        class="rounded"
+                                    />
+                                    Obligatorio
+                                </label>
+                            </div>
+                            <div class="sm:col-span-1 flex items-end">
+                                <button
+                                    type="button"
+                                    @click="removeAttribute(index)"
+                                    class="w-full rounded-md border border-red-200 bg-red-50 px-2 py-2 text-red-600 transition hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <div
+                                v-if="attr.type === 'select'"
+                                class="sm:col-span-12"
+                            >
+                                <label
+                                    class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                                >
+                                    Opciones (una por línea)
+                                </label>
+                                <textarea
+                                    v-model="attr.options_text"
+                                    rows="3"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                    placeholder="DELANTERO&#10;TRASERO"
+                                ></textarea>
+                            </div>
+                        </div>
                     </div>
                     <button
                         type="button"

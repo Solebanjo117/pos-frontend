@@ -119,6 +119,26 @@ const resetForm = () => {
     }
 };
 
+const applySupplierCost = () => {
+    if (!selectedSupplierId.value || !props.product?.suppliers?.length) {
+        return;
+    }
+
+    const relation = props.product.suppliers.find((supplier: any) => {
+        const sameSupplier =
+            Number(supplier.id) === Number(selectedSupplierId.value);
+        const sameVariant = selectedVariantId.value
+            ? Number(supplier.variant_id) === Number(selectedVariantId.value)
+            : true;
+
+        return sameSupplier && sameVariant;
+    });
+
+    if (relation?.supplier_cost !== undefined) {
+        unitCost.value = Number(relation.supplier_cost || 0);
+    }
+};
+
 watch(
     () => props.isOpen,
     async (newVal) => {
@@ -146,6 +166,8 @@ watch(
         }
     },
 );
+
+watch([selectedSupplierId, selectedVariantId], applySupplierCost);
 
 const handleClose = () => {
     if (isSubmitting.value) return;

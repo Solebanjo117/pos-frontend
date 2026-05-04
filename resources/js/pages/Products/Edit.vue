@@ -172,26 +172,56 @@ const formatYearRange = (yearRange: string | null | undefined): string => {
 const normalizeDraftAttributes = (
     attributes: any[] = [],
 ): EditableProductAttribute[] => {
-    return attributes.map((attribute) => ({
-        source:
-            attribute?.source === 'category'
-                ? ('category' as const)
-                : ('custom' as const),
-        source_category_id:
-            attribute?.source === 'category'
-                ? toCategoryId(attribute?.source_category_id)
-                : null,
-        type: normalizeAttributeType(attribute?.type),
-        options:
-            normalizeAttributeType(attribute?.type) === 'select'
-                ? normalizeAttributeOptions(attribute?.options)
-                : null,
-        id: Number(attribute.id ?? nextDraftId()),
-        product_id: props.productId,
-        name: String(attribute.name ?? ''),
-        value: String(attribute.value ?? ''),
-        unit: attribute.unit ?? null,
-    }));
+    return attributes.map((attribute) => {
+        const type = normalizeAttributeType(attribute?.type);
+
+        // Deserialize value: for select types, ensure it’s an array.
+        let value: string | string[];
+        const rawValue = attribute.value;
+        if (type === 'select') {
+            if (Array.isArray(rawValue)) {
+                value = rawValue;
+            } else if (typeof rawValue === 'string') {
+                // Try JSON decode for legacy data
+                try {
+                    const parsed = JSON.parse(rawValue);
+                    value = Array.isArray(parsed) ? parsed : [rawValue];
+                } catch {
+                    value = rawValue ? [rawValue] : [];
+                }
+            } else {
+                value = [];
+            }
+        } else {
+            value =
+                typeof rawValue === 'string'
+                    ? rawValue
+                    : Array.isArray(rawValue)
+                      ? rawValue.join(', ')
+                      : String(rawValue ?? '');
+        }
+
+        return {
+            source:
+                attribute?.source === 'category'
+                    ? ('category' as const)
+                    : ('custom' as const),
+            source_category_id:
+                attribute?.source === 'category'
+                    ? toCategoryId(attribute?.source_category_id)
+                    : null,
+            type,
+            options:
+                type === 'select'
+                    ? normalizeAttributeOptions(attribute?.options)
+                    : null,
+            id: Number(attribute.id ?? nextDraftId()),
+            product_id: props.productId,
+            name: String(attribute.name ?? ''),
+            value,
+            unit: attribute.unit ?? null,
+        };
+    });
 };
 
 const normalizeDraftOemReferences = (
@@ -274,21 +304,21 @@ const selectedExtraCategories = computed(() => {
 });
 
 const selectedCategoryIdsForImages = computed(() => {
-    const ids: number[] = []
-    if (selectedCategoryId.value) ids.push(selectedCategoryId.value)
+    const ids: number[] = [];
+    if (selectedCategoryId.value) ids.push(selectedCategoryId.value);
     for (const id of extraCategoryIds.value) {
-        if (!ids.includes(id)) ids.push(id)
+        if (!ids.includes(id)) ids.push(id);
     }
-    return ids
-})
+    return ids;
+});
 
 const categoryNameMapForImages = computed(() => {
-    const map: Record<number, string> = {}
+    const map: Record<number, string> = {};
     for (const c of categories.value) {
-        map[c.id] = c.name
+        map[c.id] = c.name;
     }
-    return map
-})
+    return map;
+});
 
 const fetchCategoryDetail = async (
     categoryId: number,
@@ -326,10 +356,14 @@ const applyPrimaryCategorySettings = async (categoryId: number | null) => {
     categoryMargin.value = category?.default_margin_percent ?? null;
 };
 
-const categoryDefaultAttributeValue = (attribute: {
-    value?: string;
-    default_value?: string;
-}): string => {
+const categoryDefaultAttributeValue = (
+    attribute: {
+        value?: string;
+        default_value?: string;
+    },
+    type: string = 'string',
+): string | string[] => {
+    if (type === 'select') return [];
     return String(attribute.value ?? attribute.default_value ?? '');
 };
 
@@ -371,13 +405,33 @@ const recalculateDraftAttributesFromCategories = async () => {
             if (!key || seenDefaultNames.has(key)) return;
 
             const existing = existingByName.get(key);
+
+            // Preserve existing value; for selects ensure it’s an array.
+            let value: string | string[];
+            if (existing?.value !== undefined) {
+                if (type === 'select') {
+                    value = Array.isArray(existing.value)
+                        ? existing.value
+                        : existing.value
+                          ? [String(existing.value)]
+                          : [];
+                } else {
+                    value =
+                        typeof existing.value === 'string'
+                            ? existing.value
+                            : Array.isArray(existing.value)
+                              ? existing.value.join(', ')
+                              : String(existing.value ?? '');
+                }
+            } else {
+                value = categoryDefaultAttributeValue(attribute, type);
+            }
+
             defaultAttributes.push({
                 id: existing?.id ?? nextDraftId(),
                 product_id: props.productId,
                 name,
-                value: String(
-                    existing?.value ?? categoryDefaultAttributeValue(attribute),
-                ),
+                value,
                 unit: existing?.unit ?? attribute.unit ?? null,
                 source: 'category' as const,
                 source_category_id: category.id,
@@ -388,15 +442,18 @@ const recalculateDraftAttributesFromCategories = async () => {
         });
     });
 
-    const customAttributes = draftAttributes.value.filter(
-        (attribute) => !seenDefaultNames.has(attributeNameKey(attribute.name)),
-    ).map((attribute) => ({
-        ...attribute,
-        source: 'custom' as const,
-        source_category_id: null as number | null,
-        type: 'string' as const,
-        options: null,
-    }));
+    const customAttributes = draftAttributes.value
+        .filter(
+            (attribute) =>
+                !seenDefaultNames.has(attributeNameKey(attribute.name)),
+        )
+        .map((attribute) => ({
+            ...attribute,
+            source: 'custom' as const,
+            source_category_id: null as number | null,
+            type: 'string' as const,
+            options: null,
+        }));
     draftAttributes.value = [...defaultAttributes, ...customAttributes];
 };
 
@@ -526,11 +583,16 @@ const metadataPayload = (): UpdateProductRequest => ({
     attributes: draftAttributes.value
         .filter(
             (attribute) =>
-                attribute.name.trim() && String(attribute.value).trim(),
+                attribute.name.trim() &&
+                (Array.isArray(attribute.value)
+                    ? attribute.value.length > 0
+                    : String(attribute.value).trim()),
         )
         .map((attribute) => ({
             name: attribute.name.trim(),
-            value: String(attribute.value).trim(),
+            value: Array.isArray(attribute.value)
+                ? attribute.value
+                : String(attribute.value).trim(),
             unit: attribute.unit ?? undefined,
             source:
                 attribute.source === 'category'

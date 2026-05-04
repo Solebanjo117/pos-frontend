@@ -41,7 +41,7 @@ export interface ProductAttribute {
     id?: number;
     product_id?: number;
     name: string;
-    value: number | string;
+    value: number | string | string[];
     unit?: string;
     required?: boolean;
     type?: ProductAttributeType;
@@ -306,7 +306,7 @@ export interface CreateProductRequest {
     }>;
     attributes?: Array<{
         name: string;
-        value: number | string;
+        value: number | string | string[];
         unit?: string;
         source?: 'category' | 'custom';
         source_category_id?: number | null;
@@ -344,7 +344,7 @@ export interface UpdateProductRequest {
     };
     attributes?: Array<{
         name: string;
-        value: number | string;
+        value: number | string | string[];
         unit?: string;
         source?: 'category' | 'custom';
         source_category_id?: number | null;

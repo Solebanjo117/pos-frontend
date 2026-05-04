@@ -134,7 +134,7 @@ const categoryDetailCache = ref<Record<number, Category>>({});
 
 type DraftProductAttribute = {
     name: string;
-    value: string;
+    value: string | string[];
     unit: string;
     required: boolean;
     type: 'string' | 'select';
@@ -222,13 +222,34 @@ const mergeCategoryDefaultAttributes = (defaults: any[]) => {
                 type === 'select'
                     ? normalizeAttributeOptions(attr?.options)
                     : null;
-            const defaultValue = String(
-                attr?.default_value ?? attr?.value ?? '',
-            );
+            const defaultValue =
+                type === 'select'
+                    ? []
+                    : String(attr?.default_value ?? attr?.value ?? '');
 
+            // Preserve existing value; for selects ensure it’s an array.
+            let value: string | string[];
+            if (existing?.value !== undefined) {
+                if (type === 'select') {
+                    value = Array.isArray(existing.value)
+                        ? existing.value
+                        : existing.value
+                          ? [existing.value]
+                          : [];
+                } else {
+                    value =
+                        typeof existing.value === 'string'
+                            ? existing.value
+                            : Array.isArray(existing.value)
+                              ? existing.value.join(', ')
+                              : String(existing.value ?? '');
+                }
+            } else {
+                value = defaultValue;
+            }
             return {
                 name,
-                value: existing?.value ?? defaultValue,
+                value,
                 unit: String(attr?.unit ?? existing?.unit ?? '').trim(),
                 required: Boolean(attr?.required),
                 type,
@@ -831,22 +852,22 @@ const submitInline = async () => {
 };
 
 const selectedCategoryIdsForImages = computed(() => {
-    const primary = (form.value as any).category_id
-    const ids: number[] = []
-    if (primary) ids.push(primary)
+    const primary = (form.value as any).category_id;
+    const ids: number[] = [];
+    if (primary) ids.push(primary);
     for (const id of extraCategoryIds.value) {
-        if (!ids.includes(id)) ids.push(id)
+        if (!ids.includes(id)) ids.push(id);
     }
-    return ids
-})
+    return ids;
+});
 
 const categoryNameMapForImages = computed(() => {
-    const map: Record<number, string> = {}
+    const map: Record<number, string> = {};
     for (const c of categories.value) {
-        map[c.id] = c.name
+        map[c.id] = c.name;
     }
-    return map
-})
+    return map;
+});
 
 const categoryOptions = computed(() =>
     categories.value.flatMap((c) => ({
@@ -980,14 +1001,20 @@ const handleSubmit = async () => {
             attributes: productAttributes.value
                 .map((a) => ({
                     name: a.name.trim(),
-                    value: a.value.trim(),
+                    value: Array.isArray(a.value)
+                        ? a.value
+                        : String(a.value).trim(),
                     unit: (a.unit ?? '').trim(),
                     source: a.fromCategory
                         ? ('category' as const)
                         : ('custom' as const),
                     source_category_id: a.source_category_id ?? null,
                 }))
-                .filter((a) => a.name && a.value),
+                .filter(
+                    (a) =>
+                        a.name &&
+                        (Array.isArray(a.value) ? a.value.length > 0 : a.value),
+                ),
             vehicle_compatibility: vehicleCompat.value.engines.map(
                 (e) => e.engine_id,
             ),
@@ -1637,21 +1664,90 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || '';
                                         >*</span
                                     >
                                 </label>
-                                <select
+                                <div
                                     v-if="hasSelectOptions(attr)"
-                                    v-model="attr.value"
-                                    :required="attr.required"
-                                    class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                    class="mt-0.5 w-full"
                                 >
-                                    <option value="">Seleccionar...</option>
-                                    <option
-                                        v-for="option in attr.options"
-                                        :key="option"
-                                        :value="option"
+                                    <div
+                                        class="max-h-40 overflow-y-auto rounded-md border border-gray-300 bg-white dark:border-border dark:bg-muted"
                                     >
-                                        {{ option }}
-                                    </option>
-                                </select>
+                                        <label
+                                            v-for="option in attr.options"
+                                            :key="option"
+                                            class="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-muted/80"
+                                            :class="
+                                                (
+                                                    Array.isArray(attr.value)
+                                                        ? attr.value.includes(
+                                                              option,
+                                                          )
+                                                        : attr.value === option
+                                                )
+                                                    ? 'bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200'
+                                                    : 'text-gray-700 dark:text-gray-300'
+                                            "
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                :checked="
+                                                    Array.isArray(attr.value)
+                                                        ? attr.value.includes(
+                                                              option,
+                                                          )
+                                                        : attr.value === option
+                                                "
+                                                class="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-border dark:bg-muted"
+                                                @change="
+                                                    (() => {
+                                                        const current =
+                                                            Array.isArray(
+                                                                attr.value,
+                                                            )
+                                                                ? [
+                                                                      ...attr.value,
+                                                                  ]
+                                                                : attr.value
+                                                                  ? [
+                                                                        String(
+                                                                            attr.value,
+                                                                        ),
+                                                                    ]
+                                                                  : [];
+                                                        attr.value =
+                                                            current.includes(
+                                                                option,
+                                                            )
+                                                                ? current.filter(
+                                                                      (v) =>
+                                                                          v !==
+                                                                          option,
+                                                                  )
+                                                                : [
+                                                                      ...current,
+                                                                      option,
+                                                                  ];
+                                                    })()
+                                                "
+                                            />
+                                            <span class="text-sm select-none">{{
+                                                option
+                                            }}</span>
+                                        </label>
+                                    </div>
+                                    <p
+                                        v-if="
+                                            Array.isArray(attr.value) &&
+                                            attr.value.length > 0
+                                        "
+                                        class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+                                    >
+                                        {{
+                                            attr.value.length === 1
+                                                ? '1 seleccionado'
+                                                : `${attr.value.length} seleccionados`
+                                        }}
+                                    </p>
+                                </div>
                                 <input
                                     v-else
                                     v-model="attr.value"
@@ -1816,7 +1912,12 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || '';
                 </div>
 
                 <!-- SECTION 9: Imagen del Producto -->
-                <ProductImagesSection mode="pending" v-model="pendingImages" :category-ids="selectedCategoryIdsForImages" :category-name-map="categoryNameMapForImages" />
+                <ProductImagesSection
+                    mode="pending"
+                    v-model="pendingImages"
+                    :category-ids="selectedCategoryIdsForImages"
+                    :category-name-map="categoryNameMapForImages"
+                />
             </form>
         </div>
 

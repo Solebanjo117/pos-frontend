@@ -860,7 +860,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 </div>
 
                 <!-- ========== SIDEBAR + TABLE LAYOUT ========== -->
-                <div v-else-if="products.length > 0" class="flex min-h-0 gap-4">
+                <div v-else class="flex min-h-0 gap-4">
                     <!-- Sidebar Filters -->
                     <div
                         :class="
@@ -882,7 +882,35 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                         ref="tableContainerRef"
                         class="min-w-0 flex-1 rounded-lg bg-white shadow dark:bg-card"
                     >
-                        <div>
+                        <div
+                            v-if="products.length === 0"
+                            class="py-12 text-center"
+                        >
+                            <svg
+                                class="mx-auto h-12 w-12 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                                />
+                            </svg>
+                            <h3
+                                class="mt-2 text-sm font-medium text-gray-900 dark:text-white"
+                            >
+                                No hay productos
+                            </h3>
+                            <p class="mt-1 text-sm text-gray-500">
+                                No hay productos que coincidan con los filtros
+                                actuales.
+                            </p>
+                        </div>
+
+                        <div v-else>
                             <table
                                 class="w-full table-fixed divide-y divide-gray-200 dark:divide-border"
                                 :class="{ 'table-compact': isCompact }"
@@ -1553,6 +1581,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
 
                         <!-- Pagination -->
                         <div
+                            v-if="products.length > 0"
                             class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 dark:border-border dark:bg-card"
                         >
                             <div class="flex flex-1 justify-between sm:hidden">
@@ -1620,40 +1649,6 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Empty State -->
-                <div
-                    v-else
-                    class="rounded-lg bg-white py-12 text-center shadow"
-                >
-                    <svg
-                        class="mx-auto h-12 w-12 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                        />
-                    </svg>
-                    <h3 class="mt-2 text-sm font-medium text-gray-900">
-                        No hay productos
-                    </h3>
-                    <p class="mt-1 text-sm text-gray-500">
-                        Comienza creando un nuevo producto.
-                    </p>
-                    <div class="mt-6">
-                        <a
-                            href="/products/create"
-                            class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                        >
-                            Nuevo Producto
-                        </a>
                     </div>
                 </div>
             </template>

@@ -38,11 +38,11 @@ type CategoryAttributeDraft = {
     options_text: string;
 };
 
-const form = ref<
-    UpdateCategoryData & {
-        default_attributes: CategoryAttributeDraft[];
-    }
->({
+type CategoryForm = Omit<UpdateCategoryData, 'default_attributes'> & {
+    default_attributes: CategoryAttributeDraft[];
+};
+
+const form = ref<CategoryForm>({
     name: '',
     parent_id: null,
     description: '',
@@ -93,7 +93,7 @@ function mapToDraftAttribute(attribute: CategoryDefaultAttribute): CategoryAttri
 
 function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
     return form.value.default_attributes
-        .map((attribute) => {
+        .flatMap((attribute): CategoryDefaultAttribute[] => {
             const name = attribute.name.trim();
             const type = attribute.type === 'select' ? 'select' : 'string';
             const options =
@@ -102,20 +102,16 @@ function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
                     : null;
 
             if (name === '') {
-                return null;
+                return [];
             }
 
-            return {
+            return [{
                 name,
                 required: Boolean(attribute.required),
                 type,
                 options,
-            } satisfies CategoryDefaultAttribute;
-        })
-        .filter(
-            (attribute): attribute is CategoryDefaultAttribute =>
-                attribute !== null,
-        );
+            }];
+        });
 }
 
 function normalizeItbmPercent() {
@@ -274,7 +270,10 @@ const parentCategoryOptions = computed<SelectOption[]>(() => [
                         Categoría Padre
                     </label>
                     <SearchableSelect
-                        v-model="form.parent_id"
+                        :model-value="form.parent_id ?? null"
+                        @update:model-value="
+                            (value) => (form.parent_id = value as number | null)
+                        "
                         :options="parentCategoryOptions"
                         placeholder="Ninguna (categoría raíz)"
                     />

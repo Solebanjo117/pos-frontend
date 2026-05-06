@@ -73,9 +73,15 @@ export function useSuppliers() {
         }
     }
 
-    async function fetchSupplierVariants(id: number) {
-        supplierProducts.value = await suppliersService.getVariants(id);
-        return supplierProducts.value;
+    async function fetchSupplierVariants(
+        id: number,
+        filters?: { search?: string; page?: number; per_page?: number },
+    ) {
+        const response = await suppliersService.getVariants(id, filters);
+        supplierProducts.value = Array.isArray(response)
+            ? response
+            : response.data || [];
+        return response;
     }
 
     async function attachVariantToSupplier(

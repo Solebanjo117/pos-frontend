@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
@@ -14,11 +14,14 @@ import type {
 } from '@/types/purchase-order';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
+import { suppliersService } from '@/services/suppliers';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import type { ProductVariantSelection } from '@/types/product-variant-picker';
 
 const props = defineProps<{ purchaseOrderId?: number }>();
 
@@ -42,9 +45,27 @@ const isEditing = computed(() => !!props.purchaseOrderId);
 
 const suppliers = ref<any[]>([]);
 const warehouses = ref<any[]>([]);
+const productFilterCategories = ref<Array<{ id: number; name: string }>>([]);
+const productFilterBrands = ref<Array<{ id: number; name: string }>>([]);
 const productSearch = ref('');
 const searchResults = ref<any[]>([]);
 const searchingProducts = ref(false);
+const showProductPicker = ref(false);
+const pickerProducts = ref<any[]>([]);
+const pickerTotal = ref(0);
+const pickerCurrentPage = ref(1);
+const pickerLastPage = ref(1);
+const pickerLoading = ref(false);
+const pickerLoadingMore = ref(false);
+const pickerFilters = ref<{
+    query: string;
+    category_ids?: number[];
+    brand_ids?: number[];
+    min_price?: number;
+    max_price?: number;
+    in_stock?: boolean;
+    sort?: string;
+}>({ query: '' });
 const entryMode = ref<'manual' | 'list'>('manual');
 const candidateSource = ref<PurchaseOrderCandidateSource>('low_stock');
 const candidateSupplyDate = ref(new Date().toISOString().split('T')[0]);
@@ -53,6 +74,7 @@ const candidateRows = ref<
         PurchaseOrderCandidateItem & {
             selected: boolean;
             quantity: number;
+            units_per_package: number;
             cost: number;
         }
     >
@@ -60,6 +82,8 @@ const candidateRows = ref<
 const loadingCandidates = ref(false);
 const candidateError = ref<string | null>(null);
 const supplierWarnings = ref<PurchaseOrderWarning[]>([]);
+const selectedSupplierBrandIds = ref<number[]>([]);
+const selectedSupplierProductLinks = ref<any[]>([]);
 
 const form = ref<CreatePurchaseOrderData>({
     supplier_id: 0,
@@ -130,13 +154,86 @@ const canLoadCandidates = computed(
 
 function supplierRelationFor(row: any) {
     const supplierId = Number(form.value.supplier_id);
-    if (!supplierId || !Array.isArray(row.suppliers)) {
+    if (!supplierId) {
         return null;
     }
 
-    return row.suppliers.find(
-        (supplier: any) => Number(supplier.id) === supplierId,
+    if (Array.isArray(row.suppliers)) {
+        const directRelation = row.suppliers.find(
+            (supplier: any) => Number(supplier.id) === supplierId,
+        );
+
+        if (directRelation) {
+            return directRelation;
+        }
+    }
+
+    const variantId = Number(row.id ?? row.variant_id ?? 0) || null;
+    const productId = Number(row.product_id ?? 0) || null;
+    const productLink = selectedSupplierProductLinks.value.find(
+        (link) =>
+            productId &&
+            Number(link.product_id) === productId &&
+            ((variantId && Number(link.variant_id) === variantId) ||
+                link.variant_id === null ||
+                link.variant_id === undefined),
     );
+
+    if (productLink) {
+        return productLink;
+    }
+
+    const brandId = Number(row.brand_id ?? row.brand?.id ?? 0) || null;
+    if (
+        brandId &&
+        selectedSupplierBrandIds.value.some((id) => Number(id) === brandId)
+    ) {
+        return {
+            id: supplierId,
+            supplier_cost: null,
+            lead_time_days: null,
+            minimum_order_quantity: null,
+        };
+    }
+
+    return null;
+}
+
+async function loadSelectedSupplierContext() {
+    const supplierId = Number(form.value.supplier_id);
+
+    if (!supplierId) {
+        selectedSupplierBrandIds.value = [];
+        selectedSupplierProductLinks.value = [];
+        return;
+    }
+
+    try {
+        const [supplierResponse, brands] = await Promise.all([
+            suppliersService.getById(supplierId),
+            suppliersService.getBrands(supplierId),
+        ]);
+
+        selectedSupplierBrandIds.value = (brands || []).map((brand: any) =>
+            Number(brand.id),
+        );
+        selectedSupplierProductLinks.value = (
+            supplierResponse.products || []
+        ).map((link: any) => ({
+            product_id: Number(link.product_id),
+            variant_id:
+                link.variant_id === null || link.variant_id === undefined
+                    ? null
+                    : Number(link.variant_id),
+            supplier_cost: link.supplier_cost,
+            lead_time_days: link.lead_time_days,
+            minimum_order_quantity: link.minimum_order_quantity,
+            is_preferred: link.is_preferred,
+        }));
+    } catch (e) {
+        selectedSupplierBrandIds.value = [];
+        selectedSupplierProductLinks.value = [];
+    }
 }
 
 function preselectCurrentWarehouse() {
@@ -209,6 +306,7 @@ async function searchProducts() {
                     product_id: product.id,
                     product_name: product.name,
                     sku,
+                    brand_id: variant.brand_id || product.brand?.id || null,
                     brand_name: brandName,
                     suppliers: variant.suppliers ?? [],
                     is_supplied_by_selected_supplier: !!supplierRelation,
@@ -230,6 +328,131 @@ async function searchProducts() {
     } finally {
         searchingProducts.value = false;
     }
+}
+
+async function fetchPickerProducts(append = false) {
+    if (append && pickerCurrentPage.value >= pickerLastPage.value) {
+        return;
+    }
+
+    if (append) {
+        pickerLoadingMore.value = true;
+    } else {
+        pickerLoading.value = true;
+        pickerCurrentPage.value = 1;
+    }
+
+    try {
+        const page = append ? pickerCurrentPage.value + 1 : 1;
+        const filters = pickerFilters.value;
+        const { data } = await apiClient.get('/products', {
+            params: {
+                search: filters.query || undefined,
+                category_id: filters.category_ids,
+                brand_id: filters.brand_ids,
+                min_price: filters.min_price,
+                max_price: filters.max_price,
+                in_stock: filters.in_stock,
+                sort: filters.sort,
+                page,
+                per_page: 20,
+                with_variants: true,
+            },
+        });
+
+        const rows = data.data || [];
+        pickerProducts.value = append
+            ? [...pickerProducts.value, ...rows]
+            : rows;
+        pickerCurrentPage.value = data.meta?.current_page ?? page;
+        pickerLastPage.value = data.meta?.last_page ?? page;
+        pickerTotal.value = data.meta?.total ?? rows.length;
+    } finally {
+        pickerLoading.value = false;
+        pickerLoadingMore.value = false;
+    }
+}
+
+async function fetchProductFilterOptions() {
+    try {
+        const [categoriesResponse, brandsResponse] = await Promise.all([
+            apiClient.get('/categories'),
+            apiClient.get('/brands'),
+        ]);
+
+        productFilterCategories.value =
+            categoriesResponse.data.data ?? categoriesResponse.data ?? [];
+        productFilterBrands.value =
+            brandsResponse.data.data ?? brandsResponse.data ?? [];
+    } catch (e) {
+        productFilterCategories.value = [];
+        productFilterBrands.value = [];
+    }
+}
+
+async function openProductPicker() {
+    showProductPicker.value = true;
+    pickerFilters.value = { query: productSearch.value };
+    await loadSelectedSupplierContext();
+    fetchPickerProducts();
+}
+
+function handlePickerSearch(filters: typeof pickerFilters.value) {
+    pickerFilters.value = filters;
+    productSearch.value = filters.query;
+    fetchPickerProducts();
+}
+
+function addVariantSelections(selections: ProductVariantSelection[]) {
+    selections.forEach(
+        ({
+            product,
+            variant,
+            quantity,
+            unitCost,
+            supplierMatch,
+            minimumOrderQuantity,
+        }) => {
+            if (
+                form.value.items.find(
+                    (item: any) =>
+                        candidateKey(item) ===
+                        candidateKey({
+                            product_id: product.id,
+                            variant_id: variant?.id ?? null,
+                        }),
+                )
+            ) {
+                return;
+            }
+
+            if (
+                form.value.supplier_id &&
+                supplierMatch === false &&
+                !confirm(
+                    'Esta variante no esta vinculada al proveedor seleccionado. Puedes continuar, pero la OC quedara con una advertencia. Deseas agregarla?',
+                )
+            ) {
+                return;
+            }
+
+            form.value.items.push({
+                product_id: product.id,
+                variant_id: variant?.id ?? null,
+                quantity_ordered: minimumOrderQuantity || quantity || 1,
+                units_per_package: 1,
+                unit_cost: unitCost || 0,
+                notes: '',
+                _name: product.name,
+                _sku: variant?.sku || product.sku_base || 'N/A',
+                _brand: variant?.brand?.name || product.brand?.name || '',
+            } as any);
+        },
+    );
+
+    productSearch.value = '';
+    searchResults.value = [];
+    showProductPicker.value = false;
 }
 
 function addProduct(row: any) {
@@ -305,6 +528,7 @@ async function loadCandidateRows() {
             ...row,
             selected: false,
             quantity: row.suggested_quantity || 1,
+            units_per_package: Number((row as any).units_per_package || 1),
             cost: Number(row.unit_cost || 0),
         }));
     } catch (e: any) {
@@ -332,6 +556,13 @@ function addSelectedCandidates() {
 
         if (existing) {
             existing.quantity_ordered += Math.max(1, Number(row.quantity || 1));
+            if (!existing.units_per_package) {
+                existing.units_per_package = Math.max(
+                    1,
+                    Number(row.units_per_package || 1),
+                );
+            }
+
             if (!existing.unit_cost && row.cost) {
                 existing.unit_cost = row.cost;
             }
@@ -350,7 +581,10 @@ function addSelectedCandidates() {
                 product_id: row.product_id,
                 variant_id: row.variant_id ?? null,
                 quantity_ordered: Math.max(1, Number(row.quantity || 1)),
-                units_per_package: 1,
+                units_per_package: Math.max(
+                    1,
+                    Number(row.units_per_package || 1),
+                ),
                 unit_cost: Number(row.cost || 0),
                 notes: row.notes || '',
                 _name: row.product_name,
@@ -431,6 +665,7 @@ onMounted(async () => {
     // Load suppliers and warehouses
     await fetchSettings();
     await initWarehouse();
+    await fetchProductFilterOptions();
     suppliers.value = await fetchActiveSuppliers();
     try {
         const { data } = await apiClient.get('/warehouses');
@@ -476,6 +711,13 @@ onMounted(async () => {
         }
     }
 });
+
+watch(
+    () => form.value.supplier_id,
+    () => {
+        loadSelectedSupplierContext();
+    },
+);
 </script>
 
 <template>
@@ -661,73 +903,21 @@ onMounted(async () => {
                             v-if="entryMode === 'manual' || isEditing"
                             class="relative mb-4"
                         >
-                            <div class="relative">
-                                <Search
-                                    class="absolute top-2.5 left-3 text-gray-400"
-                                    :size="18"
-                                />
-                                <input
-                                    v-model="productSearch"
-                                    type="text"
-                                    placeholder="Buscar producto por nombre o SKU..."
-                                    class="w-full rounded-lg border border-gray-300 bg-white py-2 pr-4 pl-10 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                    @input="searchProducts"
-                                />
-                            </div>
-                            <!-- Search Results Dropdown -->
-                            <div
-                                v-if="searchResults.length"
-                                class="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card"
+                            <button
+                                type="button"
+                                class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3 text-left text-gray-900 transition hover:bg-gray-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted/70"
+                                @click="openProductPicker"
                             >
-                                <button
-                                    v-for="row in searchResults"
-                                    :key="row.variant_id"
-                                    type="button"
-                                    @click="addProduct(row)"
-                                    class="flex w-full items-center justify-between border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-gray-50 dark:border-border dark:hover:bg-muted/50"
-                                >
-                                    <div class="min-w-0">
-                                        <p
-                                            class="truncate text-sm font-medium text-gray-900 dark:text-white"
-                                        >
-                                            {{ row.product_name }}
-                                        </p>
-                                        <p
-                                            class="text-xs text-gray-500 dark:text-gray-400"
-                                        >
-                                            <span
-                                                v-if="row.brand_name"
-                                                class="mr-1.5 font-semibold text-indigo-600 dark:text-indigo-400 dark:text-primary"
-                                                >{{ row.brand_name }}</span
-                                            >
-                                            <span class="font-mono">{{
-                                                row.sku
-                                            }}</span>
-                                            <span
-                                                v-if="
-                                                    form.supplier_id &&
-                                                    row.is_supplied_by_selected_supplier
-                                                "
-                                                class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
-                                            >
-                                                Suministrado
-                                            </span>
-                                            <span
-                                                v-else-if="form.supplier_id"
-                                                class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700"
-                                            >
-                                                No vinculado
-                                            </span>
-                                        </p>
-                                    </div>
-                                    <span
-                                        class="ml-4 shrink-0 text-sm font-medium text-gray-600 dark:text-gray-300"
-                                        >${{
-                                            Number(row.cost).toFixed(2)
-                                        }}</span
-                                    >
-                                </button>
-                            </div>
+                                <span class="flex items-center gap-2 text-sm">
+                                    <Search class="h-4 w-4 text-gray-400" />
+                                    Buscar productos y seleccionar variantes
+                                </span>
+                                <span class="text-xs text-gray-500">
+                                    {{ form.items.length }} agregado{{
+                                        form.items.length !== 1 ? 's' : ''
+                                    }}
+                                </span>
+                            </button>
                         </div>
 
                         <div
@@ -799,7 +989,7 @@ onMounted(async () => {
                                 class="mt-4 overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                             >
                                 <table
-                                    class="min-w-full divide-y divide-gray-200 dark:divide-border"
+                                    class="min-w-[980px] divide-y divide-gray-200 dark:divide-border"
                                 >
                                     <thead
                                         class="bg-gray-50 dark:bg-background"
@@ -827,24 +1017,30 @@ onMounted(async () => {
                                                 Producto
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
                                             >
-                                                Stock
+                                                Paquete
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                                title="Unidades por paquete"
                                             >
-                                                Cantidad
+                                                Unidad paquete
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
                                             >
-                                                Costo
+                                                Total unidad
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
                                             >
-                                                Notas
+                                                Costo unitario
+                                            </th>
+                                            <th
+                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                            >
+                                                Subtotal
                                             </th>
                                         </tr>
                                     </thead>
@@ -874,11 +1070,6 @@ onMounted(async () => {
                                                     {{ row.sku || 'N/A' }}
                                                 </p>
                                             </td>
-                                            <td
-                                                class="px-3 py-2 text-right text-sm text-gray-600 dark:text-gray-300"
-                                            >
-                                                {{ row.current_stock ?? '-' }}
-                                            </td>
                                             <td class="px-3 py-2">
                                                 <input
                                                     v-model.number="
@@ -891,6 +1082,26 @@ onMounted(async () => {
                                             </td>
                                             <td class="px-3 py-2">
                                                 <input
+                                                    v-model.number="
+                                                        row.units_per_package
+                                                    "
+                                                    type="number"
+                                                    min="1"
+                                                    title="Unidades por paquete"
+                                                    class="w-28 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                                />
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right text-sm font-medium text-gray-600 dark:text-gray-300"
+                                            >
+                                                {{
+                                                    row.quantity *
+                                                    (row.units_per_package ||
+                                                        1)
+                                                }}
+                                            </td>
+                                            <td class="px-3 py-2">
+                                                <input
                                                     v-model.number="row.cost"
                                                     type="number"
                                                     min="0"
@@ -899,9 +1110,16 @@ onMounted(async () => {
                                                 />
                                             </td>
                                             <td
-                                                class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
+                                                class="px-3 py-2 text-right text-sm font-medium text-gray-900 dark:text-white"
                                             >
-                                                {{ row.notes || '-' }}
+                                                ${{
+                                                    (
+                                                        row.quantity *
+                                                        (row.units_per_package ||
+                                                            1) *
+                                                        row.cost
+                                                    ).toFixed(2)
+                                                }}
                                             </td>
                                         </tr>
                                     </tbody>
@@ -933,7 +1151,7 @@ onMounted(async () => {
                         <!-- Items Table -->
                         <div v-if="form.items.length" class="overflow-x-auto">
                             <table
-                                class="min-w-full divide-y divide-gray-200 dark:divide-border"
+                                class="min-w-[1040px] divide-y divide-gray-200 dark:divide-border"
                             >
                                 <thead class="bg-gray-50 dark:bg-background">
                                     <tr>
@@ -943,25 +1161,25 @@ onMounted(async () => {
                                             Producto
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
                                         >
-                                            Paquetes
+                                            Paquete
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
                                             title="Unidades por paquete"
                                         >
-                                            Und/Paq
+                                            Unidad paquete
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
                                         >
-                                            Total Und.
+                                            Total unidad
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
                                         >
-                                            Costo Unit.
+                                            Costo unitario
                                         </th>
                                         <th
                                             class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
@@ -1148,5 +1366,27 @@ onMounted(async () => {
                 </PurchaseOrderSection>
             </form>
         </div>
+
+        <ProductVariantPickerModal
+            :show="showProductPicker"
+            :products="pickerProducts"
+            :search-query="productSearch"
+            :total-count="pickerTotal"
+            :has-more="pickerCurrentPage < pickerLastPage"
+            :loading-more="pickerLoadingMore"
+            :loading="pickerLoading"
+            :categories="productFilterCategories"
+            :brands="productFilterBrands"
+            :selected-supplier-id="form.supplier_id || null"
+            :selected-supplier-brand-ids="selectedSupplierBrandIds"
+            :selected-supplier-product-links="selectedSupplierProductLinks"
+            title="Seleccionar variantes para OC"
+            confirm-label="Agregar a OC"
+            context="purchase"
+            @close="showProductPicker = false"
+            @confirm="addVariantSelections"
+            @load-more="fetchPickerProducts(true)"
+            @search="handlePickerSearch"
+        />
     </AppLayout>
 </template>

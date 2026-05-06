@@ -52,7 +52,8 @@ export interface SupplierProduct {
     product_id: number;
     variant_id?: number | null;
     product_name: string;
-    product_sku: string;
+    product_sku?: string | null;
+    variant_sku?: string | null;
     brand_name?: string | null;
     supplier_cost: number;
     lead_time_days: number;
@@ -62,7 +63,8 @@ export interface SupplierProduct {
 }
 
 export interface SupplierVariantPayload {
-    variant_id: number;
+    variant_id?: number;
+    product_id?: number;
     supplier_cost: number;
     lead_time_days?: number;
     minimum_order_quantity?: number;

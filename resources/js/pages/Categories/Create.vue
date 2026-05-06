@@ -30,6 +30,10 @@ type CategoryAttributeDraft = {
     options_text: string;
 };
 
+type CategoryForm = Omit<CreateCategoryData, 'default_attributes'> & {
+    default_attributes: CategoryAttributeDraft[];
+};
+
 const parentCategoryOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Ninguna (categoría raíz)' },
     ...parentCategories.value.map((category) => ({
@@ -40,11 +44,7 @@ const parentCategoryOptions = computed<SelectOption[]>(() => [
     })),
 ]);
 
-const form = ref<
-    CreateCategoryData & {
-        default_attributes: CategoryAttributeDraft[];
-    }
->({
+const form = ref<CategoryForm>({
     name: '',
     parent_id: null,
     description: '',
@@ -81,7 +81,7 @@ function parseSelectOptions(optionsText: string): string[] {
 
 function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
     return form.value.default_attributes
-        .map((attribute) => {
+        .flatMap((attribute): CategoryDefaultAttribute[] => {
             const name = attribute.name.trim();
             const type = attribute.type === 'select' ? 'select' : 'string';
             const options =
@@ -90,20 +90,16 @@ function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
                     : null;
 
             if (name === '') {
-                return null;
+                return [];
             }
 
-            return {
+            return [{
                 name,
                 required: Boolean(attribute.required),
                 type,
                 options,
-            } satisfies CategoryDefaultAttribute;
-        })
-        .filter(
-            (attribute): attribute is CategoryDefaultAttribute =>
-                attribute !== null,
-        );
+            }];
+        });
 }
 
 function normalizeItbmPercent() {
@@ -227,7 +223,10 @@ function goBack() {
                         Categoría Padre
                     </label>
                     <SearchableSelect
-                        v-model="form.parent_id"
+                        :model-value="form.parent_id ?? null"
+                        @update:model-value="
+                            (value) => (form.parent_id = value as number | null)
+                        "
                         :options="parentCategoryOptions"
                         placeholder="Ninguna (categoría raíz)"
                     />

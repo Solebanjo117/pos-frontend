@@ -79,9 +79,14 @@ export const suppliersService = {
         return data.data;
     },
 
-    async getVariants(id: number): Promise<SupplierProduct[]> {
-        const { data } = await apiClient.get(`${BASE_URL}/${id}/variants`);
-        return data.data;
+    async getVariants(
+        id: number,
+        filters?: { search?: string; page?: number; per_page?: number },
+    ) {
+        const { data } = await apiClient.get(`${BASE_URL}/${id}/variants`, {
+            params: filters,
+        });
+        return data;
     },
 
     async attachVariant(id: number, payload: SupplierVariantPayload) {

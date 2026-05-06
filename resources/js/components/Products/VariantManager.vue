@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
-import { CircleDollarSign, Package } from 'lucide-vue-next';
+import { CircleDollarSign } from 'lucide-vue-next';
 
 const props = defineProps<{
     productId?: number;
@@ -1108,7 +1108,62 @@ onMounted(async () => {
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >
-                                        Costo Base
+                                        Producto
+                                    </label>
+                                    <input
+                                        :value="productName || 'Producto Base'"
+                                        type="text"
+                                        readonly
+                                        class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                                    />
+                                </div>
+
+                                <div class="md:col-span-1">
+                                    <label
+                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Cantidad
+                                    </label>
+                                    <input
+                                        v-if="
+                                            !editingVariant &&
+                                            form.initial_inventory[0]
+                                        "
+                                        v-model.number="
+                                            form.initial_inventory[0]
+                                                .stock_available
+                                        "
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    />
+                                    <input
+                                        v-else-if="editingVariant"
+                                        :value="
+                                            getVariantStockForWarehouse(
+                                                editingVariant,
+                                                currentWarehouseId,
+                                            )
+                                        "
+                                        type="number"
+                                        readonly
+                                        class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                                    />
+                                    <input
+                                        v-else
+                                        value="0"
+                                        type="number"
+                                        readonly
+                                        class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                                    />
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label
+                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Costo
                                     </label>
                                     <div class="relative mt-1">
                                         <span
@@ -1135,7 +1190,7 @@ onMounted(async () => {
                                 <div class="md:col-span-2">
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >% ITBM Costo</label
+                                        >ITBM</label
                                     >
                                     <input
                                         v-model.number="
@@ -1149,10 +1204,10 @@ onMounted(async () => {
                                     />
                                 </div>
 
-                                <div class="md:col-span-3">
+                                <div class="md:col-span-2">
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >Misceláneos</label
+                                        >Miscelaneos</label
                                     >
                                     <div class="relative mt-1">
                                         <span
@@ -1171,10 +1226,10 @@ onMounted(async () => {
                                     </div>
                                 </div>
 
-                                <div class="md:col-span-4">
+                                <div class="md:col-span-2">
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >Costo Total</label
+                                        >Total</label
                                     >
                                     <div class="relative mt-1">
                                         <span
@@ -1268,37 +1323,6 @@ onMounted(async () => {
                                         &#8635; Recalcular por categor&iacute;a
                                     </button>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Initial Inventory (Only for create) -->
-                    <div
-                        v-if="!editingVariant"
-                        class="border-t border-gray-200 pt-4 dark:border-border"
-                    >
-                        <h4
-                            class="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white"
-                        >
-                            <Package class="h-4 w-4 text-gray-500" /> Inventario
-                            Inicial
-                        </h4>
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
-                                <label
-                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Stock Disponible</label
-                                >
-                                <input
-                                    v-model.number="
-                                        form.initial_inventory[0]
-                                            .stock_available
-                                    "
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                />
                             </div>
                         </div>
                     </div>

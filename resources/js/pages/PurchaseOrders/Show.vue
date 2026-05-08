@@ -124,6 +124,13 @@ function formatDate(value?: string | null): string {
     return new Date(value).toLocaleDateString('es-PA');
 }
 
+function itemLineTotal(item: any): number {
+    return (
+        Number(item.total ?? 0) ||
+        Number(item.subtotal || 0) + Number(item.tax_amount || 0)
+    );
+}
+
 function openPdf(mode: 'standard' | 'worksheet' = 'worksheet') {
     const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(
         /\/$/,
@@ -642,6 +649,15 @@ onMounted(async () => {
                                                 Costo
                                             </th>
                                             <th class="px-3 py-2 text-right">
+                                                Subtotal
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                ITBM %
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                ITBM
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
                                                 Total
                                             </th>
                                         </tr>
@@ -764,6 +780,33 @@ onMounted(async () => {
                                                     Number(
                                                         item.subtotal,
                                                     ).toFixed(2)
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono"
+                                            >
+                                                {{
+                                                    Number(
+                                                        item.tax_rate ?? 7,
+                                                    ).toFixed(0)
+                                                }}%
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono"
+                                            >
+                                                ${{
+                                                    Number(
+                                                        item.tax_amount || 0,
+                                                    ).toFixed(2)
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono font-semibold"
+                                            >
+                                                ${{
+                                                    itemLineTotal(item).toFixed(
+                                                        2,
+                                                    )
                                                 }}
                                             </td>
                                         </tr>

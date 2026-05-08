@@ -34,6 +34,9 @@ export interface PurchaseOrderItem {
     total_units_received: number;
     unit_cost: number;
     subtotal: number;
+    tax_rate: number;
+    tax_amount: number;
+    total: number;
     pending_quantity: number;
     is_fully_received: boolean;
     notes?: string;
@@ -116,6 +119,7 @@ export interface CreatePurchaseOrderData {
         quantity_ordered: number;
         units_per_package?: number;
         unit_cost: number;
+        tax_rate?: number;
         notes?: string;
     }>;
 }
@@ -133,6 +137,7 @@ export interface PurchaseOrderCandidateItem {
     current_stock?: number | null;
     suggested_quantity: number;
     unit_cost: number;
+    tax_rate?: number;
     notes?: string | null;
 }
 

@@ -76,6 +76,7 @@ const candidateRows = ref<
             quantity: number;
             units_per_package: number;
             cost: number;
+            tax_rate: number;
         }
     >
 >([]);
@@ -108,11 +109,28 @@ const subtotal = computed(() =>
         0,
     ),
 );
+const normalizeTaxRate = (value: unknown): number => {
+    const parsed = Number(value);
+
+    if (!Number.isFinite(parsed)) {
+        return 7;
+    }
+
+    return Math.max(0, Math.min(100, Math.round(parsed)));
+};
+const itemSubtotal = (item: any): number =>
+    Number(item.quantity_ordered || 0) *
+    Number(item.units_per_package || 1) *
+    Number(item.unit_cost || 0);
+const itemTaxAmount = (item: any): number =>
+    itemSubtotal(item) * (normalizeTaxRate(item.tax_rate) / 100);
+const itemLineTotal = (item: any): number =>
+    itemSubtotal(item) + itemTaxAmount(item);
+const taxTotal = computed(() =>
+    form.value.items.reduce((sum, item: any) => sum + itemTaxAmount(item), 0),
+);
 const total = computed(
-    () =>
-        subtotal.value +
-        (form.value.tax_amount || 0) +
-        (form.value.shipping_cost || 0),
+    () => subtotal.value + taxTotal.value + (form.value.shipping_cost || 0),
 );
 
 const supplierOptions = computed<SelectOption[]>(() => [
@@ -442,6 +460,7 @@ function addVariantSelections(selections: ProductVariantSelection[]) {
                 quantity_ordered: minimumOrderQuantity || quantity || 1,
                 units_per_package: 1,
                 unit_cost: unitCost || 0,
+                tax_rate: 7,
                 notes: '',
                 _name: product.name,
                 _sku: variant?.sku || product.sku_base || 'N/A',
@@ -478,6 +497,7 @@ function addProduct(row: any) {
         quantity_ordered: row.supplier_minimum_order_quantity || 1,
         units_per_package: 1,
         unit_cost: row.cost || 0,
+        tax_rate: 7,
         notes: '',
         // Extra display fields (not sent to API)
         _name: row.product_name,
@@ -530,6 +550,7 @@ async function loadCandidateRows() {
             quantity: row.suggested_quantity || 1,
             units_per_package: Number((row as any).units_per_package || 1),
             cost: Number(row.unit_cost || 0),
+            tax_rate: normalizeTaxRate(row.tax_rate),
         }));
     } catch (e: any) {
         candidateError.value =
@@ -567,6 +588,10 @@ function addSelectedCandidates() {
                 existing.unit_cost = row.cost;
             }
 
+            if (existing.tax_rate === undefined || existing.tax_rate === null) {
+                existing.tax_rate = normalizeTaxRate(row.tax_rate);
+            }
+
             if (row.source_supply_list_item_id) {
                 existing._source_supply_list_item_ids = [
                     ...(existing._source_supply_list_item_ids ?? []),
@@ -586,6 +611,7 @@ function addSelectedCandidates() {
                     Number(row.units_per_package || 1),
                 ),
                 unit_cost: Number(row.cost || 0),
+                tax_rate: normalizeTaxRate(row.tax_rate),
                 notes: row.notes || '',
                 _name: row.product_name,
                 _sku: row.sku || 'N/A',
@@ -628,12 +654,14 @@ async function handleSubmit() {
     try {
         const payload = {
             ...form.value,
+            tax_amount: Number(taxTotal.value.toFixed(2)),
             items: form.value.items.map((item: any) => ({
                 product_id: item.product_id,
                 variant_id: item.variant_id,
                 quantity_ordered: item.quantity_ordered,
                 units_per_package: item.units_per_package || 1,
                 unit_cost: item.unit_cost,
+                tax_rate: normalizeTaxRate(item.tax_rate),
                 notes: item.notes || '',
             })),
         };
@@ -698,6 +726,7 @@ onMounted(async () => {
                     quantity_ordered: item.quantity_ordered,
                     units_per_package: item.units_per_package || 1,
                     unit_cost: Number(item.unit_cost),
+                    tax_rate: normalizeTaxRate(item.tax_rate),
                     notes: item.notes || '',
                     // Extra display fields
                     _name:
@@ -836,6 +865,19 @@ watch(
                                 <input
                                     v-model="form.expected_date"
                                     type="date"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Envio</label
+                                >
+                                <input
+                                    v-model.number="form.shipping_cost"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
                                     class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                 />
                             </div>
@@ -1017,28 +1059,33 @@ watch(
                                                 Producto
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
                                                 Paquete
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                                 title="Unidades por paquete"
                                             >
                                                 Unidad paquete
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
                                                 Total unidad
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
                                                 Costo unitario
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                            >
+                                                ITBM %
+                                            </th>
+                                            <th
+                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
                                                 Subtotal
                                             </th>
@@ -1096,8 +1143,7 @@ watch(
                                             >
                                                 {{
                                                     row.quantity *
-                                                    (row.units_per_package ||
-                                                        1)
+                                                    (row.units_per_package || 1)
                                                 }}
                                             </td>
                                             <td class="px-3 py-2">
@@ -1107,6 +1153,24 @@ watch(
                                                     min="0"
                                                     step="0.01"
                                                     class="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                                />
+                                            </td>
+                                            <td class="px-3 py-2">
+                                                <input
+                                                    v-model.number="
+                                                        row.tax_rate
+                                                    "
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    step="1"
+                                                    class="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                                    @blur="
+                                                        row.tax_rate =
+                                                            normalizeTaxRate(
+                                                                row.tax_rate,
+                                                            )
+                                                    "
                                                 />
                                             </td>
                                             <td
@@ -1151,7 +1215,7 @@ watch(
                         <!-- Items Table -->
                         <div v-if="form.items.length" class="overflow-x-auto">
                             <table
-                                class="min-w-[1040px] divide-y divide-gray-200 dark:divide-border"
+                                class="min-w-[1240px] divide-y divide-gray-200 dark:divide-border"
                             >
                                 <thead class="bg-gray-50 dark:bg-background">
                                     <tr>
@@ -1161,30 +1225,45 @@ watch(
                                             Producto
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                         >
                                             Paquete
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             title="Unidades por paquete"
                                         >
                                             Unidad paquete
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                         >
                                             Total unidad
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                         >
                                             Costo unitario
+                                        </th>
+                                        <th
+                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                        >
+                                            ITBM %
                                         </th>
                                         <th
                                             class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
                                         >
                                             Subtotal
+                                        </th>
+                                        <th
+                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                        >
+                                            ITBM
+                                        </th>
+                                        <th
+                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                        >
+                                            Total
                                         </th>
                                         <th class="px-4 py-2"></th>
                                     </tr>
@@ -1253,17 +1332,42 @@ watch(
                                                 class="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                             />
                                         </td>
+                                        <td class="px-4 py-2">
+                                            <input
+                                                v-model.number="
+                                                    (item as any).tax_rate
+                                                "
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="1"
+                                                class="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                                @blur="
+                                                    (item as any).tax_rate =
+                                                        normalizeTaxRate(
+                                                            (item as any)
+                                                                .tax_rate,
+                                                        )
+                                                "
+                                            />
+                                        </td>
                                         <td
                                             class="px-4 py-2 text-right text-sm font-medium text-gray-900 dark:text-white"
                                         >
+                                            ${{ itemSubtotal(item).toFixed(2) }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right text-sm font-medium text-gray-700 dark:text-gray-300"
+                                        >
                                             ${{
-                                                (
-                                                    item.quantity_ordered *
-                                                    ((item as any)
-                                                        .units_per_package ||
-                                                        1) *
-                                                    item.unit_cost
-                                                ).toFixed(2)
+                                                itemTaxAmount(item).toFixed(2)
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right text-sm font-semibold text-gray-900 dark:text-white"
+                                        >
+                                            ${{
+                                                itemLineTotal(item).toFixed(2)
                                             }}
                                         </td>
                                         <td class="px-4 py-2 text-right">
@@ -1288,82 +1392,46 @@ watch(
                     </div>
                 </PurchaseOrderSection>
 
-                <!-- Totals & Submit -->
-                <PurchaseOrderSection
-                    title="Costos"
-                    subtitle="Impuestos, envio y total de la orden"
-                    default-open
+                <div
+                    class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-border"
                 >
-                    <div class="p-4">
-                        <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <div>
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Impuestos</label
-                                >
-                                <input
-                                    v-model.number="form.tax_amount"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                />
-                            </div>
-                            <div>
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Envío</label
-                                >
-                                <input
-                                    v-model.number="form.shipping_cost"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                />
-                            </div>
-                            <div class="flex flex-col items-end justify-end">
-                                <p
-                                    class="text-sm text-gray-500 dark:text-gray-400"
-                                >
-                                    Subtotal: ${{ subtotal.toFixed(2) }}
-                                </p>
-                                <p
-                                    class="text-xl font-bold text-gray-900 dark:text-white"
-                                >
-                                    Total: ${{ total.toFixed(2) }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div
-                            class="flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-border"
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        <span class="mr-4"
+                            >Subtotal: ${{ subtotal.toFixed(2) }}</span
                         >
-                            <Link
-                                href="/purchase-orders"
-                                class="rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50"
-                            >
-                                Cancelar
-                            </Link>
-                            <button
-                                type="submit"
-                                :disabled="loading || form.items.length === 0"
-                                class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2 text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                            >
-                                <Save :size="18" />
-                                {{
-                                    loading
-                                        ? isEditing
-                                            ? 'Actualizando...'
-                                            : 'Creando...'
-                                        : isEditing
-                                          ? 'Actualizar Orden'
-                                          : 'Crear Orden de Compra'
-                                }}
-                            </button>
-                        </div>
+                        <span class="mr-4"
+                            >ITBM: ${{ taxTotal.toFixed(2) }}</span
+                        >
+                        <span
+                            class="font-semibold text-gray-900 dark:text-white"
+                            >Total: ${{ total.toFixed(2) }}</span
+                        >
                     </div>
-                </PurchaseOrderSection>
+                    <div class="flex justify-end gap-3">
+                        <Link
+                            href="/purchase-orders"
+                            class="rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50"
+                        >
+                            Cancelar
+                        </Link>
+                        <button
+                            type="submit"
+                            :disabled="loading || form.items.length === 0"
+                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2 text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                            <Save :size="18" />
+                            {{
+                                loading
+                                    ? isEditing
+                                        ? 'Actualizando...'
+                                        : 'Creando...'
+                                    : isEditing
+                                      ? 'Actualizar Orden'
+                                      : 'Crear Orden de Compra'
+                            }}
+                        </button>
+                    </div>
+                </div>
             </form>
         </div>
 

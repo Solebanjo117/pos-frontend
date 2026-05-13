@@ -86,7 +86,7 @@ const openEditModal = async (engine: VehicleEngine) => {
 
     // Load VINs on demand
     if (engine.model_id) {
-        _vinApi = useVehicleVins(engine.model_id)
+        _vinApi = useVehicleVins({ modelId: engine.model_id, engineId: engine.id })
         vinsLoading.value = true
         await _vinApi.fetchVins()
         engineVins.value = _vinApi.vins.value
@@ -124,7 +124,7 @@ const handleSubmit = async () => {
             // Stay open so user can add VINs
             editingEngine.value = created
             if (created.model_id) {
-                _vinApi = useVehicleVins(created.model_id)
+                _vinApi = useVehicleVins({ modelId: created.model_id, engineId: created.id })
                 await _vinApi.fetchVins()
                 engineVins.value = _vinApi.vins.value
             } else {

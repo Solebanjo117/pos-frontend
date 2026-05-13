@@ -1,27 +1,44 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import {
+    Save,
+    Plus,
+    Trash2,
+    Search,
+    Package,
+    MoreVertical,
+    Pencil,
+    ExternalLink,
+} from 'lucide-vue-next';
+import { ref, computed, onMounted, watch } from 'vue';
+import ProductVariantFormModal from '@/components/Products/ProductVariantFormModal.vue';
+import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
+import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import {
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import SearchableSelect, {
+    type SelectOption,
+} from '@/components/ui/SearchableSelect.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useSuppliers } from '@/composables/useSuppliers';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { Save, Plus, Trash2, Search, Package } from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import { purchaseOrdersService } from '@/services/purchase-orders';
+import { suppliersService } from '@/services/suppliers';
+import type { ProductVariantSelection } from '@/types/product-variant-picker';
 import type {
     CreatePurchaseOrderData,
     PurchaseOrderCandidateItem,
     PurchaseOrderCandidateSource,
     PurchaseOrderWarning,
 } from '@/types/purchase-order';
-import apiClient from '@/services/api/client';
-import { purchaseOrdersService } from '@/services/purchase-orders';
-import { suppliersService } from '@/services/suppliers';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
-import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
-import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
-import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
-import type { ProductVariantSelection } from '@/types/product-variant-picker';
 
 const props = defineProps<{ purchaseOrderId?: number }>();
 
@@ -51,6 +68,12 @@ const productSearch = ref('');
 const searchResults = ref<any[]>([]);
 const searchingProducts = ref(false);
 const showProductPicker = ref(false);
+const showVariantEditModal = ref(false);
+const variantEditTarget = ref<{
+    productId: number;
+    variantId: number;
+    productName: string;
+} | null>(null);
 const pickerProducts = ref<any[]>([]);
 const pickerTotal = ref(0);
 const pickerCurrentPage = ref(1);
@@ -109,6 +132,7 @@ const subtotal = computed(() =>
         0,
     ),
 );
+
 const normalizeTaxRate = (value: unknown): number => {
     const parsed = Number(value);
 
@@ -118,19 +142,48 @@ const normalizeTaxRate = (value: unknown): number => {
 
     return Math.max(0, Math.min(100, Math.round(parsed)));
 };
+
+const normalizeQuantity = (value: unknown): number => {
+    const parsed = Math.floor(Number(value) || 1);
+    return Math.max(1, isNaN(parsed) ? 1 : parsed);
+};
+
 const itemSubtotal = (item: any): number =>
     Number(item.quantity_ordered || 0) *
     Number(item.units_per_package || 1) *
     Number(item.unit_cost || 0);
-const itemTaxAmount = (item: any): number =>
-    itemSubtotal(item) * (normalizeTaxRate(item.tax_rate) / 100);
+
+function syncAutoTax(item: any) {
+    if (!item._taxManual) {
+        item.tax_amount = Math.round(itemSubtotal(item) * 0.07 * 100) / 100;
+    }
+}
+
+const itemTaxAmount = (item: any): number => {
+    if (item._taxManual) return Number(item.tax_amount || 0);
+    return Math.round(itemSubtotal(item) * 0.07 * 100) / 100;
+};
+
 const itemLineTotal = (item: any): number =>
-    itemSubtotal(item) + itemTaxAmount(item);
+    itemSubtotal(item) + Number(item.misc_cost || 0) + itemTaxAmount(item);
+
 const taxTotal = computed(() =>
     form.value.items.reduce((sum, item: any) => sum + itemTaxAmount(item), 0),
 );
+
+const miscTotal = computed(() =>
+    form.value.items.reduce(
+        (sum, item: any) => sum + Number(item.misc_cost || 0),
+        0,
+    ),
+);
+
 const total = computed(
-    () => subtotal.value + taxTotal.value + (form.value.shipping_cost || 0),
+    () =>
+        subtotal.value +
+        taxTotal.value +
+        miscTotal.value +
+        (form.value.shipping_cost || 0),
 );
 
 const supplierOptions = computed<SelectOption[]>(() => [
@@ -332,6 +385,8 @@ async function searchProducts() {
                         supplierRelation?.lead_time_days ?? null,
                     supplier_minimum_order_quantity:
                         supplierRelation?.minimum_order_quantity ?? null,
+                    cost_base: variant.pricing?.cost_base ?? product.pricing?.cost_base ?? null,
+                    cost_miscellaneous: variant.pricing?.cost_miscellaneous ?? product.pricing?.cost_miscellaneous ?? null,
                     cost:
                         supplierRelation?.supplier_cost ??
                         variant.pricing?.cost ??
@@ -428,6 +483,7 @@ function addVariantSelections(selections: ProductVariantSelection[]) {
             variant,
             quantity,
             unitCost,
+            miscCost,
             supplierMatch,
             minimumOrderQuantity,
         }) => {
@@ -454,13 +510,23 @@ function addVariantSelections(selections: ProductVariantSelection[]) {
                 return;
             }
 
+            const finalQty = normalizeQuantity(minimumOrderQuantity || quantity || 1);
+
             form.value.items.push({
                 product_id: product.id,
                 variant_id: variant?.id ?? null,
-                quantity_ordered: minimumOrderQuantity || quantity || 1,
+                quantity_ordered: finalQty,
                 units_per_package: 1,
                 unit_cost: unitCost || 0,
-                tax_rate: 7,
+                misc_cost: miscCost || 0,
+                tax_amount:
+                    Math.round(
+                        finalQty *
+                            (unitCost || 0) *
+                            0.07 *
+                            100,
+                    ) / 100,
+                _taxManual: false,
                 notes: '',
                 _name: product.name,
                 _sku: variant?.sku || product.sku_base || 'N/A',
@@ -491,13 +557,25 @@ function addProduct(row: any) {
         return;
     }
 
+    const qty = normalizeQuantity(row.supplier_minimum_order_quantity || 1);
+    const unitCost = Number(row.cost_base ?? row.cost ?? 0);
+    const miscCost = Number(row.cost_miscellaneous ?? 0);
+
     form.value.items.push({
         product_id: row.product_id,
         variant_id: row.variant_id,
-        quantity_ordered: row.supplier_minimum_order_quantity || 1,
+        quantity_ordered: qty,
         units_per_package: 1,
-        unit_cost: row.cost || 0,
-        tax_rate: 7,
+        unit_cost: unitCost,
+        misc_cost: miscCost,
+        tax_amount:
+            Math.round(
+                qty *
+                    unitCost *
+                    0.07 *
+                    100,
+            ) / 100,
+        _taxManual: false,
         notes: '',
         // Extra display fields (not sent to API)
         _name: row.product_name,
@@ -521,6 +599,50 @@ function removeItem(index: number) {
                 (id) => !sourceIds.includes(id),
             );
     }
+}
+
+function openVariantEdit(idx: number) {
+    const item = form.value.items[idx] as any;
+    if (!item?.variant_id) return;
+    variantEditTarget.value = {
+        productId: item.product_id,
+        variantId: item.variant_id,
+        productName: item._name || 'Producto',
+    };
+    showVariantEditModal.value = true;
+}
+
+function handleVariantSaved(savedVariant: any) {
+    if (!variantEditTarget.value) return;
+    const { productId, variantId } = variantEditTarget.value;
+
+    form.value.items.forEach((item: any) => {
+        if (
+            Number(item.product_id) === Number(productId) &&
+            Number(item.variant_id) === Number(variantId)
+        ) {
+            if (savedVariant.brand?.name) item._brand = savedVariant.brand.name;
+            if (savedVariant.sku) item._sku = savedVariant.sku;
+
+            const newCostBase = Number(
+                savedVariant._costBase ?? savedVariant.pricing?.cost_base ?? 0,
+            );
+            const newCostMisc = Number(
+                savedVariant._costMiscellaneous ??
+                    savedVariant.pricing?.cost_miscellaneous ??
+                    0,
+            );
+
+            if (newCostBase > 0) {
+                item.unit_cost = newCostBase;
+                item.misc_cost = newCostMisc;
+                syncAutoTax(item);
+            }
+        }
+    });
+
+    showVariantEditModal.value = false;
+    variantEditTarget.value = null;
 }
 
 async function loadCandidateRows() {
@@ -547,9 +669,10 @@ async function loadCandidateRows() {
         candidateRows.value = rows.map((row) => ({
             ...row,
             selected: false,
-            quantity: row.suggested_quantity || 1,
+            quantity: normalizeQuantity(row.suggested_quantity || 1),
             units_per_package: Number((row as any).units_per_package || 1),
-            cost: Number(row.unit_cost || 0),
+            cost: Number(row.unit_cost ?? row.cost_base ?? row.cost ?? 0),
+            misc_cost: Number((row as any).cost_miscellaneous || 0),
             tax_rate: normalizeTaxRate(row.tax_rate),
         }));
     } catch (e: any) {
@@ -576,21 +699,20 @@ function addSelectedCandidates() {
         ) as any;
 
         if (existing) {
-            existing.quantity_ordered += Math.max(1, Number(row.quantity || 1));
+            existing.quantity_ordered += normalizeQuantity(row.quantity);
             if (!existing.units_per_package) {
-                existing.units_per_package = Math.max(
-                    1,
-                    Number(row.units_per_package || 1),
-                );
+                existing.units_per_package = normalizeQuantity(row.units_per_package);
             }
 
             if (!existing.unit_cost && row.cost) {
                 existing.unit_cost = row.cost;
             }
 
-            if (existing.tax_rate === undefined || existing.tax_rate === null) {
-                existing.tax_rate = normalizeTaxRate(row.tax_rate);
+            if (!existing.misc_cost && (row as any).misc_cost) {
+                existing.misc_cost = (row as any).misc_cost;
             }
+
+            syncAutoTax(existing);
 
             if (row.source_supply_list_item_id) {
                 existing._source_supply_list_item_ids = [
@@ -602,16 +724,25 @@ function addSelectedCandidates() {
                 );
             }
         } else {
+            const finalQty = normalizeQuantity(row.quantity);
+            const finalUnits = normalizeQuantity(row.units_per_package);
+
             form.value.items.push({
                 product_id: row.product_id,
                 variant_id: row.variant_id ?? null,
-                quantity_ordered: Math.max(1, Number(row.quantity || 1)),
-                units_per_package: Math.max(
-                    1,
-                    Number(row.units_per_package || 1),
-                ),
+                quantity_ordered: finalQty,
+                units_per_package: finalUnits,
                 unit_cost: Number(row.cost || 0),
-                tax_rate: normalizeTaxRate(row.tax_rate),
+                misc_cost: Number((row as any).misc_cost || 0),
+                tax_amount:
+                    Math.round(
+                        finalQty *
+                            finalUnits *
+                            Number(row.cost || 0) *
+                            (normalizeTaxRate(row.tax_rate) / 100) *
+                            100,
+                    ) / 100,
+                _taxManual: normalizeTaxRate(row.tax_rate) !== 7,
                 notes: row.notes || '',
                 _name: row.product_name,
                 _sku: row.sku || 'N/A',
@@ -661,7 +792,8 @@ async function handleSubmit() {
                 quantity_ordered: item.quantity_ordered,
                 units_per_package: item.units_per_package || 1,
                 unit_cost: item.unit_cost,
-                tax_rate: normalizeTaxRate(item.tax_rate),
+                misc_cost: item.misc_cost || 0,
+                tax_amount: itemTaxAmount(item),
                 notes: item.notes || '',
             })),
         };
@@ -726,7 +858,9 @@ onMounted(async () => {
                     quantity_ordered: item.quantity_ordered,
                     units_per_package: item.units_per_package || 1,
                     unit_cost: Number(item.unit_cost),
-                    tax_rate: normalizeTaxRate(item.tax_rate),
+                    misc_cost: Number(item.misc_cost || 0),
+                    tax_amount: Number(item.tax_amount || 0),
+                    _taxManual: true, // Existing records treated as manual to preserve exact amounts
                     notes: item.notes || '',
                     // Extra display fields
                     _name:
@@ -1028,16 +1162,18 @@ watch(
 
                             <div
                                 v-if="candidateRows.length"
-                                class="mt-4 overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                                class="mt-4 rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                             >
                                 <table
-                                    class="min-w-[980px] divide-y divide-gray-200 dark:divide-border"
+                                    class="w-full table-fixed divide-y divide-gray-200 dark:divide-border"
                                 >
                                     <thead
                                         class="bg-gray-50 dark:bg-background"
                                     >
                                         <tr>
-                                            <th class="px-3 py-2 text-left">
+                                            <th
+                                                class="w-10 px-3 py-2 text-left"
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     :checked="
@@ -1059,35 +1195,29 @@ watch(
                                                 Producto
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                                class="w-24 px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
-                                                Paquete
+                                                Qty
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
-                                                title="Unidades por paquete"
+                                                class="w-28 px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
-                                                Unidad paquete
+                                                Costo
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                                class="w-24 px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
-                                                Total unidad
+                                                ITBM
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                                class="w-24 px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
-                                                Costo unitario
+                                                Misc
                                             </th>
                                             <th
-                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                                class="w-32 px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                             >
-                                                ITBM %
-                                            </th>
-                                            <th
-                                                class="px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
-                                            >
-                                                Subtotal
+                                                Total
                                             </th>
                                         </tr>
                                     </thead>
@@ -1107,12 +1237,12 @@ watch(
                                             </td>
                                             <td class="px-3 py-2">
                                                 <p
-                                                    class="text-sm font-medium text-gray-900 dark:text-white"
+                                                    class="truncate text-sm font-medium text-gray-900 dark:text-white"
                                                 >
                                                     {{ row.product_name }}
                                                 </p>
                                                 <p
-                                                    class="font-mono text-xs text-gray-500"
+                                                    class="truncate font-mono text-xs text-gray-500"
                                                 >
                                                     {{ row.sku || 'N/A' }}
                                                 </p>
@@ -1124,27 +1254,12 @@ watch(
                                                     "
                                                     type="number"
                                                     min="1"
-                                                    class="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                                />
-                                            </td>
-                                            <td class="px-3 py-2">
-                                                <input
-                                                    v-model.number="
-                                                        row.units_per_package
+                                                    step="1"
+                                                    @blur="
+                                                        row.quantity = normalizeQuantity(row.quantity)
                                                     "
-                                                    type="number"
-                                                    min="1"
-                                                    title="Unidades por paquete"
-                                                    class="w-28 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                                    class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                                 />
-                                            </td>
-                                            <td
-                                                class="px-3 py-2 text-right text-sm font-medium text-gray-600 dark:text-gray-300"
-                                            >
-                                                {{
-                                                    row.quantity *
-                                                    (row.units_per_package || 1)
-                                                }}
                                             </td>
                                             <td class="px-3 py-2">
                                                 <input
@@ -1152,36 +1267,31 @@ watch(
                                                     type="number"
                                                     min="0"
                                                     step="0.01"
-                                                    class="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                                    class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                                 />
                                             </td>
-                                            <td class="px-3 py-2">
-                                                <input
-                                                    v-model.number="
-                                                        row.tax_rate
-                                                    "
-                                                    type="number"
-                                                    min="0"
-                                                    max="100"
-                                                    step="1"
-                                                    class="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                                    @blur="
-                                                        row.tax_rate =
-                                                            normalizeTaxRate(
-                                                                row.tax_rate,
-                                                            )
-                                                    "
-                                                />
+                                            <td
+                                                class="px-3 py-2 text-right text-sm font-medium text-gray-600 dark:text-gray-300"
+                                            >
+                                                ${{
+                                                    (
+                                                        row.quantity *
+                                                        (row.units_per_package || 1) *
+                                                        row.cost *
+                                                        (row.tax_rate / 100)
+                                                    ).toFixed(2)
+                                                }}
+                                            </td>
+                                            <td class="px-3 py-2 text-right text-sm font-medium text-gray-600 dark:text-gray-300">
+                                                $0.00
                                             </td>
                                             <td
                                                 class="px-3 py-2 text-right text-sm font-medium text-gray-900 dark:text-white"
                                             >
                                                 ${{
                                                     (
-                                                        row.quantity *
-                                                        (row.units_per_package ||
-                                                            1) *
-                                                        row.cost
+                                                        (row.quantity * (row.units_per_package || 1) * row.cost) *
+                                                        (1 + row.tax_rate / 100)
                                                     ).toFixed(2)
                                                 }}
                                             </td>
@@ -1213,9 +1323,9 @@ watch(
                         </div>
 
                         <!-- Items Table -->
-                        <div v-if="form.items.length" class="overflow-x-auto">
+                        <div v-if="form.items.length" class="border border-gray-200 dark:border-border rounded-lg">
                             <table
-                                class="min-w-[1240px] divide-y divide-gray-200 dark:divide-border"
+                                class="w-full table-fixed divide-y divide-gray-200 dark:divide-border"
                             >
                                 <thead class="bg-gray-50 dark:bg-background">
                                     <tr>
@@ -1225,47 +1335,31 @@ watch(
                                             Producto
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                            class="w-24 px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                         >
-                                            Paquete
+                                            Qty
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
-                                            title="Unidades por paquete"
+                                            class="w-28 px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                         >
-                                            Unidad paquete
+                                            Costo
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
-                                        >
-                                            Total unidad
-                                        </th>
-                                        <th
-                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
-                                        >
-                                            Costo unitario
-                                        </th>
-                                        <th
-                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
-                                        >
-                                            ITBM %
-                                        </th>
-                                        <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
-                                        >
-                                            Subtotal
-                                        </th>
-                                        <th
-                                            class="px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                            class="w-32 px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
                                         >
                                             ITBM
                                         </th>
                                         <th
-                                            class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                                            class="w-28 px-4 py-2 text-right text-xs font-medium whitespace-nowrap text-gray-500 uppercase"
+                                        >
+                                            Misc
+                                        </th>
+                                        <th
+                                            class="w-32 px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase"
                                         >
                                             Total
                                         </th>
-                                        <th class="px-4 py-2"></th>
+                                        <th class="w-10 px-2 py-2"></th>
                                     </tr>
                                 </thead>
                                 <tbody
@@ -1274,14 +1368,24 @@ watch(
                                     <tr
                                         v-for="(item, idx) in form.items"
                                         :key="idx"
+                                        class="group"
+                                        @contextmenu.prevent="
+                                            (e: MouseEvent) => {
+                                                (e.currentTarget as HTMLElement)
+                                                    .querySelector<HTMLButtonElement>(
+                                                        '[data-row-menu]',
+                                                    )
+                                                    ?.click();
+                                            }
+                                        "
                                     >
                                         <td class="px-4 py-2">
                                             <p
-                                                class="text-sm font-medium text-gray-900 dark:text-white"
+                                                class="truncate text-sm font-medium text-gray-900 dark:text-white"
                                             >
                                                 {{ (item as any)._name }}
                                             </p>
-                                            <p class="text-xs text-gray-500">
+                                            <p class="truncate text-xs text-gray-500">
                                                 <span
                                                     v-if="(item as any)._brand"
                                                     class="mr-1 font-medium text-indigo-600 dark:text-indigo-400 dark:text-primary"
@@ -1299,29 +1403,16 @@ watch(
                                                 "
                                                 type="number"
                                                 min="1"
-                                                class="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                            />
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            <input
-                                                v-model.number="
-                                                    (item as any)
-                                                        .units_per_package
+                                                step="1"
+                                                @input="
+                                                    syncAutoTax(item as any)
                                                 "
-                                                type="number"
-                                                min="1"
-                                                title="Unidades por paquete"
-                                                class="w-16 rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                                @blur="
+                                                    item.quantity_ordered = normalizeQuantity(item.quantity_ordered);
+                                                    syncAutoTax(item as any);
+                                                "
+                                                class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                             />
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right text-sm font-medium text-gray-600 dark:text-gray-300"
-                                        >
-                                            {{
-                                                item.quantity_ordered *
-                                                ((item as any)
-                                                    .units_per_package || 1)
-                                            }}
                                         </td>
                                         <td class="px-4 py-2">
                                             <input
@@ -1329,39 +1420,80 @@ watch(
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
-                                                class="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                                @input="
+                                                    syncAutoTax(item as any)
+                                                "
+                                                class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                             />
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            <div
+                                                class="flex items-center gap-1"
+                                            >
+                                                <input
+                                                    :value="
+                                                        (item as any).tax_amount
+                                                    "
+                                                    @input="
+                                                        (e: Event) => {
+                                                            (
+                                                                item as any
+                                                            ).tax_amount =
+                                                                parseFloat(
+                                                                    (
+                                                                        e.target as HTMLInputElement
+                                                                    ).value,
+                                                                ) || 0;
+                                                            (
+                                                                item as any
+                                                            )._taxManual = true;
+                                                        }
+                                                    "
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    :title="
+                                                        (item as any)._taxManual
+                                                            ? 'ITBM manual — haz clic en ✕ para volver a automático'
+                                                            : 'ITBM auto (7%)'
+                                                    "
+                                                    :class="[
+                                                        'w-full rounded border px-2 py-1 text-right text-sm',
+                                                        (item as any)._taxManual
+                                                            ? 'border-blue-400 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-900/20 dark:text-blue-100'
+                                                            : 'border-gray-300 bg-white text-gray-900 dark:border-border dark:bg-muted dark:text-white',
+                                                    ]"
+                                                />
+                                                <button
+                                                    v-if="
+                                                        (item as any)._taxManual
+                                                    "
+                                                    type="button"
+                                                    title="Volver a automático (7%)"
+                                                    @click="
+                                                        (
+                                                            item as any
+                                                        )._taxManual = false;
+                                                        syncAutoTax(
+                                                            item as any,
+                                                        );
+                                                    "
+                                                    class="shrink-0 rounded p-0.5 text-blue-500 hover:text-red-500"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
                                         </td>
                                         <td class="px-4 py-2">
                                             <input
                                                 v-model.number="
-                                                    (item as any).tax_rate
+                                                    (item as any).misc_cost
                                                 "
                                                 type="number"
                                                 min="0"
-                                                max="100"
-                                                step="1"
-                                                class="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                                @blur="
-                                                    (item as any).tax_rate =
-                                                        normalizeTaxRate(
-                                                            (item as any)
-                                                                .tax_rate,
-                                                        )
-                                                "
+                                                step="0.01"
+                                                class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                             />
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right text-sm font-medium text-gray-900 dark:text-white"
-                                        >
-                                            ${{ itemSubtotal(item).toFixed(2) }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >
-                                            ${{
-                                                itemTaxAmount(item).toFixed(2)
-                                            }}
                                         </td>
                                         <td
                                             class="px-4 py-2 text-right text-sm font-semibold text-gray-900 dark:text-white"
@@ -1370,14 +1502,72 @@ watch(
                                                 itemLineTotal(item).toFixed(2)
                                             }}
                                         </td>
-                                        <td class="px-4 py-2 text-right">
-                                            <button
-                                                type="button"
-                                                @click="removeItem(idx)"
-                                                class="p-1 text-gray-400 transition hover:text-red-600"
-                                            >
-                                                <Trash2 :size="16" />
-                                            </button>
+                                        <td class="px-2 py-2 text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger as-child>
+                                                    <button
+                                                        type="button"
+                                                        data-row-menu
+                                                        class="rounded p-1 text-gray-400 opacity-0 transition group-hover:opacity-100 hover:text-gray-700 focus:opacity-100 dark:hover:text-gray-200"
+                                                        title="Acciones"
+                                                    >
+                                                        <MoreVertical
+                                                            :size="16"
+                                                        />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent
+                                                    align="end"
+                                                    class="w-48"
+                                                >
+                                                    <DropdownMenuItem
+                                                        v-if="
+                                                            (item as any)
+                                                                .product_id
+                                                        "
+                                                        as-child
+                                                    >
+                                                        <a
+                                                            :href="`/products/${(item as any).product_id}`"
+                                                            target="_blank"
+                                                            class="flex items-center gap-2"
+                                                        >
+                                                            <ExternalLink
+                                                                :size="14"
+                                                            />
+                                                            Ver producto
+                                                        </a>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        :disabled="
+                                                            !(item as any)
+                                                                .variant_id
+                                                        "
+                                                        @click="
+                                                            (item as any)
+                                                                .variant_id &&
+                                                            openVariantEdit(idx)
+                                                        "
+                                                        class="flex items-center gap-2"
+                                                        :class="{
+                                                            'cursor-not-allowed opacity-40':
+                                                                !(item as any)
+                                                                    .variant_id,
+                                                        }"
+                                                    >
+                                                        <Pencil :size="14" />
+                                                        Editar variante
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        @click="removeItem(idx)"
+                                                        class="flex items-center gap-2 text-red-600 focus:text-red-600 dark:text-red-400"
+                                                    >
+                                                        <Trash2 :size="14" />
+                                                        Quitar de la OC
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -1401,6 +1591,9 @@ watch(
                         >
                         <span class="mr-4"
                             >ITBM: ${{ taxTotal.toFixed(2) }}</span
+                        >
+                        <span class="mr-4"
+                            >Misc: ${{ miscTotal.toFixed(2) }}</span
                         >
                         <span
                             class="font-semibold text-gray-900 dark:text-white"
@@ -1455,6 +1648,16 @@ watch(
             @confirm="addVariantSelections"
             @load-more="fetchPickerProducts(true)"
             @search="handlePickerSearch"
+        />
+
+        <ProductVariantFormModal
+            v-if="variantEditTarget"
+            :open="showVariantEditModal"
+            :product-id="variantEditTarget.productId"
+            :variant-id="variantEditTarget.variantId"
+            :product-name="variantEditTarget.productName"
+            @update:open="showVariantEditModal = $event"
+            @saved="handleVariantSaved"
         />
     </AppLayout>
 </template>

@@ -163,8 +163,14 @@ const checkDuplicate = (code: string): boolean => {
     )
 }
 
-const loadVins = async (engineId: number) => {
-    vinApi = useVehicleVins({ engineId })
+const loadVins = async (engineId: number, modelId: number | null) => {
+    if (!modelId) {
+        engineVins.value = []
+        vinError.value = 'Selecciona un modelo para gestionar VINs de este motor.'
+        return
+    }
+
+    vinApi = useVehicleVins({ modelId, engineId })
     loadingVins.value = true
     vinError.value = null
 
@@ -226,7 +232,8 @@ const loadEngine = async () => {
             }
         }
 
-        await loadVins(routeEngineId.value)
+        const vinModelId = form.value.model_ids[0] ?? null
+        await loadVins(routeEngineId.value, vinModelId)
     } finally {
         loadingEngine.value = false
     }

@@ -147,9 +147,19 @@ const costFor = (product: Product, variant: ProductVariant | null): number => {
 
     return Number(
         relation?.supplier_cost ??
+            variant?.pricing?.cost_base ??
+            product.pricing?.cost_base ??
             variant?.pricing?.cost ??
             product.pricing?.cost ??
             priceFor(product, variant),
+    );
+};
+
+const miscCostFor = (product: Product, variant: ProductVariant | null): number => {
+    return Number(
+        variant?.pricing?.cost_miscellaneous ??
+        product.pricing?.cost_miscellaneous ??
+        0
     );
 };
 
@@ -287,6 +297,7 @@ const selectedSelections = computed<ProductVariantSelection[]>(() =>
                 variant: snapshot.variant,
                 quantity,
                 unitCost: costFor(snapshot.product, snapshot.variant),
+                miscCost: miscCostFor(snapshot.product, snapshot.variant),
                 supplierMatch: props.selectedSupplierId
                     ? !!relation
                     : undefined,

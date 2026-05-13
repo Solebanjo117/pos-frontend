@@ -28,8 +28,8 @@ export const AccountsReceivableApiService = {
      * Get customers with outstanding balance (current_balance > 0)
      */
     async getDebtors(params?: { search?: string; per_page?: number; page?: number }) {
-        const { data } = await apiClient.get('/customers', {
-            params: { ...params, has_balance: true, per_page: params?.per_page ?? 50 }
+        const { data } = await apiClient.get('/accounts-receivable', {
+            params: { ...params, per_page: params?.per_page ?? 50 }
         })
         return data
     },
@@ -37,8 +37,8 @@ export const AccountsReceivableApiService = {
     /**
      * Get a customer's transactions and open orders
      */
-    async getCustomerAccount(customerId: number) {
-        const { data } = await apiClient.get(`/customers/${customerId}`)
+    async getCustomerStatement(customerId: number) {
+        const { data } = await apiClient.get(`/accounts-receivable/${customerId}/statement`)
         return data
     },
 
@@ -53,6 +53,18 @@ export const AccountsReceivableApiService = {
                 per_page: 100,
             }
         })
+        return data
+    },
+
+    async recordReceipt(customerId: number, payload: {
+        amount: number
+        method: string
+        reference_number?: string
+        notes?: string
+        paid_at?: string
+        applications?: Array<{ document_id: number; amount: number }>
+    }) {
+        const { data } = await apiClient.post(`/accounts-receivable/${customerId}/receipts`, payload)
         return data
     },
 }

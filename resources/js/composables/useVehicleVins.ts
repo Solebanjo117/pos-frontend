@@ -4,6 +4,7 @@ import apiClient from '@/services/api/client'
 export interface VehicleVin {
     id: number
     model_id: number
+    chassis_id?: number | null
     engine_id?: number | null
     vin: string
     notes?: string | null
@@ -11,19 +12,40 @@ export interface VehicleVin {
 
 export interface VehicleVinScope {
     modelId?: number | null
+    chassisId?: number | null
     engineId?: number | null
 }
 
 const resolveBasePath = (scope: VehicleVinScope): string => {
-    if (scope.engineId !== null && scope.engineId !== undefined) {
-        return `/vehicle-engines/${scope.engineId}/vins`
+    if (
+        scope.modelId !== null &&
+        scope.modelId !== undefined &&
+        scope.chassisId !== null &&
+        scope.chassisId !== undefined &&
+        scope.engineId !== null &&
+        scope.engineId !== undefined
+    ) {
+        return `/vehicle-models/${scope.modelId}/chassis/${scope.chassisId}/engines/${scope.engineId}/vins`
+    }
+
+    if (
+        scope.modelId !== null &&
+        scope.modelId !== undefined &&
+        scope.engineId !== null &&
+        scope.engineId !== undefined
+    ) {
+        return `/vehicle-models/${scope.modelId}/engines/${scope.engineId}/vins`
     }
 
     if (scope.modelId !== null && scope.modelId !== undefined) {
         return `/vehicle-models/${scope.modelId}/vins`
     }
 
-    throw new Error('useVehicleVins requires modelId or engineId')
+    if (scope.engineId !== null && scope.engineId !== undefined) {
+        return `/vehicle-engines/${scope.engineId}/vins`
+    }
+
+    throw new Error('useVehicleVins requires modelId, modelId + engineId, or engineId')
 }
 
 export function useVehicleVins(scopeOrModelId: number | VehicleVinScope) {

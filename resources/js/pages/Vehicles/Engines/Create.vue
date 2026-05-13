@@ -250,7 +250,14 @@ const handleSubmit = async () => {
         const createdEngine = await createEngine(payload)
 
         if (pendingVins.value.length > 0) {
-            const vinApi = useVehicleVins({ engineId: createdEngine.id })
+            const vinModelId = payload.model_ids[0] ?? createdEngine.model_id
+            if (!vinModelId) {
+                error.value = 'Selecciona un modelo para guardar VINs del motor.'
+                router.visit(`/vehicles/engines/${createdEngine.id}/edit`)
+                return
+            }
+
+            const vinApi = useVehicleVins({ modelId: vinModelId, engineId: createdEngine.id })
             const failed: string[] = []
 
             for (const vin of pendingVins.value) {
@@ -493,5 +500,4 @@ const handleSubmit = async () => {
         </div>
     </AppLayout>
 </template>
-
 

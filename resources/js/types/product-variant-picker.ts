@@ -5,6 +5,7 @@ export interface ProductVariantSelection {
     variant: ProductVariant | null;
     quantity: number;
     unitCost?: number;
+    miscCost?: number;
     supplierMatch?: boolean;
     minimumOrderQuantity?: number | null;
     leadTimeDays?: number | null;

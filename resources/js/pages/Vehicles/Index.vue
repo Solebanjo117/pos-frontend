@@ -51,6 +51,7 @@ const treeEngineVinsLoading = ref<Record<number, boolean>>({})
 const treeEngineVinDraft = ref<Record<number, string>>({})
 const treeEngineVinAdding = ref<Record<number, boolean>>({})
 const treeEngineVinError = ref<Record<number, string | null>>({})
+const treeEngineVinModelIds = ref<Record<number, number>>({})
 const treeEngineVinApis: Record<number, ReturnType<typeof useVehicleVins>> = {}
 
 const clearRecordEntry = <T>(source: Record<number, T>, key: number): Record<number, T> => {
@@ -66,20 +67,24 @@ const setTreeEngineVinError = (engineId: number, message: string | null) => {
     }
 }
 
-const getTreeEngineVinApi = (engineId: number) => {
-    if (!treeEngineVinApis[engineId]) {
-        treeEngineVinApis[engineId] = useVehicleVins({ engineId })
+const getTreeEngineVinApi = (modelId: number, engineId: number) => {
+    if (!treeEngineVinApis[engineId] || treeEngineVinModelIds.value[engineId] !== modelId) {
+        treeEngineVinApis[engineId] = useVehicleVins({ modelId, engineId })
+        treeEngineVinModelIds.value = {
+            ...treeEngineVinModelIds.value,
+            [engineId]: modelId,
+        }
     }
 
     return treeEngineVinApis[engineId]
 }
 
-const loadTreeEngineVins = async (engineId: number, force = false) => {
-    if (!force && treeEngineVins.value[engineId]) {
+const loadTreeEngineVins = async (modelId: number, engineId: number, force = false) => {
+    if (!force && treeEngineVins.value[engineId] && treeEngineVinModelIds.value[engineId] === modelId) {
         return
     }
 
-    const api = getTreeEngineVinApi(engineId)
+    const api = getTreeEngineVinApi(modelId, engineId)
     treeEngineVinsLoading.value = {
         ...treeEngineVinsLoading.value,
         [engineId]: true,
@@ -110,6 +115,7 @@ const clearTreeEngineVinState = (engineId: number) => {
     treeEngineVinDraft.value = clearRecordEntry(treeEngineVinDraft.value, engineId)
     treeEngineVinAdding.value = clearRecordEntry(treeEngineVinAdding.value, engineId)
     treeEngineVinError.value = clearRecordEntry(treeEngineVinError.value, engineId)
+    treeEngineVinModelIds.value = clearRecordEntry(treeEngineVinModelIds.value, engineId)
     delete treeEngineVinApis[engineId]
 }
 
@@ -163,12 +169,12 @@ const toggleModel = async (modelId: number) => {
     expandedModels.value = new Set(expandedModels.value)
 }
 
-const toggleEngine = async (engineId: number) => {
+const toggleEngine = async (modelId: number, engineId: number) => {
     if (expandedEngines.value.has(engineId)) {
         expandedEngines.value.delete(engineId)
     } else {
         expandedEngines.value.add(engineId)
-        await loadTreeEngineVins(engineId)
+        await loadTreeEngineVins(modelId, engineId)
     }
 
     expandedEngines.value = new Set(expandedEngines.value)
@@ -324,12 +330,13 @@ const openEngineCreate = async (modelId: number) => {
     // Load all available engines
     await loadAllEngines()
 }
-const openEngineEdit = async (engine: VehicleEngine) => {
-    activeModelId.value = engine.model_id; editingId.value = engine.id
+const openEngineEdit = async (engine: VehicleEngine, modelId?: number) => {
+    activeModelId.value = modelId ?? engine.model_id
+    editingId.value = engine.id
     engineForm.value = { engine_code: engine.engine_code, displacement: engine.displacement, fuel_type: engine.fuel_type || 'Gasoline' }
     duplicateConfirmed.value = false
     modalType.value = 'engine'; modalError.value = null
-    await loadEngineVins(engine.id)
+    await loadEngineVins(activeModelId.value, engine.id)
 }
 
 // Quick Add Engine Modal
@@ -346,6 +353,7 @@ const closeModal = () => {
     modelVins.value = []
     selectedEngineId.value = null
 
+    _vinEngineModelId.value = null
     _vinEngineId.value = null
     engineVins.value = []
     newEngineVin.value = ''
@@ -622,15 +630,26 @@ const handleRemoveVin = async (vinId: number) => {
 const engineVins = ref<VehicleVin[]>([])
 const engineVinsLoading = ref(false)
 const _vinEngineId = ref<number | null>(null)
+const _vinEngineModelId = ref<number | null>(null)
 let _engineVinApi: ReturnType<typeof useVehicleVins> | null = null
 
 const newEngineVin = ref('')
 const addingEngineVin = ref(false)
 const engineVinError = ref<string | null>(null)
 
-const loadEngineVins = async (engineId: number) => {
+const loadEngineVins = async (modelId: number | null, engineId: number) => {
+    if (!modelId) {
+        _vinEngineModelId.value = null
+        _vinEngineId.value = engineId
+        _engineVinApi = null
+        engineVins.value = []
+        engineVinError.value = 'Selecciona un modelo para gestionar VINs de este motor.'
+        return
+    }
+
+    _vinEngineModelId.value = modelId
     _vinEngineId.value = engineId
-    _engineVinApi = useVehicleVins({ engineId })
+    _engineVinApi = useVehicleVins({ modelId, engineId })
     engineVinsLoading.value = true
     await _engineVinApi.fetchVins()
     engineVins.value = _engineVinApi.vins.value
@@ -675,11 +694,11 @@ const handleRemoveEngineVin = async (vinId: number) => {
     }
 }
 
-const handleAddTreeEngineVin = async (engineId: number) => {
+const handleAddTreeEngineVin = async (modelId: number, engineId: number) => {
     const normalized = (treeEngineVinDraft.value[engineId] ?? '').trim()
     if (normalized.length < 1 || normalized.length > 40) return
 
-    const api = getTreeEngineVinApi(engineId)
+    const api = getTreeEngineVinApi(modelId, engineId)
     treeEngineVinAdding.value = {
         ...treeEngineVinAdding.value,
         [engineId]: true,
@@ -706,8 +725,8 @@ const handleAddTreeEngineVin = async (engineId: number) => {
     }
 }
 
-const handleRemoveTreeEngineVin = async (engineId: number, vinId: number) => {
-    const api = getTreeEngineVinApi(engineId)
+const handleRemoveTreeEngineVin = async (modelId: number, engineId: number, vinId: number) => {
+    const api = getTreeEngineVinApi(modelId, engineId)
     setTreeEngineVinError(engineId, null)
 
     try {
@@ -835,7 +854,7 @@ const handleRemoveTreeEngineVin = async (engineId: number, vinId: number) => {
                                 >
                                     <div
                                         class="flex cursor-pointer items-center gap-2 py-2 pl-20 pr-4 hover:bg-gray-50/50 dark:hover:bg-card/30"
-                                        @click="toggleEngine(engine.id)"
+                                        @click="toggleEngine(model.id, engine.id)"
                                     >
                                         <button class="text-gray-400">
                                             <ChevronDown v-if="expandedEngines.has(engine.id)" class="h-4 w-4" />
@@ -846,7 +865,7 @@ const handleRemoveTreeEngineVin = async (engineId: number, vinId: number) => {
                                             <span v-if="engine.displacement" class="ml-2 text-xs text-gray-500">{{ engine.displacement }}</span>
                                         </div>
                                         <div class="flex items-center gap-1" @click.stop>
-                                            <Button variant="ghost" size="icon" class="h-7 w-7" @click="openEngineEdit(engine)" title="Editar motor">
+                                            <Button variant="ghost" size="icon" class="h-7 w-7" @click="openEngineEdit(engine, model.id)" title="Editar motor">
                                                 <Pencil class="h-3.5 w-3.5" />
                                             </Button>
                                             <Button variant="ghost" size="icon" class="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50" @click="handleDeleteEngine(engine)">
@@ -871,13 +890,13 @@ const handleRemoveTreeEngineVin = async (engineId: number, vinId: number) => {
                                                 maxlength="40"
                                                 placeholder="VIN (hasta 40 caracteres)"
                                                 class="font-mono text-xs uppercase"
-                                                @keyup.enter="handleAddTreeEngineVin(engine.id)"
+                                                @keyup.enter="handleAddTreeEngineVin(model.id, engine.id)"
                                             />
                                             <Button
                                                 type="button"
                                                 size="sm"
                                                 :disabled="(treeEngineVinDraft[engine.id] ?? '').trim().length < 1 || (treeEngineVinDraft[engine.id] ?? '').trim().length > 40 || treeEngineVinAdding[engine.id]"
-                                                @click="handleAddTreeEngineVin(engine.id)"
+                                                @click="handleAddTreeEngineVin(model.id, engine.id)"
                                             >
                                                 <Plus class="h-4 w-4" />
                                             </Button>
@@ -905,7 +924,7 @@ const handleRemoveTreeEngineVin = async (engineId: number, vinId: number) => {
                                                 <button
                                                     type="button"
                                                     class="ml-2 text-red-500 hover:text-red-700"
-                                                    @click="handleRemoveTreeEngineVin(engine.id, v.id)"
+                                                    @click="handleRemoveTreeEngineVin(model.id, engine.id, v.id)"
                                                 >
                                                     <X class="h-3.5 w-3.5" />
                                                 </button>

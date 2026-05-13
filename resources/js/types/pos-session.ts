@@ -22,8 +22,24 @@ export interface PosSessionSummary {
     cash_movements_in?: number;
     cash_movements_out?: number;
     expected_cash: number;
+    expected_total?: number;
     total_billed?: number;
     declared_cash?: number;
+    declared_total?: number;
     difference?: number;
+    total_difference?: number;
     electronic_breakdown?: Record<string, number>;
+    informational_breakdown?: Record<string, number>;
+    reconciliation_rows?: Array<{
+        code: string;
+        label: string;
+        start_adds: number;
+        payments: number;
+        withdrawals: number;
+        expected_total: number;
+        declared_total?: number;
+        difference?: number;
+        is_countable?: boolean;
+        is_informational?: boolean;
+    }>;
 }

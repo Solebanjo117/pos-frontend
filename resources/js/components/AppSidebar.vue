@@ -13,6 +13,7 @@ import {
     ListOrdered,
     Package,
     PackageSearch,
+    Receipt,
     RotateCcw,
     Settings,
     ShoppingCart,
@@ -39,7 +40,6 @@ import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import AppLogo from './AppLogo.vue';
 
-
 import { onMounted, computed } from 'vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useAuth } from '@/composables/useAuth';
@@ -51,21 +51,38 @@ import { usePurchaseOrderQueue } from '@/composables/usePurchaseOrderQueue';
 
 const { fetchSettings } = usePosSettings();
 const { fetchCurrentUser, isAdmin, role: userRole, hasRole } = useAuth();
-const { settings: storeSettings, fetchSettings: fetchStoreSettings } = useStoreSettings();
-const { count: cashierQueueCount, startPolling: startCashierPolling } = useCashierQueue();
-const { count: warehouseQueueCount, startPolling: startWarehousePolling } = useWarehouseQueue();
-const { count: deliveryQueueCount, startPolling: startDeliveryPolling } = useDeliveryQueue();
-const { count: purchaseOrderQueueCount, startPolling: startPurchaseOrderQueuePolling } = usePurchaseOrderQueue();
+const { settings: storeSettings, fetchSettings: fetchStoreSettings } =
+    useStoreSettings();
+const { count: cashierQueueCount, startPolling: startCashierPolling } =
+    useCashierQueue();
+const { count: warehouseQueueCount, startPolling: startWarehousePolling } =
+    useWarehouseQueue();
+const { count: deliveryQueueCount, startPolling: startDeliveryPolling } =
+    useDeliveryQueue();
+const {
+    count: purchaseOrderQueueCount,
+    startPolling: startPurchaseOrderQueuePolling,
+} = usePurchaseOrderQueue();
 
-const canAccessCashierQueue = computed(() => hasRole(['admin', 'manager', 'cashier']));
-const canAccessWarehouseQueue = computed(() => hasRole(['admin', 'manager', 'buyer', 'assistant']));
-const canAccessDeliveryQueue = computed(() => hasRole(['admin', 'manager', 'cashier']));
+const canAccessCashierQueue = computed(() =>
+    hasRole(['admin', 'manager', 'cashier']),
+);
+const canAccessWarehouseQueue = computed(() =>
+    hasRole(['admin', 'manager', 'buyer', 'assistant']),
+);
+const canAccessDeliveryQueue = computed(() =>
+    hasRole(['admin', 'manager', 'cashier']),
+);
 const canAccessPurchaseOrderQueue = computed(() => Boolean(userRole.value));
 
 // Load settings
 onMounted(async () => {
     try {
-        await Promise.all([fetchSettings(), fetchCurrentUser(), fetchStoreSettings()]);
+        await Promise.all([
+            fetchSettings(),
+            fetchCurrentUser(),
+            fetchStoreSettings(),
+        ]);
         if (canAccessCashierQueue.value) {
             startCashierPolling(30000);
         }
@@ -91,8 +108,13 @@ const filterWorkOrders = (items: NavItem[]): NavItem[] => {
     return items
         .filter((item) => {
             const title = item.title.toLowerCase();
-            const href = typeof item.href === 'string' ? item.href.toLowerCase() : '';
-            return title !== 'órdenes de trabajo' && title !== 'ordenes de trabajo' && !href.includes('/work-orders');
+            const href =
+                typeof item.href === 'string' ? item.href.toLowerCase() : '';
+            return (
+                title !== 'órdenes de trabajo' &&
+                title !== 'ordenes de trabajo' &&
+                !href.includes('/work-orders')
+            );
         })
         .map((item) => ({
             ...item,
@@ -101,13 +123,21 @@ const filterWorkOrders = (items: NavItem[]): NavItem[] => {
 };
 
 // Role-based access helpers
-const canAccessPOS = computed(() => hasRole(['admin', 'manager', 'cashier']))
-const canAccessQuoteEditor = computed(() => hasRole(['admin', 'manager', 'seller']))
-const canAccessPurchaseOrders = computed(() => hasRole(['admin', 'manager', 'buyer']))
-const canAccessReports = computed(() => hasRole(['admin', 'manager']))
-const canAccessCatalog = computed(() => hasRole(['admin', 'manager']))
-const canAccessVehicles = computed(() => hasRole(['admin', 'manager', 'seller']))
-const canAccessReturns = computed(() => hasRole(['admin', 'manager', 'cashier', 'buyer', 'assistant']))
+const canAccessPOS = computed(() => hasRole(['admin', 'manager', 'cashier']));
+const canAccessQuoteEditor = computed(() =>
+    hasRole(['admin', 'manager', 'seller']),
+);
+const canAccessPurchaseOrders = computed(() =>
+    hasRole(['admin', 'manager', 'buyer']),
+);
+const canAccessReports = computed(() => hasRole(['admin', 'manager']));
+const canAccessCatalog = computed(() => hasRole(['admin', 'manager']));
+const canAccessVehicles = computed(() =>
+    hasRole(['admin', 'manager', 'seller']),
+);
+const canAccessReturns = computed(() =>
+    hasRole(['admin', 'manager', 'cashier', 'buyer', 'assistant']),
+);
 
 const mainNavItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [];
@@ -119,7 +149,10 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Cola Caja',
             href: '/pos/cashier',
             icon: Inbox,
-            badge: cashierQueueCount.value > 0 ? String(cashierQueueCount.value) : undefined,
+            badge:
+                cashierQueueCount.value > 0
+                    ? String(cashierQueueCount.value)
+                    : undefined,
         });
     }
     if (canAccessWarehouseQueue.value) {
@@ -127,7 +160,10 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Cola Bodega',
             href: '/warehouses/queue',
             icon: PackageSearch,
-            badge: warehouseQueueCount.value > 0 ? String(warehouseQueueCount.value) : undefined,
+            badge:
+                warehouseQueueCount.value > 0
+                    ? String(warehouseQueueCount.value)
+                    : undefined,
         });
     }
     if (canAccessDeliveryQueue.value) {
@@ -135,7 +171,10 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Cola Entrega',
             href: '/queues/delivery',
             icon: Truck,
-            badge: deliveryQueueCount.value > 0 ? String(deliveryQueueCount.value) : undefined,
+            badge:
+                deliveryQueueCount.value > 0
+                    ? String(deliveryQueueCount.value)
+                    : undefined,
         });
     }
     if (canAccessPurchaseOrderQueue.value) {
@@ -143,7 +182,10 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Cola Pedidos',
             href: '/queues/purchase-orders',
             icon: ClipboardCheck,
-            badge: purchaseOrderQueueCount.value > 0 ? String(purchaseOrderQueueCount.value) : undefined,
+            badge:
+                purchaseOrderQueueCount.value > 0
+                    ? String(purchaseOrderQueueCount.value)
+                    : undefined,
         });
     }
 
@@ -162,6 +204,11 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Caja',
             href: '/pos',
             icon: ShoppingCart,
+        });
+        salesItems.push({
+            title: 'Cierres de Caja',
+            href: '/pos-sessions',
+            icon: Receipt,
         });
     }
 
@@ -280,11 +327,22 @@ const mainNavItems = computed<NavItem[]>(() => {
         });
     }
 
-    // --- Clientes (standalone) ---
+    // --- Clientes ---
     items.push({
         title: 'Clientes',
-        href: '/customers',
         icon: Users,
+        items: [
+            {
+                title: 'Clientes',
+                href: '/customers',
+                icon: Users,
+            },
+            {
+                title: 'Pagar deudas',
+                href: '/ar',
+                icon: Banknote,
+            },
+        ],
     });
 
     // --- Reportes ---
@@ -350,7 +408,6 @@ const mainNavItems = computed<NavItem[]>(() => {
 
     return filterWorkOrders(items);
 });
-
 
 const footerNavItems: NavItem[] = [];
 </script>

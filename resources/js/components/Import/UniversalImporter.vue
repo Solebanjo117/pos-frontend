@@ -17,6 +17,7 @@ const previewLoading = ref(false)
 const importRunning = ref(false)
 const searchableOptions = ref<Record<string, any[]>>({})
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const MAX_IMPORT_FILE_BYTES = 25 * 1024 * 1024
 
 const emit = defineEmits<{
     (e: 'create', columnKey: string, rowIndex: number): void
@@ -37,12 +38,25 @@ const canImport = computed(() => hasPreview.value && validCount.value > 0 && !im
 const handleDrop = (e: DragEvent) => {
     dragOver.value = false
     const files = e.dataTransfer?.files
-    if (files?.length) { file.value = files[0]; resetPreview() }
+    if (files?.length) setSelectedFile(files[0])
 }
 
 const handleFileSelect = (e: Event) => {
     const input = e.target as HTMLInputElement
-    if (input.files?.length) { file.value = input.files[0]; resetPreview() }
+    if (input.files?.length) setSelectedFile(input.files[0])
+}
+
+const setSelectedFile = (selectedFile: File) => {
+    resetPreview()
+
+    if (selectedFile.size > MAX_IMPORT_FILE_BYTES) {
+        file.value = null
+        error.value = 'El archivo no puede superar 25MB.'
+        if (fileInputRef.value) fileInputRef.value.value = ''
+        return
+    }
+
+    file.value = selectedFile
 }
 
 const resetPreview = () => {
@@ -285,7 +299,7 @@ const formatFileSize = (bytes: number) => {
                 <CheckCircle2 v-else class="mx-auto h-12 w-12 text-emerald-500" />
                 <div v-if="!file" class="mt-4">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Arrastra tu archivo aquí o haz clic para seleccionar</p>
-                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">.xlsx, .xls, .csv — máx 10MB</p>
+                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">.xlsx, .xls, .csv — máx 25MB</p>
                 </div>
                 <div v-else class="mt-4">
                     <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300">{{ file.name }}</p>

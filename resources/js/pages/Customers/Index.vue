@@ -77,6 +77,16 @@ const getTypeBadgeClass = (type: string) => {
     : 'bg-purple-100 text-purple-800 border-purple-200'
 }
 
+const filterByType = (type: string) => {
+  filters.value.type = type as any
+  applyFilters()
+}
+
+const filterByStatus = (status: string) => {
+  filters.value.status = status as any
+  applyFilters()
+}
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -276,33 +286,54 @@ const formatCurrency = (value: number) => {
             </tr>
             <tr v-else v-for="customer in customers" :key="customer.id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ customer.code }}</span>
+                <Link
+                  :href="`/customers/${customer.id}`"
+                  class="text-sm font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-primary"
+                  title="Ver cliente"
+                >
+                  {{ customer.code }}
+                </Link>
               </td>
               <td class="px-6 py-4">
                 <div>
-                  <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ customer.name }}</div>
+                  <Link
+                    :href="`/customers/${customer.id}`"
+                    class="text-sm font-medium text-gray-900 underline-offset-2 hover:text-indigo-600 hover:underline dark:text-gray-100 dark:hover:text-primary"
+                    title="Ver cliente"
+                  >
+                    {{ customer.name }}
+                  </Link>
                   <div v-if="customer.tax_id" class="text-sm text-gray-500 dark:text-gray-400">{{ customer.tax_id }}</div>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span
+                <button
+                  type="button"
                   class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border"
                   :class="getTypeBadgeClass(customer.type)"
+                  title="Filtrar por tipo"
+                  @click="filterByType(customer.type)"
                 >
                   <Building2 v-if="customer.type === 'business'" :size="14" />
                   <User v-else :size="14" />
                   {{ customer.type === 'business' ? 'Empresa' : 'Individual' }}
-                </span>
+                </button>
               </td>
               <td class="px-6 py-4">
                 <div class="text-sm text-gray-900 dark:text-gray-100">{{ customer.email || '-' }}</div>
                 <div class="text-sm text-gray-500 dark:text-gray-400">{{ customer.phone || '-' }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span
+                <Link
+                  v-if="customer.current_balance > 0"
+                  :href="`/ar?customer_id=${customer.id}`"
                   class="text-sm font-medium"
-                  :class="customer.current_balance > 0 ? 'text-red-600' : 'text-gray-900'"
+                  :class="'text-red-600 underline-offset-2 hover:underline'"
+                  title="Ver cuenta por cobrar"
                 >
+                  {{ formatCurrency(customer.current_balance) }}
+                </Link>
+                <span v-else class="text-sm font-medium text-gray-900">
                   {{ formatCurrency(customer.current_balance) }}
                 </span>
               </td>
@@ -312,9 +343,12 @@ const formatCurrency = (value: number) => {
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span
+                <button
+                  type="button"
                   class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border"
                   :class="getStatusBadgeClass(customer.status)"
+                  title="Filtrar por estado"
+                  @click="filterByStatus(customer.status)"
                 >
                   {{
                     customer.status === 'active'
@@ -323,7 +357,7 @@ const formatCurrency = (value: number) => {
                         ? 'Inactivo'
                         : 'Bloqueado'
                   }}
-                </span>
+                </button>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex items-center justify-end gap-2">

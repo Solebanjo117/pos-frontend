@@ -136,7 +136,7 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
 });
 
 // POS Sessions (Cierres de Caja)
-Route::middleware(['auth'])->get('/pos-sessions', function () {
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/pos-sessions', function () {
     return Inertia::render('POS/Sessions/Index');
 })->name('pos-sessions.index');
 

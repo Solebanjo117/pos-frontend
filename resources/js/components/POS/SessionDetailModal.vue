@@ -1,129 +1,310 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import {
-    X, Printer, Banknote, CreditCard, Receipt,
-    TrendingUp, TrendingDown, Minus, User, Warehouse, Clock
-} from 'lucide-vue-next'
-import type { PosSessionRecord, SessionSalesOrder } from '@/services/posSessions'
-import { usePaymentMethods } from '@/composables/usePaymentMethods'
+    AlertCircle,
+    Banknote,
+    CheckCircle2,
+    Clock,
+    CreditCard,
+    Minus,
+    Printer,
+    Receipt,
+    TrendingDown,
+    TrendingUp,
+    User,
+    Warehouse,
+    X,
+} from 'lucide-vue-next';
+import type {
+    CashMovementRecord,
+    PosSessionRecord,
+    SessionSalesOrder,
+} from '@/services/posSessions';
+import { usePaymentMethods } from '@/composables/usePaymentMethods';
 
-const { methods, fetchMethods, getMethodName } = usePaymentMethods()
-
-// Fetch methods on mount
-onMounted(fetchMethods)
-
-interface Props {
-    session: PosSessionRecord | null
-    salesOrders: SessionSalesOrder[]
-    loading: boolean
+interface ReconciliationRow {
+    code: string;
+    label?: string;
+    start_adds: number;
+    payments: number;
+    withdrawals: number;
+    expected_total: number;
+    declared_total?: number;
+    difference?: number;
+    is_countable?: boolean;
+    is_informational?: boolean;
 }
 
-const props = defineProps<Props>()
-const emit = defineEmits<{ close: [] }>()
-
-const formatCurrency = (value: string | number | null | undefined): string => {
-    const num = typeof value === 'string' ? parseFloat(value) : (value || 0)
-    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD' }).format(num)
+interface DenominationRow {
+    id: string;
+    label: string;
+    unitValue: number;
+    packValue: number;
 }
+
+const DENOM_ROWS: DenominationRow[] = [
+    { id: '100', label: '$100', unitValue: 100, packValue: 10000 },
+    { id: '50', label: '$50', unitValue: 50, packValue: 5000 },
+    { id: '20', label: '$20', unitValue: 20, packValue: 2000 },
+    { id: '10', label: '$10', unitValue: 10, packValue: 1000 },
+    { id: '5', label: '$5', unitValue: 5, packValue: 500 },
+    { id: '1', label: '$1', unitValue: 1, packValue: 100 },
+    { id: '1.00', label: '$1.00 moneda', unitValue: 1, packValue: 25 },
+    { id: '0.50', label: '$0.50', unitValue: 0.5, packValue: 10 },
+    { id: '0.25', label: '$0.25', unitValue: 0.25, packValue: 10 },
+    { id: '0.10', label: '$0.10', unitValue: 0.1, packValue: 5 },
+    { id: '0.05', label: '$0.05', unitValue: 0.05, packValue: 2 },
+    { id: '0.01', label: '$0.01', unitValue: 0.01, packValue: 0.5 },
+];
+
+const props = defineProps<{
+    session: PosSessionRecord | null;
+    salesOrders: SessionSalesOrder[];
+    cashMovements: CashMovementRecord[];
+    loading: boolean;
+}>();
+
+const emit = defineEmits<{ close: [] }>();
+
+const { fetchMethods, getMethodName } = usePaymentMethods();
+
+onMounted(fetchMethods);
+
+const moneyValue = (value: string | number | null | undefined): number => {
+    const parsed =
+        typeof value === 'string'
+            ? Number.parseFloat(value)
+            : Number(value ?? 0);
+
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatCurrency = (value: string | number | null | undefined): string =>
+    new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'USD',
+    }).format(moneyValue(value));
 
 const formatDate = (dateStr: string | null | undefined): string => {
-    if (!dateStr) return '—'
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
+    if (!dateStr) return 'Sin registro';
+
+    return new Date(dateStr).toLocaleDateString('es-MX', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
 
 const formatTime = (dateStr: string | null | undefined): string => {
-    if (!dateStr) return '—'
-    const d = new Date(dateStr)
-    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-}
+    if (!dateStr) return 'Sin hora';
 
-const summary = computed(() => props.session?.closing_details?.summary || null)
-const denominations = computed(() => props.session?.closing_details?.denominations || null)
-const electronicPayments = computed(() => props.session?.closing_details?.electronic_payments || null)
+    return new Date(dateStr).toLocaleTimeString('es-MX', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
 
-const difference = computed(() => summary.value?.difference ?? 0)
+const formatDuration = (
+    openedAt: string | null | undefined,
+    closedAt: string | null | undefined,
+): string => {
+    if (!openedAt || !closedAt) return 'En curso';
 
-const differenceClass = computed(() => {
-    if (difference.value > 0) return 'text-emerald-600 dark:text-emerald-400'
-    if (difference.value < 0) return 'text-red-600 dark:text-red-400'
-    return 'text-gray-500 dark:text-gray-400'
-})
+    const diffMinutes = Math.max(
+        0,
+        Math.round(
+            (new Date(closedAt).getTime() - new Date(openedAt).getTime()) /
+                60000,
+        ),
+    );
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+
+    if (hours === 0) return `${minutes} min`;
+    if (minutes === 0) return `${hours} h`;
+
+    return `${hours} h ${minutes} min`;
+};
+
+const summary = computed(() => props.session?.closing_details?.summary ?? null);
+const denominations = computed<Record<string, number | string> | null>(
+    () => props.session?.closing_details?.denominations ?? null,
+);
+
+const reconciliationRows = computed<ReconciliationRow[]>(() => {
+    const rows =
+        summary.value?.reconciliation_rows ??
+        props.session?.closing_details?.reconciliation_rows;
+
+    if (Array.isArray(rows) && rows.length > 0) {
+        return rows as ReconciliationRow[];
+    }
+
+    if (!summary.value) return [];
+
+    const electronicBreakdown = summary.value.electronic_breakdown ?? {};
+    const rowsFromSummary: ReconciliationRow[] = [
+        {
+            code: 'cash',
+            label: getMethodName('cash'),
+            start_adds:
+                moneyValue(summary.value.opening_amount) +
+                moneyValue(summary.value.cash_movements_in),
+            payments: moneyValue(summary.value.cash_sales),
+            withdrawals: -moneyValue(summary.value.cash_movements_out),
+            expected_total: moneyValue(summary.value.expected_cash),
+            declared_total: moneyValue(summary.value.declared_cash),
+            difference: moneyValue(summary.value.difference),
+            is_countable: true,
+            is_informational: false,
+        },
+    ];
+
+    Object.entries(electronicBreakdown).forEach(([code, amount]) => {
+        rowsFromSummary.push({
+            code,
+            label: getMethodName(code),
+            start_adds: 0,
+            payments: moneyValue(amount),
+            withdrawals: 0,
+            expected_total: moneyValue(amount),
+            declared_total: 0,
+            difference: 0,
+            is_countable: true,
+            is_informational: false,
+        });
+    });
+
+    return rowsFromSummary;
+});
+
+const countableRows = computed(() =>
+    reconciliationRows.value.filter((row) => !row.is_informational),
+);
+const informationalRows = computed(() =>
+    reconciliationRows.value.filter((row) => row.is_informational),
+);
+const cashRow = computed(
+    () => reconciliationRows.value.find((row) => row.code === 'cash') ?? null,
+);
+
+const expectedTotal = computed(() =>
+    moneyValue(
+        summary.value?.expected_total ??
+            countableRows.value.reduce(
+                (total, row) => total + moneyValue(row.expected_total),
+                0,
+            ),
+    ),
+);
+const declaredTotal = computed(() =>
+    moneyValue(
+        summary.value?.declared_total ??
+            countableRows.value.reduce(
+                (total, row) => total + moneyValue(row.declared_total),
+                0,
+            ),
+    ),
+);
+const totalDifference = computed(() =>
+    moneyValue(
+        summary.value?.total_difference ??
+            declaredTotal.value - expectedTotal.value,
+    ),
+);
+const totalSales = computed(() =>
+    moneyValue(
+        summary.value?.total_sales ??
+            countableRows.value.reduce(
+                (total, row) => total + Math.max(0, moneyValue(row.payments)),
+                0,
+            ),
+    ),
+);
+
+const differenceTone = computed<'surplus' | 'missing' | 'balanced'>(() => {
+    if (totalDifference.value > 0.005) return 'surplus';
+    if (totalDifference.value < -0.005) return 'missing';
+
+    return 'balanced';
+});
 
 const differenceLabel = computed(() => {
-    if (difference.value > 0.005) return 'Sobrante'
-    if (difference.value < -0.005) return 'Faltante'
-    return 'Cuadra'
-})
+    if (differenceTone.value === 'surplus') return 'Sobrante';
+    if (differenceTone.value === 'missing') return 'Faltante';
 
-const differenceIcon = computed(() => {
-    if (difference.value > 0) return 'up'
-    if (difference.value < 0) return 'down'
-    return 'equal'
-})
+    return 'Cuadra';
+});
 
-// Denomination table rows — must match the IDs used in CloseSessionModal / CashCountTable
-// CloseSessionModal stores: { unit_100: N, pack_100: N, unit_50: N, pack_50: N, ... }
-const DENOM_ROWS = [
-    { id: '100',  label: '$100',  unitValue: 100,  packValue: 10000 },
-    { id: '50',   label: '$50',   unitValue: 50,   packValue: 5000 },
-    { id: '20',   label: '$20',   unitValue: 20,   packValue: 2000 },
-    { id: '10',   label: '$10',   unitValue: 10,   packValue: 1000 },
-    { id: '5',    label: '$5',    unitValue: 5,     packValue: 500 },
-    { id: '1',    label: '$1',    unitValue: 1,     packValue: 100 },
-    { id: '1.00', label: '$1.00 (moneda)', unitValue: 1.00, packValue: 25.00 },
-    { id: '0.50', label: '$0.50', unitValue: 0.50, packValue: 10.00 },
-    { id: '0.25', label: '$0.25', unitValue: 0.25, packValue: 10.00 },
-    { id: '0.10', label: '$0.10', unitValue: 0.10, packValue: 5.00 },
-    { id: '0.05', label: '$0.05', unitValue: 0.05, packValue: 2.00 },
-    { id: '0.01', label: '$0.01', unitValue: 0.01, packValue: 0.50 },
-]
+const differenceClass = computed(() => {
+    if (differenceTone.value === 'surplus')
+        return 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-800';
+    if (differenceTone.value === 'missing')
+        return 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800';
+
+    return 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-muted dark:text-slate-300 dark:ring-border';
+});
 
 const denomData = computed(() => {
-    if (!denominations.value) return []
-    return DENOM_ROWS.map(d => {
-        const unitCount = Number(denominations.value?.[`unit_${d.id}`] || 0)
-        const packCount = Number(denominations.value?.[`pack_${d.id}`] || 0)
-        const subtotal = (unitCount * d.unitValue) + (packCount * d.packValue)
+    if (!denominations.value) return [];
+
+    const rows = DENOM_ROWS.map((denomination) => {
+        const unitCount = moneyValue(
+            denominations.value?.[`unit_${denomination.id}`],
+        );
+        const packCount = moneyValue(
+            denominations.value?.[`pack_${denomination.id}`],
+        );
+        const subtotal =
+            unitCount * denomination.unitValue +
+            packCount * denomination.packValue;
+
         return {
-            ...d,
+            ...denomination,
             unitCount,
             packCount,
             subtotal,
-        }
-    }).filter(d => d.unitCount > 0 || d.packCount > 0) // Only show denominations that were counted
-})
+        };
+    }).filter(
+        (denomination) =>
+            denomination.unitCount > 0 || denomination.packCount > 0,
+    );
 
-const totalDenominations = computed(() => denomData.value.reduce((sum, d) => sum + d.subtotal, 0))
-
-// Build rows from electronic_payments — show all methods with amounts > 0
-const electronicPaymentRows = computed(() => {
-    if (electronicPayments.value) {
-        // Get all codes from stored data
-        return Object.entries(electronicPayments.value)
-            .filter(([_, amount]) => Number(amount) > 0)
-            .map(([code, amount]) => ({
-                key: code,
-                label: getMethodName(code),
-                amount: Number(amount),
-            }))
+    const extra = moneyValue(denominations.value.extra);
+    if (extra > 0) {
+        rows.push({
+            id: 'extra',
+            label: 'Extra',
+            unitValue: extra,
+            packValue: 0,
+            unitCount: 1,
+            packCount: 0,
+            subtotal: extra,
+        });
     }
-    // Fallback: build from summary totals when electronic_payments was not recorded
-    if (!summary.value) return []
-    const rows = []
-    if ((summary.value.card_sales ?? 0) > 0)
-        rows.push({ key: 'card', label: getMethodName('card'), amount: Number(summary.value.card_sales) })
-    if ((summary.value.transfer_sales ?? 0) > 0)
-        rows.push({ key: 'transfer', label: getMethodName('transfer'), amount: Number(summary.value.transfer_sales) })
-    if ((summary.value.credit_sales ?? 0) > 0)
-        rows.push({ key: 'credit', label: getMethodName('credit'), amount: Number(summary.value.credit_sales) })
-    return rows
-})
 
-// Get method label dynamically
-const paymentMethodLabel = (method: string): string => {
-    return getMethodName(method)
-}
+    return rows;
+});
+
+const totalDenominations = computed(() =>
+    denomData.value.reduce(
+        (total, denomination) => total + denomination.subtotal,
+        0,
+    ),
+);
+
+const movementLabel = (movement: CashMovementRecord): string =>
+    movement.type === 'in' ? 'Ingreso' : 'Retiro';
+
+const movementClass = (movement: CashMovementRecord): string =>
+    movement.type === 'in'
+        ? 'text-emerald-700 dark:text-emerald-300'
+        : 'text-red-700 dark:text-red-300';
+
+const paymentMethodLabel = (method: string): string => getMethodName(method);
 
 const statusLabel = (status: string): string => {
     const map: Record<string, string> = {
@@ -132,332 +313,808 @@ const statusLabel = (status: string): string => {
         processing: 'En proceso',
         draft: 'Borrador',
         cancelled: 'Cancelada',
-    }
-    return map[status] || status
-}
+    };
+
+    return map[status] || status;
+};
 
 const handlePrint = () => {
-    window.print()
-}
+    window.print();
+};
 </script>
 
 <template>
-    <!-- Backdrop -->
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="emit('close')">
-        <!-- Modal Container -->
-        <div class="relative mx-4 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-card print:shadow-none print:max-w-none print:max-h-none print:overflow-visible print:rounded-none print:m-0">
-            <!-- Header (hidden on print) -->
-            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur-sm dark:border-border dark:bg-card/95 print:hidden">
-                <h2 class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
-                    <Receipt :size="24" class="text-indigo-500" />
-                    Detalle del Cierre de Caja
-                </h2>
-                <div class="flex items-center gap-2">
+    <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm print:static print:block print:bg-white print:p-0"
+        @click.self="emit('close')"
+    >
+        <div
+            class="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-card print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:shadow-none"
+        >
+            <header
+                class="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-3 backdrop-blur dark:border-border dark:bg-card/95 print:static print:bg-white print:px-0 print:pt-0 print:pb-3"
+            >
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2
+                            class="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-white print:text-base"
+                        >
+                            <Receipt
+                                :size="21"
+                                class="text-slate-500 print:hidden"
+                            />
+                            Cierre de caja
+                        </h2>
+                        <span
+                            v-if="session"
+                            class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200 dark:bg-muted dark:text-slate-300 dark:ring-border"
+                        >
+                            Sesión #{{ session.id }}
+                        </span>
+                        <span
+                            v-if="summary"
+                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ring-1"
+                            :class="differenceClass"
+                        >
+                            <TrendingUp
+                                v-if="differenceTone === 'surplus'"
+                                :size="13"
+                            />
+                            <TrendingDown
+                                v-else-if="differenceTone === 'missing'"
+                                :size="13"
+                            />
+                            <Minus v-else :size="13" />
+                            {{ differenceLabel }}
+                        </span>
+                    </div>
+                    <div
+                        v-if="session"
+                        class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400 print:text-slate-700"
+                    >
+                        <span class="inline-flex items-center gap-1">
+                            <User :size="13" class="print:hidden" />
+                            {{ session.user?.name || 'Sin cajero' }}
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <Warehouse :size="13" class="print:hidden" />
+                            {{ session.warehouse?.name || 'General' }}
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <Clock :size="13" class="print:hidden" />
+                            {{
+                                formatDuration(
+                                    session.opened_at,
+                                    session.closed_at,
+                                )
+                            }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 print:hidden">
                     <button
+                        type="button"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
                         @click="handlePrint"
-                        class="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 transition-colors"
                     >
                         <Printer :size="16" />
                         Imprimir
                     </button>
-                    <button @click="emit('close')" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-muted/50 transition-colors">
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-muted"
+                        @click="emit('close')"
+                    >
                         <X :size="20" />
                     </button>
                 </div>
+            </header>
+
+            <div
+                v-if="loading"
+                class="flex min-h-80 items-center justify-center text-sm font-medium text-slate-500 dark:text-slate-400"
+            >
+                Cargando detalle del cierre...
             </div>
 
-            <!-- Loading -->
-            <div v-if="loading" class="flex items-center justify-center py-20">
-                <div class="text-gray-500 dark:text-gray-400 animate-pulse">Cargando detalles...</div>
-            </div>
+            <main
+                v-else-if="session"
+                class="min-h-0 flex-1 overflow-y-auto p-5 print:overflow-visible print:p-0"
+            >
+                <section
+                    class="hidden border-b border-slate-300 pb-3 text-center print:block"
+                >
+                    <h1 class="text-lg font-black tracking-wide uppercase">
+                        Reporte de cierre de caja
+                    </h1>
+                    <p class="text-sm font-semibold">
+                        {{ session.warehouse?.name || 'General' }}
+                    </p>
+                    <p class="text-xs text-slate-600">
+                        Sesión #{{ session.id }} - Cajero:
+                        {{ session.user?.name || 'Sin cajero' }}
+                    </p>
+                </section>
 
-            <!-- Content -->
-            <div v-else-if="session" class="p-6 space-y-6 print:p-4 print:space-y-3">
-
-                <!-- ========== PRINT HEADER ========== -->
-                <div class="hidden print:block text-center mb-2">
-                    <h1 class="text-xl font-black uppercase tracking-widest">CIERRE DE CAJA</h1>
-                    <p class="text-sm font-semibold">{{ session.warehouse?.name || 'Sucursal General' }}</p>
-                    <div class="mt-1 flex justify-center gap-6 text-xs text-gray-600">
-                        <span>Sesión #{{ session.id }}</span>
-                        <span>Cajero: {{ session.user?.name || '—' }}</span>
+                <section
+                    class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 print:grid-cols-5 print:gap-2"
+                >
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                    >
+                        <p class="text-xs font-bold text-slate-500 uppercase">
+                            Total esperado
+                        </p>
+                        <p
+                            class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
+                        >
+                            {{ formatCurrency(expectedTotal) }}
+                        </p>
                     </div>
-                    <hr class="my-2 border-gray-400" />
-                </div>
-
-                <!-- ========== SESSION INFO ========== -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 print:grid-cols-4 print:gap-2 print:text-[11px]">
-                    <div class="flex items-center gap-2">
-                        <User :size="16" class="text-gray-400 flex-shrink-0 print:hidden" />
-                        <div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Cajero</p>
-                            <p class="font-semibold text-gray-900 dark:text-white">{{ session.user?.name || '—' }}</p>
-                        </div>
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                    >
+                        <p class="text-xs font-bold text-slate-500 uppercase">
+                            Total declarado
+                        </p>
+                        <p
+                            class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
+                        >
+                            {{ formatCurrency(declaredTotal) }}
+                        </p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <Warehouse :size="16" class="text-gray-400 flex-shrink-0 print:hidden" />
-                        <div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Sucursal</p>
-                            <p class="font-semibold text-gray-900 dark:text-white">{{ session.warehouse?.name || 'General' }}</p>
-                        </div>
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                    >
+                        <p class="text-xs font-bold text-slate-500 uppercase">
+                            Diferencia
+                        </p>
+                        <p
+                            class="mt-1 text-xl font-bold tabular-nums print:text-sm"
+                            :class="
+                                differenceTone === 'missing'
+                                    ? 'text-red-700 dark:text-red-300'
+                                    : differenceTone === 'surplus'
+                                      ? 'text-emerald-700 dark:text-emerald-300'
+                                      : 'text-slate-950 dark:text-white'
+                            "
+                        >
+                            {{ totalDifference > 0 ? '+' : ''
+                            }}{{ formatCurrency(totalDifference) }}
+                        </p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <Clock :size="16" class="text-gray-400 flex-shrink-0 print:hidden" />
-                        <div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Apertura</p>
-                            <p class="font-semibold text-gray-900 dark:text-white">{{ formatDate(session.opened_at) }}</p>
-                        </div>
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                    >
+                        <p class="text-xs font-bold text-slate-500 uppercase">
+                            Efectivo esperado
+                        </p>
+                        <p
+                            class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
+                        >
+                            {{
+                                formatCurrency(
+                                    cashRow?.expected_total ??
+                                        summary?.expected_cash,
+                                )
+                            }}
+                        </p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <Clock :size="16" class="text-gray-400 flex-shrink-0 print:hidden" />
-                        <div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Cierre</p>
-                            <p class="font-semibold text-gray-900 dark:text-white">{{ formatDate(session.closed_at) }}</p>
-                        </div>
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                    >
+                        <p class="text-xs font-bold text-slate-500 uppercase">
+                            Ventas cobradas
+                        </p>
+                        <p
+                            class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
+                        >
+                            {{ formatCurrency(totalSales) }}
+                        </p>
                     </div>
-                </div>
+                </section>
 
-                <!-- ========== TWO-COLUMN LAYOUT: Denomination Table + Reconciliation ========== -->
-                <div v-if="summary" class="grid grid-cols-1 lg:grid-cols-2 gap-5 print:grid-cols-2 print:gap-3">
-
-                    <!-- LEFT: Arqueo de Denominaciones -->
-                    <div class="rounded-xl bg-gray-50 dark:bg-muted/30 print:bg-white print:border print:border-gray-400 overflow-hidden">
-                        <div class="bg-gray-100 dark:bg-muted/60 px-4 py-2.5 print:bg-gray-200">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                                <Banknote :size="14" class="print:hidden" />
-                                Arqueo de Denominaciones
-                            </h3>
+                <section
+                    class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] print:mt-3 print:grid-cols-2 print:gap-3"
+                >
+                    <div class="space-y-4 print:space-y-3">
+                        <div
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            >
+                                <h3
+                                    class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    <CreditCard
+                                        :size="14"
+                                        class="print:hidden"
+                                    />
+                                    Conciliación por método
+                                </h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm print:text-[10px]">
+                                    <thead>
+                                        <tr
+                                            class="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-border"
+                                        >
+                                            <th
+                                                class="px-4 py-2 text-left font-bold"
+                                            >
+                                                Método
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-right font-bold"
+                                            >
+                                                Inicio + ingresos
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-right font-bold"
+                                            >
+                                                Pagos
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-right font-bold"
+                                            >
+                                                Retiros
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-right font-bold"
+                                            >
+                                                Esperado
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-right font-bold"
+                                            >
+                                                Declarado
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-right font-bold"
+                                            >
+                                                Diferencia
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody
+                                        class="divide-y divide-slate-100 dark:divide-border/60"
+                                    >
+                                        <tr
+                                            v-for="row in countableRows"
+                                            :key="row.code"
+                                        >
+                                            <td class="px-4 py-2">
+                                                <div
+                                                    class="font-semibold text-slate-950 dark:text-white"
+                                                >
+                                                    {{
+                                                        row.label ||
+                                                        paymentMethodLabel(
+                                                            row.code,
+                                                        )
+                                                    }}
+                                                </div>
+                                                <div
+                                                    class="font-mono text-[11px] text-slate-400 uppercase"
+                                                >
+                                                    {{ row.code }}
+                                                </div>
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        row.start_adds,
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                            >
+                                                {{
+                                                    formatCurrency(row.payments)
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        row.withdrawals,
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right font-semibold text-slate-950 tabular-nums dark:text-white"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        row.expected_total,
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right font-semibold text-slate-950 tabular-nums dark:text-white"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        row.declared_total ?? 0,
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right font-bold tabular-nums"
+                                                :class="
+                                                    moneyValue(row.difference) <
+                                                    -0.005
+                                                        ? 'text-red-700 dark:text-red-300'
+                                                        : moneyValue(
+                                                                row.difference,
+                                                            ) > 0.005
+                                                          ? 'text-emerald-700 dark:text-emerald-300'
+                                                          : 'text-slate-500 dark:text-slate-400'
+                                                "
+                                            >
+                                                {{
+                                                    moneyValue(row.difference) >
+                                                    0
+                                                        ? '+'
+                                                        : ''
+                                                }}{{
+                                                    formatCurrency(
+                                                        row.difference ?? 0,
+                                                    )
+                                                }}
+                                            </td>
+                                        </tr>
+                                        <tr v-if="countableRows.length === 0">
+                                            <td
+                                                colspan="7"
+                                                class="px-4 py-6 text-center text-slate-500"
+                                            >
+                                                No hay datos de conciliación.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
-                        <div v-if="denomData.length > 0" class="p-0">
+                        <div
+                            v-if="informationalRows.length > 0"
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            >
+                                <h3
+                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    Métodos informativos
+                                </h3>
+                            </div>
                             <table class="w-full text-sm print:text-[10px]">
+                                <tbody
+                                    class="divide-y divide-slate-100 dark:divide-border/60"
+                                >
+                                    <tr
+                                        v-for="row in informationalRows"
+                                        :key="row.code"
+                                    >
+                                        <td
+                                            class="px-4 py-2 font-semibold text-slate-700 dark:text-slate-200"
+                                        >
+                                            {{
+                                                row.label ||
+                                                paymentMethodLabel(row.code)
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-bold text-slate-950 tabular-nums dark:text-white"
+                                        >
+                                            {{
+                                                formatCurrency(
+                                                    row.expected_total,
+                                                )
+                                            }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            >
+                                <h3
+                                    class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    <Receipt :size="14" class="print:hidden" />
+                                    Ventas del turno ({{ salesOrders.length }})
+                                </h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm print:text-[10px]">
+                                    <thead>
+                                        <tr
+                                            class="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-border"
+                                        >
+                                            <th
+                                                class="px-4 py-2 text-left font-bold"
+                                            >
+                                                Folio
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-left font-bold"
+                                            >
+                                                Hora
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-left font-bold"
+                                            >
+                                                Cliente
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-left font-bold"
+                                            >
+                                                Pago
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-left font-bold"
+                                            >
+                                                Estado
+                                            </th>
+                                            <th
+                                                class="px-4 py-2 text-right font-bold"
+                                            >
+                                                Total
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody
+                                        class="divide-y divide-slate-100 dark:divide-border/60"
+                                    >
+                                        <tr
+                                            v-for="order in salesOrders"
+                                            :key="order.id"
+                                        >
+                              <td
+                                  class="px-4 py-2 font-mono text-xs font-semibold text-slate-950 dark:text-white"
+                              >
+                                  <Link
+                                      :href="`/sales-orders/${order.id}`"
+                                      class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-950 print:no-underline"
+                                      title="Ver venta"
+                                  >
+                                      {{ order.order_number }}
+                                  </Link>
+                              </td>
+                                            <td
+                                                class="px-4 py-2 text-xs text-slate-600 dark:text-slate-300"
+                                            >
+                                                {{
+                                                    formatTime(order.created_at)
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-slate-600 dark:text-slate-300"
+                                            >
+                                  <Link
+                                      v-if="order.customer_id"
+                                      :href="`/customers/${order.customer_id}`"
+                                      class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-600 print:no-underline"
+                                      title="Ver cliente"
+                                  >
+                                      {{
+                                          order.customer?.name ||
+                                          'Cliente registrado'
+                                      }}
+                                  </Link>
+                                  <span v-else>Público General</span>
+                              </td>
+                                            <td class="px-4 py-2">
+                                                <span
+                                                    class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:bg-muted dark:text-slate-300"
+                                                >
+                                                    {{
+                                                        paymentMethodLabel(
+                                                            order.payment_method,
+                                                        )
+                                                    }}
+                                                </span>
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-xs text-slate-600 dark:text-slate-300"
+                                            >
+                                                {{ statusLabel(order.status) }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right font-bold text-slate-950 tabular-nums dark:text-white"
+                                            >
+                                                {{
+                                                    formatCurrency(order.total)
+                                                }}
+                                            </td>
+                                        </tr>
+                                        <tr v-if="salesOrders.length === 0">
+                                            <td
+                                                colspan="6"
+                                                class="px-4 py-6 text-center text-slate-500"
+                                            >
+                                                No se registraron ventas en esta
+                                                sesión.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <aside class="space-y-4 print:space-y-3">
+                        <div
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            >
+                                <h3
+                                    class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    <Banknote :size="14" class="print:hidden" />
+                                    Arqueo de denominaciones
+                                </h3>
+                            </div>
+                            <table
+                                v-if="denomData.length > 0"
+                                class="w-full text-sm print:text-[10px]"
+                            >
                                 <thead>
-                                    <tr class="bg-gray-100/50 dark:bg-muted/40 print:bg-gray-100">
-                                        <th class="py-1.5 px-3 text-left font-semibold text-gray-500 dark:text-gray-400">Denominación</th>
-                                        <th class="py-1.5 px-3 text-center font-semibold text-gray-500 dark:text-gray-400">Sueltas</th>
-                                        <th class="py-1.5 px-3 text-center font-semibold text-gray-500 dark:text-gray-400">Fajos</th>
-                                        <th class="py-1.5 px-3 text-right font-semibold text-gray-500 dark:text-gray-400">Subtotal</th>
+                                    <tr
+                                        class="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-border"
+                                    >
+                                        <th
+                                            class="px-4 py-2 text-left font-bold"
+                                        >
+                                            Denominación
+                                        </th>
+                                        <th
+                                            class="px-4 py-2 text-center font-bold"
+                                        >
+                                            Sueltas
+                                        </th>
+                                        <th
+                                            class="px-4 py-2 text-center font-bold"
+                                        >
+                                            Fajos
+                                        </th>
+                                        <th
+                                            class="px-4 py-2 text-right font-bold"
+                                        >
+                                            Subtotal
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <tr v-for="d in denomData" :key="d.id" class="border-t border-gray-100 dark:border-border/50 print:border-gray-300">
-                                        <td class="py-1.5 px-3 font-medium text-gray-700 dark:text-gray-300">
-                                            <span class="inline-flex items-center gap-1">
-                                                <span class="w-2 h-2 rounded-full flex-shrink-0" :class="d.unitValue >= 20 ? 'bg-green-400' : 'bg-amber-400'"></span>
-                                                {{ d.label }}
-                                            </span>
-                                        </td>
-                                        <td class="py-1.5 px-3 text-center font-mono text-gray-600 dark:text-gray-400">
-                                            <span v-if="d.unitCount > 0">× {{ d.unitCount }}</span>
-                                            <span v-else class="text-gray-300 dark:text-gray-600">—</span>
-                                        </td>
-                                        <td class="py-1.5 px-3 text-center font-mono text-gray-600 dark:text-gray-400">
-                                            <span v-if="d.packCount > 0">× {{ d.packCount }}</span>
-                                            <span v-else class="text-gray-300 dark:text-gray-600">—</span>
-                                        </td>
-                                        <td class="py-1.5 px-3 text-right font-semibold text-gray-900 dark:text-white">{{ formatCurrency(d.subtotal) }}</td>
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr class="border-t-2 border-gray-300 dark:border-border bg-gray-100/70 dark:bg-muted/50 print:bg-gray-100">
-                                        <td colspan="3" class="py-2 px-3 font-bold text-gray-700 dark:text-gray-300 text-right uppercase text-xs">Total Contado</td>
-                                        <td class="py-2 px-3 text-right font-bold text-lg text-gray-900 dark:text-white print:text-sm">{{ formatCurrency(totalDenominations) }}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                        <div v-else class="p-6 text-center text-sm text-gray-400 dark:text-gray-500">
-                            No se registró conteo de denominaciones.
-                        </div>
-                    </div>
-
-                    <!-- RIGHT: Reconciliación / Arqueo -->
-                    <div class="space-y-4 print:space-y-2">
-                        <!-- Cash Reconciliation Table -->
-                        <div class="rounded-xl bg-gray-50 dark:bg-muted/30 overflow-hidden print:bg-white print:border print:border-gray-400">
-                            <div class="bg-gray-100 dark:bg-muted/60 px-4 py-2.5 print:bg-gray-200">
-                                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                                    <Receipt :size="14" class="print:hidden" />
-                                    Reconciliación de Efectivo
-                                </h3>
-                            </div>
-
-                            <div class="divide-y divide-gray-100 dark:divide-border/50 print:divide-gray-300">
-                                <!-- Opening -->
-                                <div class="flex justify-between items-center px-4 py-2.5 print:py-1.5 print:text-[11px]">
-                                    <span class="text-gray-600 dark:text-gray-400">Fondo de Apertura</span>
-                                    <span class="font-semibold text-gray-900 dark:text-white">{{ formatCurrency(summary.opening_amount) }}</span>
-                                </div>
-                                <!-- Cash Sales -->
-                                <div class="flex justify-between items-center px-4 py-2.5 print:py-1.5 print:text-[11px]">
-                                    <span class="text-green-600 dark:text-green-400">(+) Ventas en Efectivo</span>
-                                    <span class="font-semibold text-green-700 dark:text-green-300">+ {{ formatCurrency(summary.cash_sales) }}</span>
-                                </div>
-                                <!-- Cash Movements In -->
-                                <div v-if="(summary.cash_movements_in || 0) > 0" class="flex justify-between items-center px-4 py-2.5 bg-emerald-50/50 dark:bg-emerald-900/10 print:py-1.5 print:text-[11px] print:bg-white">
-                                    <span class="text-emerald-600 dark:text-emerald-400">(+) Ingresos Extra</span>
-                                    <span class="font-semibold text-emerald-700 dark:text-emerald-300">+ {{ formatCurrency(summary.cash_movements_in || 0) }}</span>
-                                </div>
-                                <!-- Cash Movements Out -->
-                                <div v-if="(summary.cash_movements_out || 0) > 0" class="flex justify-between items-center px-4 py-2.5 bg-red-50/50 dark:bg-red-900/10 print:py-1.5 print:text-[11px] print:bg-white">
-                                    <span class="text-red-600 dark:text-red-400">(−) Gastos / Retiros</span>
-                                    <span class="font-semibold text-red-700 dark:text-red-300">− {{ formatCurrency(summary.cash_movements_out || 0) }}</span>
-                                </div>
-                                <!-- Expected -->
-                                <div class="flex justify-between items-center px-4 py-3 bg-indigo-50 dark:bg-indigo-900/20 print:py-2 print:text-[11px] print:bg-gray-100">
-                                    <span class="font-bold text-indigo-700 dark:text-indigo-300 uppercase text-xs">(=) Efectivo Esperado</span>
-                                    <span class="font-bold text-lg text-indigo-700 dark:text-indigo-300 print:text-sm">{{ formatCurrency(summary.expected_cash) }}</span>
-                                </div>
-                                <!-- Declared -->
-                                <div class="flex justify-between items-center px-4 py-2.5 print:py-1.5 print:text-[11px]">
-                                    <span class="text-blue-600 dark:text-primary dark:text-blue-400 font-medium">Efectivo Declarado</span>
-                                    <span class="font-bold text-blue-700 dark:text-blue-300">{{ formatCurrency(summary.declared_cash) }}</span>
-                                </div>
-                                <!-- Difference -->
-                                <div class="flex justify-between items-center px-4 py-3 print:py-2 print:text-[11px]"
-                                    :class="difference > 0.005 ? 'bg-emerald-50 dark:bg-emerald-900/20 print:bg-white' : difference < -0.005 ? 'bg-red-50 dark:bg-red-900/20 print:bg-white' : 'bg-gray-50 dark:bg-muted/30 print:bg-white'"
+                                <tbody
+                                    class="divide-y divide-slate-100 dark:divide-border/60"
                                 >
-                                    <span class="font-bold uppercase text-xs flex items-center gap-1.5" :class="differenceClass">
-                                        <TrendingUp v-if="differenceIcon === 'up'" :size="14" class="print:hidden" />
-                                        <TrendingDown v-else-if="differenceIcon === 'down'" :size="14" class="print:hidden" />
-                                        <Minus v-else :size="14" class="print:hidden" />
-                                        {{ differenceLabel }}
-                                    </span>
-                                    <span class="font-bold text-lg print:text-sm" :class="differenceClass">
-                                        {{ formatCurrency(difference) }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Payment Method Breakdown -->
-                        <div class="rounded-xl bg-gray-50 dark:bg-muted/30 overflow-hidden print:bg-white print:border print:border-gray-400">
-                            <div class="bg-gray-100 dark:bg-muted/60 px-4 py-2.5 print:bg-gray-200">
-                                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                                    <CreditCard :size="14" class="print:hidden" />
-                                    Desglose por Método de Pago
-                                </h3>
-                            </div>
-                            <table class="w-full text-sm print:text-[10px]">
-                                <tbody>
-                                    <!-- Efectivo -->
-                                    <tr class="border-b border-gray-100 dark:border-border/50 print:border-gray-300">
-                                        <td class="py-2 px-4 flex items-center gap-2">
-                                            <Banknote :size="14" class="text-green-500 print:hidden" />
-                                            <span class="text-gray-700 dark:text-gray-300">Efectivo</span>
-                                        </td>
-                                        <td class="py-2 px-4 text-right font-semibold text-gray-900 dark:text-white">{{ formatCurrency(summary.cash_sales) }}</td>
-                                    </tr>
-                                    <!-- Electronic payment methods — detailed breakdown from closing_details.electronic_payments -->
-                                    <tr v-for="ep in electronicPaymentRows" :key="ep.key"
-                                        class="border-b border-gray-100 dark:border-border/50 print:border-gray-300">
-                                        <td class="py-2 px-4">
-                                            <div class="flex items-center gap-2">
-                                                <CreditCard :size="14" class="text-blue-400 print:hidden flex-shrink-0" />
-                                                <span class="text-gray-700 dark:text-gray-300">{{ ep.label }}</span>
-                                            </div>
-                                        </td>
-                                        <td class="py-2 px-4 text-right font-semibold"
-                                            :class="ep.amount > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'"
-                                        >{{ formatCurrency(ep.amount) }}</td>
-                                    </tr>
-
-                                </tbody>
-                                <tfoot>
-                                    <tr class="border-t-2 border-gray-300 dark:border-border bg-indigo-50/70 dark:bg-indigo-900/20 print:bg-gray-100">
-                                        <td class="py-2.5 px-4 font-bold text-indigo-700 dark:text-indigo-300 uppercase text-xs">Total Ventas</td>
-                                        <td class="py-2.5 px-4 text-right font-bold text-indigo-700 dark:text-indigo-300">{{ formatCurrency(summary.total_sales) }}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ========== NOTES ========== -->
-                <div v-if="session.notes" class="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 print:border print:border-gray-300 print:bg-white">
-                    <p class="text-xs font-semibold text-yellow-700 dark:text-yellow-400 mb-1">Notas del Cajero:</p>
-                    <p class="text-sm text-yellow-800 dark:text-yellow-300">{{ session.notes }}</p>
-                </div>
-
-                <!-- ========== SALES ORDERS TABLE ========== -->
-                <div>
-                    <h3 class="mb-3 text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                        <Receipt :size="16" class="print:hidden" />
-                        Ventas del Turno ({{ salesOrders.length }})
-                    </h3>
-                    <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-border print:border print:border-gray-400">
-                        <table class="w-full text-sm print:text-[10px]">
-                            <thead>
-                                <tr class="bg-gray-50 dark:bg-muted/50 print:bg-gray-100">
-                                    <th class="py-2 px-3 text-left font-semibold text-gray-600 dark:text-gray-400">Folio</th>
-                                    <th class="py-2 px-3 text-left font-semibold text-gray-600 dark:text-gray-400">Hora</th>
-                                    <th class="py-2 px-3 text-left font-semibold text-gray-600 dark:text-gray-400">Cliente</th>
-                                    <th class="py-2 px-3 text-left font-semibold text-gray-600 dark:text-gray-400">Pago</th>
-                                    <th class="py-2 px-3 text-left font-semibold text-gray-600 dark:text-gray-400">Estado</th>
-                                    <th class="py-2 px-3 text-right font-semibold text-gray-600 dark:text-gray-400">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr
-                                    v-for="order in salesOrders"
-                                    :key="order.id"
-                                    class="border-t border-gray-100 dark:border-border/50 print:border-gray-300"
-                                >
-                                    <td class="py-2 px-3 font-mono text-xs font-medium text-gray-900 dark:text-white">
-                                        {{ order.order_number }}
-                                    </td>
-                                    <td class="py-2 px-3 text-gray-600 dark:text-gray-400 text-xs">
-                                        {{ formatTime(order.created_at) }}
-                                    </td>
-                                    <td class="py-2 px-3 text-gray-600 dark:text-gray-400">
-                                        {{ order.customer?.name || 'Público General' }}
-                                    </td>
-                                    <td class="py-2 px-3">
-                                        <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold print:px-0 print:bg-transparent"
-                                            :class="{
-                                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': order.payment_method === 'cash',
-                                                'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': order.payment_method === 'card',
-                                                'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400': order.payment_method === 'transfer',
-                                                'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400': order.payment_method === 'credit',
-                                            }"
+                                    <tr
+                                        v-for="denomination in denomData"
+                                        :key="denomination.id"
+                                    >
+                                        <td
+                                            class="px-4 py-2 font-semibold text-slate-700 dark:text-slate-200"
                                         >
-                                            {{ paymentMethodLabel(order.payment_method) }}
-                                        </span>
-                                    </td>
-                                    <td class="py-2 px-3 text-gray-600 dark:text-gray-400 text-xs">
-                                        {{ statusLabel(order.status) }}
-                                    </td>
-                                    <td class="py-2 px-3 text-right font-semibold text-gray-900 dark:text-white">
-                                        {{ formatCurrency(order.total) }}
-                                    </td>
-                                </tr>
-                                <tr v-if="salesOrders.length === 0">
-                                    <td colspan="6" class="py-8 text-center text-gray-500 dark:text-gray-400">
-                                        No se registraron ventas en esta sesión.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                            {{ denomination.label }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-center font-mono text-slate-600 dark:text-slate-300"
+                                        >
+                                            {{ denomination.unitCount || '-' }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-center font-mono text-slate-600 dark:text-slate-300"
+                                        >
+                                            {{ denomination.packCount || '-' }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-bold text-slate-950 tabular-nums dark:text-white"
+                                        >
+                                            {{
+                                                formatCurrency(
+                                                    denomination.subtotal,
+                                                )
+                                            }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr
+                                        class="border-t border-slate-300 bg-slate-50 dark:bg-muted/50"
+                                    >
+                                        <td
+                                            colspan="3"
+                                            class="px-4 py-2 text-right text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                        >
+                                            Total contado
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-black text-slate-950 tabular-nums dark:text-white"
+                                        >
+                                            {{
+                                                formatCurrency(
+                                                    totalDenominations,
+                                                )
+                                            }}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <div
+                                v-else
+                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                            >
+                                No se registró conteo de denominaciones.
+                            </div>
+                        </div>
 
-                <!-- Print footer -->
-                <div class="hidden print:block mt-6 pt-4 border-t border-gray-300">
-                    <div class="flex justify-between text-[10px] text-gray-500">
-                        <span>Impreso: {{ new Date().toLocaleString('es-MX') }}</span>
-                        <span>Sesión #{{ session.id }} — {{ session.user?.name }}</span>
-                    </div>
-                    <div class="mt-8 grid grid-cols-2 gap-16">
-                        <div class="text-center">
-                            <div class="border-t border-gray-400 pt-1 text-[10px] text-gray-600">Firma del Cajero</div>
+                        <div
+                            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-border dark:bg-card"
+                        >
+                            <h3
+                                class="mb-3 flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                            >
+                                <Clock :size="14" class="print:hidden" />
+                                Datos del turno
+                            </h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between gap-4">
+                                    <span
+                                        class="text-slate-500 dark:text-slate-400"
+                                        >Apertura</span
+                                    >
+                                    <span
+                                        class="text-right font-semibold text-slate-950 dark:text-white"
+                                        >{{
+                                            formatDate(session.opened_at)
+                                        }}</span
+                                    >
+                                </div>
+                                <div class="flex justify-between gap-4">
+                                    <span
+                                        class="text-slate-500 dark:text-slate-400"
+                                        >Cierre</span
+                                    >
+                                    <span
+                                        class="text-right font-semibold text-slate-950 dark:text-white"
+                                        >{{
+                                            formatDate(session.closed_at)
+                                        }}</span
+                                    >
+                                </div>
+                                <div class="flex justify-between gap-4">
+                                    <span
+                                        class="text-slate-500 dark:text-slate-400"
+                                        >Fondo inicial</span
+                                    >
+                                    <span
+                                        class="font-semibold text-slate-950 tabular-nums dark:text-white"
+                                        >{{
+                                            formatCurrency(
+                                                session.opening_amount,
+                                            )
+                                        }}</span
+                                    >
+                                </div>
+                            </div>
                         </div>
-                        <div class="text-center">
-                            <div class="border-t border-gray-400 pt-1 text-[10px] text-gray-600">Firma del Supervisor</div>
+
+                        <div
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            >
+                                <h3
+                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    Movimientos de caja
+                                </h3>
+                            </div>
+                            <div
+                                v-if="cashMovements.length > 0"
+                                class="divide-y divide-slate-100 dark:divide-border/60"
+                            >
+                                <div
+                                    v-for="movement in cashMovements"
+                                    :key="movement.id"
+                                    class="px-4 py-3"
+                                >
+                                    <div
+                                        class="flex items-start justify-between gap-3"
+                                    >
+                                        <div>
+                                            <p
+                                                class="text-sm font-semibold text-slate-950 dark:text-white"
+                                            >
+                                                {{ movement.reason }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{ movementLabel(movement) }} -
+                                                {{
+                                                    formatTime(
+                                                        movement.created_at,
+                                                    )
+                                                }}
+                                            </p>
+                                            <p
+                                                v-if="movement.notes"
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{ movement.notes }}
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="shrink-0 text-sm font-bold tabular-nums"
+                                            :class="movementClass(movement)"
+                                        >
+                                            {{
+                                                movement.type === 'in'
+                                                    ? '+'
+                                                    : '-'
+                                            }}{{
+                                                formatCurrency(movement.amount)
+                                            }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                v-else
+                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                            >
+                                No hubo ingresos extra ni retiros.
+                            </div>
                         </div>
+
+                        <div
+                            v-if="session.notes"
+                            class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
+                        >
+                            <h3
+                                class="mb-1 flex items-center gap-2 text-xs font-bold uppercase"
+                            >
+                                <AlertCircle :size="14" class="print:hidden" />
+                                Nota del cierre
+                            </h3>
+                            <p class="text-sm">{{ session.notes }}</p>
+                        </div>
+                    </aside>
+                </section>
+
+                <section
+                    class="hidden print:mt-8 print:grid print:grid-cols-2 print:gap-16"
+                >
+                    <div
+                        class="border-t border-slate-400 pt-1 text-center text-[10px] text-slate-600"
+                    >
+                        Firma del cajero
                     </div>
-                </div>
-            </div>
+                    <div
+                        class="border-t border-slate-400 pt-1 text-center text-[10px] text-slate-600"
+                    >
+                        Firma del supervisor
+                    </div>
+                </section>
+            </main>
         </div>
     </div>
 </template>
@@ -467,15 +1124,17 @@ const handlePrint = () => {
     body * {
         visibility: hidden;
     }
+
     .fixed.inset-0,
     .fixed.inset-0 * {
         visibility: visible;
     }
+
     .fixed.inset-0 {
         position: absolute;
         inset: 0;
-        background: white;
     }
+
     @page {
         size: letter;
         margin: 0.5cm;

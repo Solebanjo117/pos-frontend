@@ -128,6 +128,16 @@ function getStatusLabel(status: string) {
     return statusOptions.find((s) => s.value === status)?.label || status;
 }
 
+function filterByStatus(status: PurchaseOrderStatus) {
+    filters.value.status = status;
+    loadOrders();
+}
+
+function filterByPaymentStatus(paymentStatus: string) {
+    filters.value.payment_status = paymentStatus;
+    loadOrders();
+}
+
 function getDisplayName(po: any): string {
     // Daily global PO: no supplier in header
     if (!po.supplier) {
@@ -591,21 +601,25 @@ onMounted(async () => {
                                     {{ po.formatted_total }}
                                 </td>
                                 <td class="px-6 py-4 text-center">
-                                    <span
+                                    <button
+                                        type="button"
                                         :class="[
                                             'rounded-full px-2 py-1 text-xs font-semibold',
                                             getStatusColor(po.status),
                                         ]"
+                                        title="Filtrar por estado"
+                                        @click="filterByStatus(po.status)"
                                     >
                                         {{ getStatusLabel(po.status) }}
-                                    </span>
+                                    </button>
                                 </td>
                                 <!-- Payment Status Cell -->
                                 <td class="px-6 py-4 text-center">
                                     <div
                                         class="flex flex-col items-center gap-1"
                                     >
-                                        <span
+                                        <button
+                                            type="button"
                                             :class="[
                                                 'rounded-full px-2 py-0.5 text-xs font-semibold',
                                                 getPaymentStatusColor(
@@ -613,6 +627,13 @@ onMounted(async () => {
                                                         'pending',
                                                 ),
                                             ]"
+                                            title="Filtrar por estado de pago"
+                                            @click="
+                                                filterByPaymentStatus(
+                                                    po.payment_status ??
+                                                        'pending',
+                                                )
+                                            "
                                         >
                                             {{
                                                 getPaymentStatusLabel(
@@ -620,7 +641,7 @@ onMounted(async () => {
                                                         'pending',
                                                 )
                                             }}
-                                        </span>
+                                        </button>
                                         <!-- Show pending amount if not fully paid -->
                                         <span
                                             v-if="

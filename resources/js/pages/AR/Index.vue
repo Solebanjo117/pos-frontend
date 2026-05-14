@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Head } from '@inertiajs/vue3'
+import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { AccountsReceivableApiService } from '@/services/payments'
 import { Banknote, ChevronRight, Clock, FileText, Search, X } from 'lucide-vue-next'
@@ -19,6 +19,7 @@ interface Debtor {
 
 interface StatementDocument {
     id: number
+    document_type?: string
     document_number: string
     date?: string | null
     total: number
@@ -103,6 +104,30 @@ const loadStatement = async (customer: Debtor): Promise<void> => {
     try {
         const response = await AccountsReceivableApiService.getCustomerStatement(customer.id)
         statement.value = response.data ?? response
+    } catch (e: any) {
+        statement.value = null
+        paymentError.value = e.response?.data?.message || 'No se pudo cargar el estado de cuenta.'
+    } finally {
+        loadingDetails.value = false
+    }
+}
+
+const loadStatementByCustomerId = async (customerId: number): Promise<void> => {
+    const existingCustomer = debtors.value.find((customer) => customer.id === customerId)
+
+    if (existingCustomer) {
+        await loadStatement(existingCustomer)
+        return
+    }
+
+    loadingDetails.value = true
+    paymentError.value = null
+
+    try {
+        const response = await AccountsReceivableApiService.getCustomerStatement(customerId)
+        const loadedStatement = response.data ?? response
+        statement.value = loadedStatement
+        selectedCustomer.value = loadedStatement.account
     } catch (e: any) {
         statement.value = null
         paymentError.value = e.response?.data?.message || 'No se pudo cargar el estado de cuenta.'
@@ -203,7 +228,14 @@ const onSearch = (): void => {
     searchTimeout = setTimeout(() => fetchDebtors(), 300)
 }
 
-onMounted(fetchDebtors)
+onMounted(async () => {
+    await fetchDebtors()
+
+    const customerId = Number(new URLSearchParams(window.location.search).get('customer_id'))
+    if (customerId > 0) {
+        await loadStatementByCustomerId(customerId)
+    }
+})
 </script>
 
 <template>
@@ -310,7 +342,15 @@ onMounted(fetchDebtors)
                                     </div>
                                     <div class="min-w-0">
                                         <div class="flex flex-wrap items-center gap-2">
-                                            <p class="font-bold text-gray-900 dark:text-white">{{ document.document_number }}</p>
+                                            <Link
+                                                v-if="document.document_type === 'sales_order' || !document.document_type"
+                                                :href="`/sales-orders/${document.id}`"
+                                                class="font-bold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300"
+                                                title="Ver venta"
+                                            >
+                                                {{ document.document_number }}
+                                            </Link>
+                                            <p v-else class="font-bold text-gray-900 dark:text-white">{{ document.document_number }}</p>
                                             <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
                                                 {{ document.payment_status === 'partial' ? 'Pago parcial' : 'Pendiente' }}
                                             </span>

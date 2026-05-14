@@ -14,6 +14,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 const suppliers = ref<any[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const selectedSupplier = ref<any | null>(null)
+const supplierStatement = ref<any | null>(null)
+const loadingStatement = ref(false)
 
 const totalDebt = computed(() =>
     suppliers.value.reduce((sum: number, s: any) => sum + (s.total_debt || 0), 0)
@@ -33,6 +36,21 @@ async function loadAccountsPayable() {
         error.value = e.response?.data?.message || 'Error al cargar las cuentas por pagar.'
     } finally {
         loading.value = false
+    }
+}
+
+async function loadSupplierStatement(supplier: any) {
+    selectedSupplier.value = supplier
+    supplierStatement.value = null
+    loadingStatement.value = true
+
+    try {
+        const res = await apiClient.get(`/accounts-payable/${supplier.id}/statement`)
+        supplierStatement.value = res.data.data || res.data
+    } catch (e: any) {
+        error.value = e.response?.data?.message || 'Error al cargar el estado de cuenta del proveedor.'
+    } finally {
+        loadingStatement.value = false
     }
 }
 
@@ -124,7 +142,14 @@ onMounted(loadAccountsPayable)
                                 <p class="text-xs text-gray-500 mt-0.5">{{ s.email }}</p>
                             </td>
                             <td class="px-6 py-4 text-center text-sm text-gray-600 dark:text-gray-400">
-                                {{ s.pending_orders_count || 0 }}
+                                <button
+                                    type="button"
+                                    class="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-primary"
+                                    title="Ver documentos pendientes"
+                                    @click="loadSupplierStatement(s)"
+                                >
+                                    {{ s.pending_orders_count || 0 }}
+                                </button>
                             </td>
                             <td class="px-6 py-4 text-right text-sm text-gray-600 dark:text-gray-400">
                                 {{ formatCurrency(s.total_orders_amount) }}
@@ -133,9 +158,14 @@ onMounted(loadAccountsPayable)
                                 {{ formatCurrency(s.total_paid) }}
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <span :class="['text-sm font-bold', s.total_debt > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400']">
+                                <button
+                                    type="button"
+                                    :class="['text-sm font-bold underline-offset-2 hover:underline', s.total_debt > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400']"
+                                    title="Ver documentos pendientes"
+                                    @click="loadSupplierStatement(s)"
+                                >
                                     {{ formatCurrency(s.total_debt) }}
-                                </span>
+                                </button>
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <Link :href="`/purchase-orders?supplier_id=${s.id}`" class="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-primary dark:text-indigo-400 hover:underline">
@@ -145,6 +175,65 @@ onMounted(loadAccountsPayable)
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div
+                v-if="selectedSupplier"
+                class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+            >
+                <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-border">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                            Documentos pendientes - {{ selectedSupplier.name }}
+                        </h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Órdenes de compra abiertas o parcialmente pagadas
+                        </p>
+                    </div>
+                    <Link
+                        :href="`/suppliers/${selectedSupplier.id}`"
+                        class="text-sm font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-primary"
+                    >
+                        Ver proveedor
+                    </Link>
+                </div>
+                <div v-if="loadingStatement" class="p-6 text-sm text-gray-500">
+                    Cargando documentos...
+                </div>
+                <div
+                    v-else-if="!supplierStatement?.documents?.length"
+                    class="p-6 text-sm text-gray-500"
+                >
+                    No hay documentos pendientes para este proveedor.
+                </div>
+                <div v-else class="divide-y divide-gray-200 dark:divide-border">
+                    <div
+                        v-for="document in supplierStatement.documents"
+                        :key="document.id"
+                        class="grid gap-3 px-6 py-4 md:grid-cols-[1fr_120px_120px_120px]"
+                    >
+                        <div class="min-w-0">
+                            <Link
+                                :href="`/purchase-orders/${document.id}`"
+                                class="font-mono text-sm font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-primary"
+                            >
+                                {{ document.document_number }}
+                            </Link>
+                            <p v-if="document.supplier_invoice_number" class="mt-1 text-xs text-gray-500">
+                                Factura: {{ document.supplier_invoice_number }}
+                            </p>
+                        </div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                            {{ document.date || '-' }}
+                        </div>
+                        <div class="text-right text-sm text-gray-600 dark:text-gray-400">
+                            {{ formatCurrency(document.amount_paid) }}
+                        </div>
+                        <div class="text-right text-sm font-bold text-red-600 dark:text-red-400">
+                            {{ formatCurrency(document.amount_due) }}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </AppLayout>

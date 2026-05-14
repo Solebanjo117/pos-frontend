@@ -14,6 +14,7 @@ export interface SalesOrderItem {
     warehouse_name: string
     seller_id?: number
     seller_name?: string
+    added_after_sale?: boolean
     quantity: number
     unit_price: number
     discount_percent: number
@@ -155,4 +156,5 @@ export interface UpdateOrderItemData {
     discount_amount?: number
     tax_percent?: number
     seller_id?: number
+    notes?: string
 }

@@ -332,7 +332,10 @@ const fetchCategoryDetail = async (
     }
 };
 
+let refreshToken = 0;
 const refreshCategoryDerivedState = async () => {
+    const token = ++refreshToken;
+
     const primaryCategoryId = (form.value as any).category_id as
         | number
         | undefined;
@@ -354,6 +357,9 @@ const refreshCategoryDerivedState = async () => {
         await Promise.all(defaultsCategoryIds.map(fetchCategoryDetail))
     ).filter(Boolean) as Category[];
 
+    // Discard if a newer refresh was triggered while awaiting.
+    if (token !== refreshToken) return;
+
     const mergedDefaults = categoryDetails.flatMap((category) =>
         (category.default_attributes ?? []).map((attribute) => ({
             ...attribute,
@@ -371,6 +377,9 @@ const refreshCategoryDerivedState = async () => {
               (category) => category.id === primaryCategoryId,
           ) ?? (await fetchCategoryDetail(primaryCategoryId)))
         : null;
+
+    if (token !== refreshToken) return;
+
     categoryFormula.value = primaryCategory?.pricing_formula ?? null;
     categoryAppliesItbm.value = primaryCategory?.applies_itbm ?? false;
     categoryItbmPercent.value = primaryCategory
@@ -704,9 +713,13 @@ watch(namePreview, (newVal) => {
     }
 });
 
+let categoryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
     [() => (form.value as any).category_id, () => [...extraCategoryIds.value]],
-    refreshCategoryDerivedState,
+    () => {
+        if (categoryRefreshTimer) clearTimeout(categoryRefreshTimer);
+        categoryRefreshTimer = setTimeout(refreshCategoryDerivedState, 100);
+    },
 );
 
 watch(

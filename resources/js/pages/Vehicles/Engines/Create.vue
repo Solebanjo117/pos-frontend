@@ -1,24 +1,31 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3'
-import { computed, onMounted, ref } from 'vue'
-import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
-import { useVehicleEngines, VEHICLE_ENGINE_FUEL_TYPE_OPTIONS, buildVehicleEnginePayload, hasWhitespaceInVehicleEngineCode, normalizeVehicleEngineCode, normalizeVehicleEngineFuelType } from '@/composables/useVehicleEngines'
-import { useVehicleVins } from '@/composables/useVehicleVins'
-import { useAuth } from '@/composables/useAuth'
-import AppLayout from '@/layouts/AppLayout.vue'
-import apiClient from '@/services/api/client'
-import { type BreadcrumbItem } from '@/types'
+import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, onMounted, ref, watch } from 'vue';
+import SearchableSelect, {
+    type SelectOption,
+} from '@/components/ui/SearchableSelect.vue';
+import {
+    useVehicleEngines,
+    VEHICLE_ENGINE_FUEL_TYPE_OPTIONS,
+    buildVehicleEnginePayload,
+    normalizeVehicleEngineCode,
+    normalizeVehicleEngineFuelType,
+} from '@/composables/useVehicleEngines';
+import { useAuth } from '@/composables/useAuth';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import { type BreadcrumbItem } from '@/types';
 
 interface VehicleModelItem {
-    id: number
-    make_id?: number
-    name: string
-    year_from?: number | string | null
-    year_to?: number | string | null
+    id: number;
+    make_id?: number;
+    name: string;
+    year_from?: number | string | null;
+    year_to?: number | string | null;
     make?: {
-        id: number
-        name: string
-    }
+        id: number;
+        name: string;
+    };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -26,158 +33,150 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Vehiculos', href: '/vehicles' },
     { title: 'Motores', href: '/vehicles/engines' },
     { title: 'Crear', href: '/vehicles/engines/create' },
-]
+];
 
-const { engines, createEngine, fetchEngines, loading, error } = useVehicleEngines()
-const { hasRole } = useAuth()
+const { engines, createEngine, fetchEngines, loading, error } =
+    useVehicleEngines();
+const { hasRole } = useAuth();
 
-const FUEL_TYPE_OPTIONS = VEHICLE_ENGINE_FUEL_TYPE_OPTIONS
-const canManageVehicleCatalog = computed(() => hasRole(['admin', 'manager']))
+const FUEL_TYPE_OPTIONS = VEHICLE_ENGINE_FUEL_TYPE_OPTIONS;
+const canManageVehicleCatalog = computed(() => hasRole(['admin', 'manager']));
 
 const form = ref({
+    make_id: null as number | null,
     engine_code: '',
     displacement: '',
     fuel_type: normalizeVehicleEngineFuelType(null),
     model_ids: [] as number[],
-})
+});
 
-const pendingVins = ref<string[]>([])
-const newVinInput = ref('')
-const vinQueueError = ref<string | null>(null)
-
-const addPendingVin = () => {
-    const normalized = newVinInput.value.trim().toUpperCase()
-
-    if (normalized.length < 1 || normalized.length > 40) {
-        vinQueueError.value = 'Cada VIN debe tener entre 1 y 40 caracteres.'
-        return
-    }
-
-    if (pendingVins.value.includes(normalized)) {
-        vinQueueError.value = 'Este VIN ya esta en la cola.'
-        return
-    }
-
-    pendingVins.value.push(normalized)
-    newVinInput.value = ''
-    vinQueueError.value = null
-}
-
-const removePendingVin = (vin: string) => {
-    pendingVins.value = pendingVins.value.filter(item => item !== vin)
-}
-
-const makes = ref<{ id: number; name: string }[]>([])
-const models = ref<VehicleModelItem[]>([])
-const selectedMakeFilterId = ref<number | null>(null)
-const modelSearch = ref('')
-const loadingModels = ref(false)
+const makes = ref<{ id: number; name: string }[]>([]);
+const models = ref<VehicleModelItem[]>([]);
+const modelSearch = ref('');
+const loadingModels = ref(false);
 
 const makeOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Todas las marcas' },
     ...makes.value.map((make) => ({ value: make.id, label: make.name })),
-])
+]);
 
 const modelsById = computed(() => {
-    return new Map(models.value.map((model) => [model.id, model]))
-})
+    return new Map(models.value.map((model) => [model.id, model]));
+});
 
 const normalizeYear = (year?: number | string | null): string => {
-    if (year === null || year === undefined) return ''
-    return String(year).trim()
-}
+    if (year === null || year === undefined) return '';
+    return String(year).trim();
+};
 
 const formatModelYears = (model: VehicleModelItem): string => {
-    const yearFrom = normalizeYear(model.year_from)
-    const yearTo = normalizeYear(model.year_to)
+    const yearFrom = normalizeYear(model.year_from);
+    const yearTo = normalizeYear(model.year_to);
 
-    if (!yearFrom && !yearTo) return ''
-    return `${yearFrom || '?'}-${yearTo || '?'}`
-}
+    if (!yearFrom && !yearTo) return '';
+    return `${yearFrom || '?'}-${yearTo || '?'}`;
+};
 
 const formatModelLabel = (model: VehicleModelItem): string => {
-    const makeName = model.make?.name?.trim()
-    return [makeName, model.name].filter(Boolean).join(' ')
-}
+    const makeName = model.make?.name?.trim();
+    return [makeName, model.name].filter(Boolean).join(' ');
+};
 
 const filteredModels = computed(() => {
-    const query = modelSearch.value.trim().toLowerCase()
+    const query = modelSearch.value.trim().toLowerCase();
 
     const filtered = models.value.filter((model) => {
-        const matchesMake = !selectedMakeFilterId.value || model.make?.id === selectedMakeFilterId.value || model.make_id === selectedMakeFilterId.value
-        if (!matchesMake) return false
+        const matchesMake =
+            !form.value.make_id ||
+            model.make?.id === form.value.make_id ||
+            model.make_id === form.value.make_id;
+        if (!matchesMake) return false;
 
-        if (!query) return true
+        if (!query) return true;
 
-        const haystack = [
-            model.name,
-            model.make?.name,
-            formatModelYears(model),
-        ]
+        const haystack = [model.name, model.make?.name, formatModelYears(model)]
             .filter(Boolean)
             .join(' ')
-            .toLowerCase()
+            .toLowerCase();
 
-        return haystack.includes(query)
-    })
+        return haystack.includes(query);
+    });
 
-    return filtered.sort((a, b) => formatModelLabel(a).localeCompare(formatModelLabel(b)))
-})
+    return filtered.sort((a, b) =>
+        formatModelLabel(a).localeCompare(formatModelLabel(b)),
+    );
+});
 
 const selectedModels = computed(() => {
     return form.value.model_ids
         .map((id) => modelsById.value.get(id))
-        .filter((model): model is VehicleModelItem => Boolean(model))
-})
+        .filter((model): model is VehicleModelItem => Boolean(model));
+});
 
 const fetchMakes = async () => {
     try {
-        const { data } = await apiClient.get('/vehicle-makes')
-        makes.value = data.data ?? []
+        const { data } = await apiClient.get('/vehicle-makes');
+        makes.value = data.data ?? [];
     } catch {
-        makes.value = []
+        makes.value = [];
     }
-}
+};
 
 const fetchAllModels = async () => {
-    loadingModels.value = true
+    loadingModels.value = true;
 
     try {
-        const collected: VehicleModelItem[] = []
-        let page = 1
-        let lastPage = 1
+        const collected: VehicleModelItem[] = [];
+        let page = 1;
+        let lastPage = 1;
 
         do {
             const { data } = await apiClient.get('/vehicle-models', {
                 params: { page, per_page: 200 },
-            })
+            });
 
-            const pageItems = (data.data ?? []) as VehicleModelItem[]
-            collected.push(...pageItems)
+            const pageItems = (data.data ?? []) as VehicleModelItem[];
+            collected.push(...pageItems);
 
-            lastPage = Number(data.meta?.last_page ?? 1)
-            page += 1
-        } while (page <= lastPage)
+            lastPage = Number(data.meta?.last_page ?? 1);
+            page += 1;
+        } while (page <= lastPage);
 
-        const uniqueById = new Map<number, VehicleModelItem>()
-        collected.forEach((model) => uniqueById.set(model.id, model))
-        models.value = Array.from(uniqueById.values())
+        const uniqueById = new Map<number, VehicleModelItem>();
+        collected.forEach((model) => uniqueById.set(model.id, model));
+        models.value = Array.from(uniqueById.values());
     } catch {
-        models.value = []
+        models.value = [];
     } finally {
-        loadingModels.value = false
+        loadingModels.value = false;
     }
-}
+};
 
 onMounted(() => {
-    fetchMakes()
-    fetchAllModels()
-    fetchEngines({ per_page: 500 }) // Duplicate code guard
-})
+    fetchMakes();
+    fetchAllModels();
+    fetchEngines({ per_page: 500 }); // Duplicate code guard
+});
 
-const duplicateConfirmed = ref(false)
+watch(
+    () => form.value.make_id,
+    (makeId) => {
+        form.value.model_ids = form.value.model_ids.filter((modelId) => {
+            const model = modelsById.value.get(modelId);
+            return Boolean(
+                makeId &&
+                model &&
+                (model.make?.id === makeId || model.make_id === makeId),
+            );
+        });
+    },
+);
 
-const getEngineModelIds = (engine: { model_id?: number | null; model_ids?: number[] }): number[] => {
+const duplicateConfirmed = ref(false);
+
+const getEngineModelIds = (engine: {
+    model_id?: number | null;
+    model_ids?: number[];
+}): number[] => {
     if (Array.isArray(engine.model_ids) && engine.model_ids.length > 0) {
         return Array.from(
             new Set(
@@ -185,101 +184,84 @@ const getEngineModelIds = (engine: { model_id?: number | null; model_ids?: numbe
                     .map((id) => Number(id))
                     .filter((id) => Number.isInteger(id) && id > 0),
             ),
-        )
+        );
     }
 
     if (engine.model_id !== null && engine.model_id !== undefined) {
-        return [engine.model_id]
+        return [engine.model_id];
     }
 
-    return []
-}
+    return [];
+};
 
 const checkDuplicate = (code: string, selectedModelIds: number[]): boolean => {
-    const normalizedCode = normalizeVehicleEngineCode(code).toLowerCase()
+    const normalizedCode = normalizeVehicleEngineCode(code).toLowerCase();
 
     return engines.value.some((engine) => {
-        if (normalizeVehicleEngineCode(engine.engine_code).toLowerCase() !== normalizedCode) {
-            return false
+        if (
+            normalizeVehicleEngineCode(engine.engine_code).toLowerCase() !==
+            normalizedCode
+        ) {
+            return false;
         }
 
-        const existingModelIds = getEngineModelIds(engine)
+        const existingModelIds = getEngineModelIds(engine);
 
         // For independent engines (no model association), only collide with other independent engines.
         if (selectedModelIds.length === 0) {
-            return existingModelIds.length === 0
+            return existingModelIds.length === 0;
         }
 
-        return selectedModelIds.some((modelId) => existingModelIds.includes(modelId))
-    })
-}
+        return selectedModelIds.some((modelId) =>
+            existingModelIds.includes(modelId),
+        );
+    });
+};
 
 const handleSubmit = async () => {
     if (!canManageVehicleCatalog.value) {
-        error.value = 'No tienes permisos para crear motores. Solo admin y manager pueden hacerlo.'
-        return
+        error.value =
+            'No tienes permisos para crear motores. Solo admin y manager pueden hacerlo.';
+        return;
     }
 
     const payload = buildVehicleEnginePayload({
+        make_id: form.value.make_id,
         engine_code: form.value.engine_code,
         displacement: form.value.displacement,
         fuel_type: form.value.fuel_type,
         model_ids: form.value.model_ids,
         aspiration: 'N/A',
-    })
+    });
 
     if (!payload.engine_code) {
-        error.value = 'El codigo del motor es obligatorio.'
-        return
+        error.value = 'El codigo del motor es obligatorio.';
+        return;
     }
 
-    if (hasWhitespaceInVehicleEngineCode(payload.engine_code)) {
-        error.value = 'El codigo del motor no puede contener espacios.'
-        return
+    if (!payload.make_id) {
+        error.value = 'Selecciona la marca de vehiculo del motor.';
+        return;
     }
 
-    if (!duplicateConfirmed.value && checkDuplicate(payload.engine_code, payload.model_ids)) {
+    if (
+        !duplicateConfirmed.value &&
+        checkDuplicate(payload.engine_code, payload.model_ids)
+    ) {
         const confirm = window.confirm(
-            `Ya existe un motor con el codigo "${payload.engine_code}" para al menos uno de los modelos seleccionados.\n\nDesea crear un motor duplicado?`
-        )
-        if (!confirm) return
-        duplicateConfirmed.value = true
+            `Ya existe un motor con el codigo "${payload.engine_code}" para al menos uno de los modelos seleccionados.\n\nDesea crear un motor duplicado?`,
+        );
+        if (!confirm) return;
+        duplicateConfirmed.value = true;
     }
 
     try {
-        const createdEngine = await createEngine(payload)
-
-        if (pendingVins.value.length > 0) {
-            const vinModelId = payload.model_ids[0] ?? createdEngine.model_id
-            if (!vinModelId) {
-                error.value = 'Selecciona un modelo para guardar VINs del motor.'
-                router.visit(`/vehicles/engines/${createdEngine.id}/edit`)
-                return
-            }
-
-            const vinApi = useVehicleVins({ modelId: vinModelId, engineId: createdEngine.id })
-            const failed: string[] = []
-
-            for (const vin of pendingVins.value) {
-                try {
-                    await vinApi.addVin(vin)
-                } catch {
-                    failed.push(vin)
-                }
-            }
-
-            if (failed.length > 0) {
-                window.alert(`Motor creado, pero no se pudieron guardar ${failed.length} VIN(s): ${failed.join(', ')}`)
-                router.visit(`/vehicles/engines/${createdEngine.id}/edit`)
-                return
-            }
-        }
-
-        router.visit('/vehicles/engines')
+        await createEngine(payload);
+        router.visit('/vehicles/engines');
     } catch {
-        duplicateConfirmed.value = false
+        duplicateConfirmed.value = false;
     }
-}
+};
 </script>
 
 <template>
@@ -288,24 +270,67 @@ const handleSubmit = async () => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="mx-auto max-w-3xl space-y-6 p-6">
             <div>
-                <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Crear Nuevo Motor</h1>
+                <h1
+                    class="text-2xl font-semibold text-gray-900 dark:text-white"
+                >
+                    Crear Nuevo Motor
+                </h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Los motores son reutilizables y pueden asociarse a compatibilidad vehicular.
+                    Los motores son reutilizables y pueden asociarse a
+                    compatibilidad vehicular.
                 </p>
             </div>
 
-            <div v-if="error" class="rounded-md bg-red-50 p-4 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            <div
+                v-if="error"
+                class="rounded-md bg-red-50 p-4 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+            >
                 {{ error }}
             </div>
 
-            <div v-if="!canManageVehicleCatalog" class="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-200">
-                Solo administradores y managers pueden crear motores. Este formulario esta en modo solo lectura para tu rol.
+            <div
+                v-if="!canManageVehicleCatalog"
+                class="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-200"
+            >
+                Solo administradores y managers pueden crear motores. Este
+                formulario esta en modo solo lectura para tu rol.
             </div>
 
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                <form @submit.prevent="handleSubmit" @keydown.enter="(e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') e.preventDefault() }" class="space-y-6">
+                <form
+                    @submit.prevent="handleSubmit"
+                    @keydown.enter="
+                        (e: KeyboardEvent) => {
+                            if ((e.target as HTMLElement)?.tagName === 'INPUT')
+                                e.preventDefault();
+                        }
+                    "
+                    class="space-y-6"
+                >
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
+                            Marca de vehiculo
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <div class="mt-1">
+                            <SearchableSelect
+                                v-model="form.make_id"
+                                :options="makeOptions"
+                                placeholder="Selecciona marca"
+                            />
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">
+                            La marca se administra en Carros y se reutiliza en
+                            el catalogo de motores.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
                             Codigo de Motor <span class="text-red-500">*</span>
                         </label>
                         <input
@@ -313,13 +338,17 @@ const handleSubmit = async () => {
                             type="text"
                             required
                             placeholder="Ej: 2ZR-FE, K20A, 1GR-FE"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                            class="mt-1 block w-full rounded-md border-gray-300 font-mono shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                         />
-                        <p class="mt-1 text-xs text-gray-500">Codigo unico que identifica este motor.</p>
+                        <p class="mt-1 text-xs text-gray-500">
+                            Codigo unico que identifica este motor.
+                        </p>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
                             Desplazamiento
                         </label>
                         <input
@@ -331,7 +360,9 @@ const handleSubmit = async () => {
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
                             Combustible
                         </label>
                         <select
@@ -348,77 +379,45 @@ const handleSubmit = async () => {
                         </select>
                     </div>
 
-                    <div class="space-y-3 rounded-md border border-gray-200 p-3 dark:border-border">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                VINs del motor (opcional)
-                            </label>
-                            <p class="mt-1 text-xs text-gray-500">Se guardaran automaticamente despues de crear el motor.</p>
-                        </div>
-
-                        <div class="flex gap-2">
-                            <input
-                                v-model="newVinInput"
-                                type="text"
-                                maxlength="40"
-                                placeholder="VIN (hasta 40 caracteres)"
-                                class="flex-1 rounded-md border-gray-300 font-mono text-sm uppercase shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                @keyup.enter.prevent="addPendingVin"
-                            />
-                            <button
-                                type="button"
-                                class="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 dark:border-border dark:hover:bg-muted"
-                                @click="addPendingVin"
-                            >
-                                Agregar
-                            </button>
-                        </div>
-
-                        <p v-if="vinQueueError" class="text-xs text-red-600">{{ vinQueueError }}</p>
-
-                        <div v-if="pendingVins.length === 0" class="text-xs text-gray-400">Sin VINs en cola.</div>
-                        <ul v-else class="max-h-36 divide-y divide-gray-100 overflow-y-auto rounded-md border border-gray-200 dark:divide-border dark:border-border">
-                            <li
-                                v-for="vin in pendingVins"
-                                :key="vin"
-                                class="flex items-center justify-between px-3 py-1.5"
-                            >
-                                <span class="font-mono text-xs tracking-wide text-gray-800 dark:text-gray-200">{{ vin }}</span>
-                                <button
-                                    type="button"
-                                    class="text-xs text-red-500 hover:text-red-700"
-                                    @click="removePendingVin(vin)"
-                                >
-                                    Quitar
-                                </button>
-                            </li>
-                        </ul>
-                    </div>
-
                     <div class="space-y-3">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >
                                 Modelos asociados (opcional)
                             </label>
-                            <p class="mt-1 text-xs text-gray-500">Puedes asociar este motor a uno o varios modelos, incluso de diferentes marcas.</p>
+                            <p class="mt-1 text-xs text-gray-500">
+                                Puedes asociar este motor a uno o varios modelos
+                                de la misma marca.
+                            </p>
                         </div>
 
                         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <div>
-                                <label class="block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                    Filtro por marca
+                                <label
+                                    class="block text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400"
+                                >
+                                    Modelos de la marca
                                 </label>
                                 <div class="mt-1">
-                                    <SearchableSelect
-                                        v-model="selectedMakeFilterId"
-                                        :options="makeOptions"
-                                        placeholder="Todas las marcas"
-                                    />
+                                    <p
+                                        class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-border dark:bg-muted dark:text-gray-300"
+                                    >
+                                        {{
+                                            makes.find(
+                                                (make) =>
+                                                    make.id === form.make_id,
+                                            )?.name ||
+                                            'Selecciona una marca primero'
+                                        }}
+                                    </p>
                                 </div>
                             </div>
 
                             <div>
-                                <label class="block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                <label
+                                    class="block text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400"
+                                >
                                     Buscar modelo
                                 </label>
                                 <input
@@ -430,16 +429,34 @@ const handleSubmit = async () => {
                             </div>
                         </div>
 
-                        <div class="rounded-md border border-gray-200 dark:border-border">
-                            <div v-if="loadingModels" class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        <div
+                            class="rounded-md border border-gray-200 dark:border-border"
+                        >
+                            <div
+                                v-if="loadingModels"
+                                class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400"
+                            >
                                 Cargando modelos...
                             </div>
 
-                            <div v-else-if="filteredModels.length === 0" class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
+                            <div
+                                v-else-if="!form.make_id"
+                                class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400"
+                            >
+                                Selecciona una marca para ver sus modelos.
+                            </div>
+
+                            <div
+                                v-else-if="filteredModels.length === 0"
+                                class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400"
+                            >
                                 No hay modelos para el filtro actual.
                             </div>
 
-                            <div v-else class="max-h-56 divide-y divide-gray-100 overflow-y-auto dark:divide-border">
+                            <div
+                                v-else
+                                class="max-h-56 divide-y divide-gray-100 overflow-y-auto dark:divide-border"
+                            >
                                 <label
                                     v-for="model in filteredModels"
                                     :key="model.id"
@@ -453,10 +470,15 @@ const handleSubmit = async () => {
                                     />
 
                                     <div class="min-w-0">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                        <p
+                                            class="text-sm font-medium text-gray-900 dark:text-white"
+                                        >
                                             {{ formatModelLabel(model) }}
                                         </p>
-                                        <p v-if="formatModelYears(model)" class="text-xs text-gray-500 dark:text-gray-400">
+                                        <p
+                                            v-if="formatModelYears(model)"
+                                            class="text-xs text-gray-500 dark:text-gray-400"
+                                        >
                                             Anos: {{ formatModelYears(model) }}
                                         </p>
                                     </div>
@@ -465,10 +487,14 @@ const handleSubmit = async () => {
                         </div>
 
                         <p class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ form.model_ids.length }} modelo(s) seleccionado(s)
+                            {{ form.model_ids.length }} modelo(s)
+                            seleccionado(s)
                         </p>
 
-                        <div v-if="selectedModels.length > 0" class="flex flex-wrap gap-2">
+                        <div
+                            v-if="selectedModels.length > 0"
+                            class="flex flex-wrap gap-2"
+                        >
                             <span
                                 v-for="model in selectedModels"
                                 :key="`selected-model-${model.id}`"
@@ -480,7 +506,9 @@ const handleSubmit = async () => {
                         </div>
                     </div>
 
-                    <div class="flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-border">
+                    <div
+                        class="flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-border"
+                    >
                         <Link
                             href="/vehicles/engines"
                             class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-muted dark:text-gray-200 dark:hover:bg-muted"
@@ -489,7 +517,11 @@ const handleSubmit = async () => {
                         </Link>
                         <button
                             type="submit"
-                            :disabled="loading || !canManageVehicleCatalog || !form.engine_code"
+                            :disabled="
+                                loading ||
+                                !canManageVehicleCatalog ||
+                                !form.engine_code
+                            "
                             class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
                         >
                             {{ loading ? 'Guardando...' : 'Guardar Motor' }}
@@ -500,4 +532,3 @@ const handleSubmit = async () => {
         </div>
     </AppLayout>
 </template>
-

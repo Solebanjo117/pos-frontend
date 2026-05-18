@@ -10,7 +10,9 @@ onMounted(() => fetchSettings());
 
 <template>
     <!-- Logo image or fallback icon -->
-    <div class="flex aspect-square size-8 items-center justify-center rounded-md bg-transparent overflow-hidden">
+    <div
+        class="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-md bg-transparent"
+    >
         <img
             v-if="settings.store_logo_url"
             :src="settings.store_logo_url"

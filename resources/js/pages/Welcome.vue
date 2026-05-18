@@ -3,7 +3,15 @@ import { Form, Head, Link } from '@inertiajs/vue3';
 import InputError from '@/components/InputError.vue';
 import { Spinner } from '@/components/ui/spinner';
 import { store } from '@/routes/login';
-import { User, Lock, ArrowRight, ShoppingCart, BarChart3, Package, Receipt } from 'lucide-vue-next';
+import {
+    User,
+    Lock,
+    ArrowRight,
+    ShoppingCart,
+    BarChart3,
+    Package,
+    Receipt,
+} from 'lucide-vue-next';
 import { ref } from 'vue';
 
 defineProps<{
@@ -17,8 +25,15 @@ const showPassword = ref(false);
 <template>
     <Head title="HermeX — Inicio de Sesión">
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        <link
+            rel="preconnect"
+            href="https://fonts.gstatic.com"
+            crossorigin="anonymous"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+            rel="stylesheet"
+        />
     </Head>
 
     <div class="welcome-page">
@@ -50,7 +65,11 @@ const showPassword = ref(false);
                     <div class="field-group">
                         <label for="email" class="field-label">USUARIO</label>
                         <div class="input-wrapper">
-                            <User class="input-icon" :size="18" :stroke-width="1.5" />
+                            <User
+                                class="input-icon"
+                                :size="18"
+                                :stroke-width="1.5"
+                            />
                             <input
                                 id="email"
                                 type="text"
@@ -68,9 +87,15 @@ const showPassword = ref(false);
 
                     <!-- Password -->
                     <div class="field-group">
-                        <label for="password" class="field-label">CONTRASEÑA</label>
+                        <label for="password" class="field-label"
+                            >CONTRASEÑA</label
+                        >
                         <div class="input-wrapper">
-                            <Lock class="input-icon" :size="18" :stroke-width="1.5" />
+                            <Lock
+                                class="input-icon"
+                                :size="18"
+                                :stroke-width="1.5"
+                            />
                             <input
                                 id="password"
                                 :type="showPassword ? 'text' : 'password'"
@@ -118,13 +143,13 @@ const showPassword = ref(false);
 
                 <h2 class="welcome-title">Bienvenido a <span>HermeX</span></h2>
                 <p class="welcome-desc">
-                    Gestiona inventario, ventas y clientes desde una sola plataforma. 
-                    Tu punto de venta inteligente.
+                    Gestiona inventario, ventas y clientes desde una sola
+                    plataforma. Tu punto de venta inteligente.
                 </p>
 
-                <img 
-                    src="/images/hermespos.jpeg" 
-                    alt="HermeX" 
+                <img
+                    src="/images/hermespos.jpeg"
+                    alt="HermeX"
                     class="welcome-hero"
                 />
 
@@ -158,7 +183,11 @@ const showPassword = ref(false);
 .welcome-page {
     display: flex;
     min-height: 100vh;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family:
+        'Inter',
+        system-ui,
+        -apple-system,
+        sans-serif;
     background: #0a0a0a;
 }
 
@@ -184,8 +213,8 @@ const showPassword = ref(false);
     position: relative;
     border: 1px solid rgba(255, 255, 255, 0.05);
     box-shadow:
-        0 4px 6px -1px rgba(0,0,0,.5),
-        0 10px 15px -3px rgba(0,0,0,.3);
+        0 4px 6px -1px rgba(0, 0, 0, 0.5),
+        0 10px 15px -3px rgba(0, 0, 0, 0.3);
 }
 
 .avatar-icon {
@@ -197,7 +226,7 @@ const showPassword = ref(false);
     align-items: center;
     justify-content: center;
     margin: 0 auto 1.25rem;
-    color: #D4AF37;
+    color: #d4af37;
     border: 2px solid rgba(212, 175, 55, 0.3);
 }
 
@@ -205,14 +234,14 @@ const showPassword = ref(false);
     text-align: center;
     font-size: 1.25rem;
     font-weight: 800;
-    letter-spacing: .04em;
+    letter-spacing: 0.04em;
     color: #ffffff;
-    margin-bottom: .25rem;
+    margin-bottom: 0.25rem;
 }
 
 .login-subtitle {
     text-align: center;
-    font-size: .825rem;
+    font-size: 0.825rem;
     color: #888888;
     margin-bottom: 1.5rem;
     font-weight: 400;
@@ -220,12 +249,12 @@ const showPassword = ref(false);
 
 .status-msg {
     text-align: center;
-    font-size: .8rem;
+    font-size: 0.8rem;
     font-weight: 500;
-    color: #D4AF37;
+    color: #d4af37;
     background: rgba(212, 175, 55, 0.1);
     border: 1px solid rgba(212, 175, 55, 0.2);
-    padding: .5rem 1rem;
+    padding: 0.5rem 1rem;
     border-radius: 8px;
     margin-bottom: 1rem;
 }
@@ -240,13 +269,13 @@ const showPassword = ref(false);
 .field-group {
     display: flex;
     flex-direction: column;
-    gap: .35rem;
+    gap: 0.35rem;
 }
 
 .field-label {
-    font-size: .7rem;
+    font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: .12em;
+    letter-spacing: 0.12em;
     color: #888888;
 }
 
@@ -256,47 +285,47 @@ const showPassword = ref(false);
 
 .input-icon {
     position: absolute;
-    left: .75rem;
+    left: 0.75rem;
     top: 50%;
     transform: translateY(-50%);
-    color: #D4AF37;
+    color: #d4af37;
     pointer-events: none;
 }
 
 .login-input {
     width: 100%;
-    padding: .75rem .75rem .75rem 2.5rem;
+    padding: 0.75rem 0.75rem 0.75rem 2.5rem;
     border: none;
     border-bottom: 1.5px solid #333333;
     background: transparent;
-    font-size: .9rem;
+    font-size: 0.9rem;
     font-family: inherit;
     color: #ffffff;
     outline: none;
-    transition: border-color .2s;
+    transition: border-color 0.2s;
 }
 .login-input::placeholder {
     color: #555555;
 }
 .login-input:focus {
-    border-color: #D4AF37;
+    border-color: #d4af37;
 }
 
 /* ─── Submit ──── */
 .submit-btn {
-    margin-top: .5rem;
+    margin-top: 0.5rem;
     width: 100%;
-    padding: .85rem 1.5rem;
-    background: linear-gradient(135deg, #D4AF37 0%, #AA771C 100%);
+    padding: 0.85rem 1.5rem;
+    background: linear-gradient(135deg, #d4af37 0%, #aa771c 100%);
     color: #000000;
     border: none;
     border-radius: 10px;
-    font-size: .85rem;
+    font-size: 0.85rem;
     font-weight: 700;
-    letter-spacing: .08em;
+    letter-spacing: 0.08em;
     font-family: inherit;
     cursor: pointer;
-    transition: all .2s;
+    transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -304,20 +333,20 @@ const showPassword = ref(false);
 .submit-btn:hover:not(:disabled) {
     background: linear-gradient(135deg, #e5c35b 0%, #c48c26 100%);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(212, 175, 55, .25);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25);
 }
 .submit-btn:active:not(:disabled) {
     transform: translateY(0);
 }
 .submit-btn:disabled {
-    opacity: .6;
+    opacity: 0.6;
     cursor: not-allowed;
 }
 
 .submit-text {
     display: flex;
     align-items: center;
-    gap: .5rem;
+    gap: 0.5rem;
 }
 
 .spinner {
@@ -329,9 +358,9 @@ const showPassword = ref(false);
 .login-footer {
     text-align: center;
     margin-top: 1.5rem;
-    font-size: .65rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    letter-spacing: .15em;
+    letter-spacing: 0.15em;
     color: #555555;
 }
 
@@ -354,8 +383,16 @@ const showPassword = ref(false);
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(circle at 20% 30%, rgba(212, 175, 55, .05) 0%, transparent 70%),
-        radial-gradient(circle at 80% 70%, rgba(212, 175, 55, .05) 0%, transparent 60%);
+        radial-gradient(
+            circle at 20% 30%,
+            rgba(212, 175, 55, 0.05) 0%,
+            transparent 70%
+        ),
+        radial-gradient(
+            circle at 80% 70%,
+            rgba(212, 175, 55, 0.05) 0%,
+            transparent 60%
+        );
 }
 
 .welcome-content {
@@ -380,12 +417,12 @@ const showPassword = ref(false);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #D4AF37;
+    color: #d4af37;
     border: 1px solid rgba(212, 175, 55, 0.2);
     box-shadow:
-        0 1px 3px rgba(0,0,0,.3),
-        0 4px 8px rgba(0,0,0,.2);
-    transition: all .3s ease;
+        0 1px 3px rgba(0, 0, 0, 0.3),
+        0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
 }
 .icon-bubble:hover {
     transform: translateY(-4px);
@@ -399,18 +436,18 @@ const showPassword = ref(false);
     font-size: 1.75rem;
     font-weight: 700;
     color: #ffffff;
-    margin-bottom: .5rem;
+    margin-bottom: 0.5rem;
     line-height: 1.2;
 }
 .welcome-title span {
-    background: linear-gradient(135deg, #D4AF37 0%, #AA771C 100%);
+    background: linear-gradient(135deg, #d4af37 0%, #aa771c 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
 }
 
 .welcome-desc {
-    font-size: .9rem;
+    font-size: 0.9rem;
     color: #aaaaaa;
     line-height: 1.5;
     margin-bottom: 1.5rem;
@@ -426,28 +463,28 @@ const showPassword = ref(false);
     display: block;
     object-fit: cover;
     box-shadow:
-        0 8px 30px rgba(0,0,0,.5),
-        0 2px 8px rgba(0,0,0,.3);
+        0 8px 30px rgba(0, 0, 0, 0.5),
+        0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .welcome-features {
     display: flex;
     flex-wrap: wrap;
-    gap: .75rem;
+    gap: 0.75rem;
     justify-content: center;
 }
 
 .feature {
     display: flex;
     align-items: center;
-    gap: .5rem;
-    padding: .5rem 1rem;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
     background: rgba(26, 26, 26, 0.7);
     backdrop-filter: blur(4px);
     border-radius: 20px;
-    font-size: .8rem;
+    font-size: 0.8rem;
     font-weight: 500;
-    color: #D4AF37;
+    color: #d4af37;
     border: 1px solid rgba(212, 175, 55, 0.2);
 }
 
@@ -455,7 +492,7 @@ const showPassword = ref(false);
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #D4AF37;
+    background: #d4af37;
 }
 
 /* ═══════════════════════════════════════════ */

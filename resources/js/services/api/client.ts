@@ -1,5 +1,5 @@
-import axios, { type AxiosInstance, type AxiosError } from 'axios'
-import { router } from '@inertiajs/vue3'
+import axios, { type AxiosInstance, type AxiosError } from 'axios';
+import { router } from '@inertiajs/vue3';
 
 const apiClient: AxiosInstance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -9,84 +9,103 @@ const apiClient: AxiosInstance = axios.create({
     },
     timeout: 15000,
     withCredentials: true, // Send cookies with requests
-})
+});
 
 // Get CSRF token from page meta tag (Laravel default)
 const getCSRFToken = (): string | null => {
-    const meta = document.querySelector('meta[name="csrf-token"]')
-    return meta ? meta.getAttribute('content') : null
-}
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : null;
+};
 
 // Request interceptor
 apiClient.interceptors.request.use(
     (config) => {
         // Add CSRF token to headers
-        const token = getCSRFToken()
+        const token = getCSRFToken();
         if (token) {
-            config.headers['X-CSRF-TOKEN'] = token
+            config.headers['X-CSRF-TOKEN'] = token;
         }
-        return config
+        return config;
     },
     (error) => {
-        return Promise.reject(error)
+        return Promise.reject(error);
     },
-)
+);
 
 // Response interceptor — global error handling
 apiClient.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
         if (error.response) {
-            const status = error.response.status
+            const status = error.response.status;
 
             switch (status) {
                 case 401:
                     // Session expired or unauthenticated
                     // Only redirect if we are not already on the login or welcome pages
-                    if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-                        console.warn('[API] 401 Unauthorized — redirecting to login')
-                        router.visit('/login')
+                    if (
+                        window.location.pathname !== '/login' &&
+                        window.location.pathname !== '/'
+                    ) {
+                        console.warn(
+                            '[API] 401 Unauthorized — redirecting to login',
+                        );
+                        router.visit('/login');
                     } else {
-                        console.warn('[API] 401 Unauthorized — suppressed redirect on public page')
+                        console.warn(
+                            '[API] 401 Unauthorized — suppressed redirect on public page',
+                        );
                     }
                     break;
 
                 case 403:
                     // Forbidden — show toast via custom event
-                    console.warn('[API] 403 Forbidden')
+                    console.warn('[API] 403 Forbidden');
                     window.dispatchEvent(
                         new CustomEvent('api:forbidden', {
-                            detail: { message: 'No tienes permiso para realizar esta acción.' },
+                            detail: {
+                                message:
+                                    'No tienes permiso para realizar esta acción.',
+                            },
                         }),
-                    )
-                    break
+                    );
+                    break;
 
                 case 500:
-                    console.error('[API] 500 Server Error', error.response.data)
+                    console.error(
+                        '[API] 500 Server Error',
+                        error.response.data,
+                    );
                     window.dispatchEvent(
                         new CustomEvent('api:server-error', {
-                            detail: { message: 'Error del servidor. Intenta de nuevo.' },
+                            detail: {
+                                message:
+                                    'Error del servidor. Intenta de nuevo.',
+                            },
                         }),
-                    )
-                    break
+                    );
+                    break;
 
                 default:
-                    console.error(`[API] Error ${status}:`, error.response.data)
+                    console.error(
+                        `[API] Error ${status}:`,
+                        error.response.data,
+                    );
             }
         } else if (error.request) {
             // Network error — no response received
-            console.error('[API] No response from server')
+            console.error('[API] No response from server');
             window.dispatchEvent(
                 new CustomEvent('api:network-error', {
                     detail: { message: 'Sin conexión con el servidor.' },
                 }),
-            )
+            );
         } else {
-            console.error('[API] Request error:', error.message)
+            console.error('[API] Request error:', error.message);
         }
 
-        return Promise.reject(error)
+        return Promise.reject(error);
     },
-)
+);
 
-export default apiClient
+export default apiClient;

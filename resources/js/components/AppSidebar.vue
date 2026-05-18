@@ -256,6 +256,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                     icon: Banknote,
                 },
                 {
+                    title: 'Gastos operativos',
+                    href: '/operational-expenses',
+                    icon: Receipt,
+                },
+                {
                     title: 'Proveedores',
                     href: '/suppliers',
                     icon: Factory,
@@ -266,6 +271,11 @@ const mainNavItems = computed<NavItem[]>(() => {
 
     // --- Inventario ---
     const inventoryItems: NavItem[] = [
+        {
+            title: 'Inventario',
+            href: '/inventory',
+            icon: Warehouse,
+        },
         {
             title: 'Productos',
             href: '/products',
@@ -318,11 +328,6 @@ const mainNavItems = computed<NavItem[]>(() => {
                     href: '/vehicles/engines',
                     icon: Wrench,
                 },
-                {
-                    title: 'Chasis',
-                    href: '/vehicles/chassis',
-                    icon: Truck,
-                },
             ],
         });
     }
@@ -338,7 +343,7 @@ const mainNavItems = computed<NavItem[]>(() => {
                 icon: Users,
             },
             {
-                title: 'Pagar deudas',
+                title: 'Credito cliente',
                 href: '/ar',
                 icon: Banknote,
             },

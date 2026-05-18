@@ -39,7 +39,11 @@ defineProps<Props>();
     </DropdownMenuGroup>
     <DropdownMenuGroup>
         <DropdownMenuItem :as-child="true">
-            <Link class="block w-full cursor-pointer" href="/changelog" prefetch>
+            <Link
+                class="block w-full cursor-pointer"
+                href="/changelog"
+                prefetch
+            >
                 <BookOpen class="mr-2 h-4 w-4" />
                 Changelog
             </Link>

@@ -1,37 +1,46 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { Head } from '@inertiajs/vue3'
-import { BarChart3, AlertCircle, TrendingUp, Package, Download } from 'lucide-vue-next'
-import AppLayout from '@/layouts/AppLayout.vue'
-import { type BreadcrumbItem } from '@/types'
-import { useReports } from '@/composables/useReports'
-import { useWarehouses } from '@/composables/useWarehouses'
-import { usePosSettings } from '@/composables/usePosSettings'
-import { useBrands } from '@/composables/useBrands'
-import { useCategories } from '@/composables/useCategories'
-import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
-import StockStatusChart from '@/components/charts/StockStatusChart.vue'
-import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue'
-import TopProductsChart from '@/components/charts/TopProductsChart.vue'
+import { ref, onMounted, computed, watch } from 'vue';
+import { Head } from '@inertiajs/vue3';
+import {
+    BarChart3,
+    AlertCircle,
+    TrendingUp,
+    Package,
+    Download,
+} from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import { useReports } from '@/composables/useReports';
+import { useWarehouses } from '@/composables/useWarehouses';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useBrands } from '@/composables/useBrands';
+import { useCategories } from '@/composables/useCategories';
+import SearchableSelect, {
+    type SelectOption,
+} from '@/components/ui/SearchableSelect.vue';
+import StockStatusChart from '@/components/charts/StockStatusChart.vue';
+import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue';
+import TopProductsChart from '@/components/charts/TopProductsChart.vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Reportes', href: '/reports/stock-levels' },
     { title: 'Niveles de Stock', href: '/reports/stock-levels' },
-]
+];
 
-const { stockLevelsReport, loading, error, fetchStockLevels, exportReport } = useReports()
-const { warehouses, fetchWarehouses } = useWarehouses()
-const { brands, fetchBrands } = useBrands()
-const { categories, fetchCategories } = useCategories()
-const { currentWarehouseId, initWarehouse } = usePosSettings()
+const { stockLevelsReport, loading, error, fetchStockLevels, exportReport } =
+    useReports();
+const { warehouses, fetchWarehouses } = useWarehouses();
+const { brands, fetchBrands } = useBrands();
+const { categories, fetchCategories } = useCategories();
+const { currentWarehouseId, initWarehouse } = usePosSettings();
 
 const filters = ref({
     warehouse_id: null as number | null,
     brand_id: null as number | null,
     category_id: null as number | null,
     status: null as 'critical' | 'low' | 'normal' | 'optimal' | null,
-})
+});
 
 const warehouseOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Todos los almacenes' },
@@ -39,7 +48,7 @@ const warehouseOptions = computed<SelectOption[]>(() => [
         value: warehouse.id,
         label: warehouse.name,
     })),
-])
+]);
 
 const brandOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Todas las marcas' },
@@ -47,7 +56,7 @@ const brandOptions = computed<SelectOption[]>(() => [
         value: brand.id,
         label: brand.name,
     })),
-])
+]);
 
 const categoryOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Todas las categorías' },
@@ -55,14 +64,14 @@ const categoryOptions = computed<SelectOption[]>(() => [
         value: category.id,
         label: category.name,
     })),
-])
+]);
 
 watch(currentWarehouseId, (val) => {
-    filters.value.warehouse_id = val
-    applyFilters()
-})
+    filters.value.warehouse_id = val;
+    applyFilters();
+});
 
-const exporting = ref(false)
+const exporting = ref(false);
 
 onMounted(async () => {
     await Promise.all([
@@ -70,20 +79,26 @@ onMounted(async () => {
         fetchWarehouses(),
         fetchBrands(),
         fetchCategories(),
-    ])
-    filters.value.warehouse_id = currentWarehouseId.value
-    await fetchStockLevels(filters.value.warehouse_id ? { warehouse_id: filters.value.warehouse_id } : {})
-})
+    ]);
+    filters.value.warehouse_id = currentWarehouseId.value;
+    await fetchStockLevels(
+        filters.value.warehouse_id
+            ? { warehouse_id: filters.value.warehouse_id }
+            : {},
+    );
+});
 
 const applyFilters = async () => {
-    const filterParams: any = {}
-    if (filters.value.warehouse_id) filterParams.warehouse_id = filters.value.warehouse_id
-    if (filters.value.brand_id) filterParams.brand_id = filters.value.brand_id
-    if (filters.value.category_id) filterParams.category_id = filters.value.category_id
-    if (filters.value.status) filterParams.status = filters.value.status
-    
-    await fetchStockLevels(filterParams)
-}
+    const filterParams: any = {};
+    if (filters.value.warehouse_id)
+        filterParams.warehouse_id = filters.value.warehouse_id;
+    if (filters.value.brand_id) filterParams.brand_id = filters.value.brand_id;
+    if (filters.value.category_id)
+        filterParams.category_id = filters.value.category_id;
+    if (filters.value.status) filterParams.status = filters.value.status;
+
+    await fetchStockLevels(filterParams);
+};
 
 const clearFilters = async () => {
     filters.value = {
@@ -91,58 +106,70 @@ const clearFilters = async () => {
         brand_id: null,
         category_id: null,
         status: null,
-    }
-    await fetchStockLevels()
-}
+    };
+    await fetchStockLevels();
+};
 
 const handleExport = async (format: 'pdf' | 'excel') => {
-    exporting.value = true
+    exporting.value = true;
     try {
-        await exportReport('stock-levels', format, filters.value)
+        await exportReport('stock-levels', format, filters.value);
     } catch (err) {
-        console.error('Export error:', err)
+        console.error('Export error:', err);
     } finally {
-        exporting.value = false
+        exporting.value = false;
     }
-}
+};
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'critical': return 'text-red-600 bg-red-50 dark:bg-red-900/20'
-        case 'low': return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20'
-        case 'normal': return 'text-blue-600 dark:text-primary bg-blue-50 dark:bg-blue-900/20'
-        case 'optimal': return 'text-green-600 bg-green-50 dark:bg-green-900/20'
-        default: return 'text-gray-600 bg-gray-50 dark:bg-background/20'
+        case 'critical':
+            return 'text-red-600 bg-red-50 dark:bg-red-900/20';
+        case 'low':
+            return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20';
+        case 'normal':
+            return 'text-blue-600 dark:text-primary bg-blue-50 dark:bg-blue-900/20';
+        case 'optimal':
+            return 'text-green-600 bg-green-50 dark:bg-green-900/20';
+        default:
+            return 'text-gray-600 bg-gray-50 dark:bg-background/20';
     }
-}
+};
 
 const getStatusLabel = (status: string) => {
     switch (status) {
-        case 'critical': return 'Crítico'
-        case 'low': return 'Bajo'
-        case 'normal': return 'Normal'
-        case 'optimal': return 'Óptimo'
-        default: return status
+        case 'critical':
+            return 'Crítico';
+        case 'low':
+            return 'Bajo';
+        case 'normal':
+            return 'Normal';
+        case 'optimal':
+            return 'Óptimo';
+        default:
+            return status;
     }
-}
+};
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-MX', {
         style: 'currency',
         currency: 'MXN',
-    }).format(value)
-}
+    }).format(value);
+};
 </script>
 
 <template>
     <Head title="Reporte de Niveles de Stock" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4 space-y-6">
+        <div class="space-y-6 p-4">
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
+                    <h1
+                        class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                    >
                         <BarChart3 :size="32" />
                         Reporte de Niveles de Stock
                     </h1>
@@ -150,7 +177,7 @@ const formatCurrency = (value: number) => {
                         Análisis del estado actual del inventario
                     </p>
                 </div>
-                
+
                 <div class="flex gap-2">
                     <button
                         @click="handleExport('pdf')"
@@ -172,30 +199,51 @@ const formatCurrency = (value: number) => {
             </div>
 
             <!-- Error Message -->
-            <div v-if="error" class="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200">
+            <div
+                v-if="error"
+                class="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
+            >
                 <AlertCircle :size="20" />
                 {{ error }}
             </div>
 
             <!-- Summary Cards -->
-            <div v-if="stockLevelsReport" class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <div
+                v-if="stockLevelsReport"
+                class="grid gap-4 md:grid-cols-2 lg:grid-cols-5"
+            >
                 <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Total Productos</p>
-                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                            <p
+                                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >
+                                Total Productos
+                            </p>
+                            <p
+                                class="mt-2 text-3xl font-bold text-gray-900 dark:text-white"
+                            >
                                 {{ stockLevelsReport.summary.total_products }}
                             </p>
                         </div>
-                        <Package :size="32" class="text-blue-600 dark:text-primary" />
+                        <Package
+                            :size="32"
+                            class="text-blue-600 dark:text-primary"
+                        />
                     </div>
                 </div>
 
                 <div class="rounded-lg bg-red-50 p-6 shadow dark:bg-red-900/20">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-red-700 dark:text-red-300">Stock Crítico</p>
-                            <p class="mt-2 text-3xl font-bold text-red-900 dark:text-red-200">
+                            <p
+                                class="text-sm font-medium text-red-700 dark:text-red-300"
+                            >
+                                Stock Crítico
+                            </p>
+                            <p
+                                class="mt-2 text-3xl font-bold text-red-900 dark:text-red-200"
+                            >
                                 {{ stockLevelsReport.summary.critical_stock }}
                             </p>
                         </div>
@@ -203,11 +251,19 @@ const formatCurrency = (value: number) => {
                     </div>
                 </div>
 
-                <div class="rounded-lg bg-yellow-50 p-6 shadow dark:bg-yellow-900/20">
+                <div
+                    class="rounded-lg bg-yellow-50 p-6 shadow dark:bg-yellow-900/20"
+                >
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-yellow-700 dark:text-yellow-300">Stock Bajo</p>
-                            <p class="mt-2 text-3xl font-bold text-yellow-900 dark:text-yellow-200">
+                            <p
+                                class="text-sm font-medium text-yellow-700 dark:text-yellow-300"
+                            >
+                                Stock Bajo
+                            </p>
+                            <p
+                                class="mt-2 text-3xl font-bold text-yellow-900 dark:text-yellow-200"
+                            >
                                 {{ stockLevelsReport.summary.low_stock }}
                             </p>
                         </div>
@@ -215,23 +271,42 @@ const formatCurrency = (value: number) => {
                     </div>
                 </div>
 
-                <div class="rounded-lg bg-blue-50 p-6 shadow dark:bg-blue-900/20">
+                <div
+                    class="rounded-lg bg-blue-50 p-6 shadow dark:bg-blue-900/20"
+                >
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-blue-700 dark:text-blue-300">Stock Normal</p>
-                            <p class="mt-2 text-3xl font-bold text-blue-900 dark:text-blue-200">
+                            <p
+                                class="text-sm font-medium text-blue-700 dark:text-blue-300"
+                            >
+                                Stock Normal
+                            </p>
+                            <p
+                                class="mt-2 text-3xl font-bold text-blue-900 dark:text-blue-200"
+                            >
                                 {{ stockLevelsReport.summary.normal_stock }}
                             </p>
                         </div>
-                        <BarChart3 :size="32" class="text-blue-600 dark:text-primary" />
+                        <BarChart3
+                            :size="32"
+                            class="text-blue-600 dark:text-primary"
+                        />
                     </div>
                 </div>
 
-                <div class="rounded-lg bg-green-50 p-6 shadow dark:bg-green-900/20">
+                <div
+                    class="rounded-lg bg-green-50 p-6 shadow dark:bg-green-900/20"
+                >
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-green-700 dark:text-green-300">Stock Óptimo</p>
-                            <p class="mt-2 text-3xl font-bold text-green-900 dark:text-green-200">
+                            <p
+                                class="text-sm font-medium text-green-700 dark:text-green-300"
+                            >
+                                Stock Óptimo
+                            </p>
+                            <p
+                                class="mt-2 text-3xl font-bold text-green-900 dark:text-green-200"
+                            >
                                 {{ stockLevelsReport.summary.optimal_stock }}
                             </p>
                         </div>
@@ -241,7 +316,10 @@ const formatCurrency = (value: number) => {
             </div>
 
             <!-- Charts Section -->
-            <div v-if="stockLevelsReport" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div
+                v-if="stockLevelsReport"
+                class="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+            >
                 <!-- Stock Status Chart -->
                 <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="h-80">
@@ -264,7 +342,9 @@ const formatCurrency = (value: number) => {
                 </div>
 
                 <!-- Top Products Chart -->
-                <div class="rounded-lg bg-white p-6 shadow dark:bg-card md:col-span-2 lg:col-span-1">
+                <div
+                    class="rounded-lg bg-white p-6 shadow md:col-span-2 lg:col-span-1 dark:bg-card"
+                >
                     <div class="h-80">
                         <TopProductsChart
                             :products="stockLevelsReport.products"
@@ -276,11 +356,18 @@ const formatCurrency = (value: number) => {
 
             <!-- Filters -->
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
-                <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Filtros</h2>
-                <div class="grid gap-4 md:grid-cols-4 lg:grid-cols-5 items-end">
+                <h2
+                    class="mb-4 text-lg font-semibold text-gray-900 dark:text-white"
+                >
+                    Filtros
+                </h2>
+                <div class="grid items-end gap-4 md:grid-cols-4 lg:grid-cols-5">
                     <!-- Warehouse -->
                     <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Almacén</label>
+                        <label
+                            class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+                            >Almacén</label
+                        >
                         <SearchableSelect
                             v-model="filters.warehouse_id"
                             :options="warehouseOptions"
@@ -290,7 +377,10 @@ const formatCurrency = (value: number) => {
 
                     <!-- Brand -->
                     <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Marca</label>
+                        <label
+                            class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+                            >Marca</label
+                        >
                         <SearchableSelect
                             v-model="filters.brand_id"
                             :options="brandOptions"
@@ -300,7 +390,10 @@ const formatCurrency = (value: number) => {
 
                     <!-- Category -->
                     <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Categoría</label>
+                        <label
+                            class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+                            >Categoría</label
+                        >
                         <SearchableSelect
                             v-model="filters.category_id"
                             :options="categoryOptions"
@@ -310,7 +403,10 @@ const formatCurrency = (value: number) => {
 
                     <!-- Status -->
                     <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">Estado</label>
+                        <label
+                            class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+                            >Estado</label
+                        >
                         <select
                             v-model="filters.status"
                             class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
@@ -326,7 +422,7 @@ const formatCurrency = (value: number) => {
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
+                            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
                         >
                             Aplicar
                         </button>
@@ -341,35 +437,105 @@ const formatCurrency = (value: number) => {
             </div>
 
             <!-- Products Table -->
-            <div v-if="stockLevelsReport" class="rounded-lg bg-white shadow dark:bg-card">
+            <div
+                v-if="stockLevelsReport"
+                class="rounded-lg bg-white shadow dark:bg-card"
+            >
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">SKU</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Producto</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Marca</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Almacén</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Stock</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Reorden</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Estado</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-700 dark:text-gray-300">Valor</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    SKU
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Producto
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Marca
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Almacén
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Stock
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Reorden
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Estado
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Valor
+                                </th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-border">
-                            <tr v-for="product in stockLevelsReport.products" :key="`${product.id}-${product.warehouse_id}`" class="hover:bg-gray-50 dark:hover:bg-muted/50">
-                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ product.sku }}</td>
-                                <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{{ product.name }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ product.brand || '-' }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ product.warehouse }}</td>
-                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white">{{ product.current_stock }}</td>
-                                <td class="px-6 py-4 text-right text-sm text-gray-700 dark:text-gray-300">{{ product.reorder_point }}</td>
+                        <tbody
+                            class="divide-y divide-gray-200 dark:divide-border"
+                        >
+                            <tr
+                                v-for="product in stockLevelsReport.products"
+                                :key="`${product.id}-${product.warehouse_id}`"
+                                class="hover:bg-gray-50 dark:hover:bg-muted/50"
+                            >
+                                <td
+                                    class="px-6 py-4 text-sm text-gray-900 dark:text-white"
+                                >
+                                    {{ product.sku }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white"
+                                >
+                                    {{ product.name }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
+                                >
+                                    {{ product.brand || '-' }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
+                                >
+                                    {{ product.warehouse }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white"
+                                >
+                                    {{ product.current_stock }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-right text-sm text-gray-700 dark:text-gray-300"
+                                >
+                                    {{ product.reorder_point }}
+                                </td>
                                 <td class="px-6 py-4 text-center">
-                                    <span :class="getStatusColor(product.status)" class="inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+                                    <span
+                                        :class="getStatusColor(product.status)"
+                                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold"
+                                    >
                                         {{ getStatusLabel(product.status) }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white">
+                                <td
+                                    class="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white"
+                                >
                                     {{ formatCurrency(product.stock_value) }}
                                 </td>
                             </tr>
@@ -379,8 +545,13 @@ const formatCurrency = (value: number) => {
             </div>
 
             <!-- Loading State -->
-            <div v-else-if="loading" class="flex items-center justify-center py-12">
-                <div class="text-gray-700 dark:text-gray-300">Cargando reporte...</div>
+            <div
+                v-else-if="loading"
+                class="flex items-center justify-center py-12"
+            >
+                <div class="text-gray-700 dark:text-gray-300">
+                    Cargando reporte...
+                </div>
             </div>
         </div>
     </AppLayout>

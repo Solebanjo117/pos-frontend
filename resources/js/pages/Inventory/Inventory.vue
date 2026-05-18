@@ -1,374 +1,516 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
-import { PackagePlus, PackageMinus, ArrowLeftRight, ChevronDown, ChevronRight, Package, TrendingUp, AlertCircle, Calendar } from 'lucide-vue-next'
-import AppLayout from '@/layouts/AppLayout.vue'
-import { type BreadcrumbItem } from '@/types'
-import { usePosSettings } from '@/composables/usePosSettings'
-import { useAuth } from '@/composables/useAuth'
-import apiClient from '@/services/api/client'
-import SearchableSelect, { type SelectOption } from '@/components/ui/SearchableSelect.vue'
+import { computed, onMounted, ref, watch } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import {
+    AlertCircle,
+    Calendar,
+    ChevronDown,
+    ChevronRight,
+    History,
+    Package,
+    Search,
+    TrendingUp,
+    Warehouse,
+} from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
+import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import SearchableSelect, {
+    type SelectOption,
+} from '@/components/ui/SearchableSelect.vue';
+import apiClient from '@/services/api/client';
+import { useAuth } from '@/composables/useAuth';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { type BreadcrumbItem } from '@/types';
 
-const { hasRole } = useAuth()
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Inventario', href: '/inventory' },
-]
+type ViewMode = 'summary' | 'lots' | 'movements';
 
-const { isSingleWarehouseMode, fetchSettings, currentWarehouseId, initWarehouse } = usePosSettings()
-
-// View Mode
-type ViewMode = 'batches' | 'movements'
-const viewMode = ref<ViewMode>('batches')
-
-// Interfaces
-interface Product {
-    product_id: number
-    product_name: string
-    product_sku: string
-    base_price: number | null
-    total_quantity: number
-    warehouses: Array<{
-        warehouse_id: number
-        warehouse_name: string
-        quantity: number
-    }>
+interface WarehouseOption {
+    id: number;
+    name: string;
+    code?: string;
 }
 
-interface BatchItem {
-    batch_number: string
-    expiry_date: string | null
-    manufacturing_date: string | null
-    cost: number
-    notes: string | null
-    total_quantity: number
-    product_count: number
-    products: Product[]
+interface InventoryRow {
+    id: number;
+    product_id: number;
+    variant_id: number | null;
+    product_name: string;
+    product_sku: string;
+    variant_sku: string | null;
+    brand: string;
+    warehouse_id: number;
+    warehouse_name: string;
+    stock_available: number;
+    stock_reserved: number;
+    quantity_available: number;
+    quantity_reserved: number;
+    reorder_point: number;
+    reorder_quantity: number;
+    status: 'out_of_stock' | 'low_stock' | 'normal' | 'optimal';
+    fifo_cost_current: number;
+    fifo_stock_value: number;
+    open_lots_count: number;
+    last_received_at: string | null;
+    last_sold_at: string | null;
+    base_price: number | null;
 }
 
-interface Movement {
-    id: number
-    movement_type: 'in' | 'out' | 'transfer'
-    product: {
-        id: number
-        name: string
-        sku: string
-    }
-    product_batch?: {
-        batch_number: string
-        expiry_date: string | null
-    }
-    warehouse: {
-        id: number
-        name: string
-    }
+interface FifoLotRow {
+    id: number;
+    product_id: number;
+    variant_id: number | null;
+    warehouse_id: number;
+    product_name: string;
+    product_sku: string;
+    variant_sku: string | null;
+    brand: string;
+    warehouse_name: string;
+    source_type: string | null;
+    source_id: number | null;
+    batch_number: string | null;
+    received_quantity: number;
+    quantity_available: number;
+    unit_cost_base: number;
+    tax_per_unit: number;
+    misc_per_unit: number;
+    landed_unit_cost: number;
+    remaining_value: number;
+    received_at: string | null;
+}
+
+interface MovementRow {
+    id: number;
+    movement_type: 'in' | 'out' | 'transfer';
+    product?: {
+        id: number;
+        name: string;
+        sku: string;
+    };
+    variant?: {
+        id: number;
+        sku: string;
+    } | null;
+    warehouse?: {
+        id: number;
+        name: string;
+    };
     destination_warehouse?: {
-        id: number
-        name: string
-    } | null
-    quantity: number
-    created_at: string
+        id: number;
+        name: string;
+    } | null;
+    quantity: number;
+    reference_type?: string | null;
+    reference_id?: number | null;
+    reason?: string | null;
+    fifo_allocations?: Array<{
+        lot_id: number;
+        quantity: number;
+        unit_cost: number;
+        total_cost: number;
+    }>;
+    created_at: string;
 }
 
 interface Pagination {
-    current_page: number
-    last_page: number
-    per_page: number
-    total: number
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
 }
 
 interface Filters {
-    search: string
-    warehouse_id: number | undefined
-    date_from: string
-    date_to: string
-    movement_type: string | undefined
-    expiry_status: string | undefined
+    search: string;
+    warehouse_id: number | undefined;
+    stock_status: string | undefined;
+    date_from: string;
+    date_to: string;
+    movement_type: string | undefined;
 }
 
-// State
-const batches = ref<BatchItem[]>([])
-const movements = ref<Movement[]>([])
-const warehouses = ref<any[]>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
-const expandedBatches = ref<Set<string>>(new Set())
-const expandedHistory = ref<Set<string>>(new Set())
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'Inventario', href: '/inventory' },
+];
+
+const { hasRole } = useAuth();
+const { currentWarehouseId, initWarehouse } = usePosSettings();
+
+const viewMode = ref<ViewMode>('summary');
+const loading = ref(false);
+const error = ref<string | null>(null);
+const inventoryRows = ref<InventoryRow[]>([]);
+const fifoLots = ref<FifoLotRow[]>([]);
+const movements = ref<MovementRow[]>([]);
+const warehouses = ref<WarehouseOption[]>([]);
+const expandedHistoryKey = ref<string | null>(null);
 
 const pagination = ref<Pagination>({
     current_page: 1,
     last_page: 1,
     per_page: 20,
     total: 0,
-})
+});
+
+const metrics = ref({
+    total_stock: 0,
+    total_fifo_value: 0,
+    low_stock_count: 0,
+    open_lots_count: 0,
+    movements_today: 0,
+});
 
 const filters = ref<Filters>({
     search: '',
-    warehouse_id: currentWarehouseId.value || undefined,
+    warehouse_id: undefined,
+    stock_status: undefined,
     date_from: '',
     date_to: '',
     movement_type: undefined,
-    expiry_status: undefined,
-})
+});
+
+const tabs: Array<{ key: ViewMode; label: string }> = [
+    { key: 'summary', label: 'Resumen' },
+    { key: 'lots', label: 'Lotes' },
+    { key: 'movements', label: 'Movimientos' },
+];
+
+const showWarehouseColumn = computed(() => !filters.value.warehouse_id);
+
+const summaryColspan = computed(() => (showWarehouseColumn.value ? 11 : 10));
+const lotsColspan = computed(() => (showWarehouseColumn.value ? 12 : 11));
+const movementsColspan = computed(() => (showWarehouseColumn.value ? 8 : 6));
 
 const warehouseFilterOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Todos' },
-    ...warehouses.value.map((w) => ({ value: w.id, label: w.name })),
-])
+    ...warehouses.value.map((warehouse) => ({
+        value: warehouse.id,
+        label: warehouse.name,
+    })),
+]);
 
 const warehouseFilterModel = computed<number | null>({
     get: () => filters.value.warehouse_id ?? null,
     set: (value) => {
-        filters.value.warehouse_id = value === null ? undefined : Number(value)
+        filters.value.warehouse_id = value === null ? undefined : Number(value);
     },
-})
+});
 
-// Metrics
-const metrics = ref({
-    total_batches: 0,
-    total_stock: 0,
-    expiring_soon: 0,
-    movements_today: 0,
-})
+const canMutateInventory = computed(() =>
+    hasRole(['admin', 'manager', 'buyer', 'assistant']),
+);
 
-// Lifecycle
 onMounted(async () => {
-    await initWarehouse()
-    await Promise.all([
-        fetchData(),
-        fetchWarehouses(),
-        fetchSettings(),
-        fetchMetrics()
-    ])
-})
+    await initWarehouse();
+    filters.value.warehouse_id = currentWarehouseId.value || undefined;
+    await Promise.all([fetchWarehouses(), fetchData(1), fetchMetrics()]);
+});
 
-// Watch view mode changes
-watch(viewMode, () => {
-    fetchData()
-})
+watch(viewMode, async () => {
+    expandedHistoryKey.value = null;
+    await fetchData(1);
+});
 
-// Watch warehouse changes
-watch(currentWarehouseId, (newId) => {
-    filters.value.warehouse_id = newId || undefined
-    fetchData()
-})
+watch(currentWarehouseId, async (warehouseId) => {
+    filters.value.warehouse_id = warehouseId || undefined;
+    await Promise.all([fetchData(1), fetchMetrics()]);
+});
 
-// Methods
-const fetchData = async (page = 1) => {
-    if (viewMode.value === 'batches') {
-        await fetchBatches(page)
-    } else {
-        await fetchMovements(page)
+async function fetchData(page = 1): Promise<void> {
+    if (viewMode.value === 'summary') {
+        await fetchInventory(page);
+        return;
     }
+
+    if (viewMode.value === 'lots') {
+        await fetchFifoLots(page);
+        return;
+    }
+
+    await fetchMovements(page);
 }
 
-const fetchBatches = async (page = 1) => {
-    loading.value = true
-    error.value = null
+async function fetchInventory(page = 1): Promise<void> {
+    loading.value = true;
+    error.value = null;
+
     try {
-        const params = {
-            page,
-            per_page: pagination.value.per_page,
-            search: filters.value.search,
-            warehouse_id: filters.value.warehouse_id,
-            expiry_status: filters.value.expiry_status,
-        }
-        const response = await apiClient.get('/inventory/batches', { params })
-        batches.value = response.data.data
-        pagination.value = response.data.meta
+        const { data } = await apiClient.get('/inventory', {
+            params: {
+                page,
+                per_page: pagination.value.per_page,
+                search: filters.value.search,
+                warehouse_id: filters.value.warehouse_id,
+                status: filters.value.stock_status,
+            },
+        });
+        inventoryRows.value = data.data;
+        pagination.value = data.meta;
     } catch (err: any) {
-        error.value = 'Error al cargar el inventario de lotes.'
-        console.error(err)
+        error.value =
+            err.response?.data?.message || 'Error al cargar inventario.';
     } finally {
-        loading.value = false
+        loading.value = false;
     }
 }
 
-const savingNotes = ref<Set<string>>(new Set())
+async function fetchFifoLots(page = 1): Promise<void> {
+    loading.value = true;
+    error.value = null;
 
-const updateBatchNote = async (batch: BatchItem) => {
-    if (savingNotes.value.has(batch.batch_number)) return
-    
-    savingNotes.value.add(batch.batch_number)
     try {
-        await apiClient.put(`/inventory/batches/${batch.batch_number}/notes`, { notes: batch.notes })
+        const { data } = await apiClient.get('/inventory/batches', {
+            params: {
+                fifo: 1,
+                page,
+                per_page: pagination.value.per_page,
+                search: filters.value.search,
+                warehouse_id: filters.value.warehouse_id,
+            },
+        });
+        fifoLots.value = data.data;
+        pagination.value = data.meta;
     } catch (err: any) {
-        console.error('Error saving batch notes:', err)
-        alert('Hubo un error al guardar la nota del lote.')
+        error.value = err.response?.data?.message || 'Error al cargar lotes.';
     } finally {
-        savingNotes.value.delete(batch.batch_number)
+        loading.value = false;
     }
 }
 
-const fetchMovements = async (page = 1) => {
-    loading.value = true
-    error.value = null
+async function fetchMovements(page = 1): Promise<void> {
+    loading.value = true;
+    error.value = null;
+
     try {
-        const params = {
-            page,
-            per_page: pagination.value.per_page,
-            search: filters.value.search,
-            warehouse_id: filters.value.warehouse_id,
-            date_from: filters.value.date_from,
-            date_to: filters.value.date_to,
-            movement_type: filters.value.movement_type,
-        }
-        const response = await apiClient.get('/inventory-movements', { params })
-        movements.value = response.data.data
-        pagination.value = response.data.meta
+        const { data } = await apiClient.get('/inventory-movements', {
+            params: {
+                page,
+                per_page: pagination.value.per_page,
+                search: filters.value.search,
+                warehouse_id: filters.value.warehouse_id,
+                date_from: filters.value.date_from,
+                date_to: filters.value.date_to,
+                movement_type: filters.value.movement_type,
+            },
+        });
+        movements.value = data.data;
+        pagination.value = data.meta;
     } catch (err: any) {
-        error.value = 'Error al cargar los movimientos.'
-        console.error(err)
+        error.value =
+            err.response?.data?.message || 'Error al cargar movimientos.';
     } finally {
-        loading.value = false
+        loading.value = false;
     }
 }
 
-const fetchWarehouses = async () => {
+async function fetchMetrics(): Promise<void> {
     try {
-        const response = await apiClient.get('/warehouses')
-        warehouses.value = response.data.data
+        const { data } = await apiClient.get('/inventory/summary', {
+            params: {
+                warehouse_id: filters.value.warehouse_id,
+            },
+        });
+        metrics.value = data.data;
     } catch (err) {
-        console.error('Error fetching warehouses:', err)
+        console.error('Inventory summary error:', err);
     }
 }
 
-const fetchMetrics = async () => {
+async function fetchWarehouses(): Promise<void> {
     try {
-        const [batchesRes, movementsRes] = await Promise.all([
-            apiClient.get('/inventory/batches', { params: { per_page: 1 } }),
-            apiClient.get('/inventory-movements', { params: { per_page: 1, date_from: new Date().toISOString().split('T')[0] } })
-        ])
-        
-        metrics.value.total_batches = batchesRes.data.meta.total
-        metrics.value.movements_today = movementsRes.data.meta.total
-        
-        // Fetch expiring soon
-        const expiringRes = await apiClient.get('/inventory/batches', { 
-            params: { per_page: 1, expiry_status: 'expiring_soon' } 
-        })
-        metrics.value.expiring_soon = expiringRes.data.meta.total
-        
-        // Calculate total stock
-        const allBatchesRes = await apiClient.get('/inventory/batches', { params: { per_page: 1000 } })
-        metrics.value.total_stock = allBatchesRes.data.data.reduce((sum: number, batch: BatchItem) => sum + batch.total_quantity, 0)
+        const { data } = await apiClient.get('/warehouses');
+        warehouses.value = data.data;
     } catch (err) {
-        console.error('Error fetching metrics:', err)
+        console.error('Warehouses fetch error:', err);
     }
 }
 
-const applyFilters = () => {
-    fetchData(1)
+async function applyFilters(): Promise<void> {
+    expandedHistoryKey.value = null;
+    await Promise.all([fetchData(1), fetchMetrics()]);
 }
 
-const clearFilters = () => {
+async function clearFilters(): Promise<void> {
     filters.value = {
         search: '',
-        warehouse_id: undefined,
+        warehouse_id: currentWarehouseId.value || undefined,
+        stock_status: undefined,
         date_from: '',
         date_to: '',
         movement_type: undefined,
-        expiry_status: undefined,
+    };
+    expandedHistoryKey.value = null;
+    await Promise.all([fetchData(1), fetchMetrics()]);
+}
+
+async function refreshCurrentPage(): Promise<void> {
+    await Promise.all([
+        fetchData(pagination.value.current_page),
+        fetchMetrics(),
+    ]);
+}
+
+function setDatePreset(preset: 'today' | 'week' | 'month' | '30days'): void {
+    const today = new Date();
+    const from = new Date();
+
+    if (preset === 'today') {
+        filters.value.date_from = today.toISOString().split('T')[0];
+        filters.value.date_to = today.toISOString().split('T')[0];
     }
-    fetchData(1)
-}
 
-const setDatePreset = (preset: string) => {
-    const today = new Date()
-    const from = new Date()
-    
-    switch (preset) {
-        case 'today':
-            filters.value.date_from = today.toISOString().split('T')[0]
-            filters.value.date_to = today.toISOString().split('T')[0]
-            break
-        case 'week':
-            from.setDate(today.getDate() - 7)
-            filters.value.date_from = from.toISOString().split('T')[0]
-            filters.value.date_to = today.toISOString().split('T')[0]
-            break
-        case 'month':
-            from.setMonth(today.getMonth() - 1)
-            filters.value.date_from = from.toISOString().split('T')[0]
-            filters.value.date_to = today.toISOString().split('T')[0]
-            break
-        case '30days':
-            from.setDate(today.getDate() - 30)
-            filters.value.date_from = from.toISOString().split('T')[0]
-            filters.value.date_to = today.toISOString().split('T')[0]
-            break
+    if (preset === 'week') {
+        from.setDate(today.getDate() - 7);
+        filters.value.date_from = from.toISOString().split('T')[0];
+        filters.value.date_to = today.toISOString().split('T')[0];
     }
-    applyFilters()
-}
 
-const goToPage = (page: number) => {
-    fetchData(page)
-}
-
-const toggleBatch = (batchNumber: string) => {
-    if (expandedBatches.value.has(batchNumber)) {
-        expandedBatches.value.delete(batchNumber)
-    } else {
-        expandedBatches.value.add(batchNumber)
+    if (preset === 'month') {
+        from.setMonth(today.getMonth() - 1);
+        filters.value.date_from = from.toISOString().split('T')[0];
+        filters.value.date_to = today.toISOString().split('T')[0];
     }
-}
 
-const toggleBatchHistory = (batchNumber: string) => {
-    if (expandedHistory.value.has(batchNumber)) {
-        expandedHistory.value.delete(batchNumber)
-    } else {
-        expandedHistory.value.add(batchNumber)
+    if (preset === '30days') {
+        from.setDate(today.getDate() - 30);
+        filters.value.date_from = from.toISOString().split('T')[0];
+        filters.value.date_to = today.toISOString().split('T')[0];
     }
+
+    applyFilters();
 }
 
-const formatDate = (dateString: string | null) => {
-    if (!dateString) return '-'
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat('es-MX', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: viewMode.value === 'movements' ? '2-digit' : undefined,
-        minute: viewMode.value === 'movements' ? '2-digit' : undefined,
-    }).format(date)
+function goToPage(page: number): void {
+    fetchData(page);
 }
 
-const getExpiryColor = (dateString: string | null) => {
-    if (!dateString) return 'text-gray-900 dark:text-white'
-    const expiry = new Date(dateString)
-    const now = new Date()
-    const daysDiff = (expiry.getTime() - now.getTime()) / (1000 * 3600 * 24)
-
-    if (daysDiff < 0) return 'text-red-600 font-bold'
-    if (daysDiff < 30) return 'text-yellow-600 font-semibold'
-    return 'text-green-600'
+function viewMovement(id: number): void {
+    router.visit(`/inventory-movements/${id}`);
 }
 
-const getMovementTypeLabel = (type: string) => {
-    const labels = {
-        in: 'Entrada',
-        out: 'Salida',
+function viewProduct(id: number): void {
+    router.visit(`/products/${id}`);
+}
+
+function toggleHistory(row: InventoryRow): void {
+    const key = historyKey(row);
+    expandedHistoryKey.value = expandedHistoryKey.value === key ? null : key;
+}
+
+function historyKey(row: InventoryRow): string {
+    return `${row.product_id}:${row.variant_id}:${row.warehouse_id}`;
+}
+
+function variantForHistory(row: InventoryRow): any {
+    return {
+        id: row.variant_id,
+        sku: row.variant_sku,
+        brand: { name: row.brand },
+        base_price: row.base_price,
+        pricing: { base_price: Number(row.base_price ?? 0) },
+        inventory: [
+            {
+                warehouse: {
+                    id: row.warehouse_id,
+                    name: row.warehouse_name,
+                },
+            },
+        ],
+    };
+}
+
+function formatCurrency(value?: number | null): string {
+    if (value === null || value === undefined) {
+        return '-';
+    }
+
+    return new Intl.NumberFormat('es-PA', {
+        style: 'currency',
+        currency: 'USD',
+    }).format(Number(value));
+}
+
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    return new Intl.DateTimeFormat('es-PA', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+    }).format(new Date(value));
+}
+
+function statusLabel(status: InventoryRow['status']): string {
+    return (
+        {
+            out_of_stock: 'Sin stock',
+            low_stock: 'Stock bajo',
+            normal: 'Normal',
+            optimal: 'Optimo',
+        }[status] ?? 'Normal'
+    );
+}
+
+function statusClass(status: InventoryRow['status']): string {
+    return (
+        {
+            out_of_stock:
+                'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+            low_stock:
+                'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+            normal: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+            optimal:
+                'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+        }[status] ?? 'bg-gray-100 text-gray-700'
+    );
+}
+
+function movementTypeLabel(type: string): string {
+    return (
+        {
+            in: 'Entrada',
+            out: 'Salida',
+            transfer: 'Transferencia',
+        }[type] ?? type
+    );
+}
+
+function movementTypeClass(type: string): string {
+    return (
+        {
+            in: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+            out: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+            transfer:
+                'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+        }[type] ?? 'bg-gray-100 text-gray-700'
+    );
+}
+
+function sourceLabel(type?: string | null, id?: number | null): string {
+    const labels: Record<string, string> = {
+        purchase_order: 'OC',
+        manual_inbound: 'Entrada manual',
+        opening_balance: 'Saldo inicial',
+        manual_adjustment: 'Ajuste manual',
         transfer: 'Transferencia',
+        sale: 'Venta',
+        waste: 'Merma',
+    };
+
+    const label = type ? (labels[type] ?? type) : 'Movimiento';
+    return id ? `${label} #${id}` : label;
+}
+
+function pageItemLabel(): string {
+    if (viewMode.value === 'summary') {
+        return 'registros';
     }
-    return labels[type as keyof typeof labels] || type
-}
 
-const getMovementTypeColor = (type: string) => {
-    const colors = {
-        in: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-        out: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-        transfer: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    if (viewMode.value === 'lots') {
+        return 'lotes';
     }
-    return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800'
-}
 
-const viewMovement = (id: number) => {
-    router.visit(`/inventory-movements/${id}`)
-}
-
-const formatCurrency = (value: number | null) => {
-    if (value == null) return '—'
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+    return 'movimientos';
 }
 </script>
 
@@ -376,131 +518,163 @@ const formatCurrency = (value: number | null) => {
     <Head title="Inventario" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
-            <!-- Header -->
-            <div class="mb-8 flex items-center justify-between">
+        <div class="space-y-5 p-4">
+            <div
+                class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+            >
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Inventario</h1>
-                    <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                        Gestión completa de lotes y movimientos
+                    <h1
+                        class="text-2xl font-semibold text-gray-950 dark:text-white"
+                    >
+                        Inventario
+                    </h1>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Stock operativo, lotes y movimientos por variante.
                     </p>
                 </div>
-                <div class="flex gap-2" v-if="hasRole(['admin', 'manager', 'buyer', 'assistant'])">
+
+                <div v-if="canMutateInventory" class="flex flex-wrap gap-2">
                     <a
-                        href="/inventory-movements/inbound/create"
-                        class="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+                        href="/inventory/waste"
+                        class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-border dark:text-gray-100 dark:hover:bg-muted"
                     >
-                        <PackagePlus :size="18" />
-                        Nueva Entrada
+                        <AlertCircle :size="16" />
+                        Registrar merma
                     </a>
-                    <a
-                        href="/inventory-movements/outbound/create"
-                        v-if="hasRole(['admin', 'manager'])"
-                        class="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-                    >
-                        <PackageMinus :size="18" />
-                        Nueva Salida
-                    </a>
-                    <a
-                        href="/inventory-movements/transfer/create"
-                        v-if="hasRole(['admin', 'manager'])"
-                        class="flex items-center gap-2 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
-                    >
-                        <ArrowLeftRight :size="18" />
-                        Nueva Transferencia
-                    </a>
+                    <!--
+                        Futuro: habilitar transferencia desde inventario cuando el flujo quede aprobado.
+                        <a href="/inventory-movements/transfer/create">Nueva Transferencia</a>
+                    -->
                 </div>
             </div>
 
-            <!-- Metrics Cards -->
-            <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-                <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Lotes Activos</p>
-                            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ metrics.total_batches }}</p>
-                        </div>
-                        <Package class="h-8 w-8 text-blue-600 dark:text-primary" />
-                    </div>
-                </div>
-                <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Stock Total</p>
-                            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ metrics.total_stock }}</p>
-                        </div>
-                        <TrendingUp class="h-8 w-8 text-green-600" />
-                    </div>
-                </div>
-                <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Por Vencer (30d)</p>
-                            <p class="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{ metrics.expiring_soon }}</p>
-                        </div>
-                        <AlertCircle class="h-8 w-8 text-yellow-600" />
-                    </div>
-                </div>
-                <div class="rounded-lg bg-white p-4 shadow dark:bg-card">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Movimientos Hoy</p>
-                            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ metrics.movements_today }}</p>
-                        </div>
-                        <Calendar class="h-8 w-8 text-purple-600" />
-                    </div>
-                </div>
-            </div>
-
-            <!-- View Toggle -->
-            <div class="mb-6 flex items-center justify-center gap-2 rounded-lg bg-white p-2 shadow dark:bg-card">
-                <button
-                    @click="viewMode = 'batches'"
-                    :class="[
-                        'flex items-center gap-2 rounded-lg px-6 py-3 font-medium transition-all',
-                        viewMode === 'batches'
-                            ? 'bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white shadow-lg'
-                            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50'
-                    ]"
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                 >
-                    <Package :size="20" />
-                    Vista por Lote
-                </button>
-                <button
-                    @click="viewMode = 'movements'"
-                    :class="[
-                        'flex items-center gap-2 rounded-lg px-6 py-3 font-medium transition-all',
-                        viewMode === 'movements'
-                            ? 'bg-blue-600 dark:bg-primary dark:text-primary-foreground text-white shadow-lg'
-                            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50'
-                    ]"
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p
+                                class="text-xs font-semibold text-gray-500 uppercase"
+                            >
+                                Stock total
+                            </p>
+                            <p
+                                class="mt-1 text-2xl font-semibold text-gray-950 dark:text-white"
+                            >
+                                {{ metrics.total_stock }}
+                            </p>
+                        </div>
+                        <TrendingUp class="h-7 w-7 text-emerald-600" />
+                    </div>
+                </div>
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                 >
-                    <Calendar :size="20" />
-                    Vista Cronológica
-                </button>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p
+                                class="text-xs font-semibold text-gray-500 uppercase"
+                            >
+                                Valor inventario
+                            </p>
+                            <p
+                                class="mt-1 text-2xl font-semibold text-gray-950 dark:text-white"
+                            >
+                                {{ formatCurrency(metrics.total_fifo_value) }}
+                            </p>
+                        </div>
+                        <Package class="h-7 w-7 text-blue-600" />
+                    </div>
+                </div>
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p
+                                class="text-xs font-semibold text-gray-500 uppercase"
+                            >
+                                Stock bajo
+                            </p>
+                            <p
+                                class="mt-1 text-2xl font-semibold text-amber-600 dark:text-amber-300"
+                            >
+                                {{ metrics.low_stock_count }}
+                            </p>
+                        </div>
+                        <AlertCircle class="h-7 w-7 text-amber-600" />
+                    </div>
+                </div>
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p
+                                class="text-xs font-semibold text-gray-500 uppercase"
+                            >
+                                Movimientos hoy
+                            </p>
+                            <p
+                                class="mt-1 text-2xl font-semibold text-gray-950 dark:text-white"
+                            >
+                                {{ metrics.movements_today }}
+                            </p>
+                        </div>
+                        <Calendar class="h-7 w-7 text-indigo-600" />
+                    </div>
+                </div>
             </div>
 
-            <!-- Filters -->
-            <div class="mb-6 rounded-lg bg-white p-4 shadow dark:bg-card">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-6">
-                    <!-- Search -->
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+            <div
+                class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+            >
+                <div
+                    class="flex flex-wrap gap-1 border-b border-gray-200 px-3 pt-3 dark:border-border"
+                >
+                    <button
+                        v-for="tab in tabs"
+                        :key="tab.key"
+                        type="button"
+                        class="-mb-px border-b-2 px-4 py-2 text-sm font-medium"
+                        :class="
+                            viewMode === tab.key
+                                ? 'border-blue-600 text-blue-600 dark:border-primary dark:text-primary'
+                                : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
+                        "
+                        @click="viewMode = tab.key"
+                    >
+                        {{ tab.label }}
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 p-4 lg:grid-cols-12">
+                    <div class="lg:col-span-3">
+                        <label
+                            class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                        >
                             Buscar
                         </label>
-                        <input
-                            v-model="filters.search"
-                            type="text"
-                            :placeholder="viewMode === 'batches' ? 'Lote, Producto o SKU...' : 'Producto o SKU...'"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
-                            @keyup.enter="applyFilters"
-                        />
+                        <div class="relative">
+                            <Search
+                                class="absolute top-2.5 left-2.5 h-4 w-4 text-gray-400"
+                            />
+                            <input
+                                v-model="filters.search"
+                                type="text"
+                                placeholder="Producto, SKU, marca o lote"
+                                class="w-full rounded-md border border-gray-300 py-2 pr-3 pl-8 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                @keyup.enter="applyFilters"
+                            />
+                        </div>
                     </div>
 
-                    <!-- Warehouse Filter -->
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                            Almacén
+                    <div class="lg:col-span-2">
+                        <label
+                            class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                        >
+                            Almacen
                         </label>
                         <SearchableSelect
                             v-model="warehouseFilterModel"
@@ -509,35 +683,58 @@ const formatCurrency = (value: number | null) => {
                         />
                     </div>
 
-                    <!-- Date Filters (Movements only) -->
+                    <div v-if="viewMode === 'summary'" class="lg:col-span-2">
+                        <label
+                            class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                        >
+                            Estado
+                        </label>
+                        <select
+                            v-model="filters.stock_status"
+                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                        >
+                            <option :value="undefined">Todos</option>
+                            <option value="out_of_stock">Sin stock</option>
+                            <option value="low_stock">Stock bajo</option>
+                            <option value="normal">Normal</option>
+                            <option value="optimal">Optimo</option>
+                        </select>
+                    </div>
+
                     <template v-if="viewMode === 'movements'">
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <div class="lg:col-span-2">
+                            <label
+                                class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                            >
                                 Desde
                             </label>
                             <input
                                 v-model="filters.date_from"
                                 type="date"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                             />
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <div class="lg:col-span-2">
+                            <label
+                                class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                            >
                                 Hasta
                             </label>
                             <input
                                 v-model="filters.date_to"
                                 type="date"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                             />
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <div class="lg:col-span-2">
+                            <label
+                                class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                            >
                                 Tipo
                             </label>
                             <select
                                 v-model="filters.movement_type"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                             >
                                 <option :value="undefined">Todos</option>
                                 <option value="in">Entradas</option>
@@ -547,314 +744,527 @@ const formatCurrency = (value: number | null) => {
                         </div>
                     </template>
 
-                    <!-- Expiry Filter (Batches only) -->
-                    <div v-if="viewMode === 'batches'">
-                        <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                            Caducidad
-                        </label>
-                        <select
-                            v-model="filters.expiry_status"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option value="expiring_soon">Por Vencer (30 días)</option>
-                            <option value="expired">Vencidos</option>
-                        </select>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="flex items-end gap-2">
+                    <div class="flex items-end gap-2 lg:col-span-3">
                         <button
+                            type="button"
+                            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground"
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 dark:bg-primary dark:text-primary-foreground px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-primary/90"
                         >
                             Filtrar
                         </button>
                         <button
+                            type="button"
+                            class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-border dark:text-gray-100 dark:hover:bg-muted"
                             @click="clearFilters"
-                            class="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500"
                         >
                             Limpiar
                         </button>
                     </div>
                 </div>
 
-                <!-- Date Presets (Movements only) -->
-                <div v-if="viewMode === 'movements'" class="mt-4 flex flex-wrap gap-2">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Rápido:</span>
+                <div
+                    v-if="viewMode === 'movements'"
+                    class="flex flex-wrap gap-2 px-4 pb-4"
+                >
                     <button
+                        type="button"
+                        class="rounded-md bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-200"
                         @click="setDatePreset('today')"
-                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted"
                     >
                         Hoy
                     </button>
                     <button
+                        type="button"
+                        class="rounded-md bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-200"
                         @click="setDatePreset('week')"
-                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted"
                     >
-                        Esta semana
+                        7 dias
                     </button>
                     <button
+                        type="button"
+                        class="rounded-md bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-200"
                         @click="setDatePreset('month')"
-                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted"
                     >
-                        Este mes
+                        Mes
                     </button>
                     <button
+                        type="button"
+                        class="rounded-md bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-200"
                         @click="setDatePreset('30days')"
-                        class="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-muted dark:text-gray-300 dark:hover:bg-muted"
                     >
-                        Últimos 30 días
+                        30 dias
                     </button>
                 </div>
             </div>
 
-            <!-- Loading State -->
-            <div v-if="loading" class="text-center py-12">
-                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 dark:border-primary border-r-transparent"></div>
-                <p class="mt-2 text-gray-800 dark:text-gray-200">Cargando...</p>
+            <div
+                v-if="loading"
+                class="rounded-lg border border-gray-200 bg-white py-12 text-center dark:border-border dark:bg-card"
+            >
+                <div
+                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"
+                ></div>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                    Cargando inventario...
+                </p>
             </div>
 
-            <!-- Error State -->
-            <div v-else-if="error" class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200">
-                <p>{{ error }}</p>
+            <div
+                v-else-if="error"
+                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+            >
+                {{ error }}
             </div>
 
-            <!-- Batches View -->
-            <div v-else-if="viewMode === 'batches' && batches.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
-                    <thead class="bg-gray-50 dark:bg-muted">
-                        <tr>
-                            <th class="w-12 px-6 py-3"></th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Lote (Batch)
-                            </th>
-                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Vencimiento
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Productos
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Notas
-                            </th>
-                            <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Cantidad Total
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
-                        <template v-for="batch in batches" :key="batch.batch_number">
-                            <!-- Main Batch Row -->
-                            <tr 
-                                class="hover:bg-gray-50 dark:hover:bg-muted/50 cursor-pointer"
-                                @click="toggleBatch(batch.batch_number)"
+            <div
+                v-else-if="viewMode === 'summary'"
+                class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+            >
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead
+                            class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase dark:bg-muted dark:text-gray-300"
+                        >
+                            <tr>
+                                <th class="px-4 py-3">Producto</th>
+                                <th class="px-4 py-3">Variante</th>
+                                <th
+                                    v-if="showWarehouseColumn"
+                                    class="px-4 py-3"
+                                >
+                                    Almacen
+                                </th>
+                                <th class="px-4 py-3 text-right">Disponible</th>
+                                <th class="px-4 py-3 text-right">Reservado</th>
+                                <th class="px-4 py-3 text-right">
+                                    Costo actual
+                                </th>
+                                <th class="px-4 py-3 text-right">
+                                    Valor inventario
+                                </th>
+                                <th class="px-4 py-3">Ultimo ingreso</th>
+                                <th class="px-4 py-3">Ultima salida</th>
+                                <th class="px-4 py-3">Estado</th>
+                                <th class="px-4 py-3 text-right">Accion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template
+                                v-for="row in inventoryRows"
+                                :key="historyKey(row)"
                             >
-                                <td class="px-6 py-4">
-                                    <ChevronRight v-if="!expandedBatches.has(batch.batch_number)" class="h-4 w-4 text-gray-500" />
-                                    <ChevronDown v-else class="h-4 w-4 text-gray-500" />
+                                <tr
+                                    class="border-t border-gray-100 dark:border-border"
+                                >
+                                    <td class="px-4 py-3">
+                                        <button
+                                            type="button"
+                                            class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
+                                            @click="viewProduct(row.product_id)"
+                                        >
+                                            {{ row.product_name }}
+                                        </button>
+                                        <div
+                                            class="font-mono text-xs text-gray-500"
+                                        >
+                                            {{ row.product_sku }}
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button
+                                            type="button"
+                                            class="block text-left font-medium text-blue-600 hover:underline disabled:text-gray-900 disabled:no-underline dark:text-primary dark:disabled:text-white"
+                                            :disabled="!row.variant_id"
+                                            @click="toggleHistory(row)"
+                                        >
+                                            {{ row.brand }}
+                                        </button>
+                                        <div
+                                            class="font-mono text-xs text-gray-500"
+                                        >
+                                            {{ row.variant_sku || '-' }}
+                                        </div>
+                                    </td>
+                                    <td
+                                        v-if="showWarehouseColumn"
+                                        class="px-4 py-3 text-gray-700 dark:text-gray-200"
+                                    >
+                                        {{ row.warehouse_name }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right font-semibold text-gray-950 dark:text-white"
+                                    >
+                                        {{ row.quantity_available }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        {{ row.quantity_reserved }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right font-semibold"
+                                    >
+                                        {{
+                                            formatCurrency(
+                                                row.fifo_cost_current,
+                                            )
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right font-semibold"
+                                    >
+                                        {{
+                                            formatCurrency(row.fifo_stock_value)
+                                        }}
+                                    </td>
+                                    <td class="px-4 py-3 text-xs">
+                                        {{ formatDate(row.last_received_at) }}
+                                    </td>
+                                    <td class="px-4 py-3 text-xs">
+                                        {{ formatDate(row.last_sold_at) }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span
+                                            :class="statusClass(row.status)"
+                                            class="rounded-full px-2 py-1 text-xs font-medium"
+                                        >
+                                            {{ statusLabel(row.status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline dark:text-primary"
+                                            :disabled="!row.variant_id"
+                                            @click="toggleHistory(row)"
+                                        >
+                                            <History class="h-4 w-4" />
+                                            {{
+                                                expandedHistoryKey ===
+                                                historyKey(row)
+                                                    ? 'Ocultar'
+                                                    : 'Ver historial'
+                                            }}
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-if="
+                                        expandedHistoryKey === historyKey(row)
+                                    "
+                                    class="border-t border-gray-100 bg-gray-50 dark:border-border dark:bg-muted/30"
+                                >
+                                    <td
+                                        :colspan="summaryColspan"
+                                        class="px-4 py-4"
+                                    >
+                                        <VariantFifoHistoryPanel
+                                            :product-id="row.product_id"
+                                            :variant="variantForHistory(row)"
+                                            :warehouses="[
+                                                {
+                                                    id: row.warehouse_id,
+                                                    name: row.warehouse_name,
+                                                },
+                                            ]"
+                                            :initial-warehouse-id="
+                                                row.warehouse_id
+                                            "
+                                            @updated="refreshCurrentPage"
+                                        />
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr v-if="inventoryRows.length === 0">
+                                <td
+                                    :colspan="summaryColspan"
+                                    class="px-4 py-10 text-center text-sm text-gray-500"
+                                >
+                                    No se encontraron registros de inventario.
                                 </td>
-                                <td class="px-6 py-4 text-sm text-blue-600 dark:text-primary font-medium dark:text-blue-400">
-                                    {{ batch.batch_number }}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div
+                v-else-if="viewMode === 'lots'"
+                class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+            >
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead
+                            class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase dark:bg-muted dark:text-gray-300"
+                        >
+                            <tr>
+                                <th class="px-4 py-3">Fecha</th>
+                                <th class="px-4 py-3">Producto</th>
+                                <th class="px-4 py-3">Variante</th>
+                                <th
+                                    v-if="showWarehouseColumn"
+                                    class="px-4 py-3"
+                                >
+                                    Almacen
+                                </th>
+                                <th class="px-4 py-3">Origen</th>
+                                <th class="px-4 py-3 text-right">Inicial</th>
+                                <th class="px-4 py-3 text-right">Disponible</th>
+                                <th class="px-4 py-3 text-right">Costo</th>
+                                <th class="px-4 py-3 text-right">ITBM</th>
+                                <th class="px-4 py-3 text-right">Misc</th>
+                                <th class="px-4 py-3 text-right">Final</th>
+                                <th class="px-4 py-3 text-right">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="lot in fifoLots"
+                                :key="lot.id"
+                                class="border-t border-gray-100 dark:border-border"
+                            >
+                                <td class="px-4 py-3 text-xs">
+                                    {{ formatDate(lot.received_at) }}
                                 </td>
-                                <td class="px-6 py-4 text-sm">
-                                    <span :class="getExpiryColor(batch.expiry_date)">
-                                        {{ formatDate(batch.expiry_date) }}
+                                <td class="px-4 py-3">
+                                    <button
+                                        type="button"
+                                        class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
+                                        @click="viewProduct(lot.product_id)"
+                                    >
+                                        {{ lot.product_name }}
+                                    </button>
+                                    <div
+                                        class="font-mono text-xs text-gray-500"
+                                    >
+                                        {{ lot.product_sku }}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <button
+                                        type="button"
+                                        class="text-left text-blue-600 hover:underline dark:text-primary"
+                                        :disabled="!lot.variant_id"
+                                        @click="
+                                            viewMode = 'summary';
+                                            expandedHistoryKey = `${lot.product_id}:${lot.variant_id}:${lot.warehouse_id}`;
+                                        "
+                                    >
+                                        {{ lot.brand }}
+                                    </button>
+                                    <div
+                                        class="font-mono text-xs text-gray-500"
+                                    >
+                                        {{ lot.variant_sku || '-' }}
+                                    </div>
+                                </td>
+                                <td
+                                    v-if="showWarehouseColumn"
+                                    class="px-4 py-3"
+                                >
+                                    {{ lot.warehouse_name }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{
+                                        sourceLabel(
+                                            lot.source_type,
+                                            lot.source_id,
+                                        )
+                                    }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ lot.received_quantity }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-semibold">
+                                    {{ lot.quantity_available }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ formatCurrency(lot.unit_cost_base) }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ formatCurrency(lot.tax_per_unit) }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ formatCurrency(lot.misc_per_unit) }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-semibold">
+                                    {{ formatCurrency(lot.landed_unit_cost) }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-semibold">
+                                    {{ formatCurrency(lot.remaining_value) }}
+                                </td>
+                            </tr>
+                            <tr v-if="fifoLots.length === 0">
+                                <td
+                                    :colspan="lotsColspan"
+                                    class="px-4 py-10 text-center text-sm text-gray-500"
+                                >
+                                    No hay lotes abiertos.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div
+                v-else
+                class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+            >
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead
+                            class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase dark:bg-muted dark:text-gray-300"
+                        >
+                            <tr>
+                                <th class="px-4 py-3">Fecha</th>
+                                <th class="px-4 py-3">Tipo</th>
+                                <th class="px-4 py-3">Producto</th>
+                                <th
+                                    v-if="showWarehouseColumn"
+                                    class="px-4 py-3"
+                                >
+                                    Almacen origen
+                                </th>
+                                <th
+                                    v-if="showWarehouseColumn"
+                                    class="px-4 py-3"
+                                >
+                                    Almacen destino
+                                </th>
+                                <th class="px-4 py-3 text-right">Cantidad</th>
+                                <th class="px-4 py-3">Referencia</th>
+                                <th class="px-4 py-3 text-right">Accion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="movement in movements"
+                                :key="movement.id"
+                                class="border-t border-gray-100 dark:border-border"
+                            >
+                                <td class="px-4 py-3 text-xs">
+                                    {{ formatDate(movement.created_at) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        :class="
+                                            movementTypeClass(
+                                                movement.movement_type,
+                                            )
+                                        "
+                                        class="rounded-full px-2 py-1 text-xs font-medium"
+                                    >
+                                        {{
+                                            movementTypeLabel(
+                                                movement.movement_type,
+                                            )
+                                        }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                    {{ batch.product_count }} producto(s)
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-white" @click.stop>
-                                    <div class="relative flex items-center min-w-[150px]">
-                                        <input 
-                                            v-model="batch.notes" 
-                                            @blur="updateBatchNote(batch)"
-                                            @keyup.enter="($event.target as HTMLInputElement).blur()"
-                                            type="text" 
-                                            placeholder="Añadir nota..."
-                                            class="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 text-sm py-1 px-1 transition-colors dark:text-white"
-                                            :disabled="savingNotes.has(batch.batch_number)"
-                                        />
-                                        <div v-if="savingNotes.has(batch.batch_number)" class="absolute right-1 top-1/2 -translate-y-1/2">
-                                            <div class="h-3 w-3 animate-spin rounded-full border-2 border-solid border-blue-600 border-r-transparent"></div>
-                                        </div>
+                                <td class="px-4 py-3">
+                                    <button
+                                        v-if="movement.product?.id"
+                                        type="button"
+                                        class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
+                                        @click="
+                                            viewProduct(movement.product.id)
+                                        "
+                                    >
+                                        {{ movement.product?.name || '-' }}
+                                    </button>
+                                    <div
+                                        v-else
+                                        class="font-medium text-gray-950 dark:text-white"
+                                    >
+                                        -
+                                    </div>
+                                    <div
+                                        class="font-mono text-xs text-gray-500"
+                                    >
+                                        {{
+                                            movement.variant?.sku ||
+                                            movement.product?.sku ||
+                                            '-'
+                                        }}
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-900 dark:text-white">
-                                    {{ batch.total_quantity }}
-                                </td>
-                            </tr>
-                            
-                            <!-- Expanded Products Detail -->
-                            <tr v-if="expandedBatches.has(batch.batch_number)">
-                                <td colspan="6" class="px-6 py-4 bg-gray-50 dark:bg-background">
-                                    <div class="pl-8">
-                                        <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Productos en este lote:</h4>
-                                        <div class="space-y-2">
-                                            <div 
-                                                v-for="product in batch.products" 
-                                                :key="product.product_id"
-                                                class="flex items-center justify-between bg-white dark:bg-card rounded-lg p-3 border border-gray-200 dark:border-border"
-                                            >
-                                                <div class="flex-1">
-                                                    <p class="text-sm font-medium text-gray-900 dark:text-white">{{ product.product_name }}</p>
-                                                    <p class="text-xs text-gray-500">SKU: {{ product.product_sku }}</p>
-                                                    <div v-if="product.warehouses.length > 0" class="mt-1">
-                                                        <span class="text-xs text-gray-600 dark:text-gray-400">
-                                                            Almacenes: 
-                                                            <span v-for="(wh, idx) in product.warehouses" :key="wh.warehouse_id">
-                                                                {{ wh.warehouse_name }} ({{ wh.quantity }})<template v-if="idx < product.warehouses.length - 1">, </template>
-                                                            </span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div class="text-right space-y-1">
-                                                    <p class="text-sm font-bold text-gray-900 dark:text-white">{{ product.total_quantity }} unid.</p>
-                                                    <p :class="product.base_price ? 'text-sm font-medium text-green-700 dark:text-green-400' : 'text-xs text-gray-400'">
-                                                        {{ formatCurrency(product.base_price) }}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-
-                <!-- Pagination -->
-                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
-                    <div>
-                        <p class="text-sm text-gray-900 dark:text-white">
-                            Mostrando {{ (pagination.current_page - 1) * pagination.per_page + 1 }} a {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} de {{ pagination.total }} {{ viewMode === 'batches' ? 'lotes' : 'movimientos' }}
-                        </p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button
-                            @click="goToPage(pagination.current_page - 1)"
-                            :disabled="pagination.current_page === 1"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
-                        >
-                            Anterior
-                        </button>
-                        <button
-                            @click="goToPage(pagination.current_page + 1)"
-                            :disabled="pagination.current_page === pagination.last_page"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
-                        >
-                            Siguiente
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Movements View -->
-            <div v-else-if="viewMode === 'movements' && movements.length > 0" class="overflow-hidden rounded-lg bg-white shadow dark:bg-card">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-border">
-                    <thead class="bg-gray-50 dark:bg-muted">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Fecha
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Tipo
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Lote / Item
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Almacén Origen
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Almacén Destino
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Cantidad
-                            </th>
-                            <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900 dark:text-white">
-                                Acciones
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card">
-                        <tr v-for="movement in movements" :key="movement.id" class="hover:bg-gray-50 dark:hover:bg-muted/50">
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                {{ formatDate(movement.created_at) }}
-                            </td>
-                            <td class="whitespace-nowrap px-6 py-4">
-                                <span :class="getMovementTypeColor(movement.movement_type)" class="inline-flex rounded-full px-2 py-1 text-xs font-semibold">
-                                    {{ getMovementTypeLabel(movement.movement_type) }}
-                                </span>
-                            </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                <div v-if="movement.product_batch">
-                                    <span class="font-medium text-blue-600 dark:text-primary dark:text-blue-400">{{ movement.product_batch.batch_number }}</span>
-                                    <div v-if="movement.product_batch.expiry_date" class="text-xs text-gray-500">
-                                        Vence: {{ formatDate(movement.product_batch.expiry_date).split(',')[0] }}
-                                    </div>
-                                </div>
-                                <div v-else>
-                                    <span class="font-medium">{{ movement.product.name }}</span>
-                                    <div class="text-xs text-gray-500">SKU: {{ movement.product.sku }}</div>
-                                </div>
-                            </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                {{ movement.warehouse.name }}
-                            </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                {{ movement.destination_warehouse?.name || '-' }}
-                            </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
-                                {{ movement.quantity }}
-                            </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                <button
-                                    @click="viewMovement(movement.id)"
-                                    class="text-blue-600 dark:text-primary hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                <td
+                                    v-if="showWarehouseColumn"
+                                    class="px-4 py-3"
                                 >
-                                    Ver detalle
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <!-- Pagination -->
-                <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card">
-                    <div>
-                        <p class="text-sm text-gray-900 dark:text-white">
-                            Mostrando {{ (pagination.current_page - 1) * pagination.per_page + 1 }} a {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} de {{ pagination.total }} movimientos
-                        </p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button
-                            @click="goToPage(pagination.current_page - 1)"
-                            :disabled="pagination.current_page === 1"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
-                        >
-                            Anterior
-                        </button>
-                        <button
-                            @click="goToPage(pagination.current_page + 1)"
-                            :disabled="pagination.current_page === pagination.last_page"
-                            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white dark:hover:bg-muted"
-                        >
-                            Siguiente
-                        </button>
-                    </div>
+                                    {{ movement.warehouse?.name || '-' }}
+                                </td>
+                                <td
+                                    v-if="showWarehouseColumn"
+                                    class="px-4 py-3"
+                                >
+                                    {{
+                                        movement.destination_warehouse?.name ||
+                                        '-'
+                                    }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-semibold">
+                                    {{ movement.quantity }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{
+                                        sourceLabel(
+                                            movement.reference_type,
+                                            movement.reference_id,
+                                        )
+                                    }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        class="text-sm font-medium text-blue-600 hover:underline dark:text-primary"
+                                        @click="viewMovement(movement.id)"
+                                    >
+                                        Ver detalle
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="movements.length === 0">
+                                <td
+                                    :colspan="movementsColspan"
+                                    class="px-4 py-10 text-center text-sm text-gray-500"
+                                >
+                                    No hay movimientos registrados.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- Empty State -->
-            <div v-else class="rounded-lg bg-white p-12 text-center shadow dark:bg-card">
-                <p class="text-gray-700 dark:text-gray-300">
-                    {{ viewMode === 'batches' ? 'No se encontraron lotes activos.' : 'No hay movimientos registrados.' }}
+            <div
+                v-if="pagination.total > pagination.per_page"
+                class="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-border dark:bg-card"
+            >
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                    Pagina {{ pagination.current_page }} de
+                    {{ pagination.last_page }} · {{ pagination.total }}
+                    {{ pageItemLabel() }}
                 </p>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    {{ viewMode === 'batches' ? 'Ajusta los filtros o registra una nueva entrada de inventario.' : 'Registra tu primer movimiento usando los botones de arriba.' }}
-                </p>
+                <div class="flex gap-2">
+                    <button
+                        type="button"
+                        :disabled="pagination.current_page === 1"
+                        class="rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-border"
+                        @click="goToPage(pagination.current_page - 1)"
+                    >
+                        Anterior
+                    </button>
+                    <button
+                        type="button"
+                        :disabled="
+                            pagination.current_page === pagination.last_page
+                        "
+                        class="rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-border"
+                        @click="goToPage(pagination.current_page + 1)"
+                    >
+                        Siguiente
+                    </button>
+                </div>
             </div>
         </div>
     </AppLayout>

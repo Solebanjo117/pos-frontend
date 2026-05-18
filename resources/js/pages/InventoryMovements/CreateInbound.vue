@@ -11,6 +11,7 @@ import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import { useProducts } from '@/composables/useProducts';
 import { useWarehouses } from '@/composables/useWarehouses';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useSuppliers } from '@/composables/useSuppliers';
 import SearchableSelect, {
     type SelectOption,
@@ -47,6 +48,11 @@ const {
     currentWarehouseId,
     initWarehouse,
 } = usePosSettings();
+const {
+    fetchSettings: fetchStoreSettings,
+    defaultTaxRate,
+    resolveTaxRate,
+} = useStoreSettings();
 const { suppliers, fetchActiveSuppliers } = useSuppliers();
 
 // Header State
@@ -66,13 +72,11 @@ const headerForm = ref({
 const batchDefaults = ref({
     batch_number: '',
     cost: null as number | null,
-    tax_rate: 7, // Default 7% ITBMS
+    tax_rate: defaultTaxRate(),
 });
 
 const normalizeTaxRate = (value: unknown): number => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return 0;
-    return Math.max(0, Math.min(100, Math.round(parsed)));
+    return resolveTaxRate(value);
 };
 
 // Items List
@@ -129,7 +133,9 @@ onMounted(async () => {
         fetchWarehouses(),
         fetchActiveSuppliers(),
         fetchProductFilterOptions(),
+        fetchStoreSettings(),
     ]);
+    batchDefaults.value.tax_rate = defaultTaxRate();
 
     // Initialize Warehouse from backend (Priority: Backend Context > Default Setting > First Available)
     await initWarehouse();
@@ -191,7 +197,7 @@ const handleProductSelect = (
     if (product) {
         let baseCost = null;
         let taxRate = normalizeTaxRate(
-            product.pricing?.cost_tax_rate ?? product.pricing?.tax_rate ?? 7,
+            product.pricing?.cost_tax_rate ?? product.pricing?.tax_rate ?? null,
         );
 
         if (variantId) {

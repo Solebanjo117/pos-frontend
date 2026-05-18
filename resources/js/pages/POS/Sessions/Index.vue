@@ -9,6 +9,7 @@ import {
     Clock,
     CreditCard,
     Eye,
+    Lock,
     Minus,
     Receipt,
     RefreshCw,
@@ -23,14 +24,18 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import {
     PosSessionsApiService,
+    type AccountPaymentRecord,
     type CashMovementRecord,
     type PosSessionRecord,
+    type PurchasePaymentRecord,
     type SessionSalesOrder,
 } from '@/services/posSessions';
 import { useWarehouses } from '@/composables/useWarehouses';
 import { useUsers } from '@/composables/useUsers';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { usePosSession } from '@/composables/usePosSession';
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
+import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -43,6 +48,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 const { warehouses, fetchWarehouses } = useWarehouses();
 const { users, fetchUsers } = useUsers();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
+const {
+    session: currentSession,
+    summary: currentSummary,
+    error: closeSessionError,
+    checkCurrentSession,
+    closeSession,
+} = usePosSession();
 
 const sessions = ref<PosSessionRecord[]>([]);
 const loading = ref(false);
@@ -63,8 +75,12 @@ const filterDateTo = ref<string>('');
 const selectedSession = ref<PosSessionRecord | null>(null);
 const selectedSalesOrders = ref<SessionSalesOrder[]>([]);
 const selectedCashMovements = ref<CashMovementRecord[]>([]);
+const selectedPurchasePayments = ref<PurchasePaymentRecord[]>([]);
+const selectedAccountPayments = ref<AccountPaymentRecord[]>([]);
 const showDetailModal = ref(false);
 const loadingDetail = ref(false);
+const showCloseSessionModal = ref(false);
+const closeSessionLoading = ref(false);
 
 const warehouseOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Todas' },
@@ -246,6 +262,8 @@ const pageStats = computed(() => {
     };
 });
 
+const hasOpenSession = computed(() => currentSession.value?.status === 'open');
+
 const fetchSessions = async (page: number = 1) => {
     loading.value = true;
     error.value = null;
@@ -285,6 +303,8 @@ const openDetail = async (session: PosSessionRecord) => {
     selectedSession.value = null;
     selectedSalesOrders.value = [];
     selectedCashMovements.value = [];
+    selectedPurchasePayments.value = [];
+    selectedAccountPayments.value = [];
 
     try {
         const response = await PosSessionsApiService.show(session.id);
@@ -292,6 +312,10 @@ const openDetail = async (session: PosSessionRecord) => {
         selectedSalesOrders.value = response.sales_orders;
         selectedCashMovements.value =
             response.cash_movements || response.data.cash_movements || [];
+        selectedPurchasePayments.value =
+            response.purchase_payments || response.data.purchase_payments || [];
+        selectedAccountPayments.value =
+            response.account_payments || response.data.account_payments || [];
     } catch (err: any) {
         error.value =
             err.response?.data?.message ||
@@ -308,6 +332,29 @@ const closeDetail = () => {
     selectedSession.value = null;
     selectedSalesOrders.value = [];
     selectedCashMovements.value = [];
+    selectedPurchasePayments.value = [];
+    selectedAccountPayments.value = [];
+};
+
+const handleCloseSession = async (
+    amount: number,
+    notes?: string,
+    closingDetails?: Record<string, any>,
+) => {
+    closeSessionLoading.value = true;
+    const success = await closeSession(
+        amount,
+        notes,
+        closingDetails,
+        currentWarehouseId.value ?? undefined,
+    );
+    closeSessionLoading.value = false;
+
+    if (success) {
+        showCloseSessionModal.value = false;
+        await checkCurrentSession(currentWarehouseId.value ?? undefined);
+        await fetchSessions(1);
+    }
 };
 
 const applyFilters = () => fetchSessions(1);
@@ -343,6 +390,7 @@ const filterByStatus = (status: string) => {
 onMounted(async () => {
     await Promise.all([initWarehouse(), fetchWarehouses(), fetchUsers()]);
     filterWarehouseId.value = currentWarehouseId.value || undefined;
+    await checkCurrentSession(currentWarehouseId.value ?? undefined);
     await fetchSessions();
 });
 </script>
@@ -377,18 +425,30 @@ onMounted(async () => {
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    :disabled="loading"
-                    class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-card dark:text-slate-200 dark:hover:bg-muted"
-                    @click="fetchSessions(pagination.current_page)"
-                >
-                    <RefreshCw
-                        :size="16"
-                        :class="{ 'animate-spin': loading }"
-                    />
-                    Refrescar
-                </button>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        :disabled="!hasOpenSession || closeSessionLoading"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                        @click="showCloseSessionModal = true"
+                    >
+                        <Lock :size="16" />
+                        Cerrar caja
+                    </button>
+
+                    <button
+                        type="button"
+                        :disabled="loading"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-card dark:text-slate-200 dark:hover:bg-muted"
+                        @click="fetchSessions(pagination.current_page)"
+                    >
+                        <RefreshCw
+                            :size="16"
+                            :class="{ 'animate-spin': loading }"
+                        />
+                        Refrescar
+                    </button>
+                </div>
             </header>
 
             <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -665,7 +725,7 @@ onMounted(async () => {
                                 <td class="px-4 py-3">
                                     <button
                                         type="button"
-                                        class="font-semibold text-slate-950 underline-offset-2 transition hover:text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white dark:hover:text-indigo-300"
+                                        class="font-semibold text-slate-950 underline-offset-2 transition hover:text-indigo-600 hover:underline focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:text-white dark:hover:text-indigo-300"
                                         title="Filtrar por cajero"
                                         @click="filterByUser(session)"
                                     >
@@ -676,7 +736,7 @@ onMounted(async () => {
                                     >
                                         <button
                                             type="button"
-                                            class="inline-flex items-center gap-1 underline-offset-2 transition hover:text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:hover:text-indigo-300"
+                                            class="inline-flex items-center gap-1 underline-offset-2 transition hover:text-indigo-600 hover:underline focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:hover:text-indigo-300"
                                             title="Filtrar por almacén"
                                             @click="filterByWarehouse(session)"
                                         >
@@ -858,8 +918,20 @@ onMounted(async () => {
             :session="selectedSession"
             :sales-orders="selectedSalesOrders"
             :cash-movements="selectedCashMovements"
+            :purchase-payments="selectedPurchasePayments"
+            :account-payments="selectedAccountPayments"
             :loading="loadingDetail"
             @close="closeDetail"
+        />
+
+        <CloseSessionModal
+            :show="showCloseSessionModal"
+            :session="currentSession"
+            :summary="currentSummary"
+            :loading="closeSessionLoading"
+            :error="closeSessionError"
+            @submit="handleCloseSession"
+            @close="showCloseSessionModal = false"
         />
     </AppLayout>
 </template>

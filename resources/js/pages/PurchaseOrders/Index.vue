@@ -120,6 +120,40 @@ const supplierFilterModel = computed<number | null>({
     },
 });
 
+function initializeFiltersFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+
+    filters.value.search = params.get('search') || '';
+    filters.value.status =
+        (params.get('status') as PurchaseOrderStatus | null) || undefined;
+    filters.value.supplier_id = params.has('supplier_id')
+        ? Number(params.get('supplier_id'))
+        : undefined;
+    filters.value.payment_status = params.get('payment_status') || undefined;
+    filters.value.date_from = params.get('date_from') || '';
+    filters.value.date_to = params.get('date_to') || '';
+    filters.value.per_page = params.has('per_page')
+        ? Number(params.get('per_page'))
+        : 15;
+}
+
+function syncFiltersToUrl() {
+    const params = new URLSearchParams();
+
+    Object.entries(filters.value).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            params.set(key, String(value));
+        }
+    });
+
+    const query = params.toString();
+    const nextUrl = query
+        ? `${window.location.pathname}?${query}`
+        : window.location.pathname;
+
+    window.history.replaceState({}, '', nextUrl);
+}
+
 function getStatusColor(status: string) {
     return statusOptions.find((s) => s.value === status)?.color || '';
 }
@@ -156,6 +190,7 @@ async function loadOrders() {
     Object.keys(cleanFilters).forEach((k) => {
         if (!cleanFilters[k]) delete cleanFilters[k];
     });
+    syncFiltersToUrl();
     await fetchPurchaseOrders(cleanFilters);
 }
 
@@ -187,6 +222,7 @@ async function handleDelete(id: number) {
 }
 
 onMounted(async () => {
+    initializeFiltersFromQuery();
     suppliers.value = await fetchActiveSuppliers();
     await fetchStatistics();
     await loadOrders();

@@ -33,6 +33,7 @@ import {
     Filter,
 } from 'lucide-vue-next';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 // POSFilterSidebar removed — filtering now handled inside ProductSearchModal via ProductFilters
 import { usePosSession } from '@/composables/usePosSession';
 
@@ -44,7 +45,6 @@ import SummarySection from '@/components/POS/SummarySection.vue';
 import ActionButtons from '@/components/POS/ActionButtons.vue';
 
 import OpenSessionModal from '@/components/POS/OpenSessionModal.vue';
-import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
 import CashMovementModal from '@/components/POS/CashMovementModal.vue';
 import VariantSelectModal from '@/components/POS/VariantSelectModal.vue';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
@@ -78,6 +78,20 @@ const props = withDefaults(
         orderId: undefined,
     },
 );
+
+const page = usePage();
+const currentRole = computed(() => (page.props.auth?.user as any)?.role);
+const isStrictCashier = computed(() => currentRole.value === 'cashier');
+const canEditSeller = computed(() => !isStrictCashier.value);
+const canUseProductSearch = computed(() => !isStrictCashier.value);
+const canClearCurrentCart = computed(
+    () =>
+        !isStrictCashier.value &&
+        !activeSession.value?.source_quote_id &&
+        !props.editMode,
+);
+
+const { defaultTaxRate } = useStoreSettings();
 
 const {
     cart,
@@ -142,14 +156,11 @@ const { customers, fetchCustomers } = useCustomers();
 const { warehouses, fetchWarehouses } = useWarehouses();
 
 const {
-    session,
-    summary: sessionSummary,
     isChecking: isCheckingSession,
     isOpen: isSessionOpen,
     error: sessionError,
     checkCurrentSession,
     openSession,
-    closeSession,
     addCashMovement,
 } = usePosSession();
 
@@ -164,7 +175,6 @@ const showPaymentModal = ref(false);
 const showShortcutsHelp = ref(false);
 const showProductsModal = ref(false);
 const isSearching = ref(false);
-const showCloseSessionModal = ref(false);
 const showCashMovementModal = ref(false);
 const showQuickCustomerModal = ref(false);
 const showCustomLineModal = ref(false);
@@ -242,8 +252,16 @@ const cartSortOptions: {
     { key: 'price', label: 'Precio' },
 ];
 const seller_id = ref<number | undefined>(
-    (usePage().props.auth?.user as any)?.id,
+    (page.props.auth?.user as any)?.id,
 );
+
+const handleClearCurrentCart = () => {
+    if (!canClearCurrentCart.value) {
+        return;
+    }
+
+    clearCart();
+};
 
 // Variant selection modal state — queue-based to support multiple products needing variant selection
 const showVariantModal = ref(false);
@@ -1364,7 +1382,9 @@ const handleKeyboard = (e: KeyboardEvent) => {
     switch (e.key) {
         case 'F1':
             e.preventDefault();
-            inlineSearchRef.value?.focusSearch();
+            if (canUseProductSearch.value) {
+                inlineSearchRef.value?.focusSearch();
+            }
             break;
         case 'F2':
             e.preventDefault();
@@ -1372,7 +1392,7 @@ const handleKeyboard = (e: KeyboardEvent) => {
             break;
         case 'F4':
             e.preventDefault();
-            clearCart();
+            handleClearCurrentCart();
             break;
         case 'F10':
             e.preventDefault();
@@ -1688,21 +1708,6 @@ const handleOpenSession = async (amount: number) => {
         forceShowOpenSessionModal.value = false;
         error.value = null;
         searchInput.value?.focus();
-    }
-};
-
-const handleCloseSession = async (
-    amount: number,
-    notes?: string,
-    closingDetails?: Record<string, any>,
-) => {
-    sessionActionLoading.value = true;
-    const success = await closeSession(amount, notes, closingDetails);
-    sessionActionLoading.value = false;
-    if (success) {
-        showCloseSessionModal.value = false;
-        error.value = null;
-        // Will trigger the OpenSessionModal on the next reactive loop since isOpen becomes false
     }
 };
 
@@ -2119,7 +2124,6 @@ onUnmounted(() => {
             <CashRegisterStatus
                 :hasOpenSession="isSessionOpen"
                 @request-open="forceShowOpenSessionModal = true"
-                @request-close="showCloseSessionModal = true"
                 @request-cash-movement="showCashMovementModal = true"
             />
             <!-- We use the existing modal OpenSessionModal to actually process the opening -->
@@ -2146,7 +2150,10 @@ onUnmounted(() => {
                 class="flex h-full min-w-0 flex-[3] flex-col gap-4 overflow-hidden"
             >
                 <!-- Hide search controls in return mode -->
-                <div v-if="!props.returnMode" class="shrink-0">
+                <div
+                    v-if="!props.returnMode && canUseProductSearch"
+                    class="shrink-0"
+                >
                     <POSInlineSearch
                         ref="inlineSearchRef"
                         :categories="categories"
@@ -2308,6 +2315,7 @@ onUnmounted(() => {
                         :client-mode="isClientMode()"
                         :warehouse-id="currentWarehouseId"
                         :return-mode="returnMode"
+                        :can-edit-seller="canEditSeller"
                         @update-quantity="
                             (idx, qty) => handleUpdateQuantity(idx, qty)
                         "
@@ -2351,6 +2359,7 @@ onUnmounted(() => {
                         :sellerId="seller_id"
                         :customers="customers"
                         :users="users"
+                        :can-edit-seller="canEditSeller"
                         @update:customerId="(v) => (customer_id = v)"
                         @update:sellerId="(v) => (seller_id = v)"
                         @open-quick-customer="showQuickCustomerModal = true"
@@ -2557,7 +2566,8 @@ onUnmounted(() => {
                         :canPay="canCheckout"
                         :isQuoteSession="isQuoteSession"
                         :quoteMode="props.quoteMode"
-                        @clear="clearCart"
+                        :can-clear="canClearCurrentCart"
+                        @clear="handleClearCurrentCart"
                         @save-quote="handleSaveQuote"
                         @save-quote-changes="handleSaveQuoteChanges"
                         @open-cash-register="forceShowOpenSessionModal = true"
@@ -2569,7 +2579,7 @@ onUnmounted(() => {
 
         <!-- ========== PRODUCT SELECTION MODAL (multiple results) ========== -->
         <ProductSearchModal
-            :show="showProductsModal"
+            :show="showProductsModal && canUseProductSearch"
             :products="products"
             :search-query="searchQuery"
             :client-mode="isClientMode()"
@@ -2696,17 +2706,6 @@ onUnmounted(() => {
             @success="handleAutoQuickPurchaseSuccess"
         />
 
-        <!-- CloseSession + shortcuts remain at bottom as overlays -->
-        <CloseSessionModal
-            :show="showCloseSessionModal"
-            :session="session"
-            :summary="sessionSummary"
-            :loading="sessionActionLoading"
-            :error="sessionError"
-            @submit="handleCloseSession"
-            @close="showCloseSessionModal = false"
-        />
-
         <!-- ========== Credit / Partial Payment Modal ========== -->
         <AddPaymentModal
             :show="showAddPaymentModal"
@@ -2755,6 +2754,7 @@ onUnmounted(() => {
         <!-- ========== Custom Line Modal ========== -->
         <AddCustomLineModal
             :show="showCustomLineModal"
+            :default-tax-rate="defaultTaxRate()"
             @close="showCustomLineModal = false"
             @submit="handleAddCustomLine"
         />

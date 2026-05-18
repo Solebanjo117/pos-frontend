@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/AppLayout.vue'
-import PosIndex from '@/pages/POS/Index.vue'
+import AppLayout from '@/layouts/AppLayout.vue';
+import PosIndex from '@/pages/POS/Index.vue';
 
 const props = defineProps<{
-  orderId: number
-}>()
+    orderId: number;
+}>();
 
-defineOptions({ layout: AppLayout })
+defineOptions({ layout: AppLayout });
 </script>
 
 <template>
-  <PosIndex :return-mode="true" :order-id="props.orderId" />
+    <PosIndex :return-mode="true" :order-id="props.orderId" />
 </template>

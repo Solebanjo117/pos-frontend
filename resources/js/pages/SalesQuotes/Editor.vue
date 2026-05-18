@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/AppLayout.vue'
-import PosIndex from '@/pages/POS/Index.vue'
+import AppLayout from '@/layouts/AppLayout.vue';
+import PosIndex from '@/pages/POS/Index.vue';
 
-defineOptions({ layout: AppLayout })
+defineOptions({ layout: AppLayout });
 
 const props = defineProps<{
-  quoteId?: number
-}>()
+    quoteId?: number;
+}>();
 </script>
 
 <template>
-  <PosIndex :quote-mode="true" :quote-id="props.quoteId" />
+    <PosIndex :quote-mode="true" :quote-id="props.quoteId" />
 </template>

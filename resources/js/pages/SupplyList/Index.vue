@@ -10,6 +10,7 @@ import { supplyListService, type SupplyListItem } from '@/services/supply-list';
 import { useProducts } from '@/composables/useProducts';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useToast } from '@/composables/useToast';
 import {
     Trash2,
@@ -36,6 +37,8 @@ defineOptions({ layout: AppLayout });
 const toast = useToast();
 const { fetchActiveSuppliers } = useSuppliers();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
+const { fetchSettings: fetchStoreSettings, resolveTaxRate } =
+    useStoreSettings();
 const {
     products: productList,
     fetchProducts,
@@ -192,9 +195,7 @@ const supplierOptions = computed(() => {
 });
 
 function normalizeTaxRate(value: unknown): number {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return 0;
-    return Math.max(0, Math.min(100, Math.round(parsed)));
+    return resolveTaxRate(value);
 }
 
 async function loadItems() {
@@ -361,7 +362,7 @@ async function loadLowStockStats() {
 }
 
 onMounted(async () => {
-    await initWarehouse();
+    await Promise.all([initWarehouse(), fetchStoreSettings()]);
     suppliers.value = await fetchActiveSuppliers();
     // No longer loading all products upfront - search is now on-demand
 
@@ -656,9 +657,7 @@ onMounted(async () => {
                     class="flex items-center gap-2 text-sm text-indigo-600 hover:underline dark:text-primary"
                 >
                     <ArrowRight :size="14" />
-                    {{ po.po_number }} — {{ po.supplier }} ({{
-                        po.items_count
-                    }}
+                    {{ po.po_number }} — {{ po.supplier }} ({{ po.items_count }}
                     ítems)
                 </Link>
             </div>

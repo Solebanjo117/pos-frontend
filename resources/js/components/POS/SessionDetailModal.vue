@@ -17,8 +17,10 @@ import {
     X,
 } from 'lucide-vue-next';
 import type {
+    AccountPaymentRecord,
     CashMovementRecord,
     PosSessionRecord,
+    PurchasePaymentRecord,
     SessionSalesOrder,
 } from '@/services/posSessions';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
@@ -62,6 +64,8 @@ const props = defineProps<{
     session: PosSessionRecord | null;
     salesOrders: SessionSalesOrder[];
     cashMovements: CashMovementRecord[];
+    purchasePayments: PurchasePaymentRecord[];
+    accountPayments: AccountPaymentRecord[];
     loading: boolean;
 }>();
 
@@ -187,6 +191,11 @@ const countableRows = computed(() =>
 const informationalRows = computed(() =>
     reconciliationRows.value.filter((row) => row.is_informational),
 );
+const receivablePayments = computed(() =>
+    props.accountPayments.filter(
+        (payment) => payment.account_type === 'customer',
+    ),
+);
 const cashRow = computed(
     () => reconciliationRows.value.find((row) => row.code === 'cash') ?? null,
 );
@@ -305,6 +314,23 @@ const movementClass = (movement: CashMovementRecord): string =>
         : 'text-red-700 dark:text-red-300';
 
 const paymentMethodLabel = (method: string): string => getMethodName(method);
+
+const purchasePaymentTitle = (payment: PurchasePaymentRecord): string => {
+    const poNumber =
+        payment.purchase_order?.po_number ?? payment.purchase_order_id;
+
+    return `Pago OC ${poNumber}`;
+};
+
+const accountPaymentTitle = (payment: AccountPaymentRecord): string =>
+    payment.account_type === 'customer'
+        ? `Cobro ${payment.batch_number}`
+        : `Pago ${payment.batch_number}`;
+
+const accountPaymentClass = (payment: AccountPaymentRecord): string =>
+    payment.direction === 'incoming'
+        ? 'text-emerald-700 dark:text-emerald-300'
+        : 'text-red-700 dark:text-red-300';
 
 const statusLabel = (status: string): string => {
     const map: Record<string, string> = {
@@ -733,6 +759,86 @@ const handlePrint = () => {
                                 class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
                             >
                                 <h3
+                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    Cobros de clientes
+                                </h3>
+                            </div>
+                            <div
+                                v-if="receivablePayments.length > 0"
+                                class="divide-y divide-slate-100 dark:divide-border/60"
+                            >
+                                <div
+                                    v-for="payment in receivablePayments"
+                                    :key="payment.id"
+                                    class="px-4 py-3"
+                                >
+                                    <div
+                                        class="flex items-start justify-between gap-3"
+                                    >
+                                        <div>
+                                            <p
+                                                class="text-sm font-semibold text-slate-950 dark:text-white"
+                                            >
+                                                {{
+                                                    accountPaymentTitle(payment)
+                                                }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{
+                                                    paymentMethodLabel(
+                                                        payment.method,
+                                                    )
+                                                }}
+                                                -
+                                                {{
+                                                    formatTime(payment.paid_at)
+                                                }}
+                                            </p>
+                                            <p
+                                                v-if="payment.reference_number"
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                Número de recibo:
+                                                {{ payment.reference_number }}
+                                            </p>
+                                            <p
+                                                v-if="payment.notes"
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{ payment.notes }}
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="shrink-0 text-sm font-bold tabular-nums"
+                                            :class="
+                                                accountPaymentClass(payment)
+                                            "
+                                        >
+                                            +{{
+                                                formatCurrency(payment.amount)
+                                            }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                v-else
+                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                            >
+                                No hubo cobros de clientes asociados al cierre.
+                            </div>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            >
+                                <h3
                                     class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
                                 >
                                     <Receipt :size="14" class="print:hidden" />
@@ -748,7 +854,7 @@ const handlePrint = () => {
                                             <th
                                                 class="px-4 py-2 text-left font-bold"
                                             >
-                                                Folio
+                                                Nro. venta
                                             </th>
                                             <th
                                                 class="px-4 py-2 text-left font-bold"
@@ -784,17 +890,17 @@ const handlePrint = () => {
                                             v-for="order in salesOrders"
                                             :key="order.id"
                                         >
-                              <td
-                                  class="px-4 py-2 font-mono text-xs font-semibold text-slate-950 dark:text-white"
-                              >
-                                  <Link
-                                      :href="`/sales-orders/${order.id}`"
-                                      class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-950 print:no-underline"
-                                      title="Ver venta"
-                                  >
-                                      {{ order.order_number }}
-                                  </Link>
-                              </td>
+                                            <td
+                                                class="px-4 py-2 font-mono text-xs font-semibold text-slate-950 dark:text-white"
+                                            >
+                                                <Link
+                                                    :href="`/sales-orders/${order.id}`"
+                                                    class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-950 print:no-underline"
+                                                    title="Ver venta"
+                                                >
+                                                    {{ order.order_number }}
+                                                </Link>
+                                            </td>
                                             <td
                                                 class="px-4 py-2 text-xs text-slate-600 dark:text-slate-300"
                                             >
@@ -805,19 +911,21 @@ const handlePrint = () => {
                                             <td
                                                 class="px-4 py-2 text-slate-600 dark:text-slate-300"
                                             >
-                                  <Link
-                                      v-if="order.customer_id"
-                                      :href="`/customers/${order.customer_id}`"
-                                      class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-600 print:no-underline"
-                                      title="Ver cliente"
-                                  >
-                                      {{
-                                          order.customer?.name ||
-                                          'Cliente registrado'
-                                      }}
-                                  </Link>
-                                  <span v-else>Público General</span>
-                              </td>
+                                                <Link
+                                                    v-if="order.customer_id"
+                                                    :href="`/customers/${order.customer_id}`"
+                                                    class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-600 print:no-underline"
+                                                    title="Ver cliente"
+                                                >
+                                                    {{
+                                                        order.customer?.name ||
+                                                        'Cliente registrado'
+                                                    }}
+                                                </Link>
+                                                <span v-else
+                                                    >Público General</span
+                                                >
+                                            </td>
                                             <td class="px-4 py-2">
                                                 <span
                                                     class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:bg-muted dark:text-slate-300"
@@ -1082,6 +1190,97 @@ const handlePrint = () => {
                                 class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
                             >
                                 No hubo ingresos extra ni retiros.
+                            </div>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            >
+                                <h3
+                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    Pagos de compras
+                                </h3>
+                            </div>
+                            <div
+                                v-if="purchasePayments.length > 0"
+                                class="divide-y divide-slate-100 dark:divide-border/60"
+                            >
+                                <div
+                                    v-for="payment in purchasePayments"
+                                    :key="payment.id"
+                                    class="px-4 py-3"
+                                >
+                                    <div
+                                        class="flex items-start justify-between gap-3"
+                                    >
+                                        <div>
+                                            <p
+                                                class="text-sm font-semibold text-slate-950 dark:text-white"
+                                            >
+                                                {{
+                                                    purchasePaymentTitle(
+                                                        payment,
+                                                    )
+                                                }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{
+                                                    paymentMethodLabel(
+                                                        payment.method,
+                                                    )
+                                                }}
+                                                -
+                                                {{
+                                                    formatTime(payment.paid_at)
+                                                }}
+                                            </p>
+                                            <p
+                                                v-if="
+                                                    payment.purchase_order
+                                                        ?.supplier?.name
+                                                "
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{
+                                                    payment.purchase_order
+                                                        .supplier.name
+                                                }}
+                                            </p>
+                                            <p
+                                                v-if="payment.reference_number"
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                Número de recibo:
+                                                {{ payment.reference_number }}
+                                            </p>
+                                            <p
+                                                v-if="payment.notes"
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{ payment.notes }}
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="shrink-0 text-sm font-bold text-red-700 tabular-nums dark:text-red-300"
+                                        >
+                                            -{{
+                                                formatCurrency(payment.amount)
+                                            }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                v-else
+                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                            >
+                                No hubo pagos de compras asociados al cierre.
                             </div>
                         </div>
 

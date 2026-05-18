@@ -61,7 +61,6 @@ export interface PurchaseOrder {
     payment_status: PurchaseOrderPaymentStatus;
     payment_status_label: string;
     order_date: string;
-    expected_date?: string;
     received_date?: string;
     subtotal: number;
     tax_amount: number;
@@ -108,7 +107,6 @@ export interface CreatePurchaseOrderData {
     supplier_invoice_number?: string;
     warehouse_id: number;
     order_date?: string;
-    expected_date?: string;
     tax_amount?: number;
     shipping_cost?: number;
     notes?: string;

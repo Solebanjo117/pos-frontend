@@ -26,6 +26,7 @@ import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -57,6 +58,12 @@ const {
     currentWarehouseId,
     getDefaultWarehouseId,
 } = usePosSettings();
+const {
+    fetchSettings: fetchStoreSettings,
+    defaultTaxRate,
+    resolveTaxRate,
+    calculateTaxAmount,
+} = useStoreSettings();
 
 const isEditing = computed(() => !!props.purchaseOrderId);
 
@@ -114,7 +121,6 @@ const form = ref<CreatePurchaseOrderData>({
     warehouse_id: 0,
     supplier_invoice_number: '',
     order_date: new Date().toISOString().split('T')[0],
-    expected_date: '',
     tax_amount: 0,
     shipping_cost: 0,
     notes: '',
@@ -134,13 +140,7 @@ const subtotal = computed(() =>
 );
 
 const normalizeTaxRate = (value: unknown): number => {
-    const parsed = Number(value);
-
-    if (!Number.isFinite(parsed)) {
-        return 7;
-    }
-
-    return Math.max(0, Math.min(100, Math.round(parsed)));
+    return resolveTaxRate(value);
 };
 
 const normalizeQuantity = (value: unknown): number => {
@@ -155,13 +155,14 @@ const itemSubtotal = (item: any): number =>
 
 function syncAutoTax(item: any) {
     if (!item._taxManual) {
-        item.tax_amount = Math.round(itemSubtotal(item) * 0.07 * 100) / 100;
+        item.tax_rate = normalizeTaxRate(item.tax_rate ?? null);
+        item.tax_amount = calculateTaxAmount(itemSubtotal(item), item.tax_rate);
     }
 }
 
 const itemTaxAmount = (item: any): number => {
     if (item._taxManual) return Number(item.tax_amount || 0);
-    return Math.round(itemSubtotal(item) * 0.07 * 100) / 100;
+    return calculateTaxAmount(itemSubtotal(item), item.tax_rate ?? null);
 };
 
 const itemLineTotal = (item: any): number =>
@@ -385,8 +386,14 @@ async function searchProducts() {
                         supplierRelation?.lead_time_days ?? null,
                     supplier_minimum_order_quantity:
                         supplierRelation?.minimum_order_quantity ?? null,
-                    cost_base: variant.pricing?.cost_base ?? product.pricing?.cost_base ?? null,
-                    cost_miscellaneous: variant.pricing?.cost_miscellaneous ?? product.pricing?.cost_miscellaneous ?? null,
+                    cost_base:
+                        variant.pricing?.cost_base ??
+                        product.pricing?.cost_base ??
+                        null,
+                    cost_miscellaneous:
+                        variant.pricing?.cost_miscellaneous ??
+                        product.pricing?.cost_miscellaneous ??
+                        null,
                     cost:
                         supplierRelation?.supplier_cost ??
                         variant.pricing?.cost ??
@@ -510,7 +517,10 @@ function addVariantSelections(selections: ProductVariantSelection[]) {
                 return;
             }
 
-            const finalQty = normalizeQuantity(minimumOrderQuantity || quantity || 1);
+            const finalQty = normalizeQuantity(
+                minimumOrderQuantity || quantity || 1,
+            );
+            const taxRate = defaultTaxRate();
 
             form.value.items.push({
                 product_id: product.id,
@@ -519,13 +529,11 @@ function addVariantSelections(selections: ProductVariantSelection[]) {
                 units_per_package: 1,
                 unit_cost: unitCost || 0,
                 misc_cost: miscCost || 0,
-                tax_amount:
-                    Math.round(
-                        finalQty *
-                            (unitCost || 0) *
-                            0.07 *
-                            100,
-                    ) / 100,
+                tax_rate: taxRate,
+                tax_amount: calculateTaxAmount(
+                    finalQty * (unitCost || 0),
+                    taxRate,
+                ),
                 _taxManual: false,
                 notes: '',
                 _name: product.name,
@@ -560,6 +568,7 @@ function addProduct(row: any) {
     const qty = normalizeQuantity(row.supplier_minimum_order_quantity || 1);
     const unitCost = Number(row.cost_base ?? row.cost ?? 0);
     const miscCost = Number(row.cost_miscellaneous ?? 0);
+    const taxRate = defaultTaxRate();
 
     form.value.items.push({
         product_id: row.product_id,
@@ -568,13 +577,8 @@ function addProduct(row: any) {
         units_per_package: 1,
         unit_cost: unitCost,
         misc_cost: miscCost,
-        tax_amount:
-            Math.round(
-                qty *
-                    unitCost *
-                    0.07 *
-                    100,
-            ) / 100,
+        tax_rate: taxRate,
+        tax_amount: calculateTaxAmount(qty * unitCost, taxRate),
         _taxManual: false,
         notes: '',
         // Extra display fields (not sent to API)
@@ -671,7 +675,12 @@ async function loadCandidateRows() {
             selected: false,
             quantity: normalizeQuantity(row.suggested_quantity || 1),
             units_per_package: Number((row as any).units_per_package || 1),
-            cost: Number(row.unit_cost ?? row.cost_base ?? row.cost ?? 0),
+            cost: Number(
+                row.unit_cost ??
+                    (row as any).cost_base ??
+                    (row as any).cost ??
+                    0,
+            ),
             misc_cost: Number((row as any).cost_miscellaneous || 0),
             tax_rate: normalizeTaxRate(row.tax_rate),
         }));
@@ -701,7 +710,9 @@ function addSelectedCandidates() {
         if (existing) {
             existing.quantity_ordered += normalizeQuantity(row.quantity);
             if (!existing.units_per_package) {
-                existing.units_per_package = normalizeQuantity(row.units_per_package);
+                existing.units_per_package = normalizeQuantity(
+                    row.units_per_package,
+                );
             }
 
             if (!existing.unit_cost && row.cost) {
@@ -726,6 +737,11 @@ function addSelectedCandidates() {
         } else {
             const finalQty = normalizeQuantity(row.quantity);
             const finalUnits = normalizeQuantity(row.units_per_package);
+            const taxRate = normalizeTaxRate(row.tax_rate);
+            const taxAmount = calculateTaxAmount(
+                finalQty * finalUnits * Number(row.cost || 0),
+                taxRate,
+            );
 
             form.value.items.push({
                 product_id: row.product_id,
@@ -734,15 +750,9 @@ function addSelectedCandidates() {
                 units_per_package: finalUnits,
                 unit_cost: Number(row.cost || 0),
                 misc_cost: Number((row as any).misc_cost || 0),
-                tax_amount:
-                    Math.round(
-                        finalQty *
-                            finalUnits *
-                            Number(row.cost || 0) *
-                            (normalizeTaxRate(row.tax_rate) / 100) *
-                            100,
-                    ) / 100,
-                _taxManual: normalizeTaxRate(row.tax_rate) !== 7,
+                tax_rate: taxRate,
+                tax_amount: taxAmount,
+                _taxManual: taxRate !== defaultTaxRate(),
                 notes: row.notes || '',
                 _name: row.product_name,
                 _sku: row.sku || 'N/A',
@@ -783,8 +793,9 @@ async function handleSubmit() {
         return;
     }
     try {
+        const formPayload = { ...(form.value as any) };
         const payload = {
-            ...form.value,
+            ...formPayload,
             tax_amount: Number(taxTotal.value.toFixed(2)),
             items: form.value.items.map((item: any) => ({
                 product_id: item.product_id,
@@ -823,7 +834,7 @@ async function handleSubmit() {
 
 onMounted(async () => {
     // Load suppliers and warehouses
-    await fetchSettings();
+    await Promise.all([fetchSettings(), fetchStoreSettings()]);
     await initWarehouse();
     await fetchProductFilterOptions();
     suppliers.value = await fetchActiveSuppliers();
@@ -847,7 +858,6 @@ onMounted(async () => {
                 supplier_invoice_number:
                     purchaseOrder.value.supplier_invoice_number || '',
                 order_date: purchaseOrder.value.order_date,
-                expected_date: purchaseOrder.value.expected_date || '',
                 tax_amount: Number(purchaseOrder.value.tax_amount) || 0,
                 shipping_cost: Number(purchaseOrder.value.shipping_cost) || 0,
                 notes: purchaseOrder.value.notes || '',
@@ -994,18 +1004,7 @@ watch(
                             <div>
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Fecha Esperada</label
-                                >
-                                <input
-                                    v-model="form.expected_date"
-                                    type="date"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                />
-                            </div>
-                            <div>
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Envio</label
+                                    >Costo extra</label
                                 >
                                 <input
                                     v-model.number="form.shipping_cost"
@@ -1256,7 +1255,10 @@ watch(
                                                     min="1"
                                                     step="1"
                                                     @blur="
-                                                        row.quantity = normalizeQuantity(row.quantity)
+                                                        row.quantity =
+                                                            normalizeQuantity(
+                                                                row.quantity,
+                                                            )
                                                     "
                                                     class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                                 />
@@ -1276,13 +1278,16 @@ watch(
                                                 ${{
                                                     (
                                                         row.quantity *
-                                                        (row.units_per_package || 1) *
+                                                        (row.units_per_package ||
+                                                            1) *
                                                         row.cost *
                                                         (row.tax_rate / 100)
                                                     ).toFixed(2)
                                                 }}
                                             </td>
-                                            <td class="px-3 py-2 text-right text-sm font-medium text-gray-600 dark:text-gray-300">
+                                            <td
+                                                class="px-3 py-2 text-right text-sm font-medium text-gray-600 dark:text-gray-300"
+                                            >
                                                 $0.00
                                             </td>
                                             <td
@@ -1290,7 +1295,10 @@ watch(
                                             >
                                                 ${{
                                                     (
-                                                        (row.quantity * (row.units_per_package || 1) * row.cost) *
+                                                        row.quantity *
+                                                        (row.units_per_package ||
+                                                            1) *
+                                                        row.cost *
                                                         (1 + row.tax_rate / 100)
                                                     ).toFixed(2)
                                                 }}
@@ -1323,7 +1331,10 @@ watch(
                         </div>
 
                         <!-- Items Table -->
-                        <div v-if="form.items.length" class="border border-gray-200 dark:border-border rounded-lg">
+                        <div
+                            v-if="form.items.length"
+                            class="rounded-lg border border-gray-200 dark:border-border"
+                        >
                             <table
                                 class="w-full table-fixed divide-y divide-gray-200 dark:divide-border"
                             >
@@ -1385,7 +1396,9 @@ watch(
                                             >
                                                 {{ (item as any)._name }}
                                             </p>
-                                            <p class="truncate text-xs text-gray-500">
+                                            <p
+                                                class="truncate text-xs text-gray-500"
+                                            >
                                                 <span
                                                     v-if="(item as any)._brand"
                                                     class="mr-1 font-medium text-indigo-600 dark:text-indigo-400 dark:text-primary"
@@ -1408,7 +1421,10 @@ watch(
                                                     syncAutoTax(item as any)
                                                 "
                                                 @blur="
-                                                    item.quantity_ordered = normalizeQuantity(item.quantity_ordered);
+                                                    item.quantity_ordered =
+                                                        normalizeQuantity(
+                                                            item.quantity_ordered,
+                                                        );
                                                     syncAutoTax(item as any);
                                                 "
                                                 class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
@@ -1455,7 +1471,7 @@ watch(
                                                     :title="
                                                         (item as any)._taxManual
                                                             ? 'ITBM manual — haz clic en ✕ para volver a automático'
-                                                            : 'ITBM auto (7%)'
+                                                            : `ITBM auto (${defaultTaxRate()}%)`
                                                     "
                                                     :class="[
                                                         'w-full rounded border px-2 py-1 text-right text-sm',
@@ -1469,7 +1485,7 @@ watch(
                                                         (item as any)._taxManual
                                                     "
                                                     type="button"
-                                                    title="Volver a automático (7%)"
+                                                    :title="`Volver a automático (${defaultTaxRate()}%)`"
                                                     @click="
                                                         (
                                                             item as any

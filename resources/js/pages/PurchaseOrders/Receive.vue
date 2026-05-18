@@ -12,9 +12,7 @@ const props = defineProps<{ purchaseOrderId: number }>();
 const { purchaseOrder, loading, error, fetchPurchaseOrderById, receiveItems } =
     usePurchaseOrders();
 
-const receiveData = ref<
-    { item_id: number; quantity_received: number; batch_number: string }[]
->([]);
+const receiveData = ref<{ item_id: number; quantity_received: number }[]>([]);
 
 const hasPreAppliedStock = computed(
     () =>
@@ -154,7 +152,6 @@ onMounted(async () => {
             .map((i) => ({
                 item_id: i.id,
                 quantity_received: 0,
-                batch_number: '',
             }));
     }
 });
@@ -328,7 +325,7 @@ async function handleSubmit() {
                     >
                         <PurchaseOrderSection
                             title="Articulos a recibir"
-                            subtitle="Ajusta cantidades, lotes y costos antes de registrar"
+                            subtitle="Ajusta cantidades y revisa costos antes de registrar"
                             :count="receiveData.length"
                             default-open
                         >
@@ -362,9 +359,6 @@ async function handleSubmit() {
                                             </th>
                                             <th class="px-3 py-2 text-right">
                                                 Recibir
-                                            </th>
-                                            <th class="px-3 py-2 text-left">
-                                                Lote
                                             </th>
                                             <th class="px-3 py-2 text-right">
                                                 Costo
@@ -474,14 +468,6 @@ async function handleSubmit() {
                                                             ?.pending_quantity
                                                     "
                                                     class="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-right text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                                />
-                                            </td>
-                                            <td class="px-3 py-2">
-                                                <input
-                                                    v-model="rd.batch_number"
-                                                    type="text"
-                                                    placeholder="Opcional"
-                                                    class="w-32 rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                                 />
                                             </td>
                                             <td

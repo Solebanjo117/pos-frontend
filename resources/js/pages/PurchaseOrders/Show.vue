@@ -3,6 +3,7 @@ import { computed, ref, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import {
     Copy,
     DollarSign,
@@ -20,6 +21,7 @@ import { purchaseOrdersService } from '@/services/purchase-orders';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderSideNav from '@/components/PurchaseOrders/PurchaseOrderSideNav.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 
 const props = defineProps<{ purchaseOrderId: number }>();
 const {
@@ -30,18 +32,14 @@ const {
     sendPurchaseOrder,
     cancelPurchaseOrder,
 } = usePurchaseOrders();
+const { fetchSettings: fetchStoreSettings, resolveTaxRate } =
+    useStoreSettings();
 
 const payments = ref<any[]>([]);
 const paymentStatus = ref<string>('pending');
 const amountPaid = ref<number>(0);
 const amountDue = ref<number>(0);
 const showPaymentModal = ref(false);
-const paymentForm = ref({
-    amount: 0,
-    method: 'cash',
-    reference_number: '',
-    notes: '',
-});
 const paymentLoading = ref(false);
 const paymentError = ref<string | null>(null);
 
@@ -74,6 +72,7 @@ const methodLabels: Record<string, string> = {
     card: 'Tarjeta',
     transfer: 'Transferencia',
     other: 'Otro',
+    supplier_credit: 'Credito proveedor',
 };
 
 const orderedQuantity = computed(
@@ -150,22 +149,38 @@ async function loadPayments() {
     paymentStatus.value = res.data.payment_status;
 }
 
-async function addPayment() {
+async function handlePurchasePaymentFinish(
+    submittedPayments: { method: string; amount: number }[],
+    meta: {
+        reference_number?: string | null;
+        notes?: string | null;
+        supplier_credit_amount?: number;
+    },
+) {
     paymentLoading.value = true;
     paymentError.value = null;
+
     try {
-        await apiClient.post(
-            `/purchase-orders/${props.purchaseOrderId}/payments`,
-            paymentForm.value,
+        const realPayments = submittedPayments.filter(
+            (payment) =>
+                payment.amount > 0 && payment.method !== 'supplier_credit',
         );
+
+        for (const payment of realPayments) {
+            await apiClient.post(
+                `/purchase-orders/${props.purchaseOrderId}/payments`,
+                {
+                    amount: payment.amount,
+                    method: payment.method,
+                    reference_number: meta.reference_number || null,
+                    notes: meta.notes || null,
+                },
+            );
+        }
+
         showPaymentModal.value = false;
-        paymentForm.value = {
-            amount: 0,
-            method: 'cash',
-            reference_number: '',
-            notes: '',
-        };
         await loadPayments();
+        await fetchPurchaseOrderById(props.purchaseOrderId);
     } catch (e: any) {
         paymentError.value =
             e.response?.data?.message || 'Error al registrar el pago.';
@@ -216,7 +231,10 @@ async function handleStatusAction(event: Event) {
 }
 
 onMounted(async () => {
-    await fetchPurchaseOrderById(props.purchaseOrderId);
+    await Promise.all([
+        fetchStoreSettings(),
+        fetchPurchaseOrderById(props.purchaseOrderId),
+    ]);
     await loadPayments();
 });
 </script>
@@ -439,20 +457,6 @@ onMounted(async () => {
                                             }}
                                         </div>
                                         <div
-                                            class="border-r border-b border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
-                                        >
-                                            Esperada
-                                        </div>
-                                        <div
-                                            class="border-b border-gray-200 px-3 py-2 dark:border-border"
-                                        >
-                                            {{
-                                                formatDate(
-                                                    purchaseOrder.expected_date,
-                                                )
-                                            }}
-                                        </div>
-                                        <div
                                             class="border-r border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
                                         >
                                             Almacen
@@ -575,7 +579,7 @@ onMounted(async () => {
                                             <div
                                                 class="border-b border-gray-200 px-3 py-2 dark:border-border"
                                             >
-                                                Envio
+                                                Costo extra
                                             </div>
                                             <div
                                                 class="border-b border-gray-200 px-3 py-2 text-right font-mono dark:border-border"
@@ -787,7 +791,10 @@ onMounted(async () => {
                                             >
                                                 {{
                                                     Number(
-                                                        item.tax_rate ?? 7,
+                                                        resolveTaxRate(
+                                                            item.tax_rate ??
+                                                                null,
+                                                        ),
                                                     ).toFixed(0)
                                                 }}%
                                             </td>
@@ -857,7 +864,7 @@ onMounted(async () => {
                                         class="inline-flex items-center gap-2 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
                                         @click="
                                             showPaymentModal = true;
-                                            paymentForm.amount = amountDue;
+                                            paymentError = null;
                                         "
                                     >
                                         <Plus :size="15" />
@@ -882,7 +889,7 @@ onMounted(async () => {
                                                 Metodo
                                             </th>
                                             <th class="py-2 text-left">
-                                                Referencia
+                                                Numero de recibo
                                             </th>
                                             <th class="py-2 text-right">
                                                 Monto
@@ -934,102 +941,34 @@ onMounted(async () => {
             </main>
         </div>
 
-        <div
-            v-if="showPaymentModal"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-        >
-            <div
-                class="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-card"
-            >
-                <h3
-                    class="mb-4 text-lg font-bold text-gray-900 dark:text-white"
-                >
-                    Registrar Pago
-                </h3>
-                <div
-                    v-if="paymentError"
-                    class="mb-4 rounded bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                >
-                    {{ paymentError }}
-                </div>
-                <div class="space-y-4">
-                    <div>
-                        <label
-                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                            Monto *
-                        </label>
-                        <input
-                            v-model.number="paymentForm.amount"
-                            type="number"
-                            min="0.01"
-                            :max="amountDue"
-                            step="0.01"
-                            class="w-full rounded border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label
-                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                            Metodo *
-                        </label>
-                        <select
-                            v-model="paymentForm.method"
-                            class="w-full rounded border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="cash">Efectivo</option>
-                            <option value="card">Tarjeta</option>
-                            <option value="transfer">Transferencia</option>
-                            <option value="other">Otro</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label
-                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                            Referencia / Folio
-                        </label>
-                        <input
-                            v-model="paymentForm.reference_number"
-                            type="text"
-                            class="w-full rounded border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label
-                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                            Notas
-                        </label>
-                        <textarea
-                            v-model="paymentForm.notes"
-                            rows="2"
-                            class="w-full resize-none rounded border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        ></textarea>
-                    </div>
-                </div>
-                <div class="mt-6 flex justify-end gap-3">
-                    <button
-                        type="button"
-                        class="rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
-                        @click="
-                            showPaymentModal = false;
-                            paymentError = null;
-                        "
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        type="button"
-                        :disabled="paymentLoading || paymentForm.amount <= 0"
-                        class="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
-                        @click="addPayment"
-                    >
-                        {{ paymentLoading ? 'Guardando...' : 'Guardar Pago' }}
-                    </button>
-                </div>
-            </div>
-        </div>
+        <OperationalPaymentPanel
+            mode="purchase"
+            :show="showPaymentModal"
+            :amount-to-charge="amountDue"
+            :subtotal="amountDue"
+            title="Registrar pago OC"
+            primary-action-label="Registrar pago"
+            cancel-label="Cancelar"
+            allow-partial
+            include-supplier-credit
+            :allowed-method-codes="[
+                'cash',
+                'card',
+                'transfer',
+                'other',
+                'supplier_credit',
+            ]"
+            show-reference-number
+            show-notes
+            reference-number-label="Numero de recibo"
+            notes-label="Notas"
+            :loading="paymentLoading"
+            :error="paymentError"
+            @finish="handlePurchasePaymentFinish"
+            @cancel="
+                showPaymentModal = false;
+                paymentError = null;
+            "
+        />
     </AppLayout>
 </template>

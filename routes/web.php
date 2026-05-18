@@ -216,13 +216,13 @@ Route::middleware(['auth'])->prefix('vehicles')->name('vehicles.')->group(functi
 
     // Chassis
     Route::get('/chassis', function () {
-        return Inertia::render('Vehicles/Chassis/Index');
+        return redirect('/vehicles');
     })->name('chassis.index');
     Route::get('/chassis/create', function () {
-        return Inertia::render('Vehicles/Chassis/Create');
+        return redirect('/vehicles');
     })->name('chassis.create');
-    Route::get('/chassis/{id}/edit', function ($id) {
-        return Inertia::render('Vehicles/Chassis/Edit', ['chassisId' => (int) $id]);
+    Route::get('/chassis/{id}/edit', function () {
+        return redirect('/vehicles');
     })->name('chassis.edit');
 
     Route::get('/import', function () {
@@ -296,6 +296,10 @@ Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
     Route::get('/accounts-payable', function () {
         return Inertia::render('AccountsPayable/Index');
     })->name('accounts-payable.index');
+
+    Route::get('/operational-expenses', function () {
+        return Inertia::render('OperationalExpenses/Index');
+    })->name('operational-expenses.index')->middleware('role:admin,manager');
 });
 
 

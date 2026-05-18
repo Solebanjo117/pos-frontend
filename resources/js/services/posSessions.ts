@@ -54,6 +54,8 @@ export interface PosSessionRecord {
     user?: { id: number; name: string };
     warehouse?: { id: number; name: string };
     cash_movements?: CashMovementRecord[];
+    purchase_payments?: PurchasePaymentRecord[];
+    account_payments?: AccountPaymentRecord[];
 }
 
 export interface CashMovementRecord {
@@ -81,6 +83,49 @@ export interface SessionSalesOrder {
     customer_id: number | null;
     created_at: string;
     customer?: { id: number; name: string } | null;
+}
+
+export interface PurchasePaymentRecord {
+    id: number;
+    purchase_order_id: number;
+    pos_session_id: number | null;
+    cash_movement_id: number | null;
+    user_id: number | null;
+    amount: string;
+    method: string;
+    reference_number: string | null;
+    notes: string | null;
+    paid_at: string | null;
+    created_at: string;
+    updated_at: string;
+    purchase_order?: {
+        id: number;
+        po_number: string;
+        total: string;
+        supplier?: { id: number; name: string } | null;
+    } | null;
+    user?: { id: number; name: string } | null;
+}
+
+export interface AccountPaymentRecord {
+    id: number;
+    account_type: 'customer' | 'supplier';
+    account_id: number;
+    direction: 'incoming' | 'outgoing';
+    batch_number: string;
+    amount: string;
+    method: string;
+    reference_number: string | null;
+    notes: string | null;
+    paid_at: string | null;
+    created_at: string;
+    creator?: { id: number; name: string } | null;
+    applications?: Array<{
+        document_type: string;
+        document_id: number;
+        document_number: string | null;
+        amount: string;
+    }>;
 }
 
 export const PosSessionsApiService = {
@@ -117,11 +162,15 @@ export const PosSessionsApiService = {
         data: PosSessionRecord;
         sales_orders: SessionSalesOrder[];
         cash_movements: CashMovementRecord[];
+        purchase_payments: PurchasePaymentRecord[];
+        account_payments: AccountPaymentRecord[];
     }> {
         const response = await apiClient.get<{
             data: PosSessionRecord;
             sales_orders: SessionSalesOrder[];
             cash_movements: CashMovementRecord[];
+            purchase_payments: PurchasePaymentRecord[];
+            account_payments: AccountPaymentRecord[];
         }>(`${BASE_PATH}/${id}`);
         return response.data;
     },

@@ -155,11 +155,14 @@ const costFor = (product: Product, variant: ProductVariant | null): number => {
     );
 };
 
-const miscCostFor = (product: Product, variant: ProductVariant | null): number => {
+const miscCostFor = (
+    product: Product,
+    variant: ProductVariant | null,
+): number => {
     return Number(
         variant?.pricing?.cost_miscellaneous ??
-        product.pricing?.cost_miscellaneous ??
-        0
+            product.pricing?.cost_miscellaneous ??
+            0,
     );
 };
 

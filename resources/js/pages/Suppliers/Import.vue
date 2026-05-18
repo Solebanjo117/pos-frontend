@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3'
-import AppLayout from '@/layouts/AppLayout.vue'
-import UniversalImporter from '@/components/Import/UniversalImporter.vue'
-import type { ImporterConfig } from '@/services/import'
+import { Head } from '@inertiajs/vue3';
+import AppLayout from '@/layouts/AppLayout.vue';
+import UniversalImporter from '@/components/Import/UniversalImporter.vue';
+import type { ImporterConfig } from '@/services/import';
 
 const importConfig: ImporterConfig = {
     entity: 'suppliers',
@@ -20,10 +20,23 @@ const importConfig: ImporterConfig = {
         { key: 'condiciones_pago', label: 'Condiciones de Pago', type: 'text' },
         { key: 'dias_entrega', label: 'Días de Entrega', type: 'number' },
         { key: 'notas', label: 'Notas', type: 'text' },
-        { key: 'estado', label: 'Estado', type: 'select', options: [{ label: 'Activo', value: 'active' }, { label: 'Inactivo', value: 'inactive' }] },
-        { key: 'marcas', label: 'Marcas', type: 'text', placeholder: 'Nombres separados por coma' },
+        {
+            key: 'estado',
+            label: 'Estado',
+            type: 'select',
+            options: [
+                { label: 'Activo', value: 'active' },
+                { label: 'Inactivo', value: 'inactive' },
+            ],
+        },
+        {
+            key: 'marcas',
+            label: 'Marcas',
+            type: 'text',
+            placeholder: 'Nombres separados por coma',
+        },
     ],
-}
+};
 </script>
 
 <template>

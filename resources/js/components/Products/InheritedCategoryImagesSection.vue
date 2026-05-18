@@ -28,7 +28,9 @@ const loading = ref(false);
 const refreshing = ref(false);
 
 const categoryNameMap = computed(() =>
-    Object.fromEntries(props.categories.map((category) => [category.id, category.name])),
+    Object.fromEntries(
+        props.categories.map((category) => [category.id, category.name]),
+    ),
 );
 
 const normalizedCategoryIds = computed(() =>
@@ -72,7 +74,8 @@ const fetchInheritedImages = async (silent = false) => {
             normalizedCategoryIds.value.map(async (categoryId) => {
                 const images = await categoriesService.getImages(categoryId);
                 const categoryName =
-                    categoryNameMap.value[categoryId] ?? `Categoría ${categoryId}`;
+                    categoryNameMap.value[categoryId] ??
+                    `Categoría ${categoryId}`;
 
                 return (images as any[]).map((image, index) => ({
                     id: image.id ?? null,
@@ -138,9 +141,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card">
+    <div
+        class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+    >
         <div class="mb-3 flex items-center justify-between gap-3">
-            <h2 class="text-sm font-semibold tracking-wider text-gray-500 uppercase">
+            <h2
+                class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
+            >
                 Imágenes Heredadas
             </h2>
             <button
@@ -149,7 +156,10 @@ onBeforeUnmount(() => {
                 :disabled="refreshing || normalizedCategoryIds.length === 0"
                 class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted"
             >
-                <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
+                <RefreshCw
+                    class="h-3.5 w-3.5"
+                    :class="{ 'animate-spin': refreshing }"
+                />
                 Actualizar
             </button>
         </div>
@@ -186,7 +196,9 @@ onBeforeUnmount(() => {
                     :alt="image.category_name"
                     class="h-28 w-full object-cover"
                 />
-                <div class="truncate border-t border-gray-100 px-2 py-1 text-center text-[11px] text-gray-500 dark:border-border dark:text-gray-400">
+                <div
+                    class="truncate border-t border-gray-100 px-2 py-1 text-center text-[11px] text-gray-500 dark:border-border dark:text-gray-400"
+                >
                     {{ image.category_name }}
                 </div>
             </div>

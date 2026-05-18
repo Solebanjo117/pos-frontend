@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
+import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import { CircleDollarSign } from 'lucide-vue-next';
 
 const props = defineProps<{
@@ -25,6 +26,7 @@ const props = defineProps<{
     categoryItbmPercent?: number | null;
     skuBase?: string;
     productName?: string;
+    initialEditVariantId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -39,7 +41,12 @@ const {
     loading,
     error,
 } = useProducts();
-const { settings: storeSettings, fetchSettings } = useStoreSettings();
+const {
+    settings: storeSettings,
+    fetchSettings,
+    defaultTaxRate,
+    resolveTaxRate,
+} = useStoreSettings();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 
 // === Rounding helper — respects LL-013: only applied on auto-calc, never on manual input ===
@@ -57,6 +64,7 @@ const variants = ref<any[]>([]);
 const showModal = ref(false);
 const editingVariant = ref<any>(null);
 const processing = ref(false);
+const initialEditVariantHandled = ref(false);
 
 const modalInitialSnapshot = ref('');
 
@@ -73,9 +81,9 @@ const form = ref({
         cost: 0,
         cost_base: 0,
         cost_miscellaneous: 0,
-        tax_rate: 7,
-        sale_tax_rate: 7,
-        cost_tax_rate: 7,
+        tax_rate: defaultTaxRate(),
+        sale_tax_rate: defaultTaxRate(),
+        cost_tax_rate: defaultTaxRate(),
         tax_type: 'custom' as 'standard' | 'exempt' | 'custom',
         pricing_formula: '' as string,
     },
@@ -412,7 +420,7 @@ const recalculatePriceFromCategory = async () => {
                 formula: props.categoryFormula,
                 costo: cost,
                 applies_itbm: false,
-                itbm_percent: props.categoryItbmPercent ?? 7,
+                itbm_percent: resolveTaxRate(props.categoryItbmPercent ?? null),
             });
             if (data.price !== null) {
                 form.value.pricing.base_price = applyRounding(data.price);
@@ -450,7 +458,9 @@ watch(
                         formula: props.categoryFormula,
                         costo: cost,
                         applies_itbm: false,
-                        itbm_percent: props.categoryItbmPercent ?? 7,
+                        itbm_percent: resolveTaxRate(
+                            props.categoryItbmPercent ?? null,
+                        ),
                     },
                 );
                 if (data.price !== null) {
@@ -502,9 +512,9 @@ const openCreateModal = () => {
             cost: 0,
             cost_base: 0,
             cost_miscellaneous: 0,
-            tax_rate: 7,
-            sale_tax_rate: 7,
-            cost_tax_rate: 7,
+            tax_rate: defaultTaxRate(),
+            sale_tax_rate: defaultTaxRate(),
+            cost_tax_rate: defaultTaxRate(),
             tax_type: 'custom',
             pricing_formula: props.categoryFormula || '',
         },
@@ -567,6 +577,33 @@ const openEditModal = (variant: any) => {
     showModal.value = true;
     captureModalInitialState();
 };
+
+const openInitialEditVariant = () => {
+    if (
+        initialEditVariantHandled.value ||
+        isDraftMode.value ||
+        !props.initialEditVariantId
+    ) {
+        return;
+    }
+
+    const targetVariant = variants.value.find(
+        (variant) => Number(variant.id) === Number(props.initialEditVariantId),
+    );
+
+    if (!targetVariant) return;
+
+    initialEditVariantHandled.value = true;
+    openEditModal(targetVariant);
+};
+
+watch(
+    () => props.initialEditVariantId,
+    () => {
+        initialEditVariantHandled.value = false;
+        openInitialEditVariant();
+    },
+);
 
 const handleSubmit = async () => {
     processing.value = true;
@@ -725,6 +762,13 @@ onMounted(async () => {
         fetchWarehouses(),
         fetchSettings(),
     ]);
+    if (!editingVariant.value) {
+        const rate = defaultTaxRate();
+        form.value.pricing.tax_rate = rate;
+        form.value.pricing.sale_tax_rate = rate;
+        form.value.pricing.cost_tax_rate = rate;
+    }
+    openInitialEditVariant();
     if (!isDraftMode.value) {
         initWarehouse().catch(() => {});
     }
@@ -1095,7 +1139,7 @@ onMounted(async () => {
                             Precios de esta Variante
                         </h4>
 
-                        <!-- Tax type toggle fue removido: ahora ITBM siempre es numérico y modificable con 7% default -->
+                        <!-- Tax type toggle fue removido: ahora ITBM siempre es numérico y modificable con default de tienda -->
 
                         <!-- Costos: Base + ITBM% + Misceláneos => Costo Total -->
                         <div
@@ -1292,7 +1336,7 @@ onMounted(async () => {
                                             Number(
                                                 form.pricing.sale_tax_rate ??
                                                     form.pricing.tax_rate,
-                                            ) || 7
+                                            ) || defaultTaxRate()
                                         "
                                         :model-value="form.pricing_formula"
                                         :price="
@@ -1344,6 +1388,14 @@ onMounted(async () => {
                             {{ processing ? 'Guardando...' : 'Guardar' }}
                         </Button>
                     </div>
+
+                    <VariantFifoHistoryPanel
+                        v-if="editingVariant?.id && props.productId"
+                        :product-id="props.productId"
+                        :variant="editingVariant"
+                        :warehouses="warehouses"
+                        :initial-warehouse-id="currentWarehouseId"
+                    />
                 </form>
             </DialogContent>
         </Dialog>

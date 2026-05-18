@@ -89,17 +89,23 @@ const emptyMessage = computed(() => {
     return `Sin resultados para "${query}"`
 })
 
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const normalizeSearchText = (value: string) =>
+    value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
 
 const filteredOptions = computed(() => {
     if (!searchQuery.value.trim()) return props.options
-    const escaped = escapeRegExp(searchQuery.value.trim())
-    // Match start of any word (\b) so "CS" matches "CS35" but not "Tucson"
-    const re = new RegExp('\\b' + escaped, 'i')
-    return props.options.filter(o =>
-        re.test(o.label) ||
-        (o.sublabel && re.test(o.sublabel))
-    )
+    const tokens = normalizeSearchText(searchQuery.value).split(' ').filter(Boolean)
+
+    return props.options.filter(o => {
+        const searchable = normalizeSearchText(`${o.label} ${o.sublabel ?? ''}`)
+
+        return tokens.every(token => searchable.includes(token))
+    })
 })
 
 const open = () => {

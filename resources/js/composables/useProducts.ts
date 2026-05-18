@@ -1,5 +1,5 @@
-import { ref, computed, type Ref } from 'vue'
-import { productsApi } from '@/services/api/products'
+import { ref, computed, type Ref } from 'vue';
+import { productsApi } from '@/services/api/products';
 import type {
     Product,
     ProductDetail,
@@ -7,32 +7,32 @@ import type {
     CreateProductRequest,
     UpdateProductRequest,
     PaginatedResponse,
-} from '@/types/product'
+} from '@/types/product';
 
 export function useProducts() {
     // State
-    const products: Ref<Product[]> = ref([])
-    const currentProduct: Ref<ProductDetail | null> = ref(null)
-    const loading = ref(false)
-    const error: Ref<string | null> = ref(null)
+    const products: Ref<Product[]> = ref([]);
+    const currentProduct: Ref<ProductDetail | null> = ref(null);
+    const loading = ref(false);
+    const error: Ref<string | null> = ref(null);
 
     // Pagination
-    const currentPage = ref(1)
-    const lastPage = ref(1)
-    const total = ref(0)
-    const perPage = ref(20)
+    const currentPage = ref(1);
+    const lastPage = ref(1);
+    const total = ref(0);
+    const perPage = ref(20);
 
     // Computed
-    const hasProducts = computed(() => products.value.length > 0)
-    const hasNextPage = computed(() => currentPage.value < lastPage.value)
-    const hasPrevPage = computed(() => currentPage.value > 1)
+    const hasProducts = computed(() => products.value.length > 0);
+    const hasNextPage = computed(() => currentPage.value < lastPage.value);
+    const hasPrevPage = computed(() => currentPage.value > 1);
 
     /**
      * Fetch products with filters
      */
     async function fetchProducts(filters?: ProductFilters) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
             const response: PaginatedResponse<Product> =
@@ -40,19 +40,20 @@ export function useProducts() {
                     ...filters,
                     page: currentPage.value,
                     per_page: perPage.value,
-                })
+                });
 
-            products.value = response.data
-            currentPage.value = response.meta.current_page
-            lastPage.value = response.meta.last_page
-            total.value = response.meta.total
+            products.value = response.data;
+            currentPage.value = response.meta.current_page;
+            lastPage.value = response.meta.last_page;
+            total.value = response.meta.total;
 
-            return response
+            return response;
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al cargar productos'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al cargar productos';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -60,10 +61,10 @@ export function useProducts() {
      * Fetch more products (append) for infinite scroll / load-more
      */
     async function fetchMoreProducts(filters?: ProductFilters) {
-        if (!hasNextPage.value || loading.value) return
+        if (!hasNextPage.value || loading.value) return;
 
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
             const response: PaginatedResponse<Product> =
@@ -71,19 +72,20 @@ export function useProducts() {
                     ...filters,
                     page: currentPage.value + 1,
                     per_page: perPage.value,
-                })
+                });
 
-            products.value = [...products.value, ...response.data]
-            currentPage.value = response.meta.current_page
-            lastPage.value = response.meta.last_page
-            total.value = response.meta.total
+            products.value = [...products.value, ...response.data];
+            currentPage.value = response.meta.current_page;
+            lastPage.value = response.meta.last_page;
+            total.value = response.meta.total;
 
-            return response
+            return response;
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al cargar más productos'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al cargar más productos';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -103,25 +105,26 @@ export function useProducts() {
             'inherited_images',
         ],
     ) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
             // Fix: Pass warehouse_id if provided
-            const params: any = { include: includes.join(',') }
-            if (warehouseId) params.warehouse_id = warehouseId
+            const params: any = { include: includes.join(',') };
+            if (warehouseId) params.warehouse_id = warehouseId;
 
             // We need to update productsApi.getProduct signature if it doesn't support params object or query string
             // But since I don't see productsApi file, I assume I can pass it or modify it.
             // Let's modify the call assuming getProduct handles options or I need to check API service.
-            const response = await productsApi.getProduct(id, params)
-            currentProduct.value = response.data
-            return response.data
+            const response = await productsApi.getProduct(id, params);
+            currentProduct.value = response.data;
+            return response.data;
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al cargar producto'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al cargar producto';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -129,19 +132,18 @@ export function useProducts() {
      * Create new product
      */
     async function createProduct(data: CreateProductRequest) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
-            const response = await productsApi.createProduct(data)
-            // Optionally refresh products list
-            await fetchProducts()
-            return response.data
+            const response = await productsApi.createProduct(data);
+            return response.data;
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al crear producto'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al crear producto';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -149,30 +151,33 @@ export function useProducts() {
      * Update existing product
      */
     async function updateProduct(id: number, data: UpdateProductRequest) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
-            const response = await productsApi.updateProduct(id, data)
+            const response = await productsApi.updateProduct(id, data);
 
             // Update in list if exists
-            const index = products.value.findIndex((p) => p.id === id)
+            const index = products.value.findIndex((p) => p.id === id);
             if (index !== -1) {
-                products.value[index] = response.data
+                products.value[index] = response.data;
             }
 
             // Update current product if it's the same
             if (currentProduct.value?.id === id) {
-                currentProduct.value = { ...currentProduct.value, ...response.data }
+                currentProduct.value = {
+                    ...currentProduct.value,
+                    ...response.data,
+                };
             }
 
-            return response.data
+            return response.data;
         } catch (err: any) {
             error.value =
-                err.response?.data?.message || 'Error al actualizar producto'
-            throw err
+                err.response?.data?.message || 'Error al actualizar producto';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -180,24 +185,25 @@ export function useProducts() {
      * Archive product (soft delete)
      */
     async function deleteProduct(id: number) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
-            await productsApi.deleteProduct(id)
+            await productsApi.deleteProduct(id);
 
             // Remove from list
-            products.value = products.value.filter((p) => p.id !== id)
+            products.value = products.value.filter((p) => p.id !== id);
 
             // Clear current product if it was deleted
             if (currentProduct.value?.id === id) {
-                currentProduct.value = null
+                currentProduct.value = null;
             }
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al archivar producto'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al archivar producto';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -205,19 +211,20 @@ export function useProducts() {
      * Restore archived product
      */
     async function restoreProduct(id: number) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
-            await productsApi.restoreProduct(id)
+            await productsApi.restoreProduct(id);
 
             // Remove from archived list
-            products.value = products.value.filter((p) => p.id !== id)
+            products.value = products.value.filter((p) => p.id !== id);
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al restaurar producto'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al restaurar producto';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -226,8 +233,8 @@ export function useProducts() {
      */
     async function nextPage(filters?: ProductFilters) {
         if (hasNextPage.value) {
-            currentPage.value++
-            await fetchProducts(filters)
+            currentPage.value++;
+            await fetchProducts(filters);
         }
     }
 
@@ -236,8 +243,8 @@ export function useProducts() {
      */
     async function prevPage(filters?: ProductFilters) {
         if (hasPrevPage.value) {
-            currentPage.value--
-            await fetchProducts(filters)
+            currentPage.value--;
+            await fetchProducts(filters);
         }
     }
 
@@ -246,8 +253,8 @@ export function useProducts() {
      */
     async function goToPage(page: number, filters?: ProductFilters) {
         if (page >= 1 && page <= lastPage.value) {
-            currentPage.value = page
-            await fetchProducts(filters)
+            currentPage.value = page;
+            await fetchProducts(filters);
         }
     }
 
@@ -255,31 +262,35 @@ export function useProducts() {
      * Clear current product
      */
     function clearCurrentProduct() {
-        currentProduct.value = null
+        currentProduct.value = null;
     }
 
     /**
      * Clear error
      */
     function clearError() {
-        error.value = null
+        error.value = null;
     }
 
     /**
      * Get product batches
      */
     async function fetchBatches(productId: number, warehouseId?: number) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
-            const response = await productsApi.getBatches(productId, warehouseId)
-            return response.data
+            const response = await productsApi.getBatches(
+                productId,
+                warehouseId,
+            );
+            return response.data;
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al cargar lotes'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al cargar lotes';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -287,17 +298,18 @@ export function useProducts() {
      * Fetch variants for a product
      */
     async function fetchVariants(productId: number) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
-            const response = await productsApi.getVariants(productId)
-            return response.data
+            const response = await productsApi.getVariants(productId);
+            return response.data;
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al cargar variantes'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al cargar variantes';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -305,35 +317,45 @@ export function useProducts() {
      * Create variant
      */
     async function createVariant(productId: number, data: any) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
-            const response = await productsApi.createVariant(productId, data)
-            return response.data
+            const response = await productsApi.createVariant(productId, data);
+            return response.data;
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al crear variante'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al crear variante';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
     /**
      * Update variant
      */
-    async function updateVariant(productId: number, variantId: number, data: any) {
-        loading.value = true
-        error.value = null
+    async function updateVariant(
+        productId: number,
+        variantId: number,
+        data: any,
+    ) {
+        loading.value = true;
+        error.value = null;
 
         try {
-            const response = await productsApi.updateVariant(productId, variantId, data)
-            return response.data
+            const response = await productsApi.updateVariant(
+                productId,
+                variantId,
+                data,
+            );
+            return response.data;
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al actualizar variante'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al actualizar variante';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -341,16 +363,17 @@ export function useProducts() {
      * Delete variant
      */
     async function deleteVariant(productId: number, variantId: number) {
-        loading.value = true
-        error.value = null
+        loading.value = true;
+        error.value = null;
 
         try {
-            await productsApi.deleteVariant(productId, variantId)
+            await productsApi.deleteVariant(productId, variantId);
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Error al eliminar variante'
-            throw err
+            error.value =
+                err.response?.data?.message || 'Error al eliminar variante';
+            throw err;
         } finally {
-            loading.value = false
+            loading.value = false;
         }
     }
 
@@ -388,5 +411,5 @@ export function useProducts() {
         createVariant,
         updateVariant,
         deleteVariant,
-    }
+    };
 }

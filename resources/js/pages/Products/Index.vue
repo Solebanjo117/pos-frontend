@@ -37,6 +37,16 @@ const sidebarFilterValues = ref<ProductFilterValues>({
     in_stock: false,
 });
 
+const sidebarActiveFilterCount = computed(() => {
+    let count = 0;
+    if (sidebarFilterValues.value.category_ids.length > 0) count++;
+    if (sidebarFilterValues.value.brand_ids.length > 0) count++;
+    if (sidebarFilterValues.value.min_price != null) count++;
+    if (sidebarFilterValues.value.max_price != null) count++;
+    if (sidebarFilterValues.value.in_stock) count++;
+    return count;
+});
+
 const handleSidebarFilterChange = async (newFilters: ProductFilterValues) => {
     sidebarFilterValues.value = newFilters;
     // Map sidebar filter values to the main filters object
@@ -163,7 +173,7 @@ const defaultColumnWidths: Record<ProductsTableColumn, number> = {
     sku: 170,
     product: 360,
     attributes: 280,
-    stock: 120,
+    stock: 92,
     actions: 150,
 };
 const minColumnWidths: Record<ProductsTableColumn, number> = {
@@ -172,7 +182,7 @@ const minColumnWidths: Record<ProductsTableColumn, number> = {
     sku: 130,
     product: 240,
     attributes: 180,
-    stock: 96,
+    stock: 84,
     actions: 120,
 };
 const tableContainerRef = ref<HTMLElement | null>(null);
@@ -223,6 +233,7 @@ const isCompact = computed(() => {
 });
 
 let resizingColumn: ProductsTableColumn | null = null;
+const activeResizeColumn = ref<ProductsTableColumn | null>(null);
 let resizeStartX = 0;
 let resizeStartWidth = 0;
 let suppressSortClickUntil = 0;
@@ -234,6 +245,15 @@ const getColumnStyle = (column: ProductsTableColumn) => {
         width: `${width}px`,
     };
 };
+
+const getResizeHandleClass = (column: ProductsTableColumn) => [
+    'absolute top-0 right-0 h-full w-4 cursor-col-resize select-none transition-colors',
+    'after:absolute after:top-2 after:right-1.5 after:bottom-2 after:w-px after:rounded-full after:bg-transparent',
+    'hover:bg-emerald-500/10 hover:after:bg-emerald-400',
+    activeResizeColumn.value === column
+        ? 'bg-emerald-500/15 after:bg-emerald-500'
+        : '',
+];
 
 const persistColumnWidths = () => {
     if (typeof window === 'undefined') return;
@@ -286,6 +306,7 @@ const stopColumnResize = () => {
     if (!resizingColumn) return;
 
     resizingColumn = null;
+    activeResizeColumn.value = null;
     suppressSortClickUntil = Date.now() + 150;
     window.removeEventListener('mousemove', handleColumnResizeMouseMove);
     window.removeEventListener('mouseup', stopColumnResize);
@@ -298,6 +319,7 @@ const startColumnResize = (event: MouseEvent, column: ProductsTableColumn) => {
     suppressSortClickUntil = Date.now() + 400;
 
     resizingColumn = column;
+    activeResizeColumn.value = column;
     resizeStartX = event.clientX;
     resizeStartWidth = preferredWidths.value[column];
 
@@ -515,12 +537,7 @@ const getTechnicalSpecsPreview = (product: any): string => {
 
 const getTechnicalSpecsTooltip = (product: any): string => {
     const attributes = collectTechnicalSpecs(product);
-    return attributes
-        .map(
-            (attr) =>
-                attr.name,
-        )
-        .join(' • ');
+    return attributes.map((attr) => attr.name).join(' • ');
 };
 </script>
 
@@ -828,7 +845,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                 @click="
                                     showSidebarFilters = !showSidebarFilters
                                 "
-                                class="rounded-lg border px-3 py-2 text-sm transition-colors md:hidden"
+                                class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors md:hidden"
                                 :class="
                                     showSidebarFilters
                                         ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
@@ -836,6 +853,12 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                 "
                             >
                                 <Filter class="h-4 w-4" />
+                                <span
+                                    v-if="sidebarActiveFilterCount > 0"
+                                    class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-100 px-1 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+                                >
+                                    {{ sidebarActiveFilterCount }}
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -860,27 +883,39 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 </div>
 
                 <!-- ========== SIDEBAR + TABLE LAYOUT ========== -->
-                <div v-else class="flex min-h-0 gap-4">
+                <div v-else class="flex min-h-0 flex-col gap-4 lg:flex-row">
                     <!-- Sidebar Filters -->
-                    <div
-                        :class="
-                            showSidebarFilters ? 'block' : 'hidden md:block'
-                        "
-                        class="shrink-0"
-                    >
+                    <div v-if="showSidebarFilters" class="shrink-0">
                         <ProductFiltersComponent
                             :model-value="sidebarFilterValues"
                             @update:model-value="handleSidebarFilterChange"
                             :categories="categories"
                             :brands="brands"
-                            :collapsible="false"
+                            :collapsible="true"
+                            @close="showSidebarFilters = false"
                         />
                     </div>
+                    <button
+                        v-else
+                        type="button"
+                        class="hidden h-10 shrink-0 items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 text-sm font-medium text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50 md:flex dark:border-indigo-800 dark:bg-card dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                        @click="showSidebarFilters = true"
+                        title="Mostrar filtros"
+                    >
+                        <Filter class="h-4 w-4" />
+                        Filtros
+                        <span
+                            v-if="sidebarActiveFilterCount > 0"
+                            class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-100 px-1 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+                        >
+                            {{ sidebarActiveFilterCount }}
+                        </span>
+                    </button>
 
                     <!-- Products Table -->
                     <div
                         ref="tableContainerRef"
-                        class="min-w-0 flex-1 rounded-lg bg-white shadow dark:bg-card"
+                        class="min-w-0 flex-1 overflow-x-auto rounded-lg bg-white shadow dark:bg-card"
                     >
                         <div
                             v-if="products.length === 0"
@@ -922,7 +957,11 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                             class="relative px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-900 uppercase dark:text-white"
                                         >
                                             <span
-                                                class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                                                :class="
+                                                    getResizeHandleClass(
+                                                        'expander',
+                                                    )
+                                                "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
@@ -938,7 +977,11 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                         >
                                             Foto
                                             <span
-                                                class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                                                :class="
+                                                    getResizeHandleClass(
+                                                        'image',
+                                                    )
+                                                "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
@@ -998,7 +1041,9 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 </svg>
                                             </span>
                                             <span
-                                                class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                                                :class="
+                                                    getResizeHandleClass('sku')
+                                                "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
@@ -1058,7 +1103,11 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 </svg>
                                             </span>
                                             <span
-                                                class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                                                :class="
+                                                    getResizeHandleClass(
+                                                        'product',
+                                                    )
+                                                "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
@@ -1076,7 +1125,11 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                         >
                                             Atributos
                                             <span
-                                                class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                                                :class="
+                                                    getResizeHandleClass(
+                                                        'attributes',
+                                                    )
+                                                "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
@@ -1088,11 +1141,15 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                         </th>
                                         <th
                                             :style="getColumnStyle('stock')"
-                                            class="relative px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-900 uppercase dark:text-white"
+                                            class="relative px-3 py-3 text-right text-xs font-medium tracking-wider text-gray-900 uppercase dark:text-white"
                                         >
                                             Stock
                                             <span
-                                                class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                                                :class="
+                                                    getResizeHandleClass(
+                                                        'stock',
+                                                    )
+                                                "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
@@ -1108,7 +1165,11 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                         >
                                             Acciones
                                             <span
-                                                class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                                                :class="
+                                                    getResizeHandleClass(
+                                                        'actions',
+                                                    )
+                                                "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
@@ -1310,7 +1371,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                             </td>
                                             <td
                                                 :style="getColumnStyle('stock')"
-                                                class="px-6 py-4 text-sm whitespace-nowrap text-gray-900 dark:text-white"
+                                                class="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-900 tabular-nums dark:text-white"
                                             >
                                                 {{
                                                     product.total_stock ?? 'N/A'
@@ -1404,7 +1465,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                         Precio
                                                                     </th>
                                                                     <th
-                                                                        class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase dark:text-gray-400"
+                                                                        class="px-4 py-2 text-right text-xs font-medium text-gray-600 uppercase dark:text-gray-400"
                                                                     >
                                                                         Stock
                                                                     </th>
@@ -1502,7 +1563,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                         </div>
                                                                     </td>
                                                                     <td
-                                                                        class="px-4 py-3 text-sm text-gray-900 dark:text-white"
+                                                                        class="px-4 py-3 text-right text-sm whitespace-nowrap text-gray-900 tabular-nums dark:text-white"
                                                                     >
                                                                         {{
                                                                             variant.total_stock ??

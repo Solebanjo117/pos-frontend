@@ -38,8 +38,12 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const { createProduct, loading, error } = useProducts();
-const { settings: storeSettings, fetchSettings: fetchStoreSettings } =
-    useStoreSettings();
+const {
+    settings: storeSettings,
+    fetchSettings: fetchStoreSettings,
+    defaultTaxRate,
+    resolveTaxRate,
+} = useStoreSettings();
 const toast = useToast();
 
 const applyRounding = (price: number): number => {
@@ -65,9 +69,9 @@ const form = ref<CreateProductRequest>({
         base_price: 0,
         msrp: 0,
         cost: 0,
-        tax_rate: 7,
-        sale_tax_rate: 7,
-        cost_tax_rate: 7,
+        tax_rate: defaultTaxRate(),
+        sale_tax_rate: defaultTaxRate(),
+        cost_tax_rate: defaultTaxRate(),
         tax_type: 'custom',
         max_discount_percentage: 0,
     },
@@ -383,7 +387,7 @@ const refreshCategoryDerivedState = async () => {
     categoryFormula.value = primaryCategory?.pricing_formula ?? null;
     categoryAppliesItbm.value = primaryCategory?.applies_itbm ?? false;
     categoryItbmPercent.value = primaryCategory
-        ? (primaryCategory.itbm_percent ?? 7)
+        ? resolveTaxRate(primaryCategory.itbm_percent ?? null)
         : null;
     categoryMargin.value = primaryCategory?.default_margin_percent ?? null;
 };
@@ -484,6 +488,8 @@ const vehicleCompat = ref<DraftCompatData>({
     allEngines: false,
     allChassis: false,
     isUniversal: false,
+    modelId: null,
+    makeId: null,
 });
 
 const openVehicleInline = (
@@ -737,7 +743,9 @@ watch(
                         formula: categoryFormula.value,
                         costo: cost,
                         applies_itbm: categoryAppliesItbm.value,
-                        itbm_percent: categoryItbmPercent.value ?? 7,
+                        itbm_percent: resolveTaxRate(
+                            categoryItbmPercent.value ?? null,
+                        ),
                     },
                 );
                 if (data.price !== null) {
@@ -914,7 +922,14 @@ const oemBrandOptions = computed(() =>
 );
 
 onMounted(async () => {
-    fetchStoreSettings();
+    await fetchStoreSettings();
+    form.value.pricing.tax_rate = resolveTaxRate(form.value.pricing.tax_rate);
+    form.value.pricing.sale_tax_rate = resolveTaxRate(
+        (form.value.pricing as any).sale_tax_rate ?? null,
+    );
+    form.value.pricing.cost_tax_rate = resolveTaxRate(
+        (form.value.pricing as any).cost_tax_rate ?? null,
+    );
     loadingCategories.value = true;
     try {
         const response = await apiClient.get('/categories');
@@ -974,6 +989,20 @@ const handleSubmit = async () => {
         return;
     }
 
+    // Require model selection when "todos los motores" or "todos los chasis" is checked.
+    if (
+        (vehicleCompat.value.allEngines || vehicleCompat.value.allChassis) &&
+        !(
+            vehicleCompatRef.value?.selectedModelId ??
+            vehicleCompat.value.modelId
+        )
+    ) {
+        toast.error(
+            'Debes seleccionar un modelo de vehículo antes de marcar "todos los motores" o "todos los chasis".',
+        );
+        return;
+    }
+
     try {
         const normalizedSaleTaxRate = Math.max(
             0,
@@ -983,7 +1012,7 @@ const handleSubmit = async () => {
                     Number(
                         (form.value.pricing as any).sale_tax_rate ??
                             form.value.pricing.tax_rate ??
-                            7,
+                            defaultTaxRate(),
                     ),
                 ),
             ),
@@ -1028,14 +1057,20 @@ const handleSubmit = async () => {
                         a.name &&
                         (Array.isArray(a.value) ? a.value.length > 0 : a.value),
                 ),
-            vehicle_compatibility: vehicleCompat.value.engines.map(
-                (e) => e.engine_id,
-            ),
-            vehicle_chassis: vehicleCompat.value.chassis.map(
-                (c) => c.chassis_id,
-            ),
-            all_engines: vehicleCompat.value.allEngines,
-            all_chassis: vehicleCompat.value.allChassis,
+            vehicle_compatibility: {
+                engines: vehicleCompat.value.engines.map((e) => ({
+                    engine_id: e.engine_id,
+                })),
+                chassis: vehicleCompat.value.chassis.map((c) => ({
+                    chassis_id: c.chassis_id,
+                })),
+                all_engines: vehicleCompat.value.allEngines,
+                all_chassis: vehicleCompat.value.allChassis,
+                model_id:
+                    vehicleCompatRef.value?.selectedModelId ??
+                    vehicleCompat.value.modelId ??
+                    null,
+            },
             is_universal: vehicleCompat.value.isUniversal,
         };
         const result = await createProduct(payload);

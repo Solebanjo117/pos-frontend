@@ -90,6 +90,7 @@ export interface ProductInventory {
     stock_on_order: number;
     reorder_point: number;
     needs_reorder: boolean;
+    fifo_cost_current?: number;
     // Legacy fields (optional if needed)
     quantity_available?: number;
     quantity_reserved?: number;
@@ -106,6 +107,7 @@ export interface VariantInventory {
     stock_on_order: number;
     reorder_point: number;
     needs_reorder: boolean;
+    fifo_cost_current?: number;
 }
 
 export interface ProductMedia {
@@ -219,10 +221,83 @@ export interface ProductVariant {
     is_default: boolean;
     brand?: Brand;
     pricing?: ProductPricing; // Variant-level pricing (overrides product pricing)
+    base_price?: number | null;
     total_stock?: number;
     created_at: string;
     updated_at: string;
     inventory?: VariantInventory[];
+}
+
+export interface VariantFifoSummary {
+    product_id: number;
+    variant_id: number;
+    warehouse_id: number;
+    stock_available: number;
+    fifo_cost_current: number;
+    total_lot_quantity: number;
+    total_lot_value: number;
+    average_landed_cost: number;
+    open_lots_count: number;
+    last_received_at?: string | null;
+    last_sold_at?: string | null;
+}
+
+export interface InventoryFifoLot {
+    id: number;
+    warehouse_id: number;
+    warehouse?: Warehouse | null;
+    source_type?: string | null;
+    source_id?: number | null;
+    source_movement_id?: number | null;
+    batch_number?: string | null;
+    received_quantity: number;
+    quantity_available: number;
+    unit_cost_base: number;
+    tax_per_unit: number;
+    misc_per_unit: number;
+    landed_unit_cost: number;
+    remaining_value: number;
+    received_at?: string | null;
+}
+
+export interface VariantFifoMovement {
+    id: number;
+    movement_type: 'in' | 'out' | 'transfer';
+    quantity: number;
+    reference_type?: string | null;
+    reference_id?: number | null;
+    reason?: string | null;
+    notes?: string | null;
+    supplier?: Supplier | null;
+    warehouse?: Warehouse | null;
+    created_at: string;
+    fifo_lots?: Array<{
+        lot_id: number;
+        quantity: number;
+        quantity_available: number;
+        unit_cost_base: number;
+        tax_per_unit: number;
+        misc_per_unit: number;
+        landed_unit_cost: number;
+        remaining_value: number;
+        received_at?: string | null;
+    }>;
+    fifo_allocations?: Array<{
+        lot_id: number;
+        quantity: number;
+        unit_cost: number;
+        total_cost: number;
+        source_type?: string | null;
+        source_id?: number | null;
+        received_at?: string | null;
+    }>;
+}
+
+export interface VariantFifoHistory {
+    summary: VariantFifoSummary;
+    lots: InventoryFifoLot[];
+    purchase_movements: VariantFifoMovement[];
+    sale_movements: VariantFifoMovement[];
 }
 
 export interface ProductVin {
@@ -270,6 +345,14 @@ export interface ProductDetail extends Product {
 }
 
 // API Request Types
+export interface ProductVehicleCompatibilityPayload {
+    engines: Array<{ engine_id: number }>;
+    chassis: Array<{ chassis_id: number }>;
+    all_engines: boolean;
+    all_chassis: boolean;
+    model_id: number | null;
+}
+
 export interface CreateProductRequest {
     sku_base: string;
     name: string;
@@ -314,6 +397,7 @@ export interface CreateProductRequest {
         options?: string[] | null;
     }>;
     vins?: string[];
+    vehicle_compatibility?: ProductVehicleCompatibilityPayload;
 }
 
 export interface UpdateProductRequest {
@@ -360,13 +444,7 @@ export interface UpdateProductRequest {
         alternative_product_id?: number;
         relationship_type?: 'compatible' | 'substitute' | 'upgrade';
     }>;
-    vehicle_compatibility?: {
-        engines: Array<{ engine_id: number }>;
-        chassis: Array<{ chassis_id: number }>;
-        allEngines: boolean;
-        allChassis: boolean;
-        isUniversal: boolean;
-    };
+    vehicle_compatibility?: ProductVehicleCompatibilityPayload;
 }
 
 export interface ProductFilters {

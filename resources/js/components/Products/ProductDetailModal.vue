@@ -4,6 +4,7 @@ import type { Product } from '@/types/product';
 import apiClient from '@/services/api/client';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 
 interface Props {
     product: Product;
@@ -13,6 +14,7 @@ const emit = defineEmits<{
     close: [];
     'view-alternative': [product: Product];
 }>();
+const { resolveTaxRate } = useStoreSettings();
 
 // ── Blind Mode (for customer screenshots) ─────────────────────────────────────
 const blindMode = ref(localStorage.getItem('product_blind_mode') === 'true');
@@ -104,9 +106,7 @@ const resolveSaleTaxRate = (pricing: any): number => {
 
 const resolveCostTaxRate = (pricing: any): number => {
     const raw = pricing?.cost_tax_rate;
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed)) return 7;
-    return Math.max(0, Math.min(100, Math.round(parsed)));
+    return resolveTaxRate(raw ?? null);
 };
 
 // Returns the best pricing object for a variant (variant-level first, then product-level fallback)
@@ -116,7 +116,7 @@ const getVariantPricing = (variant: any) => {
     return props.product.pricing ?? null;
 };
 
-const getQuantity = (variant: any): number => quantities[variant.id] ?? 1;
+const getQuantity = (variant: any): number => quantities.value[variant.id] ?? 1;
 
 const saleBasePrice = (pricing: any): number =>
     Number(pricing?.calculated_price ?? pricing?.base_price) || 0;

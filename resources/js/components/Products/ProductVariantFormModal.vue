@@ -31,7 +31,12 @@ const emit = defineEmits<{
 }>();
 
 const { updateVariant, fetchVariants, loading, error } = useProducts();
-const { settings: storeSettings, fetchSettings } = useStoreSettings();
+const {
+    settings: storeSettings,
+    fetchSettings,
+    defaultTaxRate,
+    resolveTaxRate,
+} = useStoreSettings();
 
 const applyRounding = (price: number): number => {
     const increment = Number(storeSettings.value.price_rounding_increment) || 0;
@@ -147,9 +152,9 @@ const form = ref({
         cost: 0,
         cost_base: 0,
         cost_miscellaneous: 0,
-        tax_rate: 7,
-        sale_tax_rate: 7,
-        cost_tax_rate: 7,
+        tax_rate: defaultTaxRate(),
+        sale_tax_rate: defaultTaxRate(),
+        cost_tax_rate: defaultTaxRate(),
         tax_type: 'custom' as 'standard' | 'exempt' | 'custom',
         pricing_formula: '' as string,
     },
@@ -171,7 +176,7 @@ const recalculatePriceFromCategory = async () => {
                 formula: props.categoryFormula,
                 costo: cost,
                 applies_itbm: false,
-                itbm_percent: props.categoryItbmPercent ?? 7,
+                itbm_percent: resolveTaxRate(props.categoryItbmPercent ?? null),
             });
             if (data.price !== null)
                 form.value.pricing.base_price = applyRounding(data.price);
@@ -203,7 +208,9 @@ watch(
                         formula: props.categoryFormula,
                         costo: cost,
                         applies_itbm: false,
-                        itbm_percent: props.categoryItbmPercent ?? 7,
+                        itbm_percent: resolveTaxRate(
+                            props.categoryItbmPercent ?? null,
+                        ),
                     },
                 );
                 if (data.price !== null)
@@ -615,7 +622,7 @@ const handleSubmit = async () => {
                                         Number(
                                             form.pricing.sale_tax_rate ??
                                                 form.pricing.tax_rate,
-                                        ) || 7
+                                        ) || defaultTaxRate()
                                     "
                                     :model-value="form.pricing_formula"
                                     :price="

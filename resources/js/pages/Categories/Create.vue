@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useCategories } from '@/composables/useCategories';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import { categoriesService } from '@/services/categories';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import type {
@@ -19,6 +20,7 @@ import CategoryImagesSection, {
 
 const { loading, error, createCategory, fetchCategoriesWithParent } =
     useCategories();
+const { fetchSettings, defaultTaxRate, resolveTaxRate } = useStoreSettings();
 
 const parentCategories = ref<Category[]>([]);
 const pendingImages = ref<PendingCategoryImage[]>([]);
@@ -56,7 +58,7 @@ const form = ref<CategoryForm>({
     pricing_formula: null,
     min_suggested_price: null,
     applies_itbm: false,
-    itbm_percent: 7,
+    itbm_percent: defaultTaxRate(),
 });
 
 function addAttribute() {
@@ -80,8 +82,8 @@ function parseSelectOptions(optionsText: string): string[] {
 }
 
 function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
-    return form.value.default_attributes
-        .flatMap((attribute): CategoryDefaultAttribute[] => {
+    return form.value.default_attributes.flatMap(
+        (attribute): CategoryDefaultAttribute[] => {
             const name = attribute.name.trim();
             const type = attribute.type === 'select' ? 'select' : 'string';
             const options =
@@ -93,13 +95,16 @@ function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
                 return [];
             }
 
-            return [{
-                name,
-                required: Boolean(attribute.required),
-                type,
-                options,
-            }];
-        });
+            return [
+                {
+                    name,
+                    required: Boolean(attribute.required),
+                    type,
+                    options,
+                },
+            ];
+        },
+    );
 }
 
 function normalizeItbmPercent() {
@@ -111,10 +116,12 @@ function normalizeItbmPercent() {
     const parsed = Number(form.value.itbm_percent);
     form.value.itbm_percent = Number.isFinite(parsed)
         ? Math.max(0, Math.min(100, Math.round(parsed)))
-        : 7;
+        : defaultTaxRate();
 }
 
 onMounted(async () => {
+    await fetchSettings();
+    form.value.itbm_percent = resolveTaxRate(form.value.itbm_percent ?? null);
     parentCategories.value = await fetchCategoriesWithParent();
 });
 
@@ -298,9 +305,7 @@ function goBack() {
                                     <option value="select">Lista</option>
                                 </select>
                             </div>
-                            <div
-                                class="sm:col-span-2 flex items-end sm:pb-2"
-                            >
+                            <div class="flex items-end sm:col-span-2 sm:pb-2">
                                 <label
                                     class="flex items-center gap-1 text-xs whitespace-nowrap text-gray-600 dark:text-gray-400"
                                 >
@@ -312,7 +317,7 @@ function goBack() {
                                     Obligatorio
                                 </label>
                             </div>
-                            <div class="sm:col-span-1 flex items-end">
+                            <div class="flex items-end sm:col-span-1">
                                 <button
                                     type="button"
                                     @click="removeAttribute(index)"

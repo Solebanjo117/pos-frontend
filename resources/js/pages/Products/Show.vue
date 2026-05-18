@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
+import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import { type BreadcrumbItem } from '@/types';
 import { useProducts } from '@/composables/useProducts';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -46,6 +47,7 @@ const toast = useToast();
 
 const duplicating = ref(false);
 const currentImageIndex = ref(0);
+const selectedFifoVariantId = ref<number | null>(null);
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -58,6 +60,42 @@ const product = computed<ProductDetail | null>(() => currentProduct.value);
 
 const variants = computed<ProductVariant[]>(() => {
     return product.value?.variants ?? [];
+});
+
+const productWarehouseOptions = computed(() => {
+    const inventoryWarehouses =
+        product.value?.inventory
+            ?.map((item) => item.warehouse)
+            .filter(Boolean)
+            .map((warehouse: any) => ({
+                id: Number(warehouse.id),
+                name: warehouse.name,
+                code: warehouse.code,
+            })) ?? [];
+
+    const variantWarehouses = variants.value.flatMap(
+        (variant) =>
+            variant.inventory
+                ?.map((item) => item.warehouse)
+                .filter(Boolean)
+                .map((warehouse: any) => ({
+                    id: Number(warehouse.id),
+                    name: warehouse.name,
+                    code: warehouse.code,
+                })) ?? [],
+    );
+
+    const seen = new Set<number>();
+    return [...inventoryWarehouses, ...variantWarehouses].filter(
+        (warehouse) => {
+            if (!warehouse?.id || seen.has(Number(warehouse.id))) {
+                return false;
+            }
+
+            seen.add(Number(warehouse.id));
+            return true;
+        },
+    );
 });
 
 const effectiveImages = computed<ProductImage[]>(() => {
@@ -196,6 +234,23 @@ function inventoryStockForVariant(variant: ProductVariant): number {
                 Number(resolvedWarehouseId.value),
         )?.stock_available ?? Number(variant.total_stock ?? 0)
     );
+}
+
+function fifoCostForVariant(variant: ProductVariant): number | undefined {
+    if (!resolvedWarehouseId.value) {
+        return variant.inventory?.find((item) => item.fifo_cost_current)
+            ?.fifo_cost_current;
+    }
+
+    return variant.inventory?.find(
+        (item) =>
+            Number(item.warehouse?.id) === Number(resolvedWarehouseId.value),
+    )?.fifo_cost_current;
+}
+
+function toggleVariantFifoHistory(variant: ProductVariant): void {
+    selectedFifoVariantId.value =
+        selectedFifoVariantId.value === variant.id ? null : variant.id;
 }
 
 function relationLabel(type?: string): string {
@@ -658,52 +713,101 @@ watch(effectiveImages, () => {
                                         <th class="px-4 py-2 text-right">
                                             Precio
                                         </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Acciones
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr
+                                    <template
                                         v-for="variant in variants"
                                         :key="variant.id"
-                                        class="border-t border-gray-100 dark:border-border"
                                     >
-                                        <td class="px-4 py-3">
-                                            {{ variant.brand?.name || '-' }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-3 text-right font-semibold"
+                                        <tr
+                                            class="border-t border-gray-100 dark:border-border"
                                         >
-                                            {{
-                                                inventoryStockForVariant(
-                                                    variant,
-                                                )
-                                            }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-3 text-right font-mono"
+                                            <td class="px-4 py-3">
+                                                {{ variant.brand?.name || '-' }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-right font-semibold"
+                                            >
+                                                {{
+                                                    inventoryStockForVariant(
+                                                        variant,
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-right font-mono"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        fifoCostForVariant(
+                                                            variant,
+                                                        ) ??
+                                                            variant.pricing
+                                                                ?.cost ??
+                                                            product.pricing
+                                                                ?.cost,
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-right font-mono font-semibold"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        variant.pricing
+                                                            ?.base_price ??
+                                                            product.pricing
+                                                                ?.base_price,
+                                                    )
+                                                }}
+                                            </td>
+                                            <td class="px-4 py-3 text-right">
+                                                <button
+                                                    type="button"
+                                                    class="text-sm font-medium text-blue-600 hover:underline dark:text-primary"
+                                                    @click="
+                                                        toggleVariantFifoHistory(
+                                                            variant,
+                                                        )
+                                                    "
+                                                >
+                                                    {{
+                                                        selectedFifoVariantId ===
+                                                        variant.id
+                                                            ? 'Ocultar FIFO'
+                                                            : 'Historial FIFO'
+                                                    }}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr
+                                            v-if="
+                                                selectedFifoVariantId ===
+                                                variant.id
+                                            "
+                                            class="border-t border-gray-100 dark:border-border"
                                         >
-                                            {{
-                                                formatCurrency(
-                                                    variant.pricing?.cost ??
-                                                        product.pricing?.cost,
-                                                )
-                                            }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-3 text-right font-mono font-semibold"
-                                        >
-                                            {{
-                                                formatCurrency(
-                                                    variant.pricing
-                                                        ?.base_price ??
-                                                        product.pricing
-                                                            ?.base_price,
-                                                )
-                                            }}
-                                        </td>
-                                    </tr>
+                                            <td colspan="5" class="px-4 py-4">
+                                                <VariantFifoHistoryPanel
+                                                    :product-id="product.id"
+                                                    :variant="variant"
+                                                    :warehouses="
+                                                        productWarehouseOptions
+                                                    "
+                                                    :initial-warehouse-id="
+                                                        resolvedWarehouseId
+                                                    "
+                                                />
+                                            </td>
+                                        </tr>
+                                    </template>
                                     <tr v-if="variants.length === 0">
                                         <td
-                                            colspan="4"
+                                            colspan="5"
                                             class="px-4 py-8 text-center text-sm text-gray-500"
                                         >
                                             Sin variantes registradas.
@@ -754,6 +858,9 @@ watch(effectiveImages, () => {
                                         <th class="px-4 py-2 text-right">
                                             Reorden
                                         </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Costo FIFO
+                                        </th>
                                         <th class="px-4 py-2 text-left">
                                             Estado
                                         </th>
@@ -782,6 +889,13 @@ watch(effectiveImages, () => {
                                         <td class="px-4 py-3 text-right">
                                             {{ item.reorder_point }}
                                         </td>
+                                        <td class="px-4 py-3 text-right">
+                                            {{
+                                                formatCurrency(
+                                                    item.fifo_cost_current,
+                                                )
+                                            }}
+                                        </td>
                                         <td class="px-4 py-3">
                                             <span
                                                 v-if="item.needs_reorder"
@@ -800,7 +914,7 @@ watch(effectiveImages, () => {
                                     </tr>
                                     <tr v-if="!product.inventory?.length">
                                         <td
-                                            colspan="6"
+                                            colspan="7"
                                             class="px-4 py-8 text-center text-sm text-gray-500"
                                         >
                                             Sin inventario registrado.

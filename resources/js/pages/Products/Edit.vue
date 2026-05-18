@@ -4,6 +4,7 @@ import { Head } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { useProducts } from '@/composables/useProducts';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useToast } from '@/composables/useToast';
 import type { UpdateProductRequest } from '@/types/product';
 import type { Category } from '@/types/category';
@@ -23,6 +24,8 @@ import { Archive, Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next';
 const props = defineProps<{
     productId: number;
 }>();
+
+const { resolveTaxRate } = useStoreSettings();
 
 interface DraftOemReference {
     id: number;
@@ -56,6 +59,8 @@ interface DraftCompatData {
     allEngines: boolean;
     allChassis: boolean;
     isUniversal: boolean;
+    modelId?: number | null;
+    makeId?: number | null;
 }
 
 const { currentProduct, updateProduct, fetchProduct, loading, error } =
@@ -84,6 +89,7 @@ const form = ref<UpdateProductRequest>({
 
 const validationErrors = ref<Record<string, string[]>>({});
 const successMessage = ref('');
+const initialEditVariantId = ref<number | null>(null);
 
 const categories = ref<Category[]>([]);
 const loadingCategories = ref(false);
@@ -110,6 +116,8 @@ const draftCompatibility = ref<DraftCompatData>({
     allEngines: false,
     allChassis: false,
     isUniversal: false,
+    modelId: null,
+    makeId: null,
 });
 
 const categoryOptions = computed(() =>
@@ -256,6 +264,12 @@ const normalizeDraftCompatibility = (
     compatibility: any[] = [],
     isUniversal = false,
 ): DraftCompatData => {
+    const scopedCompatibility = compatibility.find(
+        (item) => (item.all_engines || item.all_chassis) && item.model_id,
+    );
+    const scopedModel = scopedCompatibility?.model ?? null;
+    const scopedMake = scopedCompatibility?.make ?? scopedModel?.make ?? null;
+
     return {
         engines: compatibility
             .filter((item) => item.engine_id)
@@ -279,6 +293,14 @@ const normalizeDraftCompatibility = (
         allEngines: compatibility.some((item) => item.all_engines),
         allChassis: compatibility.some((item) => item.all_chassis),
         isUniversal,
+        modelId: scopedCompatibility?.model_id
+            ? Number(scopedCompatibility.model_id)
+            : null,
+        makeId:
+            scopedCompatibility?.make_id ??
+            scopedMake?.id ??
+            scopedModel?.make_id ??
+            null,
     };
 };
 
@@ -352,7 +374,9 @@ const applyPrimaryCategorySettings = async (categoryId: number | null) => {
 
     categoryFormula.value = category?.pricing_formula ?? null;
     categoryAppliesItbm.value = category?.applies_itbm ?? false;
-    categoryItbmPercent.value = category ? (category.itbm_percent ?? 7) : null;
+    categoryItbmPercent.value = category
+        ? resolveTaxRate(category.itbm_percent ?? null)
+        : null;
     categoryMargin.value = category?.default_margin_percent ?? null;
 };
 
@@ -533,6 +557,13 @@ const initializeProductDraft = async () => {
 };
 
 onMounted(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const variantParam = Number(params.get('variant'));
+    initialEditVariantId.value =
+        Number.isInteger(variantParam) && variantParam > 0
+            ? variantParam
+            : null;
+
     loadingCategories.value = true;
     try {
         const response = await apiClient.get('/categories');
@@ -620,9 +651,12 @@ const metadataPayload = (): UpdateProductRequest => ({
         chassis: draftCompatibility.value.chassis.map((chassis) => ({
             chassis_id: chassis.chassis_id,
         })),
-        allEngines: draftCompatibility.value.allEngines,
-        allChassis: draftCompatibility.value.allChassis,
-        isUniversal: draftCompatibility.value.isUniversal,
+        all_engines: draftCompatibility.value.allEngines,
+        all_chassis: draftCompatibility.value.allChassis,
+        model_id:
+            vehicleCompatRef.value?.selectedModelId ??
+            draftCompatibility.value.modelId ??
+            null,
     },
 });
 
@@ -707,9 +741,12 @@ const handleRegenerateName = async () => {
                 chassis: draftCompatibility.value.chassis.map((chassis) => ({
                     chassis_id: chassis.chassis_id,
                 })),
-                allEngines: draftCompatibility.value.allEngines,
-                allChassis: draftCompatibility.value.allChassis,
-                isUniversal: draftCompatibility.value.isUniversal,
+                all_engines: draftCompatibility.value.allEngines,
+                all_chassis: draftCompatibility.value.allChassis,
+                model_id:
+                    vehicleCompatRef.value?.selectedModelId ??
+                    draftCompatibility.value.modelId ??
+                    null,
             },
         });
         const newName = response.data?.name;
@@ -1051,6 +1088,7 @@ const onChassisCreated = (chassis: any) => {
                     :category-applies-itbm="categoryAppliesItbm"
                     :category-itbm-percent="categoryItbmPercent"
                     :category-margin="categoryMargin"
+                    :initial-edit-variant-id="initialEditVariantId"
                 />
 
                 <!-- SECTION 6: Atributos -->

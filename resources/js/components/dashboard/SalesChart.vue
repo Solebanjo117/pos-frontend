@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Line } from 'vue-chartjs'
+import { computed } from 'vue';
+import { Line } from 'vue-chartjs';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -11,9 +11,9 @@ import {
     Tooltip,
     Legend,
     Filler,
-    type ChartOptions
-} from 'chart.js'
-import type { SalesChartData } from '@/types/dashboard'
+    type ChartOptions,
+} from 'chart.js';
+import type { SalesChartData } from '@/types/dashboard';
 
 // Register Chart.js components
 ChartJS.register(
@@ -24,17 +24,17 @@ ChartJS.register(
     Title,
     Tooltip,
     Legend,
-    Filler
-)
+    Filler,
+);
 
 interface Props {
-    data: SalesChartData
-    period?: string
+    data: SalesChartData;
+    period?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    period: '7d'
-})
+    period: '7d',
+});
 
 const chartData = computed(() => ({
     labels: props.data.labels,
@@ -51,34 +51,42 @@ const chartData = computed(() => ({
             fill: true,
             tension: 0.4,
         },
-        ...(props.data.cost && props.data.cost.some(v => v !== 0) ? [{
-            label: 'Costo',
-            backgroundColor: 'rgba(239, 68, 68, 0.05)',
-            borderColor: 'rgb(239, 68, 68)',
-            pointBackgroundColor: 'rgb(239, 68, 68)',
-            pointBorderColor: '#fff',
-            pointHoverBackgroundColor: '#fff',
-            pointHoverBorderColor: 'rgb(239, 68, 68)',
-            data: props.data.cost,
-            fill: true,
-            tension: 0.4,
-            borderDash: [5, 5],
-        }] : []),
-        ...(props.data.profit && props.data.profit.some(v => v !== 0) ? [{
-            label: 'Utilidad',
-            backgroundColor: 'rgba(16, 185, 129, 0.05)',
-            borderColor: 'rgb(16, 185, 129)',
-            pointBackgroundColor: 'rgb(16, 185, 129)',
-            pointBorderColor: '#fff',
-            pointHoverBackgroundColor: '#fff',
-            pointHoverBorderColor: 'rgb(16, 185, 129)',
-            data: props.data.profit,
-            fill: true,
-            tension: 0.4,
-            borderDash: [5, 5],
-        }] : [])
-    ]
-}))
+        ...(props.data.cost && props.data.cost.some((v) => v !== 0)
+            ? [
+                  {
+                      label: 'Costo',
+                      backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                      borderColor: 'rgb(239, 68, 68)',
+                      pointBackgroundColor: 'rgb(239, 68, 68)',
+                      pointBorderColor: '#fff',
+                      pointHoverBackgroundColor: '#fff',
+                      pointHoverBorderColor: 'rgb(239, 68, 68)',
+                      data: props.data.cost,
+                      fill: true,
+                      tension: 0.4,
+                      borderDash: [5, 5],
+                  },
+              ]
+            : []),
+        ...(props.data.profit && props.data.profit.some((v) => v !== 0)
+            ? [
+                  {
+                      label: 'Utilidad',
+                      backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                      borderColor: 'rgb(16, 185, 129)',
+                      pointBackgroundColor: 'rgb(16, 185, 129)',
+                      pointBorderColor: '#fff',
+                      pointHoverBackgroundColor: '#fff',
+                      pointHoverBorderColor: 'rgb(16, 185, 129)',
+                      data: props.data.profit,
+                      fill: true,
+                      tension: 0.4,
+                      borderDash: [5, 5],
+                  },
+              ]
+            : []),
+    ],
+}));
 
 const chartOptions = computed<ChartOptions<'line'>>(() => ({
     responsive: true,
@@ -92,7 +100,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
             mode: 'index',
             intersect: false,
             callbacks: {
-                label: function(context: any) {
+                label: function (context: any) {
                     let label = context.dataset.label || '';
                     if (label) {
                         label += ': ';
@@ -100,45 +108,42 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
                     if (context.parsed.y !== null) {
                         label += new Intl.NumberFormat('es-MX', {
                             style: 'currency',
-                            currency: 'USD'
+                            currency: 'USD',
                         }).format(context.parsed.y);
                     }
                     return label;
-                }
-            }
-        }
+                },
+            },
+        },
     },
     scales: {
         y: {
             beginAtZero: true,
             ticks: {
-                callback: function(value: any) {
+                callback: function (value: any) {
                     return '$' + value.toLocaleString('es-MX');
-                }
+                },
             },
             grid: {
-                color: 'rgba(0, 0, 0, 0.05)'
-            }
+                color: 'rgba(0, 0, 0, 0.05)',
+            },
         },
         x: {
             grid: {
-                display: false
-            }
-        }
+                display: false,
+            },
+        },
     },
     interaction: {
         mode: 'nearest',
         axis: 'x',
-        intersect: false
-    }
-}))
+        intersect: false,
+    },
+}));
 </script>
 
 <template>
     <div class="h-full w-full">
-        <Line
-            :data="chartData"
-            :options="chartOptions"
-        />
+        <Line :data="chartData" :options="chartOptions" />
     </div>
 </template>

@@ -14,4 +14,3 @@ export type NavItem = {
     badge?: string;
     items?: NavItem[];
 };
-

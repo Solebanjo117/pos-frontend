@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import {
     BarChart3,
     AlertCircle,
@@ -156,6 +156,26 @@ const formatCurrency = (value: number) => {
         style: 'currency',
         currency: 'MXN',
     }).format(value);
+};
+
+const inventoryProductHref = (product: {
+    id: number;
+    warehouse_id?: number | null;
+    variant_id?: number | null;
+}) => {
+    const params = new URLSearchParams();
+
+    if (product.warehouse_id) {
+        params.set('warehouse_id', String(product.warehouse_id));
+    }
+
+    if (product.variant_id) {
+        params.set('variant_id', String(product.variant_id));
+    }
+
+    const query = params.toString();
+
+    return `/inventory/products/${product.id}${query ? `?${query}` : ''}`;
 };
 </script>
 
@@ -492,18 +512,34 @@ const formatCurrency = (value: number) => {
                         >
                             <tr
                                 v-for="product in stockLevelsReport.products"
-                                :key="`${product.id}-${product.warehouse_id}`"
+                                :key="`${product.id}-${product.variant_id || 'base'}-${product.warehouse_id}`"
                                 class="hover:bg-gray-50 dark:hover:bg-muted/50"
                             >
                                 <td
                                     class="px-6 py-4 text-sm text-gray-900 dark:text-white"
                                 >
-                                    {{ product.sku }}
+                                    <Link
+                                        :href="inventoryProductHref(product)"
+                                        class="font-mono text-blue-700 hover:underline dark:text-blue-300"
+                                    >
+                                        {{ product.variant_sku || product.sku }}
+                                    </Link>
                                 </td>
                                 <td
                                     class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white"
                                 >
-                                    {{ product.name }}
+                                    <Link
+                                        :href="inventoryProductHref(product)"
+                                        class="text-blue-700 hover:underline dark:text-blue-300"
+                                    >
+                                        {{ product.name }}
+                                    </Link>
+                                    <p
+                                        v-if="product.variant_sku"
+                                        class="mt-1 font-mono text-xs font-normal text-gray-500"
+                                    >
+                                        Variante {{ product.variant_sku }}
+                                    </p>
                                 </td>
                                 <td
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"

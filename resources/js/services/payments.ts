@@ -39,6 +39,9 @@ export const AccountsReceivableApiService = {
         search?: string;
         per_page?: number;
         page?: number;
+        date_from?: string;
+        date_to?: string;
+        warehouse_id?: number;
     }) {
         const { data } = await apiClient.get('/accounts-receivable', {
             params: { ...params, per_page: params?.per_page ?? 50 },
@@ -49,9 +52,17 @@ export const AccountsReceivableApiService = {
     /**
      * Get a customer's transactions and open orders
      */
-    async getCustomerStatement(customerId: number) {
+    async getCustomerStatement(
+        customerId: number,
+        params?: {
+            date_from?: string;
+            date_to?: string;
+            warehouse_id?: number;
+        },
+    ) {
         const { data } = await apiClient.get(
             `/accounts-receivable/${customerId}/statement`,
+            { params },
         );
         return data;
     },

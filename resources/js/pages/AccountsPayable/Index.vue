@@ -26,6 +26,12 @@ interface PaymentMeta {
     notes?: string | null;
 }
 
+interface ReportFilters {
+    date_from?: string;
+    date_to?: string;
+    warehouse_id?: number;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Cuentas por Pagar', href: '/accounts-payable' },
@@ -41,6 +47,7 @@ const showPaymentModal = ref(false);
 const paymentLoading = ref(false);
 const paymentError = ref<string | null>(null);
 const manualApplications = ref<Record<number, number>>({});
+const reportFilters = ref<ReportFilters>({});
 
 const documents = computed<any[]>(
     () => supplierStatement.value?.documents ?? [],
@@ -50,7 +57,11 @@ const ledgerEntries = computed<any[]>(
 );
 const recentPayments = computed(() =>
     ledgerEntries.value
-        .filter((entry: any) => Number(entry.credit || 0) > 0)
+        .filter(
+            (entry: any) =>
+                entry.movement_type === 'payment' &&
+                Number(entry.debit || 0) > 0,
+        )
         .slice(0, 6),
 );
 
@@ -87,6 +98,27 @@ const manualApplicationTotal = computed(() =>
         ),
     ),
 );
+const activeReportFilters = computed(
+    () =>
+        Boolean(reportFilters.value.date_from) ||
+        Boolean(reportFilters.value.date_to) ||
+        Boolean(reportFilters.value.warehouse_id),
+);
+const reportFilterSummary = computed(() => {
+    const labels: string[] = [];
+
+    if (reportFilters.value.date_from || reportFilters.value.date_to) {
+        labels.push(
+            `${reportFilters.value.date_from || 'Inicio'} - ${reportFilters.value.date_to || 'Hoy'}`,
+        );
+    }
+
+    if (reportFilters.value.warehouse_id) {
+        labels.push(`Sucursal #${reportFilters.value.warehouse_id}`);
+    }
+
+    return labels.join(' · ');
+});
 
 const money = (value: number): number =>
     Math.round((Number(value) || 0) * 100) / 100;
@@ -105,12 +137,25 @@ const formatDate = (value?: string | null): string => {
     return new Date(value).toLocaleDateString('es-PA');
 };
 
+const readReportFilters = (): ReportFilters => {
+    const params = new URLSearchParams(window.location.search);
+    const warehouseId = Number(params.get('warehouse_id'));
+
+    return {
+        date_from: params.get('date_from') || undefined,
+        date_to: params.get('date_to') || undefined,
+        warehouse_id: warehouseId > 0 ? warehouseId : undefined,
+    };
+};
+
 async function loadAccountsPayable() {
     loading.value = true;
     error.value = null;
 
     try {
-        const res = await apiClient.get('/accounts-payable');
+        const res = await apiClient.get('/accounts-payable', {
+            params: reportFilters.value,
+        });
         suppliers.value = res.data.data || res.data;
     } catch (e: any) {
         error.value =
@@ -129,6 +174,7 @@ async function loadSupplierStatement(supplier: any) {
     try {
         const res = await apiClient.get(
             `/accounts-payable/${supplier.id}/statement`,
+            { params: reportFilters.value },
         );
         supplierStatement.value = res.data.data || res.data;
     } catch (e: any) {
@@ -275,7 +321,10 @@ async function handlePaymentFinish(payments: Payment[], meta: PaymentMeta) {
     }
 }
 
-onMounted(loadAccountsPayable);
+onMounted(() => {
+    reportFilters.value = readReportFilters();
+    loadAccountsPayable();
+});
 </script>
 
 <template>
@@ -314,6 +363,14 @@ onMounted(loadAccountsPayable);
                         <ExternalLink :size="16" />
                         Ver ordenes de compra
                     </Link>
+                </div>
+
+                <div
+                    v-if="activeReportFilters"
+                    class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-100"
+                >
+                    Vista filtrada desde reportes:
+                    <span class="font-semibold">{{ reportFilterSummary }}</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -744,7 +801,7 @@ onMounted(loadAccountsPayable);
                                                 class="font-mono text-sm font-bold text-green-600"
                                             >
                                                 {{
-                                                    formatCurrency(entry.credit)
+                                                    formatCurrency(entry.debit)
                                                 }}
                                             </p>
                                         </div>
@@ -794,9 +851,7 @@ onMounted(loadAccountsPayable);
                             Aplicacion manual opcional
                         </span>
                         <span class="text-xs text-gray-500">
-                            {{
-                                formatCurrency(manualApplicationTotal)
-                            }}
+                            {{ formatCurrency(manualApplicationTotal) }}
                             aplicado
                         </span>
                     </div>

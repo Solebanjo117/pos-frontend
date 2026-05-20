@@ -22,6 +22,8 @@ export interface ProductStockLevel {
     sku: string;
     name: string;
     brand: string | null;
+    variant_id?: number | null;
+    variant_sku?: string | null;
     warehouse_id: number;
     warehouse: string;
     current_stock: number;
@@ -128,6 +130,18 @@ export interface FinancialReport {
         total_tax: number;
         total_discounts: number;
         orders_count: number;
+    };
+    credit_balances: {
+        accounts_receivable: {
+            total_open_balance: number;
+            open_documents_count: number;
+            accounts_count: number;
+        };
+        accounts_payable: {
+            total_open_balance: number;
+            open_documents_count: number;
+            accounts_count: number;
+        };
     };
     timeline: Array<{
         date: string;

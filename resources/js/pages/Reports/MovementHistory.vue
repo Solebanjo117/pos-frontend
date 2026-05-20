@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import {
     Clock,
     AlertCircle,
@@ -73,6 +73,28 @@ const userOptions = computed<SelectOption[]>(() => [
 
 const exporting = ref(false);
 
+const readInitialFilters = () => {
+    const params = new URLSearchParams(window.location.search);
+    const warehouseId = Number(params.get('warehouse_id'));
+    const productId = Number(params.get('product_id'));
+
+    if (params.get('date_from')) {
+        filters.value.date_from = params.get('date_from') as string;
+    }
+
+    if (params.get('date_to')) {
+        filters.value.date_to = params.get('date_to') as string;
+    }
+
+    if (warehouseId > 0) {
+        filters.value.warehouse_id = warehouseId;
+    }
+
+    if (productId > 0) {
+        filters.value.product_id = productId;
+    }
+};
+
 onMounted(async () => {
     await Promise.all([
         initWarehouse(),
@@ -80,7 +102,12 @@ onMounted(async () => {
         fetchUsers(),
         fetchProducts(),
     ]);
-    filters.value.warehouse_id = currentWarehouseId.value;
+    readInitialFilters();
+
+    if (!filters.value.warehouse_id) {
+        filters.value.warehouse_id = currentWarehouseId.value;
+    }
+
     await fetchMovementHistory(filters.value);
 });
 
@@ -169,6 +196,81 @@ const formatDate = (dateString: string) => {
         hour: '2-digit',
         minute: '2-digit',
     });
+};
+
+const formatCurrency = (value: number | undefined) =>
+    new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+    }).format(Number(value) || 0);
+
+const inventoryProductHref = (productId: number, variantId?: number | null) => {
+    const params = new URLSearchParams();
+
+    if (filters.value.warehouse_id) {
+        params.set('warehouse_id', String(filters.value.warehouse_id));
+    }
+
+    if (variantId) {
+        params.set('variant_id', String(variantId));
+    }
+
+    const query = params.toString();
+
+    return `/inventory/products/${productId}${query ? `?${query}` : ''}`;
+};
+
+const sourceHref = (movement: {
+    id: number;
+    reference_type?: string | null;
+    reference_id?: string | number | null;
+}) => {
+    const type = String(movement.reference_type || '').toLowerCase();
+    const id = movement.reference_id;
+
+    if (!id) {
+        return `/inventory-movements/${movement.id}`;
+    }
+
+    if (type.includes('purchase')) {
+        return `/purchase-orders/${id}`;
+    }
+
+    if (type.includes('sales') || type.includes('sale')) {
+        return `/sales-orders/${id}`;
+    }
+
+    if (type.includes('transfer')) {
+        return `/inventory-transfers/${id}`;
+    }
+
+    return `/inventory-movements/${movement.id}`;
+};
+
+const sourceLabel = (movement: {
+    reference_type?: string | null;
+    reference_id?: string | number | null;
+}) => {
+    const type = String(movement.reference_type || '').toLowerCase();
+    const id = movement.reference_id;
+
+    if (!id) {
+        return 'Movimiento manual';
+    }
+
+    if (type.includes('purchase')) {
+        return `OC #${id}`;
+    }
+
+    if (type.includes('sales') || type.includes('sale')) {
+        return `Venta #${id}`;
+    }
+
+    if (type.includes('transfer')) {
+        return `Transferencia #${id}`;
+    }
+
+    return `${movement.reference_type || 'Origen'} #${id}`;
 };
 </script>
 
@@ -545,12 +647,30 @@ const formatDate = (dateString: string) => {
                                 <td
                                     class="px-6 py-4 text-sm text-gray-900 dark:text-white"
                                 >
-                                    {{ product.product_sku }}
+                                    <Link
+                                        :href="
+                                            inventoryProductHref(
+                                                product.product_id,
+                                            )
+                                        "
+                                        class="font-mono text-blue-700 hover:underline dark:text-blue-300"
+                                    >
+                                        {{ product.product_sku }}
+                                    </Link>
                                 </td>
                                 <td
                                     class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white"
                                 >
-                                    {{ product.product_name }}
+                                    <Link
+                                        :href="
+                                            inventoryProductHref(
+                                                product.product_id,
+                                            )
+                                        "
+                                        class="text-blue-700 hover:underline dark:text-blue-300"
+                                    >
+                                        {{ product.product_name }}
+                                    </Link>
                                 </td>
                                 <td
                                     class="px-6 py-4 text-center text-sm font-bold text-gray-900 dark:text-white"
@@ -637,6 +757,21 @@ const formatDate = (dateString: string) => {
                                 >
                                     Usuario
                                 </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Origen
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Costo asignado
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
+                                >
+                                    Lotes
+                                </th>
                             </tr>
                         </thead>
                         <tbody
@@ -655,12 +790,41 @@ const formatDate = (dateString: string) => {
                                 <td
                                     class="px-6 py-4 text-sm text-gray-900 dark:text-white"
                                 >
-                                    {{ movement.product_sku }}
+                                    <Link
+                                        :href="
+                                            inventoryProductHref(
+                                                movement.product_id,
+                                                movement.variant_id,
+                                            )
+                                        "
+                                        class="font-mono text-blue-700 hover:underline dark:text-blue-300"
+                                    >
+                                        {{
+                                            movement.variant_sku ||
+                                            movement.product_sku
+                                        }}
+                                    </Link>
                                 </td>
                                 <td
                                     class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white"
                                 >
-                                    {{ movement.product_name }}
+                                    <Link
+                                        :href="
+                                            inventoryProductHref(
+                                                movement.product_id,
+                                                movement.variant_id,
+                                            )
+                                        "
+                                        class="text-blue-700 hover:underline dark:text-blue-300"
+                                    >
+                                        {{ movement.product_name }}
+                                    </Link>
+                                    <p
+                                        v-if="movement.variant_sku"
+                                        class="mt-1 font-mono text-xs font-normal text-gray-500"
+                                    >
+                                        Variante {{ movement.variant_sku }}
+                                    </p>
                                 </td>
                                 <td
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
@@ -693,6 +857,49 @@ const formatDate = (dateString: string) => {
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
                                 >
                                     {{ movement.user || '-' }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
+                                >
+                                    <Link
+                                        :href="sourceHref(movement)"
+                                        class="text-blue-700 hover:underline dark:text-blue-300"
+                                    >
+                                        {{ sourceLabel(movement) }}
+                                    </Link>
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white"
+                                >
+                                    {{
+                                        movement.fifo_total_cost
+                                            ? formatCurrency(
+                                                  movement.fifo_total_cost,
+                                              )
+                                            : '-'
+                                    }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-xs text-gray-600 dark:text-gray-300"
+                                >
+                                    <div
+                                        v-if="movement.fifo_allocations?.length"
+                                        class="space-y-1"
+                                    >
+                                        <div
+                                            v-for="allocation in movement.fifo_allocations"
+                                            :key="`${movement.id}-${allocation.lot_id}`"
+                                        >
+                                            Lote #{{ allocation.lot_id }} ·
+                                            {{ allocation.quantity }} @
+                                            {{
+                                                formatCurrency(
+                                                    allocation.unit_cost,
+                                                )
+                                            }}
+                                        </div>
+                                    </div>
+                                    <span v-else>-</span>
                                 </td>
                             </tr>
                         </tbody>

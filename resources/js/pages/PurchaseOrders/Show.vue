@@ -4,6 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { usePosSettings } from '@/composables/usePosSettings';
 import {
     Copy,
     DollarSign,
@@ -34,6 +35,7 @@ const {
 } = usePurchaseOrders();
 const { fetchSettings: fetchStoreSettings, resolveTaxRate } =
     useStoreSettings();
+const { initWarehouse } = usePosSettings();
 
 const payments = ref<any[]>([]);
 const paymentStatus = ref<string>('pending');
@@ -72,7 +74,7 @@ const methodLabels: Record<string, string> = {
     card: 'Tarjeta',
     transfer: 'Transferencia',
     other: 'Otro',
-    supplier_credit: 'Credito proveedor',
+    supplier_credit: 'Crédito proveedor',
 };
 
 const orderedQuantity = computed(
@@ -154,7 +156,6 @@ async function handlePurchasePaymentFinish(
     meta: {
         reference_number?: string | null;
         notes?: string | null;
-        supplier_credit_amount?: number;
     },
 ) {
     paymentLoading.value = true;
@@ -162,14 +163,14 @@ async function handlePurchasePaymentFinish(
 
     try {
         const realPayments = submittedPayments.filter(
-            (payment) =>
-                payment.amount > 0 && payment.method !== 'supplier_credit',
+            (payment) => payment.amount > 0,
         );
 
         for (const payment of realPayments) {
             await apiClient.post(
                 `/purchase-orders/${props.purchaseOrderId}/payments`,
                 {
+                    warehouse_id: purchaseOrder.value?.warehouse_id,
                     amount: payment.amount,
                     method: payment.method,
                     reference_number: meta.reference_number || null,
@@ -233,6 +234,7 @@ async function handleStatusAction(event: Event) {
 onMounted(async () => {
     await Promise.all([
         fetchStoreSettings(),
+        initWarehouse(),
         fetchPurchaseOrderById(props.purchaseOrderId),
     ]);
     await loadPayments();
@@ -950,14 +952,7 @@ onMounted(async () => {
             primary-action-label="Registrar pago"
             cancel-label="Cancelar"
             allow-partial
-            include-supplier-credit
-            :allowed-method-codes="[
-                'cash',
-                'card',
-                'transfer',
-                'other',
-                'supplier_credit',
-            ]"
+            :allowed-method-codes="['cash', 'card', 'transfer', 'other']"
             show-reference-number
             show-notes
             reference-number-label="Numero de recibo"
@@ -969,6 +964,23 @@ onMounted(async () => {
                 showPaymentModal = false;
                 paymentError = null;
             "
-        />
+        >
+            <template #details>
+                <div
+                    class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                >
+                    Efectivo, tarjeta, transferencia u otro método real se
+                    concilian contra la caja abierta de
+                    <span class="font-semibold">
+                        {{
+                            purchaseOrder?.warehouse?.name ||
+                            'la sucursal de la OC'
+                        }}
+                    </span>
+                    . El crédito proveedor queda como cuenta por pagar, no como
+                    pago inmediato.
+                </div>
+            </template>
+        </OperationalPaymentPanel>
     </AppLayout>
 </template>

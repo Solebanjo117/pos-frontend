@@ -1,5 +1,6 @@
 export type PurchaseOrderStatus =
     | 'draft'
+    | 'open'
     | 'sent'
     | 'partial'
     | 'received'

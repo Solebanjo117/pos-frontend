@@ -15,6 +15,7 @@ import type { ProductFilterValues } from '@/components/Products/ProductFilters.v
 import ProductSort from '@/components/Products/ProductSort.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import apiClient from '@/services/api/client';
+import { usePosSettings } from '@/composables/usePosSettings';
 import type { Product, ProductVariant } from '@/types/product';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
 
@@ -104,6 +105,7 @@ const selectedSnapshots = ref<
 >({});
 const selectedProductForDetail = ref<Product | null>(null);
 const loadingProductDetail = ref(false);
+const { currentWarehouseId } = usePosSettings();
 
 const defaultFilters = (): ProductFilterValues => ({
     sku: '',
@@ -125,9 +127,34 @@ const variantsFor = (product: Product): Array<ProductVariant | null> => {
     return [null];
 };
 
+const activeInventoryForVariant = (variant: ProductVariant | null) => {
+    const inventory = variant?.inventory ?? [];
+    const warehouseId = currentWarehouseId.value
+        ? Number(currentWarehouseId.value)
+        : null;
+
+    return (
+        inventory.find(
+            (item) =>
+                warehouseId &&
+                Number(item.warehouse?.id ?? item.warehouse_id) === warehouseId,
+        ) ??
+        inventory.find(
+            (item) =>
+                Number(
+                    item.current_sale_price ?? item.fifo_sale_price_current,
+                ) > 0 ||
+                Number(item.current_cost ?? item.fifo_cost_current) > 0,
+        ) ??
+        null
+    );
+};
+
 const priceFor = (product: Product, variant: ProductVariant | null): number =>
     Number(
-        variant?.pricing?.base_price ??
+        activeInventoryForVariant(variant)?.current_sale_price ??
+            activeInventoryForVariant(variant)?.fifo_sale_price_current ??
+            variant?.pricing?.base_price ??
             product.pricing?.base_price ??
             product.default_variant?.pricing?.base_price ??
             0,
@@ -147,6 +174,8 @@ const costFor = (product: Product, variant: ProductVariant | null): number => {
 
     return Number(
         relation?.supplier_cost ??
+            activeInventoryForVariant(variant)?.current_cost ??
+            activeInventoryForVariant(variant)?.fifo_cost_current ??
             variant?.pricing?.cost_base ??
             product.pricing?.cost_base ??
             variant?.pricing?.cost ??

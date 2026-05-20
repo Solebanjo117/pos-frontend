@@ -116,16 +116,64 @@ const getVariantPricing = (variant: any) => {
     return props.product.pricing ?? null;
 };
 
+const activeInventoryForVariant = (variant: any) => {
+    const inventory = variant?.inventory ?? [];
+    const warehouseId = currentWarehouseId.value
+        ? Number(currentWarehouseId.value)
+        : null;
+
+    return (
+        inventory.find(
+            (item: any) =>
+                warehouseId &&
+                Number(item.warehouse?.id ?? item.warehouse_id) === warehouseId,
+        ) ??
+        inventory.find(
+            (item: any) =>
+                Number(
+                    item.current_sale_price ?? item.fifo_sale_price_current,
+                ) > 0 ||
+                Number(item.current_cost ?? item.fifo_cost_current) > 0,
+        ) ??
+        null
+    );
+};
+
 const getQuantity = (variant: any): number => quantities.value[variant.id] ?? 1;
 
 const saleBasePrice = (pricing: any): number =>
     Number(pricing?.calculated_price ?? pricing?.base_price) || 0;
 
 const saleDisplayPrice = (variant: any): number => {
+    const inventory = activeInventoryForVariant(variant);
+    const currentSalePrice = Number(
+        inventory?.current_sale_price ?? inventory?.fifo_sale_price_current,
+    );
+    if (Number.isFinite(currentSalePrice) && currentSalePrice > 0) {
+        const p = getVariantPricing(variant);
+        const taxRate = resolveSaleTaxRate(p);
+
+        return includeITBM.value
+            ? priceWithTax(currentSalePrice, taxRate)
+            : currentSalePrice;
+    }
+
     const p = getVariantPricing(variant);
     if (!p) return 0;
     const base = saleBasePrice(p);
     return includeITBM.value ? priceWithTax(base, resolveSaleTaxRate(p)) : base;
+};
+
+const saleUnitBaseDisplayPrice = (variant: any): number => {
+    const inventory = activeInventoryForVariant(variant);
+    const currentSalePrice = Number(
+        inventory?.current_sale_price ?? inventory?.fifo_sale_price_current,
+    );
+    if (Number.isFinite(currentSalePrice) && currentSalePrice > 0) {
+        return currentSalePrice;
+    }
+
+    return saleBasePrice(getVariantPricing(variant));
 };
 
 const costBaseAmount = (pricing: any): number =>
@@ -138,6 +186,14 @@ const costSubtotal = (pricing: any): number =>
     costBaseAmount(pricing) + costMiscAmount(pricing);
 
 const costDisplayPrice = (variant: any): number => {
+    const inventory = activeInventoryForVariant(variant);
+    const currentCost = Number(
+        inventory?.current_cost ?? inventory?.fifo_cost_current,
+    );
+    if (Number.isFinite(currentCost) && currentCost > 0) {
+        return currentCost;
+    }
+
     const p = getVariantPricing(variant);
     if (!p) return 0;
     if (!includeITBM.value) return costSubtotal(p);
@@ -153,13 +209,28 @@ const costDisplayPrice = (variant: any): number => {
 const variantDisplayPrice = (variant: any): number =>
     blindMode.value ? saleDisplayPrice(variant) : costDisplayPrice(variant);
 
+const hasDisplayAmount = (variant: any): boolean =>
+    variantDisplayPrice(variant) > 0 || Boolean(getVariantPricing(variant));
+
 const saleTaxAmount = (variant: any): number => {
     const p = getVariantPricing(variant);
     if (!p) return 0;
-    return Math.max(0, saleDisplayPrice(variant) - saleBasePrice(p));
+    const inventory = activeInventoryForVariant(variant);
+    const currentSalePrice = Number(
+        inventory?.current_sale_price ?? inventory?.fifo_sale_price_current,
+    );
+    const base =
+        Number.isFinite(currentSalePrice) && currentSalePrice > 0
+            ? currentSalePrice
+            : saleBasePrice(p);
+
+    return Math.max(0, saleDisplayPrice(variant) - base);
 };
 
 const costTaxAmount = (variant: any): number => {
+    const inventory = activeInventoryForVariant(variant);
+    if (inventory?.active_lot_id) return 0;
+
     const p = getVariantPricing(variant);
     if (!p) return 0;
     return Math.max(0, costDisplayPrice(variant) - costSubtotal(p));
@@ -1052,7 +1123,7 @@ const handleViewAlternative = async (altId: number) => {
                                                 >
                                                     <template
                                                         v-if="
-                                                            getVariantPricing(
+                                                            hasDisplayAmount(
                                                                 variant,
                                                             )
                                                         "
@@ -1087,10 +1158,8 @@ const handleViewAlternative = async (altId: number) => {
                                                             Venta
                                                             {{
                                                                 formatCurrency(
-                                                                    saleBasePrice(
-                                                                        getVariantPricing(
-                                                                            variant,
-                                                                        ),
+                                                                    saleUnitBaseDisplayPrice(
+                                                                        variant,
                                                                     ) *
                                                                         getQuantity(
                                                                             variant,
@@ -1110,36 +1179,10 @@ const handleViewAlternative = async (altId: number) => {
                                                             }}
                                                         </template>
                                                         <template v-else>
-                                                            Costo Base
+                                                            Costo actual
                                                             {{
                                                                 formatCurrency(
-                                                                    costBaseAmount(
-                                                                        getVariantPricing(
-                                                                            variant,
-                                                                        ),
-                                                                    ) *
-                                                                        getQuantity(
-                                                                            variant,
-                                                                        ),
-                                                                )
-                                                            }}
-                                                            + Misc
-                                                            {{
-                                                                formatCurrency(
-                                                                    costMiscAmount(
-                                                                        getVariantPricing(
-                                                                            variant,
-                                                                        ),
-                                                                    ) *
-                                                                        getQuantity(
-                                                                            variant,
-                                                                        ),
-                                                                )
-                                                            }}
-                                                            + ITBM
-                                                            {{
-                                                                formatCurrency(
-                                                                    costTaxAmount(
+                                                                    costDisplayPrice(
                                                                         variant,
                                                                     ) *
                                                                         getQuantity(

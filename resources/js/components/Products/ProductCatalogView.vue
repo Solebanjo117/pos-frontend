@@ -121,6 +121,13 @@ const searchMatchesProduct = (product: Product, query: string) => {
 
 const getComparablePrice = (product: Product): number | null => {
     const prices = [
+        ...(product.variants?.flatMap(
+            (variant) =>
+                variant.inventory?.map(
+                    (item) =>
+                        item.current_sale_price ?? item.fifo_sale_price_current,
+                ) ?? [],
+        ) ?? []),
         product.pricing?.base_price,
         product.default_variant?.pricing?.base_price,
         ...(product.variants?.map((v) => v.pricing?.base_price) ?? []),

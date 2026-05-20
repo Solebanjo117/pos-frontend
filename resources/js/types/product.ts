@@ -14,6 +14,8 @@ export interface ProductLine {
 
 export interface ProductPricing {
     base_price: number;
+    current_sale_price?: number;
+    fifo_sale_price_current?: number;
     calculated_price?: number;
     msrp: number;
     cost: number;
@@ -90,24 +92,37 @@ export interface ProductInventory {
     stock_on_order: number;
     reorder_point: number;
     needs_reorder: boolean;
+    active_lot_id?: number | null;
     fifo_cost_current?: number;
+    fifo_sale_price_current?: number;
+    current_cost?: number;
+    current_sale_price?: number;
+    inventory_value?: number;
     // Legacy fields (optional if needed)
     quantity_available?: number;
     quantity_reserved?: number;
 }
 
 export interface VariantInventory {
+    warehouse_id?: number;
     warehouse: {
         id: number;
         name: string;
         code: string;
     };
-    stock_available: number;
-    stock_reserved: number;
-    stock_on_order: number;
-    reorder_point: number;
-    needs_reorder: boolean;
+    stock_available?: number;
+    stock_reserved?: number;
+    stock_on_order?: number;
+    quantity_available?: number;
+    quantity_reserved?: number;
+    reorder_point?: number;
+    needs_reorder?: boolean;
+    active_lot_id?: number | null;
     fifo_cost_current?: number;
+    fifo_sale_price_current?: number;
+    current_cost?: number;
+    current_sale_price?: number;
+    inventory_value?: number;
 }
 
 export interface ProductMedia {
@@ -222,6 +237,8 @@ export interface ProductVariant {
     brand?: Brand;
     pricing?: ProductPricing; // Variant-level pricing (overrides product pricing)
     base_price?: number | null;
+    current_sale_price?: number | null;
+    fifo_sale_price_current?: number | null;
     total_stock?: number;
     created_at: string;
     updated_at: string;
@@ -233,7 +250,12 @@ export interface VariantFifoSummary {
     variant_id: number;
     warehouse_id: number;
     stock_available: number;
+    active_lot_id?: number | null;
+    current_cost?: number;
+    current_sale_price?: number;
+    inventory_value?: number;
     fifo_cost_current: number;
+    fifo_sale_price_current?: number;
     total_lot_quantity: number;
     total_lot_value: number;
     average_landed_cost: number;
@@ -254,8 +276,12 @@ export interface InventoryFifoLot {
     quantity_available: number;
     unit_cost_base: number;
     tax_per_unit: number;
+    tax_total?: number;
     misc_per_unit: number;
+    misc_total?: number;
     landed_unit_cost: number;
+    landed_total?: number;
+    sale_price: number;
     remaining_value: number;
     received_at?: string | null;
 }
@@ -277,12 +303,40 @@ export interface VariantFifoMovement {
         quantity_available: number;
         unit_cost_base: number;
         tax_per_unit: number;
+        tax_total?: number;
         misc_per_unit: number;
+        misc_total?: number;
         landed_unit_cost: number;
+        landed_total?: number;
+        sale_price: number;
+        remaining_value: number;
+        received_at?: string | null;
+    }>;
+    source_lots?: Array<{
+        lot_id: number;
+        quantity: number;
+        quantity_available: number;
+        unit_cost_base: number;
+        tax_per_unit: number;
+        tax_total?: number;
+        misc_per_unit: number;
+        misc_total?: number;
+        landed_unit_cost: number;
+        landed_total?: number;
+        sale_price: number;
         remaining_value: number;
         received_at?: string | null;
     }>;
     fifo_allocations?: Array<{
+        lot_id: number;
+        quantity: number;
+        unit_cost: number;
+        total_cost: number;
+        source_type?: string | null;
+        source_id?: number | null;
+        received_at?: string | null;
+    }>;
+    lot_allocations?: Array<{
         lot_id: number;
         quantity: number;
         unit_cost: number;
@@ -350,7 +404,7 @@ export interface ProductVehicleCompatibilityPayload {
     chassis: Array<{ chassis_id: number }>;
     all_engines: boolean;
     all_chassis: boolean;
-    model_id: number | null;
+    model_id?: number | null;
 }
 
 export interface CreateProductRequest {

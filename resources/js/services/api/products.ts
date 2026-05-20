@@ -378,7 +378,7 @@ export const productsApi = {
         },
     ): Promise<ApiResponse<VariantFifoHistory>> {
         const response = await apiClient.get<ApiResponse<VariantFifoHistory>>(
-            `/products/${productId}/variants/${variantId}/fifo-history`,
+            `/products/${productId}/variants/${variantId}/inventory-history`,
             { params: filters },
         );
         return response.data;

@@ -122,6 +122,31 @@ const getItemCost = (item: any): number => {
         const variant = product.variants.find(
             (v: any) => v.id === item.variant_id,
         );
+        const activeInventory =
+            variant?.inventory?.find(
+                (inventory: any) =>
+                    props.warehouseId &&
+                    Number(
+                        inventory.warehouse?.id ?? inventory.warehouse_id,
+                    ) === Number(props.warehouseId),
+            ) ??
+            variant?.inventory?.find(
+                (inventory: any) =>
+                    Number(
+                        inventory.current_cost ??
+                            inventory.fifo_cost_current ??
+                            0,
+                    ) > 0,
+            );
+        if (
+            activeInventory?.current_cost ||
+            activeInventory?.fifo_cost_current
+        ) {
+            return Number(
+                activeInventory.current_cost ??
+                    activeInventory.fifo_cost_current,
+            );
+        }
         if (variant?.pricing?.cost) return Number(variant.pricing.cost);
     }
     return Number(product.pricing?.cost ?? 0);

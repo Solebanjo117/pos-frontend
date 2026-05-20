@@ -23,6 +23,24 @@ const variants = computed(() => props.product?.variants ?? []);
 // Helpers
 const getStock = (v: ProductVariant): number => v.total_stock ?? 0;
 
+const currentSalePriceForVariant = (variant: ProductVariant): number =>
+    Number(
+        variant.inventory?.find(
+            (item) =>
+                Number(
+                    item.current_sale_price ?? item.fifo_sale_price_current,
+                ) > 0,
+        )?.current_sale_price ??
+            variant.inventory?.find(
+                (item) =>
+                    Number(
+                        item.current_sale_price ?? item.fifo_sale_price_current,
+                    ) > 0,
+            )?.fifo_sale_price_current ??
+            variant.pricing?.base_price ??
+            0,
+    );
+
 const hasLowStock = (v: ProductVariant): boolean => {
     const stock = getStock(v);
     return stock > 0 && stock <= 5;
@@ -421,8 +439,9 @@ const handlePurchaseSuccess = (result: {
                                         <td class="px-3 py-4 text-right">
                                             <PriceDisplay
                                                 :base-price="
-                                                    variant.pricing
-                                                        ?.base_price ?? 0
+                                                    currentSalePriceForVariant(
+                                                        variant,
+                                                    )
                                                 "
                                                 :tax-rate="
                                                     variant.pricing

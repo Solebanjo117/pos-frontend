@@ -4,8 +4,6 @@ import { Head, router } from '@inertiajs/vue3';
 import {
     AlertCircle,
     Calendar,
-    ChevronDown,
-    ChevronRight,
     History,
     Package,
     Search,
@@ -13,7 +11,6 @@ import {
     Warehouse,
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
-import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -47,6 +44,9 @@ interface InventoryRow {
     reorder_point: number;
     reorder_quantity: number;
     status: 'out_of_stock' | 'low_stock' | 'normal' | 'optimal';
+    active_lot_id: number | null;
+    current_sale_price: number;
+    fifo_sale_price_current: number;
     fifo_cost_current: number;
     fifo_stock_value: number;
     open_lots_count: number;
@@ -74,6 +74,7 @@ interface FifoLotRow {
     tax_per_unit: number;
     misc_per_unit: number;
     landed_unit_cost: number;
+    sale_price: number;
     remaining_value: number;
     received_at: string | null;
 }
@@ -142,7 +143,6 @@ const inventoryRows = ref<InventoryRow[]>([]);
 const fifoLots = ref<FifoLotRow[]>([]);
 const movements = ref<MovementRow[]>([]);
 const warehouses = ref<WarehouseOption[]>([]);
-const expandedHistoryKey = ref<string | null>(null);
 
 const pagination = ref<Pagination>({
     current_page: 1,
@@ -176,8 +176,7 @@ const tabs: Array<{ key: ViewMode; label: string }> = [
 
 const showWarehouseColumn = computed(() => !filters.value.warehouse_id);
 
-const summaryColspan = computed(() => (showWarehouseColumn.value ? 11 : 10));
-const lotsColspan = computed(() => (showWarehouseColumn.value ? 12 : 11));
+const lotsColspan = computed(() => (showWarehouseColumn.value ? 13 : 12));
 const movementsColspan = computed(() => (showWarehouseColumn.value ? 8 : 6));
 
 const warehouseFilterOptions = computed<SelectOption[]>(() => [
@@ -206,7 +205,6 @@ onMounted(async () => {
 });
 
 watch(viewMode, async () => {
-    expandedHistoryKey.value = null;
     await fetchData(1);
 });
 
@@ -260,7 +258,7 @@ async function fetchFifoLots(page = 1): Promise<void> {
     try {
         const { data } = await apiClient.get('/inventory/batches', {
             params: {
-                fifo: 1,
+                open_lots: 1,
                 page,
                 per_page: pagination.value.per_page,
                 search: filters.value.search,
@@ -325,7 +323,6 @@ async function fetchWarehouses(): Promise<void> {
 }
 
 async function applyFilters(): Promise<void> {
-    expandedHistoryKey.value = null;
     await Promise.all([fetchData(1), fetchMetrics()]);
 }
 
@@ -338,15 +335,7 @@ async function clearFilters(): Promise<void> {
         date_to: '',
         movement_type: undefined,
     };
-    expandedHistoryKey.value = null;
     await Promise.all([fetchData(1), fetchMetrics()]);
-}
-
-async function refreshCurrentPage(): Promise<void> {
-    await Promise.all([
-        fetchData(pagination.value.current_page),
-        fetchMetrics(),
-    ]);
 }
 
 function setDatePreset(preset: 'today' | 'week' | 'month' | '30days'): void {
@@ -387,35 +376,27 @@ function viewMovement(id: number): void {
     router.visit(`/inventory-movements/${id}`);
 }
 
-function viewProduct(id: number): void {
-    router.visit(`/products/${id}`);
-}
+function viewInventoryProduct(
+    productId: number,
+    variantId?: number | null,
+    warehouseId?: number | null,
+): void {
+    const params = new URLSearchParams();
 
-function toggleHistory(row: InventoryRow): void {
-    const key = historyKey(row);
-    expandedHistoryKey.value = expandedHistoryKey.value === key ? null : key;
+    if (variantId) {
+        params.set('variant', String(variantId));
+    }
+
+    if (warehouseId) {
+        params.set('warehouse_id', String(warehouseId));
+    }
+
+    const query = params.toString();
+    router.visit(`/inventory/products/${productId}${query ? `?${query}` : ''}`);
 }
 
 function historyKey(row: InventoryRow): string {
     return `${row.product_id}:${row.variant_id}:${row.warehouse_id}`;
-}
-
-function variantForHistory(row: InventoryRow): any {
-    return {
-        id: row.variant_id,
-        sku: row.variant_sku,
-        brand: { name: row.brand },
-        base_price: row.base_price,
-        pricing: { base_price: Number(row.base_price ?? 0) },
-        inventory: [
-            {
-                warehouse: {
-                    id: row.warehouse_id,
-                    name: row.warehouse_name,
-                },
-            },
-        ],
-    };
 }
 
 function formatCurrency(value?: number | null): string {
@@ -840,6 +821,9 @@ function pageItemLabel(): string {
                                     Costo actual
                                 </th>
                                 <th class="px-4 py-3 text-right">
+                                    Precio actual
+                                </th>
+                                <th class="px-4 py-3 text-right">
                                     Valor inventario
                                 </th>
                                 <th class="px-4 py-3">Ultimo ingreso</th>
@@ -860,7 +844,13 @@ function pageItemLabel(): string {
                                         <button
                                             type="button"
                                             class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
-                                            @click="viewProduct(row.product_id)"
+                                            @click="
+                                                viewInventoryProduct(
+                                                    row.product_id,
+                                                    row.variant_id,
+                                                    row.warehouse_id,
+                                                )
+                                            "
                                         >
                                             {{ row.product_name }}
                                         </button>
@@ -875,7 +865,13 @@ function pageItemLabel(): string {
                                             type="button"
                                             class="block text-left font-medium text-blue-600 hover:underline disabled:text-gray-900 disabled:no-underline dark:text-primary dark:disabled:text-white"
                                             :disabled="!row.variant_id"
-                                            @click="toggleHistory(row)"
+                                            @click="
+                                                viewInventoryProduct(
+                                                    row.product_id,
+                                                    row.variant_id,
+                                                    row.warehouse_id,
+                                                )
+                                            "
                                         >
                                             {{ row.brand }}
                                         </button>
@@ -912,6 +908,16 @@ function pageItemLabel(): string {
                                         class="px-4 py-3 text-right font-semibold"
                                     >
                                         {{
+                                            formatCurrency(
+                                                row.current_sale_price ??
+                                                    row.fifo_sale_price_current,
+                                            )
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right font-semibold"
+                                    >
+                                        {{
                                             formatCurrency(row.fifo_stock_value)
                                         }}
                                     </td>
@@ -934,48 +940,23 @@ function pageItemLabel(): string {
                                             type="button"
                                             class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline dark:text-primary"
                                             :disabled="!row.variant_id"
-                                            @click="toggleHistory(row)"
+                                            @click="
+                                                viewInventoryProduct(
+                                                    row.product_id,
+                                                    row.variant_id,
+                                                    row.warehouse_id,
+                                                )
+                                            "
                                         >
                                             <History class="h-4 w-4" />
-                                            {{
-                                                expandedHistoryKey ===
-                                                historyKey(row)
-                                                    ? 'Ocultar'
-                                                    : 'Ver historial'
-                                            }}
+                                            Ver movimientos
                                         </button>
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-if="
-                                        expandedHistoryKey === historyKey(row)
-                                    "
-                                    class="border-t border-gray-100 bg-gray-50 dark:border-border dark:bg-muted/30"
-                                >
-                                    <td
-                                        :colspan="summaryColspan"
-                                        class="px-4 py-4"
-                                    >
-                                        <VariantFifoHistoryPanel
-                                            :product-id="row.product_id"
-                                            :variant="variantForHistory(row)"
-                                            :warehouses="[
-                                                {
-                                                    id: row.warehouse_id,
-                                                    name: row.warehouse_name,
-                                                },
-                                            ]"
-                                            :initial-warehouse-id="
-                                                row.warehouse_id
-                                            "
-                                            @updated="refreshCurrentPage"
-                                        />
                                     </td>
                                 </tr>
                             </template>
                             <tr v-if="inventoryRows.length === 0">
                                 <td
-                                    :colspan="summaryColspan"
+                                    :colspan="showWarehouseColumn ? 11 : 10"
                                     class="px-4 py-10 text-center text-sm text-gray-500"
                                 >
                                     No se encontraron registros de inventario.
@@ -1012,6 +993,7 @@ function pageItemLabel(): string {
                                 <th class="px-4 py-3 text-right">ITBM</th>
                                 <th class="px-4 py-3 text-right">Misc</th>
                                 <th class="px-4 py-3 text-right">Final</th>
+                                <th class="px-4 py-3 text-right">Precio</th>
                                 <th class="px-4 py-3 text-right">Valor</th>
                             </tr>
                         </thead>
@@ -1028,7 +1010,13 @@ function pageItemLabel(): string {
                                     <button
                                         type="button"
                                         class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
-                                        @click="viewProduct(lot.product_id)"
+                                        @click="
+                                            viewInventoryProduct(
+                                                lot.product_id,
+                                                lot.variant_id,
+                                                lot.warehouse_id,
+                                            )
+                                        "
                                     >
                                         {{ lot.product_name }}
                                     </button>
@@ -1044,8 +1032,11 @@ function pageItemLabel(): string {
                                         class="text-left text-blue-600 hover:underline dark:text-primary"
                                         :disabled="!lot.variant_id"
                                         @click="
-                                            viewMode = 'summary';
-                                            expandedHistoryKey = `${lot.product_id}:${lot.variant_id}:${lot.warehouse_id}`;
+                                            viewInventoryProduct(
+                                                lot.product_id,
+                                                lot.variant_id,
+                                                lot.warehouse_id,
+                                            )
                                         "
                                     >
                                         {{ lot.brand }}
@@ -1087,6 +1078,9 @@ function pageItemLabel(): string {
                                 </td>
                                 <td class="px-4 py-3 text-right font-semibold">
                                     {{ formatCurrency(lot.landed_unit_cost) }}
+                                </td>
+                                <td class="px-4 py-3 text-right font-semibold">
+                                    {{ formatCurrency(lot.sale_price) }}
                                 </td>
                                 <td class="px-4 py-3 text-right font-semibold">
                                     {{ formatCurrency(lot.remaining_value) }}
@@ -1166,7 +1160,11 @@ function pageItemLabel(): string {
                                         type="button"
                                         class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
                                         @click="
-                                            viewProduct(movement.product.id)
+                                            viewInventoryProduct(
+                                                movement.product.id,
+                                                movement.variant?.id,
+                                                movement.warehouse?.id,
+                                            )
                                         "
                                     >
                                         {{ movement.product?.name || '-' }}

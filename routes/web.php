@@ -59,6 +59,12 @@ Route::middleware(['auth', 'role:admin,manager,buyer,assistant'])->prefix('inven
         return Inertia::render('Inventory/Inventory');
     })->name('index');
 
+    Route::get('/products/{productId}', function ($productId) {
+        return Inertia::render('Inventory/ProductMovements', [
+            'productId' => (int) $productId,
+        ]);
+    })->name('products.show');
+
     Route::get('/waste', function () {
         return Inertia::render('Inventory/Waste');
     })->name('waste');
@@ -164,6 +170,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/ar', function () {
         return Inertia::render('AR/Index');
     })->name('ar.index');
+
+    Route::get('/accounts-receivable', function () {
+        return Inertia::render('AR/Index');
+    })->name('accounts-receivable.index');
 });
 
 // Sales Orders routes

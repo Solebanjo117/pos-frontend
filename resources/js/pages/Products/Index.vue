@@ -28,6 +28,30 @@ const { brands, fetchBrands: fetchBrandsList } = useBrands();
 const showSidebarFilters = ref(true);
 const sidebarSortValue = ref('newest');
 
+const currentSalePriceForVariant = (variant: any, product: Product): number => {
+    const activeInventory =
+        variant.inventory?.find(
+            (item: any) =>
+                currentWarehouseId.value &&
+                Number(item.warehouse?.id ?? item.warehouse_id) ===
+                    Number(currentWarehouseId.value),
+        ) ??
+        variant.inventory?.find(
+            (item: any) =>
+                Number(
+                    item.current_sale_price ?? item.fifo_sale_price_current,
+                ) > 0,
+        );
+
+    return Number(
+        activeInventory?.current_sale_price ??
+            activeInventory?.fifo_sale_price_current ??
+            variant.pricing?.base_price ??
+            product.pricing?.base_price ??
+            0,
+    );
+};
+
 // Sidebar filter values
 const sidebarFilterValues = ref<ProductFilterValues>({
     category_ids: [],
@@ -1503,13 +1527,13 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                     >
                                                                         <PriceDisplay
                                                                             v-if="
-                                                                                variant.pricing
+                                                                                variant.pricing ||
+                                                                                variant.inventory
                                                                             "
                                                                             :base-price="
-                                                                                Number(
-                                                                                    variant
-                                                                                        .pricing
-                                                                                        .base_price,
+                                                                                currentSalePriceForVariant(
+                                                                                    variant,
+                                                                                    product,
                                                                                 )
                                                                             "
                                                                             :tax-rate="

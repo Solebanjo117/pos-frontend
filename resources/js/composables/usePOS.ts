@@ -357,6 +357,28 @@ export function usePOS() {
         return true;
     };
 
+    const activeInventoryForVariant = (variant: any, warehouseId?: number) => {
+        const inventory = variant?.inventory ?? [];
+
+        return (
+            inventory.find(
+                (item: any) =>
+                    warehouseId &&
+                    Number(item.warehouse?.id ?? item.warehouse_id) ===
+                        Number(warehouseId),
+            ) ??
+            inventory.find(
+                (item: any) =>
+                    Number(
+                        item.current_sale_price ??
+                            item.fifo_sale_price_current ??
+                            0,
+                    ) > 0,
+            ) ??
+            null
+        );
+    };
+
     // Add product to cart (always requires an explicit variant)
     const addToCart = (
         product: Product,
@@ -400,10 +422,16 @@ export function usePOS() {
             existingItem.quantity += quantity;
             recalculateItem(existingItem);
         } else {
-            // Resolve price: variant pricing first, then product pricing, then 0
+            // Resolve price: active lot first, then variant/product pricing.
             const variantPricing = variant?.pricing;
             const productPricing = product.pricing;
+            const activeInventory = activeInventoryForVariant(
+                variant,
+                warehouse_id,
+            );
             const resolvedPrice =
+                activeInventory?.current_sale_price ??
+                activeInventory?.fifo_sale_price_current ??
                 variantPricing?.calculated_price ??
                 variantPricing?.base_price ??
                 productPricing?.calculated_price ??

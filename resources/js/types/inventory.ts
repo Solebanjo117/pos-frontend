@@ -15,7 +15,12 @@ export interface InventoryItem {
     needs_reorder: boolean;
     status: 'out_of_stock' | 'low_stock' | 'normal' | 'optimal';
     base_price: number | null; // precio de venta (product_pricing.base_price)
+    current_sale_price?: number | null;
+    fifo_sale_price_current?: number | null;
+    active_lot_id?: number | null;
     cost: number | null; // costo de adquisición
+    current_cost?: number | null;
+    fifo_cost_current?: number | null;
 }
 
 export interface Warehouse {

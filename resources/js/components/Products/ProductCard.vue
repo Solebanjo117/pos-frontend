@@ -79,6 +79,13 @@ const getAttributeBadges = (
 
 const getMinPrice = (product: Product): number | null => {
     const prices = [
+        ...(product.variants?.flatMap(
+            (variant) =>
+                variant.inventory?.map(
+                    (item) =>
+                        item.current_sale_price ?? item.fifo_sale_price_current,
+                ) ?? [],
+        ) ?? []),
         product.pricing?.base_price,
         product.pricing?.calculated_price,
         product.default_variant?.pricing?.base_price,

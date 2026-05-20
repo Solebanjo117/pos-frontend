@@ -17,6 +17,10 @@ interface FoundProduct {
             tax_rate?: number;
             sale_tax_rate?: number;
         };
+        inventory?: {
+            current_sale_price?: number;
+            fifo_sale_price_current?: number;
+        }[];
     };
     variants?: {
         id: number;
@@ -28,6 +32,10 @@ interface FoundProduct {
             sale_tax_rate?: number;
         };
         total_stock: number;
+        inventory?: {
+            current_sale_price?: number;
+            fifo_sale_price_current?: number;
+        }[];
     }[];
     pricing?: { base_price: number; tax_rate?: number; sale_tax_rate?: number };
     image_url?: string | null;
@@ -79,6 +87,19 @@ const resolveSaleTaxRate = (pricing?: {
     const raw = pricing?.sale_tax_rate ?? pricing?.tax_rate;
     if (raw === null || raw === undefined) return storeDefaultTaxRate();
     return normalizeTaxPercent(raw);
+};
+
+const activeSalePriceForProduct = (product: FoundProduct): number | null => {
+    const activeInventory = product.default_variant?.inventory?.find(
+        (item) =>
+            Number(item.current_sale_price ?? item.fifo_sale_price_current) > 0,
+    );
+    const price = Number(
+        activeInventory?.current_sale_price ??
+            activeInventory?.fifo_sale_price_current,
+    );
+
+    return Number.isFinite(price) && price > 0 ? price : null;
 };
 
 watch(
@@ -135,7 +156,8 @@ const addProduct = (product: FoundProduct) => {
         product,
         variant_id: product.default_variant?.id ?? null,
         quantity: 1,
-        unit_price: pricing?.base_price ?? 0,
+        unit_price:
+            activeSalePriceForProduct(product) ?? pricing?.base_price ?? 0,
         tax_percent: resolveSaleTaxRate(pricing),
         seller_id: props.currentUserId ?? null,
     });
@@ -300,11 +322,15 @@ const handleSubmit = async () => {
                                         >
                                             {{
                                                 formatCurrency(
-                                                    (
-                                                        p.default_variant
-                                                            ?.pricing ??
-                                                        p.pricing
-                                                    )?.base_price ?? 0,
+                                                    activeSalePriceForProduct(
+                                                        p,
+                                                    ) ??
+                                                        (
+                                                            p.default_variant
+                                                                ?.pricing ??
+                                                            p.pricing
+                                                        )?.base_price ??
+                                                        0,
                                                 )
                                             }}
                                         </span>

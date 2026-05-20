@@ -174,6 +174,59 @@ const currentWarehouseInventory = computed(() => {
     );
 });
 
+const activeInventoryForVariant = (variant: ProductVariant) => {
+    const inventory = variant.inventory ?? [];
+    if (!resolvedWarehouseId.value) {
+        return (
+            inventory.find(
+                (item) =>
+                    Number(
+                        item.current_sale_price ??
+                            item.fifo_sale_price_current ??
+                            0,
+                    ) > 0 ||
+                    Number(item.current_cost ?? item.fifo_cost_current ?? 0) >
+                        0,
+            ) ?? null
+        );
+    }
+
+    return (
+        inventory.find(
+            (item) =>
+                Number(item.warehouse?.id) ===
+                Number(resolvedWarehouseId.value),
+        ) ?? null
+    );
+};
+
+const primaryCurrentCost = computed(() => {
+    const value = variants.value
+        .map((variant) => activeInventoryForVariant(variant))
+        .find(
+            (item) => Number(item?.current_cost ?? item?.fifo_cost_current) > 0,
+        );
+
+    return value
+        ? Number(value.current_cost ?? value.fifo_cost_current)
+        : Number(primaryPricing.value?.cost ?? 0);
+});
+
+const primaryCurrentSalePrice = computed(() => {
+    const value = variants.value
+        .map((variant) => activeInventoryForVariant(variant))
+        .find(
+            (item) =>
+                Number(
+                    item?.current_sale_price ?? item?.fifo_sale_price_current,
+                ) > 0,
+        );
+
+    return value
+        ? Number(value.current_sale_price ?? value.fifo_sale_price_current)
+        : Number(primaryPricing.value?.base_price ?? 0);
+});
+
 const preferredSupplier = computed(() => {
     return (
         product.value?.suppliers?.find((supplier) => supplier.is_preferred) ??
@@ -237,15 +290,18 @@ function inventoryStockForVariant(variant: ProductVariant): number {
 }
 
 function fifoCostForVariant(variant: ProductVariant): number | undefined {
-    if (!resolvedWarehouseId.value) {
-        return variant.inventory?.find((item) => item.fifo_cost_current)
-            ?.fifo_cost_current;
-    }
+    const inventory = activeInventoryForVariant(variant);
+    const value = inventory?.current_cost ?? inventory?.fifo_cost_current;
 
-    return variant.inventory?.find(
-        (item) =>
-            Number(item.warehouse?.id) === Number(resolvedWarehouseId.value),
-    )?.fifo_cost_current;
+    return value !== undefined ? Number(value) : undefined;
+}
+
+function fifoSalePriceForVariant(variant: ProductVariant): number | undefined {
+    const inventory = activeInventoryForVariant(variant);
+    const value =
+        inventory?.current_sale_price ?? inventory?.fifo_sale_price_current;
+
+    return value !== undefined ? Number(value) : undefined;
 }
 
 function toggleVariantFifoHistory(variant: ProductVariant): void {
@@ -456,11 +512,11 @@ watch(effectiveImages, () => {
                             <p
                                 class="mt-2 text-lg font-semibold text-gray-950 dark:text-white"
                             >
-                                {{ formatCurrency(primaryPricing?.cost) }}
+                                {{ formatCurrency(primaryCurrentCost) }}
                             </p>
                             <p class="text-xs text-gray-500">
                                 Venta
-                                {{ formatCurrency(primaryPricing?.base_price) }}
+                                {{ formatCurrency(primaryCurrentSalePrice) }}
                             </p>
                         </div>
                         <div
@@ -758,8 +814,11 @@ watch(effectiveImages, () => {
                                             >
                                                 {{
                                                     formatCurrency(
-                                                        variant.pricing
-                                                            ?.base_price ??
+                                                        fifoSalePriceForVariant(
+                                                            variant,
+                                                        ) ??
+                                                            variant.pricing
+                                                                ?.base_price ??
                                                             product.pricing
                                                                 ?.base_price,
                                                     )
@@ -778,8 +837,8 @@ watch(effectiveImages, () => {
                                                     {{
                                                         selectedFifoVariantId ===
                                                         variant.id
-                                                            ? 'Ocultar FIFO'
-                                                            : 'Historial FIFO'
+                                                            ? 'Ocultar historial'
+                                                            : 'Historial de stock'
                                                     }}
                                                 </button>
                                             </td>
@@ -859,7 +918,7 @@ watch(effectiveImages, () => {
                                             Reorden
                                         </th>
                                         <th class="px-4 py-2 text-right">
-                                            Costo FIFO
+                                            Costo actual
                                         </th>
                                         <th class="px-4 py-2 text-left">
                                             Estado

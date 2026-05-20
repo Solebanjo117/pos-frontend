@@ -23,7 +23,37 @@ type WarehouseOption = {
     code?: string;
 };
 
-type MovementSourceLot = NonNullable<VariantFifoMovement['fifo_lots']>[number];
+type MovementSourceLot = NonNullable<
+    VariantFifoMovement['source_lots'] | VariantFifoMovement['fifo_lots']
+>[number];
+type MovementLotAllocation = NonNullable<
+    | VariantFifoMovement['lot_allocations']
+    | VariantFifoMovement['fifo_allocations']
+>[number];
+type HeaderLotSyncState = {
+    revision: number;
+    warehouse_id: number | null;
+    quantity_available: number;
+    unit_cost_base: number;
+    cost_tax_rate: number;
+    misc_total: number;
+    sale_price: number;
+};
+type LotEditForm = {
+    received_at: string;
+    received_quantity: number;
+    quantity_available: number;
+    unit_cost_base: number;
+    tax_total: number;
+    misc_total: number;
+    sale_price: number;
+};
+type LotUpdatedPayload = {
+    lot: InventoryFifoLot;
+    summary: VariantFifoHistory['summary'] | null;
+    warehouse_id: number | null;
+};
+type SyncedActiveLotSaveResult = 'saved' | 'skipped' | 'failed';
 
 const props = withDefaults(
     defineProps<{
@@ -31,15 +61,23 @@ const props = withDefaults(
         variant: ProductVariant | any;
         warehouses?: WarehouseOption[];
         initialWarehouseId?: number | null;
+        dateFrom?: string;
+        dateTo?: string;
+        embedded?: boolean;
+        headerSync?: HeaderLotSyncState | null;
     }>(),
     {
         warehouses: () => [],
         initialWarehouseId: null,
+        dateFrom: '',
+        dateTo: '',
+        embedded: false,
+        headerSync: null,
     },
 );
 
 const emit = defineEmits<{
-    (e: 'updated'): void;
+    (e: 'updated', payload?: LotUpdatedPayload): void;
 }>();
 
 const loading = ref(false);
@@ -50,12 +88,13 @@ const history = ref<VariantFifoHistory | null>(null);
 const selectedWarehouseId = ref<number | null>(null);
 const activeTab = ref<'lots' | 'purchases' | 'sales'>('lots');
 const expandedSaleIds = ref<Set<number>>(new Set());
-const lotEditForm = ref({
+const lotEditForm = ref<LotEditForm>({
     received_at: '',
+    received_quantity: 0,
     quantity_available: 0,
     unit_cost_base: 0,
-    tax_per_unit: 0,
-    misc_per_unit: 0,
+    tax_total: 0,
+    misc_total: 0,
     sale_price: 0,
 });
 const tabs = [
@@ -97,12 +136,130 @@ const selectedWarehouseLabel = computed(() => {
         (item) => Number(item.id) === Number(selectedWarehouseId.value),
     );
 
-    return warehouse?.name ?? 'Almacen';
+    return warehouse?.name ?? 'Almacén';
 });
 
 const currentSalePrice = computed(() =>
     Number(
-        props.variant?.pricing?.base_price ?? props.variant?.base_price ?? 0,
+        history.value?.summary.current_sale_price ??
+            history.value?.summary.fifo_sale_price_current ??
+            props.variant?.pricing?.base_price ??
+            props.variant?.base_price ??
+            0,
+    ),
+);
+
+const costTaxRate = computed(() =>
+    Number(
+        props.variant?.pricing?.cost_tax_rate ??
+            props.variant?.pricing?.sale_tax_rate ??
+            props.variant?.pricing?.tax_rate ??
+            0,
+    ),
+);
+
+const roundMoney = (value: number, decimals = 4): number =>
+    Number(value.toFixed(decimals));
+
+const lotInitialQuantity = (
+    lot: Partial<InventoryFifoLot & MovementSourceLot>,
+): number => {
+    const quantity = Number(
+        (lot as InventoryFifoLot).received_quantity ??
+            (lot as MovementSourceLot).quantity ??
+            lot.quantity_available ??
+            0,
+    );
+
+    return quantity > 0 ? quantity : 1;
+};
+
+const unitFromTotal = (total: number, quantity: number): number =>
+    roundMoney(Number(total || 0) / Math.max(1, Number(quantity || 0)));
+
+const lotTaxTotal = (
+    lot?: Partial<InventoryFifoLot & MovementSourceLot> | null,
+): number => {
+    if (!lot) {
+        return 0;
+    }
+
+    return Number(
+        lot.tax_total ??
+            Number(lot.tax_per_unit ?? 0) * lotInitialQuantity(lot),
+    );
+};
+
+const lotMiscTotal = (
+    lot?: Partial<InventoryFifoLot & MovementSourceLot> | null,
+): number => {
+    if (!lot) {
+        return 0;
+    }
+
+    return Number(
+        lot.misc_total ??
+            Number(lot.misc_per_unit ?? 0) * lotInitialQuantity(lot),
+    );
+};
+
+const lotLandedTotal = (
+    lot?: Partial<InventoryFifoLot & MovementSourceLot> | null,
+): number => {
+    if (!lot) {
+        return 0;
+    }
+
+    return Number(
+        lot.landed_total ??
+            Number(lot.landed_unit_cost ?? 0) * lotInitialQuantity(lot),
+    );
+};
+
+const editedLandedUnitCost = computed(() =>
+    roundMoney(
+        Number(lotEditForm.value.unit_cost_base || 0) +
+            unitFromTotal(
+                lotEditForm.value.tax_total,
+                lotEditForm.value.received_quantity,
+            ) +
+            unitFromTotal(
+                lotEditForm.value.misc_total,
+                lotEditForm.value.received_quantity,
+            ),
+    ),
+);
+
+const activeEditableLot = computed<InventoryFifoLot | null>(() => {
+    if (!history.value?.lots?.length) {
+        return null;
+    }
+
+    const activeLotId = history.value.summary.active_lot_id;
+    const lot = history.value.lots.find(
+        (item) => Number(item.id) === Number(activeLotId),
+    );
+
+    if (!lot || Number(lot.quantity_available) <= 0) {
+        return null;
+    }
+
+    return lot;
+});
+
+const editedLandedTotal = computed(() =>
+    roundMoney(
+        editedLandedUnitCost.value *
+            Math.max(1, Number(lotEditForm.value.received_quantity || 0)),
+        2,
+    ),
+);
+
+const editedRemainingValue = computed(() =>
+    roundMoney(
+        editedLandedUnitCost.value *
+            Number(lotEditForm.value.quantity_available || 0),
+        2,
     ),
 );
 
@@ -139,11 +296,14 @@ const loadHistory = async () => {
             Number(props.variant.id),
             {
                 warehouse_id: Number(selectedWarehouseId.value),
+                date_from: props.dateFrom || undefined,
+                date_to: props.dateTo || undefined,
                 per_page: 50,
             },
         );
         history.value = response.data;
         expandedSaleIds.value = new Set();
+        applyHeaderSyncToHistory();
     } catch (err: any) {
         error.value =
             err.response?.data?.message || 'Error al cargar historial de stock';
@@ -201,20 +361,39 @@ const sourceLabel = (type?: string | null, id?: number | null): string => {
     return id ? `${label} #${id}` : label;
 };
 
+const referenceHref = (
+    type?: string | null,
+    id?: number | null,
+): string | null => {
+    if (type !== 'purchase_order' || !id) {
+        return null;
+    }
+
+    return `/purchase-orders/${id}`;
+};
+
+const movementSourceLots = (movement: VariantFifoMovement) =>
+    movement.source_lots ?? movement.fifo_lots ?? [];
+
+const movementLotAllocations = (
+    movement: VariantFifoMovement,
+): MovementLotAllocation[] =>
+    movement.lot_allocations ?? movement.fifo_allocations ?? [];
+
 const purchaseUnitCost = (movement: VariantFifoMovement): number => {
-    const lot = movement.fifo_lots?.[0];
+    const lot = movementSourceLots(movement)[0];
     return Number(lot?.unit_cost_base ?? 0);
 };
 
 const purchaseAvailableStock = (movement: VariantFifoMovement): number => {
-    const lot = movement.fifo_lots?.[0];
+    const lot = movementSourceLots(movement)[0];
     return Number(lot?.quantity_available ?? 0);
 };
 
 const editableLotForMovement = (
     movement: VariantFifoMovement,
 ): (MovementSourceLot & { id: number }) | null => {
-    const lot = movement.fifo_lots?.[0];
+    const lot = movementSourceLots(movement)[0];
 
     if (!lot?.lot_id) {
         return null;
@@ -230,42 +409,196 @@ const startEditingLot = (
     lot: InventoryFifoLot | (MovementSourceLot & { id: number }),
 ) => {
     editingLotId.value = Number(lot.id);
-    lotEditForm.value = {
+    lotEditForm.value = buildLotEditForm(lot);
+};
+
+const buildLotEditForm = (
+    lot: InventoryFifoLot | (MovementSourceLot & { id: number }),
+    syncState: HeaderLotSyncState | null = null,
+): LotEditForm => {
+    const receivedQuantity = lotInitialQuantity(lot);
+    const quantityAvailable =
+        syncState && Number(history.value?.summary.open_lots_count ?? 0) <= 1
+            ? Number(syncState.quantity_available)
+            : Number(lot.quantity_available ?? 0);
+    const unitCostBase = Number(
+        syncState?.unit_cost_base ?? lot.unit_cost_base ?? 0,
+    );
+    const taxTotal =
+        syncState !== null
+            ? roundMoney(
+                  unitCostBase *
+                      Math.max(1, receivedQuantity) *
+                      (Number(syncState.cost_tax_rate || 0) / 100),
+                  2,
+              )
+            : lotTaxTotal(lot);
+    const miscTotal =
+        syncState !== null
+            ? roundMoney(Number(syncState.misc_total || 0), 2)
+            : lotMiscTotal(lot);
+
+    return {
         received_at: toDateTimeLocal(lot.received_at),
-        quantity_available: Number(lot.quantity_available ?? 0),
-        unit_cost_base: Number(lot.unit_cost_base ?? 0),
-        tax_per_unit: Number(lot.tax_per_unit ?? 0),
-        misc_per_unit: Number(lot.misc_per_unit ?? 0),
-        sale_price: currentSalePrice.value,
+        received_quantity: receivedQuantity,
+        quantity_available: quantityAvailable,
+        unit_cost_base: unitCostBase,
+        tax_total: taxTotal,
+        misc_total: miscTotal,
+        sale_price: Number(
+            syncState?.sale_price ??
+                (lot as any).sale_price ??
+                currentSalePrice.value,
+        ),
     };
+};
+
+const updateLotUnitCostBase = (event: Event) => {
+    const value = Number((event.target as HTMLInputElement).value);
+    const unitCostBase = Number.isFinite(value) ? value : 0;
+
+    lotEditForm.value.unit_cost_base = unitCostBase;
+    lotEditForm.value.tax_total = roundMoney(
+        unitCostBase *
+            Math.max(1, Number(lotEditForm.value.received_quantity || 0)) *
+            (costTaxRate.value / 100),
+        2,
+    );
 };
 
 const cancelEditingLot = () => {
     editingLotId.value = null;
 };
 
-const saveLot = async (lotId: number) => {
+const applyHeaderSyncToHistory = () => {
+    const syncState = props.headerSync;
+    const lot = activeEditableLot.value;
+
+    if (
+        !syncState ||
+        syncState.revision < 1 ||
+        !lot ||
+        Number(syncState.warehouse_id) !== Number(selectedWarehouseId.value)
+    ) {
+        return;
+    }
+
+    const syncedForm = buildLotEditForm(lot, syncState);
+    const taxPerUnit = unitFromTotal(
+        syncedForm.tax_total,
+        syncedForm.received_quantity,
+    );
+    const miscPerUnit = unitFromTotal(
+        syncedForm.misc_total,
+        syncedForm.received_quantity,
+    );
+    const landedUnitCost = roundMoney(
+        syncedForm.unit_cost_base + taxPerUnit + miscPerUnit,
+    );
+    const receivedQuantity = Math.max(
+        1,
+        Number(syncedForm.received_quantity || 0),
+    );
+
+    Object.assign(lot, {
+        quantity_available: syncedForm.quantity_available,
+        unit_cost_base: syncedForm.unit_cost_base,
+        tax_per_unit: taxPerUnit,
+        tax_total: syncedForm.tax_total,
+        misc_per_unit: miscPerUnit,
+        misc_total: syncedForm.misc_total,
+        landed_unit_cost: landedUnitCost,
+        landed_total: roundMoney(landedUnitCost * receivedQuantity, 2),
+        sale_price: syncedForm.sale_price,
+        remaining_value: roundMoney(
+            landedUnitCost * Number(syncedForm.quantity_available || 0),
+            2,
+        ),
+    });
+
+    if (history.value?.summary) {
+        history.value.summary.current_cost = landedUnitCost;
+        history.value.summary.fifo_cost_current = landedUnitCost;
+        history.value.summary.current_sale_price = syncedForm.sale_price;
+        history.value.summary.fifo_sale_price_current = syncedForm.sale_price;
+
+        if (Number(history.value.summary.open_lots_count ?? 0) <= 1) {
+            history.value.summary.stock_available =
+                syncedForm.quantity_available;
+            history.value.summary.total_lot_quantity =
+                syncedForm.quantity_available;
+            history.value.summary.total_lot_value = roundMoney(
+                landedUnitCost * Number(syncedForm.quantity_available || 0),
+                2,
+            );
+            history.value.summary.inventory_value =
+                history.value.summary.total_lot_value;
+        }
+    }
+
+    if (Number(editingLotId.value) === Number(lot.id)) {
+        lotEditForm.value = syncedForm;
+    }
+};
+
+const saveLot = async (
+    lotId: number,
+    formData: LotEditForm = lotEditForm.value,
+    emitAfterSave = true,
+) => {
     savingLotId.value = lotId;
     error.value = null;
 
     try {
-        await productsApi.updateInventoryLot(lotId, {
-            received_at: lotEditForm.value.received_at,
-            quantity_available: Number(lotEditForm.value.quantity_available),
-            unit_cost_base: Number(lotEditForm.value.unit_cost_base),
-            tax_per_unit: Number(lotEditForm.value.tax_per_unit),
-            misc_per_unit: Number(lotEditForm.value.misc_per_unit),
-            sale_price: Number(lotEditForm.value.sale_price),
+        const response = await productsApi.updateInventoryLot(lotId, {
+            received_at: formData.received_at,
+            quantity_available: Number(formData.quantity_available),
+            unit_cost_base: Number(formData.unit_cost_base),
+            tax_per_unit: unitFromTotal(
+                formData.tax_total,
+                formData.received_quantity,
+            ),
+            misc_per_unit: unitFromTotal(
+                formData.misc_total,
+                formData.received_quantity,
+            ),
+            sale_price: Number(formData.sale_price),
         });
         editingLotId.value = null;
         await loadHistory();
-        emit('updated');
+        if (emitAfterSave) {
+            emit('updated', {
+                lot: response.data,
+                summary: history.value?.summary ?? null,
+                warehouse_id: selectedWarehouseId.value,
+            });
+        }
+        return true;
     } catch (err: any) {
         error.value =
             err.response?.data?.message || 'Error al actualizar el lote.';
+        return false;
     } finally {
         savingLotId.value = null;
     }
+};
+
+const saveSyncedActiveLot = async (): Promise<SyncedActiveLotSaveResult> => {
+    const syncState = props.headerSync;
+    const lot = activeEditableLot.value;
+
+    if (
+        !syncState ||
+        syncState.revision < 1 ||
+        !lot ||
+        Number(syncState.warehouse_id) !== Number(selectedWarehouseId.value)
+    ) {
+        return 'skipped';
+    }
+
+    return (await saveLot(lot.id, buildLotEditForm(lot, syncState), false))
+        ? 'saved'
+        : 'failed';
 };
 
 const startEditingMovementLot = (movement: VariantFifoMovement) => {
@@ -285,12 +618,12 @@ const saveMovementLot = async (movement: VariantFifoMovement) => {
 };
 
 const purchaseLandedCost = (movement: VariantFifoMovement): number => {
-    const lot = movement.fifo_lots?.[0];
-    return Number(lot?.landed_unit_cost ?? 0);
+    const lot = movementSourceLots(movement)[0];
+    return lotLandedTotal(lot);
 };
 
 const saleUnitCost = (movement: VariantFifoMovement): number => {
-    const allocations = movement.fifo_allocations ?? [];
+    const allocations = movementLotAllocations(movement);
     const quantity = allocations.reduce(
         (sum, item) => sum + Number(item.quantity),
         0,
@@ -304,7 +637,7 @@ const saleUnitCost = (movement: VariantFifoMovement): number => {
 };
 
 const saleTotalCost = (movement: VariantFifoMovement): number => {
-    return (movement.fifo_allocations ?? []).reduce(
+    return movementLotAllocations(movement).reduce(
         (sum, item) => sum + Number(item.total_cost),
         0,
     );
@@ -328,7 +661,14 @@ watch(
         variantWarehouseOptions.value.length,
     ],
     () => {
-        selectedWarehouseId.value = resolveInitialWarehouse();
+        const nextWarehouseId = resolveInitialWarehouse();
+
+        if (Number(selectedWarehouseId.value) === Number(nextWarehouseId)) {
+            loadHistory();
+            return;
+        }
+
+        selectedWarehouseId.value = nextWarehouseId;
     },
     { immediate: true },
 );
@@ -337,12 +677,31 @@ watch(selectedWarehouseId, () => {
     loadHistory();
 });
 
+watch(
+    () => [props.dateFrom, props.dateTo],
+    () => {
+        loadHistory();
+    },
+);
+
+watch(
+    () => props.headerSync,
+    () => {
+        applyHeaderSyncToHistory();
+    },
+    { deep: true },
+);
+
 onMounted(() => {
     if (!selectedWarehouseId.value) {
         selectedWarehouseId.value = resolveInitialWarehouse();
     } else {
         loadHistory();
     }
+});
+
+defineExpose({
+    saveSyncedActiveLot,
 });
 </script>
 
@@ -363,13 +722,13 @@ onMounted(() => {
                     </h3>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                         {{ variant?.brand?.name || variant?.sku || 'Variante' }}
-                        ·
+                        -
                         {{ selectedWarehouseLabel }}
                     </p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div v-if="!embedded" class="flex items-center gap-2">
                 <select
                     v-model.number="selectedWarehouseId"
                     class="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
@@ -443,7 +802,12 @@ onMounted(() => {
                     <p
                         class="text-lg font-semibold text-gray-900 dark:text-white"
                     >
-                        {{ formatCurrency(history?.summary.fifo_cost_current) }}
+                        {{
+                            formatCurrency(
+                                history?.summary.current_cost ??
+                                    history?.summary.fifo_cost_current,
+                            )
+                        }}
                     </p>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 dark:bg-muted/40">
@@ -522,7 +886,7 @@ onMounted(() => {
                 Cargando historial de stock...
             </div>
 
-            <div v-else class="overflow-x-auto">
+            <div v-else class="max-w-full overflow-x-auto">
                 <table
                     v-if="activeTab === 'lots'"
                     class="w-full text-left text-xs text-gray-600 dark:text-gray-300"
@@ -539,10 +903,14 @@ onMounted(() => {
                             <th class="px-4 py-2 text-right">Precio venta</th>
                             <th class="px-4 py-2 text-right">Costo</th>
                             <th class="px-4 py-2 text-right">ITBM</th>
-                            <th class="px-4 py-2 text-right">Misc</th>
+                            <th class="px-4 py-2 text-right">MISC total</th>
                             <th class="px-4 py-2 text-right">Final</th>
                             <th class="px-4 py-2 text-right">Valor</th>
-                            <th class="px-4 py-2 text-right">Accion</th>
+                            <th
+                                class="sticky right-0 bg-gray-50 px-3 py-2 text-right shadow-[-10px_0_14px_-14px_rgba(15,23,42,0.7)] dark:bg-muted"
+                            >
+                                Accion
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -563,9 +931,36 @@ onMounted(() => {
                                 }}</span>
                             </td>
                             <td class="px-4 py-2">
-                                {{
-                                    sourceLabel(lot.source_type, lot.source_id)
-                                }}
+                                <a
+                                    v-if="
+                                        referenceHref(
+                                            lot.source_type,
+                                            lot.source_id,
+                                        )
+                                    "
+                                    :href="
+                                        referenceHref(
+                                            lot.source_type,
+                                            lot.source_id,
+                                        ) ?? '#'
+                                    "
+                                    class="font-medium text-blue-600 hover:underline dark:text-primary"
+                                >
+                                    {{
+                                        sourceLabel(
+                                            lot.source_type,
+                                            lot.source_id,
+                                        )
+                                    }}
+                                </a>
+                                <span v-else>
+                                    {{
+                                        sourceLabel(
+                                            lot.source_type,
+                                            lot.source_id,
+                                        )
+                                    }}
+                                </span>
                             </td>
                             <td class="px-4 py-2 font-mono">
                                 {{ lot.batch_number || `#${lot.id}` }}
@@ -596,17 +991,18 @@ onMounted(() => {
                                     class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-xs dark:border-border dark:bg-muted dark:text-white"
                                 />
                                 <span v-else>{{
-                                    formatCurrency(currentSalePrice)
+                                    formatCurrency(lot.sale_price)
                                 }}</span>
                             </td>
                             <td class="px-4 py-2 text-right">
                                 <input
                                     v-if="editingLotId === lot.id"
-                                    v-model.number="lotEditForm.unit_cost_base"
+                                    :value="lotEditForm.unit_cost_base"
                                     type="number"
                                     min="0"
                                     step="0.0001"
                                     class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-xs dark:border-border dark:bg-muted dark:text-white"
+                                    @input="updateLotUnitCostBase"
                                 />
                                 <span v-else>{{
                                     formatCurrency(lot.unit_cost_base)
@@ -615,41 +1011,57 @@ onMounted(() => {
                             <td class="px-4 py-2 text-right">
                                 <input
                                     v-if="editingLotId === lot.id"
-                                    v-model.number="lotEditForm.tax_per_unit"
+                                    v-model.number="lotEditForm.tax_total"
                                     type="number"
                                     min="0"
-                                    step="0.0001"
+                                    step="0.01"
                                     class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-xs dark:border-border dark:bg-muted dark:text-white"
                                 />
                                 <span v-else>{{
-                                    formatCurrency(lot.tax_per_unit)
+                                    formatCurrency(lotTaxTotal(lot))
                                 }}</span>
                             </td>
                             <td class="px-4 py-2 text-right">
                                 <input
                                     v-if="editingLotId === lot.id"
-                                    v-model.number="lotEditForm.misc_per_unit"
+                                    v-model.number="lotEditForm.misc_total"
                                     type="number"
                                     min="0"
-                                    step="0.0001"
+                                    step="0.01"
                                     class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-xs dark:border-border dark:bg-muted dark:text-white"
                                 />
                                 <span v-else>{{
-                                    formatCurrency(lot.misc_per_unit)
+                                    formatCurrency(lotMiscTotal(lot))
                                 }}</span>
                             </td>
                             <td class="px-4 py-2 text-right font-semibold">
-                                {{ formatCurrency(lot.landed_unit_cost) }}
+                                {{
+                                    formatCurrency(
+                                        editingLotId === lot.id
+                                            ? editedLandedTotal
+                                            : lotLandedTotal(lot),
+                                    )
+                                }}
                             </td>
                             <td class="px-4 py-2 text-right font-semibold">
-                                {{ formatCurrency(lot.remaining_value) }}
+                                {{
+                                    formatCurrency(
+                                        editingLotId === lot.id
+                                            ? editedRemainingValue
+                                            : lot.remaining_value,
+                                    )
+                                }}
                             </td>
-                            <td class="px-4 py-2 text-right">
-                                <div class="inline-flex items-center gap-1">
+                            <td
+                                class="sticky right-0 bg-white px-3 py-2 text-right shadow-[-10px_0_14px_-14px_rgba(15,23,42,0.7)] dark:bg-card"
+                            >
+                                <div
+                                    class="inline-flex items-center justify-end gap-1 whitespace-nowrap"
+                                >
                                     <template v-if="editingLotId === lot.id">
                                         <button
                                             type="button"
-                                            class="inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                                             :disabled="savingLotId === lot.id"
                                             title="Guardar"
                                             @click="saveLot(lot.id)"
@@ -658,11 +1070,11 @@ onMounted(() => {
                                         </button>
                                         <button
                                             type="button"
-                                            class="inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted"
                                             title="Cancelar"
                                             @click="cancelEditingLot"
                                         >
-                                            Cancelar
+                                            <X class="h-4 w-4" />
                                         </button>
                                     </template>
                                     <button
@@ -703,11 +1115,15 @@ onMounted(() => {
                             <th class="px-4 py-2 text-right">Stock disp.</th>
                             <th class="px-4 py-2 text-right">Costo unit.</th>
                             <th class="px-4 py-2 text-right">ITBM</th>
-                            <th class="px-4 py-2 text-right">Misc</th>
+                            <th class="px-4 py-2 text-right">MISC total</th>
                             <th class="px-4 py-2 text-right">Costo final</th>
                             <th class="px-4 py-2 text-right">Precio venta</th>
-                            <th class="px-4 py-2">Almacen</th>
-                            <th class="px-4 py-2 text-right">Acciones</th>
+                            <th class="px-4 py-2">Almacén</th>
+                            <th
+                                class="sticky right-0 bg-gray-50 px-3 py-2 text-right shadow-[-10px_0_14px_-14px_rgba(15,23,42,0.7)] dark:bg-muted"
+                            >
+                                Acciones
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -738,12 +1154,36 @@ onMounted(() => {
                                 </span>
                             </td>
                             <td class="px-4 py-2">
-                                {{
-                                    sourceLabel(
-                                        movement.reference_type,
-                                        movement.reference_id,
-                                    )
-                                }}
+                                <a
+                                    v-if="
+                                        referenceHref(
+                                            movement.reference_type,
+                                            movement.reference_id,
+                                        )
+                                    "
+                                    :href="
+                                        referenceHref(
+                                            movement.reference_type,
+                                            movement.reference_id,
+                                        ) ?? '#'
+                                    "
+                                    class="font-medium text-blue-600 hover:underline dark:text-primary"
+                                >
+                                    {{
+                                        sourceLabel(
+                                            movement.reference_type,
+                                            movement.reference_id,
+                                        )
+                                    }}
+                                </a>
+                                <span v-else>
+                                    {{
+                                        sourceLabel(
+                                            movement.reference_type,
+                                            movement.reference_id,
+                                        )
+                                    }}
+                                </span>
                             </td>
                             <td class="px-4 py-2">
                                 {{ movement.supplier?.name || '-' }}
@@ -775,11 +1215,12 @@ onMounted(() => {
                                         editingLotId ===
                                         editableLotForMovement(movement)?.id
                                     "
-                                    v-model.number="lotEditForm.unit_cost_base"
+                                    :value="lotEditForm.unit_cost_base"
                                     type="number"
                                     min="0"
                                     step="0.0001"
                                     class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-xs dark:border-border dark:bg-muted dark:text-white"
+                                    @input="updateLotUnitCostBase"
                                 />
                                 <span v-else>
                                     {{
@@ -795,17 +1236,20 @@ onMounted(() => {
                                         editingLotId ===
                                         editableLotForMovement(movement)?.id
                                     "
-                                    v-model.number="lotEditForm.tax_per_unit"
+                                    v-model.number="lotEditForm.tax_total"
                                     type="number"
                                     min="0"
-                                    step="0.0001"
+                                    step="0.01"
                                     class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-xs dark:border-border dark:bg-muted dark:text-white"
                                 />
                                 <span v-else>
                                     {{
                                         formatCurrency(
-                                            editableLotForMovement(movement)
-                                                ?.tax_per_unit ?? 0,
+                                            lotTaxTotal(
+                                                editableLotForMovement(
+                                                    movement,
+                                                ),
+                                            ),
                                         )
                                     }}
                                 </span>
@@ -816,24 +1260,32 @@ onMounted(() => {
                                         editingLotId ===
                                         editableLotForMovement(movement)?.id
                                     "
-                                    v-model.number="lotEditForm.misc_per_unit"
+                                    v-model.number="lotEditForm.misc_total"
                                     type="number"
                                     min="0"
-                                    step="0.0001"
+                                    step="0.01"
                                     class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-xs dark:border-border dark:bg-muted dark:text-white"
                                 />
                                 <span v-else>
                                     {{
                                         formatCurrency(
-                                            editableLotForMovement(movement)
-                                                ?.misc_per_unit ?? 0,
+                                            lotMiscTotal(
+                                                editableLotForMovement(
+                                                    movement,
+                                                ),
+                                            ),
                                         )
                                     }}
                                 </span>
                             </td>
                             <td class="px-4 py-2 text-right font-semibold">
                                 {{
-                                    formatCurrency(purchaseLandedCost(movement))
+                                    formatCurrency(
+                                        editingLotId ===
+                                            editableLotForMovement(movement)?.id
+                                            ? editedLandedTotal
+                                            : purchaseLandedCost(movement),
+                                    )
                                 }}
                             </td>
                             <td class="px-4 py-2 text-right">
@@ -849,16 +1301,21 @@ onMounted(() => {
                                     class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-xs dark:border-border dark:bg-muted dark:text-white"
                                 />
                                 <span v-else>{{
-                                    formatCurrency(currentSalePrice)
+                                    formatCurrency(
+                                        editableLotForMovement(movement)
+                                            ?.sale_price ?? currentSalePrice,
+                                    )
                                 }}</span>
                             </td>
                             <td class="px-4 py-2">
                                 {{ movement.warehouse?.name || '-' }}
                             </td>
-                            <td class="px-4 py-2 text-right">
+                            <td
+                                class="sticky right-0 bg-white px-3 py-2 text-right shadow-[-10px_0_14px_-14px_rgba(15,23,42,0.7)] dark:bg-card"
+                            >
                                 <div
                                     v-if="editableLotForMovement(movement)"
-                                    class="inline-flex items-center gap-1"
+                                    class="inline-flex items-center justify-end gap-1 whitespace-nowrap"
                                 >
                                     <template
                                         v-if="
@@ -868,7 +1325,7 @@ onMounted(() => {
                                     >
                                         <button
                                             type="button"
-                                            class="inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                                             :disabled="
                                                 savingLotId ===
                                                 editableLotForMovement(movement)
@@ -877,27 +1334,27 @@ onMounted(() => {
                                             title="Guardar"
                                             @click="saveMovementLot(movement)"
                                         >
-                                            Guardar
+                                            <Check class="h-4 w-4" />
                                         </button>
                                         <button
                                             type="button"
-                                            class="inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted"
                                             title="Cancelar"
                                             @click="cancelEditingLot"
                                         >
-                                            Cancelar
+                                            <X class="h-4 w-4" />
                                         </button>
                                     </template>
                                     <button
                                         v-else
                                         type="button"
-                                        class="inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-medium text-blue-700 hover:bg-blue-50 dark:text-primary dark:hover:bg-primary/10"
+                                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-blue-700 hover:bg-blue-50 dark:text-primary dark:hover:bg-primary/10"
                                         title="Editar compra"
                                         @click="
                                             startEditingMovementLot(movement)
                                         "
                                     >
-                                        Editar
+                                        <Pencil class="h-4 w-4" />
                                     </button>
                                 </div>
                                 <span
@@ -947,12 +1404,36 @@ onMounted(() => {
                                     {{ formatDate(movement.created_at) }}
                                 </td>
                                 <td class="px-4 py-2">
-                                    {{
-                                        sourceLabel(
-                                            movement.reference_type,
-                                            movement.reference_id,
-                                        )
-                                    }}
+                                    <a
+                                        v-if="
+                                            referenceHref(
+                                                movement.reference_type,
+                                                movement.reference_id,
+                                            )
+                                        "
+                                        :href="
+                                            referenceHref(
+                                                movement.reference_type,
+                                                movement.reference_id,
+                                            ) ?? '#'
+                                        "
+                                        class="font-medium text-blue-600 hover:underline dark:text-primary"
+                                    >
+                                        {{
+                                            sourceLabel(
+                                                movement.reference_type,
+                                                movement.reference_id,
+                                            )
+                                        }}
+                                    </a>
+                                    <span v-else>
+                                        {{
+                                            sourceLabel(
+                                                movement.reference_type,
+                                                movement.reference_id,
+                                            )
+                                        }}
+                                    </span>
                                 </td>
                                 <td class="px-4 py-2 text-right">
                                     {{ movement.quantity }}
@@ -991,8 +1472,9 @@ onMounted(() => {
                                 <td colspan="6" class="px-4 py-3">
                                     <div class="grid gap-2 md:grid-cols-2">
                                         <div
-                                            v-for="allocation in movement.fifo_allocations ??
-                                            []"
+                                            v-for="allocation in movementLotAllocations(
+                                                movement,
+                                            )"
                                             :key="`${movement.id}-${allocation.lot_id}`"
                                             class="rounded-md border border-gray-200 bg-white px-3 py-2 dark:border-border dark:bg-card"
                                         >

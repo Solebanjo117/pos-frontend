@@ -26,6 +26,21 @@ const cost = computed(() => {
         const variant = props.productDetails.variants.find(
             (v: any) => v.id === props.item.variant_id,
         );
+        const activeInventory = variant?.inventory?.find(
+            (inventory: any) =>
+                props.warehouseId &&
+                Number(inventory.warehouse?.id ?? inventory.warehouse_id) ===
+                    Number(props.warehouseId),
+        );
+        if (
+            activeInventory?.current_cost ||
+            activeInventory?.fifo_cost_current
+        ) {
+            return (
+                activeInventory.current_cost ??
+                activeInventory.fifo_cost_current
+            );
+        }
         if (variant?.pricing?.cost) return variant.pricing.cost;
     }
     return props.productDetails.pricing?.cost ?? null;

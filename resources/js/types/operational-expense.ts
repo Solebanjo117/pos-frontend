@@ -21,7 +21,13 @@ export interface OperationalExpense {
     created_by?: number | null;
     creator?: { id: number; name: string } | null;
     cash_movement_id?: number | null;
-    cash_movement?: { id: number; pos_session_id: number; amount: number } | null;
+    cash_movement?: {
+        id: number;
+        pos_session_id: number;
+        amount: number;
+    } | null;
+    pos_session_id?: number | null;
+    pos_session?: { id: number; status: string } | null;
     expense_date: string;
     category: OperationalExpenseCategory;
     category_label: string;

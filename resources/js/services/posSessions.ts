@@ -56,6 +56,7 @@ export interface PosSessionRecord {
     cash_movements?: CashMovementRecord[];
     purchase_payments?: PurchasePaymentRecord[];
     account_payments?: AccountPaymentRecord[];
+    operational_expenses?: OperationalExpenseRecord[];
 }
 
 export interface CashMovementRecord {
@@ -128,6 +129,27 @@ export interface AccountPaymentRecord {
     }>;
 }
 
+export interface OperationalExpenseRecord {
+    id: number;
+    warehouse_id: number | null;
+    created_by: number | null;
+    cash_movement_id: number | null;
+    pos_session_id: number | null;
+    expense_date: string;
+    category: string;
+    category_label?: string;
+    description: string | null;
+    amount: string;
+    payment_method: string | null;
+    payment_method_label?: string | null;
+    reference_number: string | null;
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+    warehouse?: { id: number; name: string } | null;
+    creator?: { id: number; name: string } | null;
+}
+
 export const PosSessionsApiService = {
     /**
      * List POS sessions with optional filters
@@ -164,6 +186,7 @@ export const PosSessionsApiService = {
         cash_movements: CashMovementRecord[];
         purchase_payments: PurchasePaymentRecord[];
         account_payments: AccountPaymentRecord[];
+        operational_expenses: OperationalExpenseRecord[];
     }> {
         const response = await apiClient.get<{
             data: PosSessionRecord;
@@ -171,6 +194,7 @@ export const PosSessionsApiService = {
             cash_movements: CashMovementRecord[];
             purchase_payments: PurchasePaymentRecord[];
             account_payments: AccountPaymentRecord[];
+            operational_expenses: OperationalExpenseRecord[];
         }>(`${BASE_PATH}/${id}`);
         return response.data;
     },

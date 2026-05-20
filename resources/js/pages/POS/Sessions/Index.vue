@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
 import {
     AlertCircle,
     Banknote,
@@ -26,6 +26,7 @@ import {
     PosSessionsApiService,
     type AccountPaymentRecord,
     type CashMovementRecord,
+    type OperationalExpenseRecord,
     type PosSessionRecord,
     type PurchasePaymentRecord,
     type SessionSalesOrder,
@@ -45,6 +46,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Cierres de Caja', href: '/pos-sessions' },
 ];
 
+const page = usePage();
 const { warehouses, fetchWarehouses } = useWarehouses();
 const { users, fetchUsers } = useUsers();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
@@ -77,6 +79,7 @@ const selectedSalesOrders = ref<SessionSalesOrder[]>([]);
 const selectedCashMovements = ref<CashMovementRecord[]>([]);
 const selectedPurchasePayments = ref<PurchasePaymentRecord[]>([]);
 const selectedAccountPayments = ref<AccountPaymentRecord[]>([]);
+const selectedOperationalExpenses = ref<OperationalExpenseRecord[]>([]);
 const showDetailModal = ref(false);
 const loadingDetail = ref(false);
 const showCloseSessionModal = ref(false);
@@ -264,6 +267,54 @@ const pageStats = computed(() => {
 
 const hasOpenSession = computed(() => currentSession.value?.status === 'open');
 
+const activeSessionWarehouseId = computed(() =>
+    Number(
+        (currentSession.value as { warehouse_id?: number | null } | null)
+            ?.warehouse_id ??
+            currentWarehouseId.value ??
+            0,
+    ),
+);
+
+const activeSessionWarehouseName = computed(() => {
+    const warehouse = warehouses.value.find(
+        (item) => item.id === activeSessionWarehouseId.value,
+    );
+
+    return warehouse?.name ?? 'Sucursal actual';
+});
+
+const activeSessionUserName = computed(() => {
+    const sessionUserId = currentSession.value?.user_id;
+    const sessionUser = users.value.find((item) => item.id === sessionUserId);
+    const authUser = (page.props.auth as any)?.user;
+
+    return sessionUser?.name ?? authUser?.name ?? 'Cajero actual';
+});
+
+const activeSessionExpected = computed(() =>
+    moneyValue(
+        currentSummary.value?.expected_total ??
+            currentSummary.value?.expected_cash ??
+            currentSession.value?.expected_amount,
+    ),
+);
+
+const hasActiveSessionDifference = computed(
+    () =>
+        currentSession.value?.closing_amount !== null &&
+        currentSession.value?.closing_amount !== undefined &&
+        (currentSummary.value?.total_difference !== undefined ||
+            currentSummary.value?.difference !== undefined),
+);
+
+const activeSessionDifference = computed(() =>
+    moneyValue(
+        currentSummary.value?.total_difference ??
+            currentSummary.value?.difference,
+    ),
+);
+
 const fetchSessions = async (page: number = 1) => {
     loading.value = true;
     error.value = null;
@@ -297,7 +348,7 @@ const fetchSessions = async (page: number = 1) => {
     }
 };
 
-const openDetail = async (session: PosSessionRecord) => {
+const openDetailById = async (sessionId: number) => {
     loadingDetail.value = true;
     showDetailModal.value = true;
     selectedSession.value = null;
@@ -305,9 +356,10 @@ const openDetail = async (session: PosSessionRecord) => {
     selectedCashMovements.value = [];
     selectedPurchasePayments.value = [];
     selectedAccountPayments.value = [];
+    selectedOperationalExpenses.value = [];
 
     try {
-        const response = await PosSessionsApiService.show(session.id);
+        const response = await PosSessionsApiService.show(sessionId);
         selectedSession.value = response.data;
         selectedSalesOrders.value = response.sales_orders;
         selectedCashMovements.value =
@@ -316,6 +368,10 @@ const openDetail = async (session: PosSessionRecord) => {
             response.purchase_payments || response.data.purchase_payments || [];
         selectedAccountPayments.value =
             response.account_payments || response.data.account_payments || [];
+        selectedOperationalExpenses.value =
+            response.operational_expenses ||
+            response.data.operational_expenses ||
+            [];
     } catch (err: any) {
         error.value =
             err.response?.data?.message ||
@@ -327,6 +383,14 @@ const openDetail = async (session: PosSessionRecord) => {
     }
 };
 
+const openDetail = (session: PosSessionRecord) => openDetailById(session.id);
+
+const openCurrentSessionDetail = () => {
+    if (!currentSession.value?.id) return;
+
+    openDetailById(currentSession.value.id);
+};
+
 const closeDetail = () => {
     showDetailModal.value = false;
     selectedSession.value = null;
@@ -334,6 +398,7 @@ const closeDetail = () => {
     selectedCashMovements.value = [];
     selectedPurchasePayments.value = [];
     selectedAccountPayments.value = [];
+    selectedOperationalExpenses.value = [];
 };
 
 const handleCloseSession = async (
@@ -450,6 +515,135 @@ onMounted(async () => {
                     </button>
                 </div>
             </header>
+
+            <section
+                v-if="hasOpenSession && currentSession"
+                class="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20"
+            >
+                <div
+                    class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
+                >
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span
+                                class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-200 ring-inset dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-800"
+                            >
+                                <Clock :size="13" />
+                                Caja activa
+                            </span>
+                            <span
+                                class="text-sm font-semibold text-slate-900 dark:text-white"
+                            >
+                                Sesion #{{ currentSession.id }}
+                            </span>
+                        </div>
+
+                        <div
+                            class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+                        >
+                            <div>
+                                <p
+                                    class="text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Cajero
+                                </p>
+                                <p
+                                    class="mt-1 truncate text-sm font-semibold text-slate-900 dark:text-white"
+                                >
+                                    {{ activeSessionUserName }}
+                                </p>
+                            </div>
+                            <div>
+                                <p
+                                    class="text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Sucursal
+                                </p>
+                                <p
+                                    class="mt-1 truncate text-sm font-semibold text-slate-900 dark:text-white"
+                                >
+                                    {{ activeSessionWarehouseName }}
+                                </p>
+                            </div>
+                            <div>
+                                <p
+                                    class="text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Apertura
+                                </p>
+                                <p
+                                    class="mt-1 text-sm font-semibold text-slate-900 dark:text-white"
+                                >
+                                    {{ formatDate(currentSession.opened_at) }}
+                                </p>
+                            </div>
+                            <div>
+                                <p
+                                    class="text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Fondo inicial
+                                </p>
+                                <p
+                                    class="mt-1 text-sm font-semibold text-slate-900 tabular-nums dark:text-white"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            currentSession.opening_amount,
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                            <div>
+                                <p
+                                    class="text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Esperado actual
+                                </p>
+                                <p
+                                    class="mt-1 text-sm font-semibold text-slate-900 tabular-nums dark:text-white"
+                                >
+                                    {{ formatCurrency(activeSessionExpected) }}
+                                </p>
+                                <p
+                                    v-if="hasActiveSessionDifference"
+                                    class="mt-0.5 text-xs font-semibold tabular-nums"
+                                    :class="
+                                        differenceTextClass(
+                                            activeSessionDifference,
+                                        )
+                                    "
+                                >
+                                    {{ activeSessionDifference > 0 ? '+' : ''
+                                    }}{{
+                                        formatCurrency(activeSessionDifference)
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            :disabled="loadingDetail"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-card dark:text-emerald-200 dark:hover:bg-emerald-950/40"
+                            @click="openCurrentSessionDetail"
+                        >
+                            <Eye :size="16" />
+                            Ver auditoria
+                        </button>
+                        <button
+                            type="button"
+                            :disabled="closeSessionLoading"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                            @click="showCloseSessionModal = true"
+                        >
+                            <Lock :size="16" />
+                            Cerrar caja
+                        </button>
+                    </div>
+                </div>
+            </section>
 
             <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <div
@@ -920,6 +1114,7 @@ onMounted(async () => {
             :cash-movements="selectedCashMovements"
             :purchase-payments="selectedPurchasePayments"
             :account-payments="selectedAccountPayments"
+            :operational-expenses="selectedOperationalExpenses"
             :loading="loadingDetail"
             @close="closeDetail"
         />

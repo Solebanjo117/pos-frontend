@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { AlertCircle, Lock, LockOpen, ArrowDownUp } from 'lucide-vue-next';
-import { usePosSession } from '@/composables/usePosSession';
-import { formatCurrency } from '@/utils/formatters';
-import { usePage } from '@inertiajs/vue3';
+import { AlertCircle, Lock } from 'lucide-vue-next';
 import { useAuth } from '@/composables/useAuth';
-
-const page = usePage();
-const userName = computed(
-    () => (page.props.auth as any)?.user?.name || 'Vendedor',
-);
 
 const { hasRole } = useAuth();
 // Only admin, manager, and cashier can open/close the register
@@ -17,13 +9,11 @@ const canManageCashRegister = computed(() =>
     hasRole(['admin', 'manager', 'cashier']),
 );
 
-const { session, openSession } = usePosSession();
-
-const props = defineProps<{
+defineProps<{
     hasOpenSession: boolean;
 }>();
 
-const emit = defineEmits(['request-open', 'request-cash-movement']);
+const emit = defineEmits(['request-open']);
 </script>
 
 <template>
@@ -51,40 +41,6 @@ const emit = defineEmits(['request-open', 'request-cash-movement']);
                     <Lock class="h-4 w-4" />
                     Abrir Caja
                 </button>
-            </div>
-        </div>
-
-        <!-- Session Open Status -->
-        <div
-            v-else
-            class="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-6 py-3 dark:border-emerald-900/50 dark:bg-emerald-900/20"
-        >
-            <div
-                class="flex items-center gap-3 text-emerald-800 dark:text-emerald-400"
-            >
-                <LockOpen class="h-5 w-5 flex-shrink-0" />
-                <span class="text-sm font-medium md:text-base">
-                    Caja Abierta (Usuario: {{ userName }})
-                </span>
-            </div>
-
-            <div class="flex items-center gap-4">
-                <div class="text-sm text-emerald-700 dark:text-emerald-300">
-                    <span class="hidden md:inline">Fondo inicial:</span>
-                    <span class="font-bold">{{
-                        formatCurrency(session?.opening_amount || 0)
-                    }}</span>
-                </div>
-                <template v-if="canManageCashRegister">
-                    <button
-                        @click="emit('request-cash-movement')"
-                        class="flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
-                        title="Registrar retiro o ingreso de efectivo"
-                    >
-                        <ArrowDownUp class="h-4 w-4" />
-                        <span class="hidden md:inline">Mov. Caja</span>
-                    </button>
-                </template>
             </div>
         </div>
     </div>

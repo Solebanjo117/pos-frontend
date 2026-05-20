@@ -19,6 +19,7 @@ import {
 import type {
     AccountPaymentRecord,
     CashMovementRecord,
+    OperationalExpenseRecord,
     PosSessionRecord,
     PurchasePaymentRecord,
     SessionSalesOrder,
@@ -66,6 +67,7 @@ const props = defineProps<{
     cashMovements: CashMovementRecord[];
     purchasePayments: PurchasePaymentRecord[];
     accountPayments: AccountPaymentRecord[];
+    operationalExpenses: OperationalExpenseRecord[];
     loading: boolean;
 }>();
 
@@ -331,6 +333,27 @@ const accountPaymentClass = (payment: AccountPaymentRecord): string =>
     payment.direction === 'incoming'
         ? 'text-emerald-700 dark:text-emerald-300'
         : 'text-red-700 dark:text-red-300';
+
+const operationalExpenseTitle = (expense: OperationalExpenseRecord): string =>
+    expense.description ||
+    expense.category_label ||
+    expense.category ||
+    'Gasto operativo';
+
+const isCashOperationalExpense = (expense: OperationalExpenseRecord): boolean =>
+    expense.payment_method === 'cash';
+
+const operationalExpenseBadge = (expense: OperationalExpenseRecord): string =>
+    isCashOperationalExpense(expense)
+        ? 'Salida de caja'
+        : 'No contado en efectivo';
+
+const operationalExpenseAmountClass = (
+    expense: OperationalExpenseRecord,
+): string =>
+    isCashOperationalExpense(expense)
+        ? 'text-red-700 dark:text-red-300'
+        : 'text-slate-600 dark:text-slate-300';
 
 const statusLabel = (status: string): string => {
     const map: Record<string, string> = {
@@ -1281,6 +1304,129 @@ const handlePrint = () => {
                                 class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
                             >
                                 No hubo pagos de compras asociados al cierre.
+                            </div>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            >
+                                <h3
+                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    Gastos operativos
+                                </h3>
+                            </div>
+                            <div
+                                v-if="operationalExpenses.length > 0"
+                                class="divide-y divide-slate-100 dark:divide-border/60"
+                            >
+                                <div
+                                    v-for="expense in operationalExpenses"
+                                    :key="expense.id"
+                                    class="px-4 py-3"
+                                >
+                                    <div
+                                        class="flex items-start justify-between gap-3"
+                                    >
+                                        <div>
+                                            <p
+                                                class="text-sm font-semibold text-slate-950 dark:text-white"
+                                            >
+                                                {{
+                                                    operationalExpenseTitle(
+                                                        expense,
+                                                    )
+                                                }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{
+                                                    expense.category_label ||
+                                                    expense.category
+                                                }}
+                                                -
+                                                {{
+                                                    paymentMethodLabel(
+                                                        expense.payment_method ||
+                                                            'other',
+                                                    )
+                                                }}
+                                                -
+                                                {{
+                                                    formatTime(
+                                                        expense.created_at,
+                                                    )
+                                                }}
+                                            </p>
+                                            <span
+                                                class="mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-bold ring-1"
+                                                :class="
+                                                    isCashOperationalExpense(
+                                                        expense,
+                                                    )
+                                                        ? 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800'
+                                                        : 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-muted dark:text-slate-300 dark:ring-border'
+                                                "
+                                            >
+                                                {{
+                                                    operationalExpenseBadge(
+                                                        expense,
+                                                    )
+                                                }}
+                                            </span>
+                                            <p
+                                                v-if="expense.reference_number"
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                Número de recibo:
+                                                {{ expense.reference_number }}
+                                            </p>
+                                            <p
+                                                v-if="expense.creator?.name"
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                Registrado por
+                                                {{ expense.creator.name }}
+                                            </p>
+                                            <p
+                                                v-if="expense.notes"
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{ expense.notes }}
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="shrink-0 text-sm font-bold tabular-nums"
+                                            :class="
+                                                operationalExpenseAmountClass(
+                                                    expense,
+                                                )
+                                            "
+                                        >
+                                            <template
+                                                v-if="
+                                                    isCashOperationalExpense(
+                                                        expense,
+                                                    )
+                                                "
+                                            >
+                                                - </template
+                                            >{{
+                                                formatCurrency(expense.amount)
+                                            }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                v-else
+                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                            >
+                                No hubo gastos operativos asociados al cierre.
                             </div>
                         </div>
 

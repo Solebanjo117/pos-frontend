@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import {
     AlertCircle,
+    Banknote,
+    CheckCircle2,
     DollarSign,
     Pencil,
     Plus,
@@ -80,7 +82,7 @@ const formCategoryOptions = computed<SelectOption[]>(() =>
 );
 
 const warehouseOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Global' },
+    { value: null, label: 'Sucursal actual' },
     ...warehouses.value.map((warehouse) => ({
         value: warehouse.id,
         label: warehouse.name,
@@ -88,7 +90,7 @@ const warehouseOptions = computed<SelectOption[]>(() => [
 ]);
 
 const filterWarehouseOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Globales' },
+    { value: null, label: 'Todas' },
     ...warehouses.value.map((warehouse) => ({
         value: warehouse.id,
         label: warehouse.name,
@@ -104,6 +106,22 @@ const paymentMethods: Array<{
     { value: 'transfer', label: 'Transferencia' },
     { value: 'other', label: 'Otro' },
 ];
+
+const sessionLinkedCount = computed(
+    () => expenses.value.filter((expense) => expense.pos_session_id).length,
+);
+
+const cashExpenseTotal = computed(() =>
+    expenses.value
+        .filter((expense) => expense.payment_method === 'cash')
+        .reduce((total, expense) => total + Number(expense.amount || 0), 0),
+);
+
+const nonCashExpenseTotal = computed(() =>
+    expenses.value
+        .filter((expense) => expense.payment_method !== 'cash')
+        .reduce((total, expense) => total + Number(expense.amount || 0), 0),
+);
 
 function formatCurrency(value: number | string | null | undefined): string {
     return new Intl.NumberFormat('en-US', {
@@ -199,7 +217,25 @@ async function deleteExpense(expense: OperationalExpense) {
     await loadExpenses();
 }
 
+function readInitialFilters() {
+    const params = new URLSearchParams(window.location.search);
+    const warehouseId = Number(params.get('warehouse_id'));
+
+    if (params.get('date_from')) {
+        filters.value.date_from = params.get('date_from') as string;
+    }
+
+    if (params.get('date_to')) {
+        filters.value.date_to = params.get('date_to') as string;
+    }
+
+    if (warehouseId > 0) {
+        filters.value.warehouse_id = warehouseId;
+    }
+}
+
 onMounted(async () => {
+    readInitialFilters();
     await Promise.all([loadWarehouses(), loadExpenses()]);
 });
 </script>
@@ -222,7 +258,8 @@ onMounted(async () => {
                         </h1>
                         <p class="text-sm text-gray-500">
                             Luz, alquiler, contador, mantenimiento, software y
-                            otros gastos de operacion.
+                            otros gastos de operación separados por impacto de
+                            caja.
                         </p>
                     </div>
                     <button
@@ -264,26 +301,37 @@ onMounted(async () => {
                         <p
                             class="text-xs font-semibold text-gray-500 uppercase"
                         >
-                            Registros
+                            Ligados a caja
                         </p>
                         <p
                             class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"
                         >
-                            {{ summary.count }}
+                            {{ sessionLinkedCount }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            {{ summary.count }} registro(s) visibles
                         </p>
                     </div>
                     <div
                         class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                     >
-                        <p
-                            class="text-xs font-semibold text-gray-500 uppercase"
-                        >
-                            Alcance
-                        </p>
+                        <div class="flex items-center justify-between">
+                            <p
+                                class="text-xs font-semibold text-gray-500 uppercase"
+                            >
+                                Caja
+                            </p>
+                            <Banknote :size="16" class="text-slate-400" />
+                        </div>
                         <p
                             class="mt-1 text-sm font-semibold text-gray-900 dark:text-white"
                         >
-                            Global o por almacen
+                            Efectivo {{ formatCurrency(cashExpenseTotal) }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            Otros métodos
+                            {{ formatCurrency(nonCashExpenseTotal) }}
+                            no contado en efectivo
                         </p>
                     </div>
                 </div>
@@ -331,7 +379,7 @@ onMounted(async () => {
                             <label
                                 class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
                             >
-                                Almacen
+                                Sucursal
                             </label>
                             <SearchableSelect
                                 v-model="filters.warehouse_id"
@@ -365,8 +413,9 @@ onMounted(async () => {
                                 <th class="px-3 py-2 text-left">Fecha</th>
                                 <th class="px-3 py-2 text-left">Categoria</th>
                                 <th class="px-3 py-2 text-left">Descripcion</th>
-                                <th class="px-3 py-2 text-left">Almacen</th>
+                                <th class="px-3 py-2 text-left">Sucursal</th>
                                 <th class="px-3 py-2 text-left">Metodo</th>
+                                <th class="px-3 py-2 text-left">Caja</th>
                                 <th class="px-3 py-2 text-left">Recibo</th>
                                 <th class="px-3 py-2 text-right">Monto</th>
                                 <th class="px-3 py-2 text-right"></th>
@@ -377,7 +426,7 @@ onMounted(async () => {
                         >
                             <tr v-if="loading">
                                 <td
-                                    colspan="8"
+                                    colspan="9"
                                     class="px-3 py-8 text-center text-gray-500"
                                 >
                                     Cargando gastos...
@@ -385,7 +434,7 @@ onMounted(async () => {
                             </tr>
                             <tr v-else-if="expenses.length === 0">
                                 <td
-                                    colspan="8"
+                                    colspan="9"
                                     class="px-3 py-8 text-center text-gray-500"
                                 >
                                     No hay gastos para este filtro.
@@ -419,6 +468,21 @@ onMounted(async () => {
                                         {{
                                             expense.payment_method_label || '-'
                                         }}
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <span
+                                            v-if="expense.pos_session_id"
+                                            class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-800"
+                                        >
+                                            <CheckCircle2 :size="12" />
+                                            Caja #{{ expense.pos_session_id }}
+                                        </span>
+                                        <span
+                                            v-else
+                                            class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-muted dark:text-slate-300 dark:ring-border"
+                                        >
+                                            Sin caja
+                                        </span>
                                     </td>
                                     <td class="px-3 py-2 font-mono text-xs">
                                         {{ expense.reference_number || '-' }}
@@ -470,7 +534,8 @@ onMounted(async () => {
                             }}
                         </h2>
                         <p class="text-sm text-gray-500">
-                            Este registro afecta reportes financieros, no caja.
+                            Este registro afecta reportes financieros y se
+                            separa entre efectivo de caja y otros métodos.
                         </p>
                     </div>
                     <button
@@ -518,7 +583,7 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium"
-                            >Almacen</label
+                            >Sucursal</label
                         >
                         <SearchableSelect
                             v-model="form.warehouse_id"

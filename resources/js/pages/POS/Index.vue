@@ -251,9 +251,7 @@ const cartSortOptions: {
     { key: 'qty', label: 'Cant.' },
     { key: 'price', label: 'Precio' },
 ];
-const seller_id = ref<number | undefined>(
-    (page.props.auth?.user as any)?.id,
-);
+const seller_id = ref<number | undefined>((page.props.auth?.user as any)?.id);
 
 const handleClearCurrentCart = () => {
     if (!canClearCurrentCart.value) {
@@ -2124,7 +2122,6 @@ onUnmounted(() => {
             <CashRegisterStatus
                 :hasOpenSession="isSessionOpen"
                 @request-open="forceShowOpenSessionModal = true"
-                @request-cash-movement="showCashMovementModal = true"
             />
             <!-- We use the existing modal OpenSessionModal to actually process the opening -->
             <OpenSessionModal

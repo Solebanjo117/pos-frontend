@@ -20,6 +20,14 @@ import type { DraftCompatData } from '@/components/Products/VehicleCompatSection
 import type { PendingImage } from '@/components/Products/ProductImagesSection.vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import {
+    normalizeIdArray,
+    normalizeInitialInventoryPayload,
+    normalizePricingPayload,
+    normalizeProductAttributesPayload,
+    normalizeVehicleCompatibilityPayload,
+    toPositiveInt,
+} from '@/utils/productPayload';
+import {
     Dialog,
     DialogContent,
     DialogHeader,
@@ -975,14 +983,28 @@ const onDraftVariantsChanged = (variants: any[]) => {
     pendingVariants.value = variants;
 };
 
+const resolveVehicleModelId = (): number | null => {
+    return (
+        toPositiveInt(vehicleCompatRef.value?.selectedModelId) ??
+        toPositiveInt(vehicleCompat.value.modelId)
+    );
+};
+
+const vehicleCompatibilityPayload = () => {
+    return normalizeVehicleCompatibilityPayload(
+        vehicleCompat.value,
+        vehicleCompatRef.value?.selectedModelId,
+    );
+};
+
 const handleSubmit = async () => {
     validationErrors.value = {};
     successMessage.value = '';
+    const normalizedInitialInventory = normalizeInitialInventoryPayload(
+        form.value.initial_inventory,
+    );
 
-    if (
-        form.value.brand_id &&
-        !form.value.initial_inventory?.[0]?.warehouse_id
-    ) {
+    if (form.value.brand_id && normalizedInitialInventory.length === 0) {
         toast.error(
             'Debes seleccionar un almacén cuando creas una variante con marca',
         );
@@ -992,10 +1014,7 @@ const handleSubmit = async () => {
     // Require model selection when "todos los motores" or "todos los chasis" is checked.
     if (
         (vehicleCompat.value.allEngines || vehicleCompat.value.allChassis) &&
-        !(
-            vehicleCompatRef.value?.selectedModelId ??
-            vehicleCompat.value.modelId
-        )
+        !resolveVehicleModelId()
     ) {
         toast.error(
             'Debes seleccionar un modelo de vehículo antes de marcar "todos los motores" o "todos los chasis".',
@@ -1004,73 +1023,21 @@ const handleSubmit = async () => {
     }
 
     try {
-        const normalizedSaleTaxRate = Math.max(
-            0,
-            Math.min(
-                100,
-                Math.round(
-                    Number(
-                        (form.value.pricing as any).sale_tax_rate ??
-                            form.value.pricing.tax_rate ??
-                            defaultTaxRate(),
-                    ),
-                ),
-            ),
-        );
-        const normalizedCostTaxRate = Math.max(
-            0,
-            Math.min(
-                100,
-                Math.round(
-                    Number(
-                        (form.value.pricing as any).cost_tax_rate ??
-                            normalizedSaleTaxRate,
-                    ),
-                ),
-            ),
-        );
-
         const payload = {
             ...form.value,
-            extra_category_ids: extraCategoryIds.value,
-            pricing: {
-                ...form.value.pricing,
-                tax_rate: normalizedSaleTaxRate,
-                sale_tax_rate: normalizedSaleTaxRate,
-                cost_tax_rate: normalizedCostTaxRate,
-            },
+            extra_category_ids: normalizeIdArray(
+                sortCategoryIdsByName(extraCategoryIds.value),
+            ),
+            initial_inventory: normalizedInitialInventory,
+            pricing: normalizePricingPayload(
+                form.value.pricing as Record<string, unknown>,
+                defaultTaxRate(),
+            ),
             sku: form.value.sku || form.value.sku_base || '',
-            attributes: productAttributes.value
-                .map((a) => ({
-                    name: a.name.trim(),
-                    value: Array.isArray(a.value)
-                        ? a.value
-                        : String(a.value).trim(),
-                    unit: (a.unit ?? '').trim(),
-                    source: a.fromCategory
-                        ? ('category' as const)
-                        : ('custom' as const),
-                    source_category_id: a.source_category_id ?? null,
-                }))
-                .filter(
-                    (a) =>
-                        a.name &&
-                        (Array.isArray(a.value) ? a.value.length > 0 : a.value),
-                ),
-            vehicle_compatibility: {
-                engines: vehicleCompat.value.engines.map((e) => ({
-                    engine_id: e.engine_id,
-                })),
-                chassis: vehicleCompat.value.chassis.map((c) => ({
-                    chassis_id: c.chassis_id,
-                })),
-                all_engines: vehicleCompat.value.allEngines,
-                all_chassis: vehicleCompat.value.allChassis,
-                model_id:
-                    vehicleCompatRef.value?.selectedModelId ??
-                    vehicleCompat.value.modelId ??
-                    null,
-            },
+            attributes: normalizeProductAttributesPayload(
+                productAttributes.value,
+            ),
+            vehicle_compatibility: vehicleCompatibilityPayload(),
             is_universal: vehicleCompat.value.isUniversal,
         };
         const result = await createProduct(payload);
@@ -1207,25 +1174,133 @@ const cancel = () => {
     window.location.href = '/products';
 };
 const getError = (field: string) => validationErrors.value[field]?.[0] || '';
+
+const validationErrorItems = computed(() =>
+    Object.entries(validationErrors.value).flatMap(([field, messages]) =>
+        messages.map((message) => ({ field, message })),
+    ),
+);
+
+const workbenchSections = [
+    { id: 'identidad', label: 'Resumen' },
+    { id: 'codigos', label: 'Codigos' },
+    { id: 'compatibilidad', label: 'Compatibilidad' },
+    { id: 'variantes', label: 'Variantes' },
+    { id: 'atributos', label: 'Atributos' },
+    { id: 'relaciones', label: 'Relaciones' },
+    { id: 'imagenes', label: 'Imagenes' },
+];
+
+const statusLabels: Record<string, string> = {
+    active: 'Activo',
+    pending: 'Pendiente',
+    discontinued: 'Descontinuado',
+};
+
+const primaryCategoryName = computed(() => {
+    return categoryNameById((form.value as any).category_id) || 'Sin categoria';
+});
+
+const initialStockTotal = computed(() =>
+    (form.value.initial_inventory ?? []).reduce(
+        (total, item) => total + (Number(item.stock_available) || 0),
+        0,
+    ),
+);
+
+const summaryMetrics = computed(() => [
+    {
+        label: 'Categoria',
+        value: primaryCategoryName.value,
+        tone: 'indigo',
+    },
+    {
+        label: 'Codigo',
+        value: form.value.sku_base || 'Pendiente',
+        tone: form.value.sku_base ? 'gray' : 'amber',
+    },
+    {
+        label: 'Variantes',
+        value:
+            pendingVariants.value.length > 0
+                ? `${pendingVariants.value.length} adicionales`
+                : 'Base',
+        tone: 'gray',
+    },
+    {
+        label: 'Stock inicial',
+        value: initialStockTotal.value.toLocaleString('es-MX'),
+        tone: initialStockTotal.value > 0 ? 'emerald' : 'amber',
+    },
+    {
+        label: 'Costo',
+        value: `$${Number(form.value.pricing.cost || 0).toFixed(2)}`,
+        tone: 'gray',
+    },
+    {
+        label: 'Precio',
+        value: `$${Number(computed_total.value || 0).toFixed(2)}`,
+        tone: 'emerald',
+    },
+]);
+
+const readinessItems = computed(() => [
+    {
+        label: 'Identidad',
+        ready: Boolean(form.value.name || namePreview.value),
+    },
+    {
+        label: 'Categoria',
+        ready: Boolean((form.value as any).category_id),
+    },
+    {
+        label: 'Codigo',
+        ready: Boolean(form.value.sku_base),
+    },
+    {
+        label: 'Precio',
+        ready: Number(form.value.pricing.base_price || 0) > 0,
+    },
+    {
+        label: 'Stock',
+        ready: initialStockTotal.value > 0,
+    },
+]);
 </script>
 
 <template>
     <Head title="Crear Producto" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-6 p-4">
+        <div class="space-y-5 p-4">
             <!-- Header -->
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1
-                        class="text-2xl font-bold text-gray-900 dark:text-white"
+            <div
+                class="flex flex-col gap-4 border-b border-gray-200 pb-4 lg:flex-row lg:items-start lg:justify-between dark:border-border"
+            >
+                <div class="min-w-0">
+                    <div
+                        class="mb-2 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400"
                     >
-                        Crear Nuevo Producto
+                        <span>Productos</span>
+                        <span class="text-gray-300 dark:text-gray-600">/</span>
+                        <span>Alta operativa</span>
+                        <span
+                            class="rounded-md bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
+                        >
+                            {{ statusLabels[form.status ?? 'pending'] }}
+                        </span>
+                    </div>
+                    <h1
+                        class="text-2xl font-bold break-words text-gray-900 dark:text-white"
+                    >
+                        {{ form.name || namePreview || 'Nuevo producto' }}
                     </h1>
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                        Completa los datos del producto base y agrega variantes
+                    <p
+                        class="mt-1 font-mono text-sm break-words text-gray-500 dark:text-gray-400"
+                    >
+                        {{ form.sku_base || 'Codigo pendiente' }}
                     </p>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex flex-wrap gap-2 lg:justify-end">
                     <button
                         type="button"
                         @click="cancel"
@@ -1242,6 +1317,70 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || '';
                         {{ loading ? 'Creando...' : 'Crear Producto' }}
                     </button>
                 </div>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <div
+                    v-for="metric in summaryMetrics"
+                    :key="metric.label"
+                    class="rounded-lg border bg-white p-3 shadow-sm dark:border-border dark:bg-card"
+                    :class="{
+                        'border-amber-200 dark:border-amber-900/60':
+                            metric.tone === 'amber',
+                        'border-emerald-200 dark:border-emerald-900/60':
+                            metric.tone === 'emerald',
+                        'border-indigo-200 dark:border-indigo-900/60':
+                            metric.tone === 'indigo',
+                        'border-gray-200': metric.tone === 'gray',
+                    }"
+                >
+                    <p
+                        class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
+                    >
+                        {{ metric.label }}
+                    </p>
+                    <p
+                        class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white"
+                        :class="{ 'font-mono': metric.label === 'Codigo' }"
+                        :title="metric.value"
+                    >
+                        {{ metric.value }}
+                    </p>
+                </div>
+            </div>
+
+            <nav
+                class="sticky top-0 z-20 -mx-4 overflow-x-auto border-y border-gray-200 bg-white/95 px-4 py-2 backdrop-blur dark:border-border dark:bg-background/95"
+                aria-label="Secciones del producto"
+            >
+                <div class="flex min-w-max gap-2">
+                    <a
+                        v-for="section in workbenchSections"
+                        :key="section.id"
+                        :href="`#${section.id}`"
+                        class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                    >
+                        {{ section.label }}
+                    </a>
+                </div>
+            </nav>
+
+            <div
+                v-if="validationErrorItems.length"
+                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-200"
+            >
+                <div class="font-semibold">Revisa los datos del producto</div>
+                <ul class="mt-2 space-y-1">
+                    <li
+                        v-for="item in validationErrorItems"
+                        :key="`${item.field}-${item.message}`"
+                        class="break-words"
+                    >
+                        <span class="font-mono text-xs">{{ item.field }}</span>
+                        <span class="mx-1">-</span>
+                        <span>{{ item.message }}</span>
+                    </li>
+                </ul>
             </div>
 
             <div
@@ -1305,668 +1444,763 @@ const getError = (field: string) => validationErrors.value[field]?.[0] || '';
                 </div>
             </div>
 
-            <form
-                @submit.prevent="handleSubmit"
-                @keydown.enter="
-                    (e: KeyboardEvent) => {
-                        if ((e.target as HTMLElement)?.tagName === 'INPUT')
-                            e.preventDefault();
-                    }
-                "
-                class="space-y-4"
-            >
-                <!-- SECTION 1: Descripcion -->
-                <div
-                    class="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+            <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+                <form
+                    @submit.prevent="handleSubmit"
+                    @keydown.enter="
+                        (e: KeyboardEvent) => {
+                            if ((e.target as HTMLElement)?.tagName === 'INPUT')
+                                e.preventDefault();
+                        }
+                    "
+                    class="space-y-4"
                 >
-                    <h2
-                        class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                    <!-- SECTION 1: Descripcion -->
+                    <div
+                        id="identidad"
+                        class="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
                     >
-                        Descripción
-                    </h2>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >
-                                Descripción <span class="text-red-500">*</span>
-                            </label>
-                            <input
-                                v-model="form.name"
-                                type="text"
-                                @input="onNameInput"
-                                class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                placeholder="Se autogenera con categoría + compatibilidad vehicular..."
-                            />
-                            <div
-                                v-if="!form.name && namePreview"
-                                class="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 dark:border-amber-700/40 dark:bg-amber-900/20"
-                            >
-                                <p
-                                    class="text-xs text-amber-600 dark:text-amber-400"
-                                >
-                                    Preview:
-                                    <span class="font-semibold">{{
-                                        namePreview
-                                    }}</span>
-                                </p>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="mb-1 flex items-center justify-between">
+                        <h2
+                            class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                        >
+                            Identidad y clasificacion
+                        </h2>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div>
                                 <label
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Categoría</label
                                 >
+                                    Descripción
+                                    <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    v-model="form.name"
+                                    type="text"
+                                    @input="onNameInput"
+                                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                    placeholder="Se autogenera con categoría + compatibilidad vehicular..."
+                                />
+                                <div
+                                    v-if="!form.name && namePreview"
+                                    class="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 dark:border-amber-700/40 dark:bg-amber-900/20"
+                                >
+                                    <p
+                                        class="text-xs text-amber-600 dark:text-amber-400"
+                                    >
+                                        Preview:
+                                        <span class="font-semibold">{{
+                                            namePreview
+                                        }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <div>
+                                <div
+                                    class="mb-1 flex items-center justify-between"
+                                >
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                        >Categoría</label
+                                    >
+                                    <button
+                                        type="button"
+                                        @click="openInline('category')"
+                                        class="flex items-center gap-0.5 text-xs text-blue-600 hover:underline dark:text-blue-400"
+                                    >
+                                        <Plus class="h-3 w-3" /> Crear
+                                    </button>
+                                </div>
+                                <SearchableSelect
+                                    :options="categoryOptions"
+                                    :model-value="
+                                        (form as any).category_id ?? null
+                                    "
+                                    @update:model-value="
+                                        (v) => ((form as any).category_id = v)
+                                    "
+                                    placeholder="-- Selecciona categoría --"
+                                    :loading="loadingCategories"
+                                />
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Categorías extra</label
+                            >
+                            <div
+                                class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]"
+                            >
+                                <SearchableSelect
+                                    :options="extraCategoryOptions"
+                                    :model-value="selectedExtraCategoryId"
+                                    @update:model-value="
+                                        (v) =>
+                                            (selectedExtraCategoryId = v as
+                                                | number
+                                                | null)
+                                    "
+                                    placeholder="-- Selecciona categoría extra --"
+                                    :loading="loadingCategories"
+                                    :clearable="true"
+                                />
                                 <button
                                     type="button"
-                                    @click="openInline('category')"
-                                    class="flex items-center gap-0.5 text-xs text-blue-600 hover:underline dark:text-blue-400"
+                                    @click="addExtraCategory"
+                                    :disabled="!selectedExtraCategoryId"
+                                    class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
                                 >
-                                    <Plus class="h-3 w-3" /> Crear
+                                    <Plus class="h-4 w-4" /> Agregar
                                 </button>
                             </div>
-                            <SearchableSelect
-                                :options="categoryOptions"
-                                :model-value="(form as any).category_id ?? null"
-                                @update:model-value="
-                                    (v) => ((form as any).category_id = v)
-                                "
-                                placeholder="-- Selecciona categoría --"
-                                :loading="loadingCategories"
-                            />
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <label
-                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >Categorías extra</label
-                        >
-                        <div
-                            class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]"
-                        >
-                            <SearchableSelect
-                                :options="extraCategoryOptions"
-                                :model-value="selectedExtraCategoryId"
-                                @update:model-value="
-                                    (v) =>
-                                        (selectedExtraCategoryId = v as
-                                            | number
-                                            | null)
-                                "
-                                placeholder="-- Selecciona categoría extra --"
-                                :loading="loadingCategories"
-                                :clearable="true"
-                            />
-                            <button
-                                type="button"
-                                @click="addExtraCategory"
-                                :disabled="!selectedExtraCategoryId"
-                                class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                            <div
+                                v-if="selectedExtraCategories.length > 0"
+                                class="flex flex-wrap gap-2"
                             >
-                                <Plus class="h-4 w-4" /> Agregar
-                            </button>
-                        </div>
-                        <div
-                            v-if="selectedExtraCategories.length > 0"
-                            class="flex flex-wrap gap-2"
-                        >
-                            <span
-                                v-for="category in selectedExtraCategories"
-                                :key="category.id"
-                                class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
-                            >
-                                {{ category.name }}
-                                <button
-                                    type="button"
-                                    @click="removeExtraCategory(category.id)"
-                                    class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
-                                    :aria-label="`Quitar ${category.name}`"
+                                <span
+                                    v-for="category in selectedExtraCategories"
+                                    :key="category.id"
+                                    class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
                                 >
-                                    <X class="h-3 w-3" />
-                                </button>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SECTION 2: Codigo + Estado -->
-                <div
-                    class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                >
-                    <h2
-                        class="mb-4 text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                    >
-                        Código y Estado
-                    </h2>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                            <label
-                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >
-                                Código
-                                <span class="text-xs font-normal text-gray-400"
-                                    >(opcional)</span
-                                >
-                            </label>
-                            <input
-                                v-model="form.sku_base"
-                                type="text"
-                                class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
-                                placeholder="Ingresa manualmente el código"
-                            />
-                        </div>
-                        <div>
-                            <label
-                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >Estado</label
-                            >
-                            <select
-                                v-model="form.status"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option value="active">Activo</option>
-                                <option value="pending">Pendiente</option>
-                                <option value="discontinued">
-                                    Descontinuado
-                                </option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SECTION 3: Codigos alternos -->
-                <div
-                    class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-border dark:bg-card"
-                >
-                    <h2
-                        class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                    >
-                        Códigos alternos
-                    </h2>
-                    <div class="grid items-end gap-3 sm:grid-cols-12">
-                        <div class="sm:col-span-5">
-                            <label
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >Código
-                                <span class="text-red-500">*</span></label
-                            >
-                            <input
-                                v-model="refInput"
-                                type="text"
-                                @keydown.enter.prevent="addRef"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
-                                placeholder="Ej: 123-456-ABC"
-                            />
-                        </div>
-                        <div class="sm:col-span-4">
-                            <label
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >Marca</label
-                            >
-                            <SearchableSelect
-                                :options="oemBrandOptions"
-                                :model-value="refManufacturerInput"
-                                @update:model-value="
-                                    (value) =>
-                                        (refManufacturerInput = value as
-                                            | string
-                                            | null)
-                                "
-                                :loading="loadingBrands"
-                                placeholder="Sin marca"
-                                search-placeholder="Buscar marca..."
-                                :clearable="true"
-                            />
-                        </div>
-                        <div class="sm:col-span-3">
-                            <button
-                                type="button"
-                                @click="addRef"
-                                :disabled="!refInput.trim()"
-                                class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                            >
-                                Agregar
-                            </button>
+                                    {{ category.name }}
+                                    <button
+                                        type="button"
+                                        @click="
+                                            removeExtraCategory(category.id)
+                                        "
+                                        class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
+                                        :aria-label="`Quitar ${category.name}`"
+                                    >
+                                        <X class="h-3 w-3" />
+                                    </button>
+                                </span>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- SECTION 2: Codigo + Estado -->
                     <div
-                        class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
+                        id="codigos"
+                        class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
                     >
-                        <div
-                            v-if="addedRefs.length === 0"
-                            class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+                        <h2
+                            class="mb-4 text-sm font-semibold tracking-wider text-gray-500 uppercase"
                         >
-                            No hay códigos alternos agregados.
-                        </div>
-                        <table v-else class="w-full text-left text-sm">
-                            <thead class="bg-gray-50 dark:bg-card">
-                                <tr>
-                                    <th
-                                        class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                                    >
-                                        Código
-                                    </th>
-                                    <th
-                                        class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                                    >
-                                        Marca
-                                    </th>
-                                    <th class="w-12 px-4 py-2"></th>
-                                </tr>
-                            </thead>
-                            <tbody
-                                class="divide-y divide-gray-100 dark:divide-border/50"
-                            >
-                                <tr
-                                    v-for="(ref, idx) in addedRefs"
-                                    :key="`${ref.oem_code}-${ref.manufacturer || ''}-${idx}`"
-                                >
-                                    <td
-                                        class="px-4 py-2 font-mono text-gray-900 dark:text-white"
-                                    >
-                                        {{ ref.oem_code }}
-                                    </td>
-                                    <td
-                                        class="px-4 py-2 text-gray-700 dark:text-gray-300"
-                                    >
-                                        {{ ref.manufacturer || '-' }}
-                                    </td>
-                                    <td class="px-4 py-2 text-right">
-                                        <button
-                                            type="button"
-                                            @click="removeRef(idx)"
-                                            class="text-xs font-semibold text-red-500 hover:text-red-700"
-                                        >
-                                            Eliminar
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- SECTION 4: Compatibilidad Vehicular -->
-                <VehicleCompatSection
-                    ref="vehicleCompatRef"
-                    mode="draft"
-                    v-model="vehicleCompat"
-                    @open-inline="openVehicleInline"
-                />
-
-                <!-- SECTION 5: Variantes -->
-                <div
-                    class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white shadow-sm dark:border-border dark:bg-card"
-                >
-                    <div class="px-5 py-4">
-                        <div class="flex items-center justify-between">
+                            Codigo y estado
+                        </h2>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div>
-                                <h2
-                                    class="mb-0.5 text-sm font-semibold text-gray-900 dark:text-white"
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >
-                                    Variantes del Producto
+                                    Código
                                     <span
                                         class="text-xs font-normal text-gray-400"
                                         >(opcional)</span
                                     >
-                                    <span
-                                        v-if="pendingVariants.length > 0"
-                                        class="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                    >
-                                        {{ pendingVariants.length }} pendiente{{
-                                            pendingVariants.length > 1
-                                                ? 's'
-                                                : ''
-                                        }}
-                                    </span>
-                                </h2>
-                                <p
-                                    class="text-xs text-gray-500 dark:text-gray-400"
+                                </label>
+                                <input
+                                    v-model="form.sku_base"
+                                    type="text"
+                                    class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
+                                    placeholder="Ingresa manualmente el código"
+                                />
+                            </div>
+                            <div>
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Estado</label
                                 >
-                                    Agrega variantes adicionales con su propia
-                                    marca, precios e inventario. Se guardarán
-                                    junto con el producto.
-                                </p>
+                                <select
+                                    v-model="form.status"
+                                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                >
+                                    <option value="active">Activo</option>
+                                    <option value="pending">Pendiente</option>
+                                    <option value="discontinued">
+                                        Descontinuado
+                                    </option>
+                                </select>
                             </div>
                         </div>
                     </div>
-                    <div class="px-5 pb-5">
-                        <VariantManager
-                            :category-id="form.category_id ?? undefined"
-                            :sku-base="form.sku_base || undefined"
-                            :product-name="form.name"
-                            :category-formula="categoryFormula"
-                            :category-applies-itbm="categoryAppliesItbm"
-                            :category-itbm-percent="categoryItbmPercent"
-                            @draft-variants-changed="onDraftVariantsChanged"
-                        />
-                    </div>
-                </div>
 
-                <!-- SECTION 6: Atributos -->
-                <div
-                    class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                >
-                    <div class="mb-3 flex items-center justify-between gap-3">
-                        <h2
-                            class="flex items-center gap-1 text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                        >
-                            <Wrench class="h-4 w-4" /> Atributos
-                        </h2>
-                        <button
-                            type="button"
-                            @click="addCustomAttribute"
-                            class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
-                        >
-                            <Plus class="h-3.5 w-3.5" /> Agregar atributo
-                        </button>
-                    </div>
+                    <!-- SECTION 3: Codigos alternos -->
                     <div
-                        v-if="productAttributes.length === 0"
-                        class="rounded-md border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 dark:border-border dark:text-gray-400"
+                        class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-border dark:bg-card"
                     >
-                        Puedes agregar atributos manualmente o seleccionar una
-                        categoría con atributos por defecto.
-                    </div>
-                    <div v-else class="space-y-3">
-                        <div
-                            v-for="(attr, index) in productAttributes"
-                            :key="index"
-                            class="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end"
+                        <h2
+                            class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
                         >
+                            Códigos alternos
+                        </h2>
+                        <div class="grid items-end gap-3 sm:grid-cols-12">
                             <div class="sm:col-span-5">
                                 <label
-                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                    >Código
+                                    <span class="text-red-500">*</span></label
                                 >
-                                    Nombre del atributo
-                                    <span
-                                        v-if="attr.required"
-                                        class="text-red-500"
-                                        >*</span
-                                    >
-                                </label>
                                 <input
-                                    v-model="attr.name"
+                                    v-model="refInput"
                                     type="text"
-                                    :required="attr.required"
-                                    :readonly="attr.fromCategory"
-                                    class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                    :class="
-                                        attr.fromCategory
-                                            ? 'cursor-not-allowed opacity-75'
-                                            : ''
-                                    "
-                                    placeholder="Ej: Amperaje"
+                                    @keydown.enter.prevent="addRef"
+                                    class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
+                                    placeholder="Ej: 123-456-ABC"
                                 />
                             </div>
-                            <div class="sm:col-span-6">
+                            <div class="sm:col-span-4">
                                 <label
-                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400"
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                    >Marca</label
                                 >
-                                    Valor
-                                    <span
-                                        v-if="attr.required"
-                                        class="text-red-500"
-                                        >*</span
-                                    >
-                                </label>
-                                <div
-                                    v-if="hasSelectOptions(attr)"
-                                    class="mt-0.5 w-full"
-                                >
-                                    <div
-                                        class="max-h-40 overflow-y-auto rounded-md border border-gray-300 bg-white dark:border-border dark:bg-muted"
-                                    >
-                                        <label
-                                            v-for="option in attr.options"
-                                            :key="option"
-                                            class="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-muted/80"
-                                            :class="
-                                                (
-                                                    Array.isArray(attr.value)
-                                                        ? attr.value.includes(
-                                                              option,
-                                                          )
-                                                        : attr.value === option
-                                                )
-                                                    ? 'bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200'
-                                                    : 'text-gray-700 dark:text-gray-300'
-                                            "
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                :checked="
-                                                    Array.isArray(attr.value)
-                                                        ? attr.value.includes(
-                                                              option,
-                                                          )
-                                                        : attr.value === option
-                                                "
-                                                class="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                                @change="
-                                                    (() => {
-                                                        const current =
-                                                            Array.isArray(
-                                                                attr.value,
-                                                            )
-                                                                ? [
-                                                                      ...attr.value,
-                                                                  ]
-                                                                : attr.value
-                                                                  ? [
-                                                                        String(
-                                                                            attr.value,
-                                                                        ),
-                                                                    ]
-                                                                  : [];
-                                                        attr.value =
-                                                            current.includes(
-                                                                option,
-                                                            )
-                                                                ? current.filter(
-                                                                      (v) =>
-                                                                          v !==
-                                                                          option,
-                                                                  )
-                                                                : [
-                                                                      ...current,
-                                                                      option,
-                                                                  ];
-                                                    })()
-                                                "
-                                            />
-                                            <span class="text-sm select-none">{{
-                                                option
-                                            }}</span>
-                                        </label>
-                                    </div>
-                                    <p
-                                        v-if="
-                                            Array.isArray(attr.value) &&
-                                            attr.value.length > 0
-                                        "
-                                        class="mt-1 text-xs text-gray-400 dark:text-gray-500"
-                                    >
-                                        {{
-                                            attr.value.length === 1
-                                                ? '1 seleccionado'
-                                                : `${attr.value.length} seleccionados`
-                                        }}
-                                    </p>
-                                </div>
-                                <input
-                                    v-else
-                                    v-model="attr.value"
-                                    type="text"
-                                    :required="attr.required"
-                                    class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                    :placeholder="
-                                        attr.name ? `${attr.name}...` : 'Valor'
+                                <SearchableSelect
+                                    :options="oemBrandOptions"
+                                    :model-value="refManufacturerInput"
+                                    @update:model-value="
+                                        (value) =>
+                                            (refManufacturerInput = value as
+                                                | string
+                                                | null)
                                     "
+                                    :loading="loadingBrands"
+                                    placeholder="Sin marca"
+                                    search-placeholder="Buscar marca..."
+                                    :clearable="true"
                                 />
                             </div>
-                            <div class="sm:col-span-1">
+                            <div class="sm:col-span-3">
                                 <button
                                     type="button"
-                                    @click="removeProductAttribute(index)"
-                                    :disabled="attr.fromCategory"
-                                    class="w-full rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                                    :class="
-                                        attr.fromCategory
-                                            ? 'cursor-not-allowed opacity-50'
-                                            : ''
-                                    "
-                                    title="Quitar atributo"
+                                    @click="addRef"
+                                    :disabled="!refInput.trim()"
+                                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
                                 >
-                                    <X class="mx-auto h-3.5 w-3.5" />
+                                    Agregar
                                 </button>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- SECTION 7: Upsales -->
-                <div
-                    class="space-y-4 rounded-xl border border-l-4 border-gray-200 border-l-violet-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                >
-                    <h2
-                        class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                    >
-                        Upsales
-                    </h2>
-
-                    <div class="grid items-end gap-4 sm:grid-cols-12">
-                        <div class="sm:col-span-6">
-                            <label
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >Buscar producto
-                                <span class="text-red-500">*</span></label
+                        <div
+                            class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
+                        >
+                            <div
+                                v-if="addedRefs.length === 0"
+                                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
                             >
-                            <AsyncProductCombobox
-                                :model-value="selectedUpsaleProduct?.id ?? null"
-                                @select="selectedUpsaleProduct = $event"
+                                No hay códigos alternos agregados.
+                            </div>
+                            <table v-else class="w-full text-left text-sm">
+                                <thead class="bg-gray-50 dark:bg-card">
+                                    <tr>
+                                        <th
+                                            class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
+                                        >
+                                            Código
+                                        </th>
+                                        <th
+                                            class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
+                                        >
+                                            Marca
+                                        </th>
+                                        <th class="w-12 px-4 py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody
+                                    class="divide-y divide-gray-100 dark:divide-border/50"
+                                >
+                                    <tr
+                                        v-for="(ref, idx) in addedRefs"
+                                        :key="`${ref.oem_code}-${ref.manufacturer || ''}-${idx}`"
+                                    >
+                                        <td
+                                            class="px-4 py-2 font-mono text-gray-900 dark:text-white"
+                                        >
+                                            {{ ref.oem_code }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-gray-700 dark:text-gray-300"
+                                        >
+                                            {{ ref.manufacturer || '-' }}
+                                        </td>
+                                        <td class="px-4 py-2 text-right">
+                                            <button
+                                                type="button"
+                                                @click="removeRef(idx)"
+                                                class="text-xs font-semibold text-red-500 hover:text-red-700"
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 4: Compatibilidad Vehicular -->
+                    <VehicleCompatSection
+                        id="compatibilidad"
+                        ref="vehicleCompatRef"
+                        mode="draft"
+                        v-model="vehicleCompat"
+                        @open-inline="openVehicleInline"
+                    />
+
+                    <!-- SECTION 5: Variantes -->
+                    <div
+                        id="variantes"
+                        class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <div class="px-5 py-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h2
+                                        class="mb-0.5 text-sm font-semibold text-gray-900 dark:text-white"
+                                    >
+                                        Variantes del Producto
+                                        <span
+                                            class="text-xs font-normal text-gray-400"
+                                            >(opcional)</span
+                                        >
+                                        <span
+                                            v-if="pendingVariants.length > 0"
+                                            class="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                        >
+                                            {{ pendingVariants.length }}
+                                            pendiente{{
+                                                pendingVariants.length > 1
+                                                    ? 's'
+                                                    : ''
+                                            }}
+                                        </span>
+                                    </h2>
+                                    <p
+                                        class="text-xs text-gray-500 dark:text-gray-400"
+                                    >
+                                        Agrega variantes adicionales con su
+                                        propia marca, precios e inventario. Se
+                                        guardarán junto con el producto.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="px-5 pb-5">
+                            <VariantManager
+                                :category-id="form.category_id ?? undefined"
+                                :sku-base="form.sku_base || undefined"
+                                :product-name="form.name"
+                                :category-formula="categoryFormula"
+                                :category-applies-itbm="categoryAppliesItbm"
+                                :category-itbm-percent="categoryItbmPercent"
+                                @draft-variants-changed="onDraftVariantsChanged"
                             />
                         </div>
-                        <div class="sm:col-span-3">
-                            <label
-                                class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                >Tipo de relación</label
+                    </div>
+
+                    <!-- SECTION 6: Atributos -->
+                    <div
+                        id="atributos"
+                        class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="mb-3 flex items-center justify-between gap-3"
+                        >
+                            <h2
+                                class="flex items-center gap-1 text-sm font-semibold tracking-wider text-gray-500 uppercase"
                             >
-                            <select
-                                v-model="upsaleRelationshipType"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option value="compatible">Compatible</option>
-                                <option value="substitute">Sustituto</option>
-                                <option value="upgrade">Upgrade</option>
-                            </select>
-                        </div>
-                        <div class="sm:col-span-3">
+                                <Wrench class="h-4 w-4" /> Atributos
+                            </h2>
                             <button
                                 type="button"
-                                @click="addUpsale"
-                                :disabled="!selectedUpsaleProduct"
-                                class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                @click="addCustomAttribute"
+                                class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
                             >
-                                Agregar upsale
+                                <Plus class="h-3.5 w-3.5" /> Agregar atributo
                             </button>
+                        </div>
+                        <div
+                            v-if="productAttributes.length === 0"
+                            class="rounded-md border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 dark:border-border dark:text-gray-400"
+                        >
+                            Puedes agregar atributos manualmente o seleccionar
+                            una categoría con atributos por defecto.
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div
+                                v-for="(attr, index) in productAttributes"
+                                :key="index"
+                                class="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end"
+                            >
+                                <div class="sm:col-span-5">
+                                    <label
+                                        class="block text-xs font-medium text-gray-600 dark:text-gray-400"
+                                    >
+                                        Nombre del atributo
+                                        <span
+                                            v-if="attr.required"
+                                            class="text-red-500"
+                                            >*</span
+                                        >
+                                    </label>
+                                    <input
+                                        v-model="attr.name"
+                                        type="text"
+                                        :required="attr.required"
+                                        :readonly="attr.fromCategory"
+                                        class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                        :class="
+                                            attr.fromCategory
+                                                ? 'cursor-not-allowed opacity-75'
+                                                : ''
+                                        "
+                                        placeholder="Ej: Amperaje"
+                                    />
+                                </div>
+                                <div class="sm:col-span-6">
+                                    <label
+                                        class="block text-xs font-medium text-gray-600 dark:text-gray-400"
+                                    >
+                                        Valor
+                                        <span
+                                            v-if="attr.required"
+                                            class="text-red-500"
+                                            >*</span
+                                        >
+                                    </label>
+                                    <div
+                                        v-if="hasSelectOptions(attr)"
+                                        class="mt-0.5 w-full"
+                                    >
+                                        <div
+                                            class="max-h-40 overflow-y-auto rounded-md border border-gray-300 bg-white dark:border-border dark:bg-muted"
+                                        >
+                                            <label
+                                                v-for="option in attr.options"
+                                                :key="option"
+                                                class="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-muted/80"
+                                                :class="
+                                                    (
+                                                        Array.isArray(
+                                                            attr.value,
+                                                        )
+                                                            ? attr.value.includes(
+                                                                  option,
+                                                              )
+                                                            : attr.value ===
+                                                              option
+                                                    )
+                                                        ? 'bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200'
+                                                        : 'text-gray-700 dark:text-gray-300'
+                                                "
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    :checked="
+                                                        Array.isArray(
+                                                            attr.value,
+                                                        )
+                                                            ? attr.value.includes(
+                                                                  option,
+                                                              )
+                                                            : attr.value ===
+                                                              option
+                                                    "
+                                                    class="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-border dark:bg-muted"
+                                                    @change="
+                                                        (() => {
+                                                            const current =
+                                                                Array.isArray(
+                                                                    attr.value,
+                                                                )
+                                                                    ? [
+                                                                          ...attr.value,
+                                                                      ]
+                                                                    : attr.value
+                                                                      ? [
+                                                                            String(
+                                                                                attr.value,
+                                                                            ),
+                                                                        ]
+                                                                      : [];
+                                                            attr.value =
+                                                                current.includes(
+                                                                    option,
+                                                                )
+                                                                    ? current.filter(
+                                                                          (v) =>
+                                                                              v !==
+                                                                              option,
+                                                                      )
+                                                                    : [
+                                                                          ...current,
+                                                                          option,
+                                                                      ];
+                                                        })()
+                                                    "
+                                                />
+                                                <span
+                                                    class="text-sm select-none"
+                                                    >{{ option }}</span
+                                                >
+                                            </label>
+                                        </div>
+                                        <p
+                                            v-if="
+                                                Array.isArray(attr.value) &&
+                                                attr.value.length > 0
+                                            "
+                                            class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+                                        >
+                                            {{
+                                                attr.value.length === 1
+                                                    ? '1 seleccionado'
+                                                    : `${attr.value.length} seleccionados`
+                                            }}
+                                        </p>
+                                    </div>
+                                    <input
+                                        v-else
+                                        v-model="attr.value"
+                                        type="text"
+                                        :required="attr.required"
+                                        class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                        :placeholder="
+                                            attr.name
+                                                ? `${attr.name}...`
+                                                : 'Valor'
+                                        "
+                                    />
+                                </div>
+                                <div class="sm:col-span-1">
+                                    <button
+                                        type="button"
+                                        @click="removeProductAttribute(index)"
+                                        :disabled="attr.fromCategory"
+                                        class="w-full rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                        :class="
+                                            attr.fromCategory
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : ''
+                                        "
+                                        title="Quitar atributo"
+                                    >
+                                        <X class="mx-auto h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 7: Upsales -->
+                    <div
+                        id="relaciones"
+                        class="space-y-4 rounded-xl border border-l-4 border-gray-200 border-l-violet-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <h2
+                            class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                        >
+                            Upsales
+                        </h2>
+
+                        <div class="grid items-end gap-4 sm:grid-cols-12">
+                            <div class="sm:col-span-6">
+                                <label
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                    >Buscar producto
+                                    <span class="text-red-500">*</span></label
+                                >
+                                <AsyncProductCombobox
+                                    :model-value="
+                                        selectedUpsaleProduct?.id ?? null
+                                    "
+                                    @select="selectedUpsaleProduct = $event"
+                                />
+                            </div>
+                            <div class="sm:col-span-3">
+                                <label
+                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                                    >Tipo de relación</label
+                                >
+                                <select
+                                    v-model="upsaleRelationshipType"
+                                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                >
+                                    <option value="compatible">
+                                        Compatible
+                                    </option>
+                                    <option value="substitute">
+                                        Sustituto
+                                    </option>
+                                    <option value="upgrade">Upgrade</option>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-3">
+                                <button
+                                    type="button"
+                                    @click="addUpsale"
+                                    :disabled="!selectedUpsaleProduct"
+                                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                >
+                                    Agregar upsale
+                                </button>
+                            </div>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
+                        >
+                            <div
+                                v-if="pendingUpsales.length === 0"
+                                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+                            >
+                                No hay upsales pendientes por vincular.
+                            </div>
+                            <table v-else class="w-full text-left text-sm">
+                                <thead class="bg-gray-50 dark:bg-card">
+                                    <tr>
+                                        <th
+                                            class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
+                                        >
+                                            Producto
+                                        </th>
+                                        <th
+                                            class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
+                                        >
+                                            Relacion
+                                        </th>
+                                        <th class="w-12 px-4 py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody
+                                    class="divide-y divide-gray-100 dark:divide-border/50"
+                                >
+                                    <tr
+                                        v-for="item in pendingUpsales"
+                                        :key="item.id"
+                                    >
+                                        <td
+                                            class="px-4 py-2 text-gray-900 dark:text-white"
+                                        >
+                                            <span class="font-mono">{{
+                                                item.sku_base
+                                            }}</span>
+                                            <span class="text-gray-500">
+                                                - {{ item.name }}</span
+                                            >
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-gray-700 dark:text-gray-300"
+                                        >
+                                            {{
+                                                getUpsaleRelationshipLabel(
+                                                    item.relationship_type,
+                                                )
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-2 text-right">
+                                            <button
+                                                type="button"
+                                                @click="removeUpsale(item.id)"
+                                                class="text-red-500 hover:text-red-700"
+                                                title="Quitar upsale"
+                                            >
+                                                <X class="h-4 w-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 8: Notas -->
+                    <div
+                        class="rounded-xl border border-l-4 border-gray-100 border-l-slate-400 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <h2
+                            class="mb-2 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                        >
+                            Notas internas
+                        </h2>
+                        <textarea
+                            v-model="form.description"
+                            rows="3"
+                            class="mt-1 w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                            placeholder="Notas internas del producto..."
+                        ></textarea>
+                    </div>
+
+                    <!-- SECTION 9: Imagen del Producto -->
+                    <ProductImagesSection
+                        id="imagenes"
+                        mode="pending"
+                        v-model="pendingImages"
+                        :category-ids="selectedCategoryIdsForImages"
+                        :category-name-map="categoryNameMapForImages"
+                    />
+                </form>
+
+                <aside class="space-y-4 xl:sticky xl:top-16 xl:self-start">
+                    <div
+                        class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <h2
+                            class="text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white"
+                        >
+                            Estado del alta
+                        </h2>
+                        <div class="mt-4 space-y-3">
+                            <div
+                                v-for="item in readinessItems"
+                                :key="item.label"
+                                class="flex items-center justify-between gap-3 text-sm"
+                            >
+                                <span class="text-gray-600 dark:text-gray-300">
+                                    {{ item.label }}
+                                </span>
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                                    :class="
+                                        item.ready
+                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300'
+                                            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
+                                    "
+                                >
+                                    {{ item.ready ? 'Listo' : 'Pendiente' }}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
                     <div
-                        class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
+                        class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
                     >
-                        <div
-                            v-if="pendingUpsales.length === 0"
-                            class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+                        <h2
+                            class="text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white"
                         >
-                            No hay upsales pendientes por vincular.
-                        </div>
-                        <table v-else class="w-full text-left text-sm">
-                            <thead class="bg-gray-50 dark:bg-card">
-                                <tr>
-                                    <th
-                                        class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                                    >
-                                        Producto
-                                    </th>
-                                    <th
-                                        class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                                    >
-                                        Relacion
-                                    </th>
-                                    <th class="w-12 px-4 py-2"></th>
-                                </tr>
-                            </thead>
-                            <tbody
-                                class="divide-y divide-gray-100 dark:divide-border/50"
+                            Acciones
+                        </h2>
+                        <div class="mt-4 grid gap-2">
+                            <button
+                                type="button"
+                                @click="handleSubmit"
+                                :disabled="loading"
+                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
                             >
-                                <tr
-                                    v-for="item in pendingUpsales"
-                                    :key="item.id"
-                                >
-                                    <td
-                                        class="px-4 py-2 text-gray-900 dark:text-white"
-                                    >
-                                        <span class="font-mono">{{
-                                            item.sku_base
-                                        }}</span>
-                                        <span class="text-gray-500">
-                                            - {{ item.name }}</span
-                                        >
-                                    </td>
-                                    <td
-                                        class="px-4 py-2 text-gray-700 dark:text-gray-300"
-                                    >
-                                        {{
-                                            getUpsaleRelationshipLabel(
-                                                item.relationship_type,
-                                            )
-                                        }}
-                                    </td>
-                                    <td class="px-4 py-2 text-right">
-                                        <button
-                                            type="button"
-                                            @click="removeUpsale(item.id)"
-                                            class="text-red-500 hover:text-red-700"
-                                            title="Quitar upsale"
-                                        >
-                                            <X class="h-4 w-4" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                                {{ loading ? 'Creando...' : 'Crear producto' }}
+                            </button>
+                            <button
+                                type="button"
+                                @click="cancel"
+                                class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-white"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
                     </div>
-                </div>
-
-                <!-- SECTION 8: Notas -->
-                <div
-                    class="rounded-xl border border-l-4 border-gray-100 border-l-slate-400 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                >
-                    <h2
-                        class="mb-2 text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                    >
-                        Notas
-                    </h2>
-                    <textarea
-                        v-model="form.description"
-                        rows="3"
-                        class="mt-1 w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="Notas internas del producto..."
-                    ></textarea>
-                </div>
-
-                <!-- SECTION 9: Imagen del Producto -->
-                <ProductImagesSection
-                    mode="pending"
-                    v-model="pendingImages"
-                    :category-ids="selectedCategoryIdsForImages"
-                    :category-name-map="categoryNameMapForImages"
-                />
-            </form>
+                </aside>
+            </div>
         </div>
 
         <!-- Inline Creation Modal (Category & Brand only — vehicle modals use VehicleInlineModals) -->

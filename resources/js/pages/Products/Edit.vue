@@ -19,6 +19,12 @@ import AttributeManager from '@/components/Products/AttributeManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
 import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
+import {
+    normalizeAlternativesPayload,
+    normalizeOemReferencesPayload,
+    normalizeProductAttributesPayload,
+    normalizeVehicleCompatibilityPayload,
+} from '@/utils/productPayload';
 import { Archive, Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next';
 
 const props = defineProps<{
@@ -611,54 +617,18 @@ const metadataPayload = (): UpdateProductRequest => ({
     ...form.value,
     ...categoryPayload(),
     is_universal: draftCompatibility.value.isUniversal,
-    attributes: draftAttributes.value
-        .filter(
-            (attribute) =>
-                attribute.name.trim() &&
-                (Array.isArray(attribute.value)
-                    ? attribute.value.length > 0
-                    : String(attribute.value).trim()),
-        )
-        .map((attribute) => ({
-            name: attribute.name.trim(),
-            value: Array.isArray(attribute.value)
-                ? attribute.value
-                : String(attribute.value).trim(),
-            unit: attribute.unit ?? undefined,
-            source:
-                attribute.source === 'category'
-                    ? ('category' as const)
-                    : ('custom' as const),
-            source_category_id:
-                attribute.source === 'category'
-                    ? (attribute.source_category_id ?? null)
-                    : null,
-        })),
-    oem_references: draftOemReferences.value
-        .filter((reference) => reference.oem_code.trim())
-        .map((reference) => ({
-            oem_code: reference.oem_code.trim(),
-            manufacturer: reference.manufacturer?.trim() || null,
-        })),
-    alternatives: draftAlternatives.value.map((alternative) => ({
-        alternative_product_id: alternative.id,
-        relationship_type: alternative.relationship_type,
-    })),
-    vehicle_compatibility: {
-        engines: draftCompatibility.value.engines.map((engine) => ({
-            engine_id: engine.engine_id,
-        })),
-        chassis: draftCompatibility.value.chassis.map((chassis) => ({
-            chassis_id: chassis.chassis_id,
-        })),
-        all_engines: draftCompatibility.value.allEngines,
-        all_chassis: draftCompatibility.value.allChassis,
-        model_id:
-            vehicleCompatRef.value?.selectedModelId ??
-            draftCompatibility.value.modelId ??
-            null,
-    },
+    attributes: normalizeProductAttributesPayload(draftAttributes.value),
+    oem_references: normalizeOemReferencesPayload(draftOemReferences.value),
+    alternatives: normalizeAlternativesPayload(draftAlternatives.value),
+    vehicle_compatibility: vehicleCompatibilityPayload(),
 });
+
+const vehicleCompatibilityPayload = () => {
+    return normalizeVehicleCompatibilityPayload(
+        draftCompatibility.value,
+        vehicleCompatRef.value?.selectedModelId,
+    );
+};
 
 const handleSubmit = async () => {
     validationErrors.value = {};
@@ -734,20 +704,7 @@ const handleRegenerateName = async () => {
     try {
         const response = await productsApi.previewName(props.productId, {
             ...categoryPayload(),
-            vehicle_compatibility: {
-                engines: draftCompatibility.value.engines.map((engine) => ({
-                    engine_id: engine.engine_id,
-                })),
-                chassis: draftCompatibility.value.chassis.map((chassis) => ({
-                    chassis_id: chassis.chassis_id,
-                })),
-                all_engines: draftCompatibility.value.allEngines,
-                all_chassis: draftCompatibility.value.allChassis,
-                model_id:
-                    vehicleCompatRef.value?.selectedModelId ??
-                    draftCompatibility.value.modelId ??
-                    null,
-            },
+            vehicle_compatibility: vehicleCompatibilityPayload(),
         });
         const newName = response.data?.name;
         if (newName) {
@@ -803,26 +760,175 @@ const onEngineCreated = (engine: any) => {
 const onChassisCreated = (chassis: any) => {
     vehicleCompatRef.value?.addChassisToList(chassis);
 };
+
+const workbenchSections = [
+    { id: 'identidad', label: 'Resumen' },
+    { id: 'codigos', label: 'Codigos' },
+    { id: 'compatibilidad', label: 'Compatibilidad' },
+    { id: 'variantes', label: 'Variantes' },
+    { id: 'atributos', label: 'Atributos' },
+    { id: 'relaciones', label: 'Relaciones' },
+    { id: 'imagenes', label: 'Imagenes' },
+];
+
+const statusLabels: Record<string, string> = {
+    active: 'Activo',
+    pending: 'Pendiente',
+    discontinued: 'Descontinuado',
+};
+
+const editCategoryName = computed(() => {
+    return (
+        categoryNameById(selectedCategoryId.value) ||
+        currentProduct.value?.category?.name ||
+        'Sin categoria'
+    );
+});
+
+const editVariantCount = computed(() => {
+    return (
+        currentProduct.value?.variants_count ??
+        currentProduct.value?.variants?.length ??
+        0
+    );
+});
+
+const editTotalStock = computed(() => {
+    const product = currentProduct.value as any;
+    if (product?.total_stock !== undefined && product?.total_stock !== null) {
+        return Number(product.total_stock) || 0;
+    }
+
+    return (product?.variants ?? []).reduce(
+        (total: number, variant: any) =>
+            total + (Number(variant.total_stock) || 0),
+        0,
+    );
+});
+
+const editPrimaryPricing = computed(() => {
+    const pricing =
+        currentProduct.value?.default_variant?.pricing ??
+        currentProduct.value?.pricing ??
+        null;
+
+    return {
+        cost: Number(pricing?.cost ?? pricing?.cost_total ?? 0),
+        price: Number(
+            pricing?.current_sale_price ??
+                pricing?.base_price ??
+                pricing?.calculated_price ??
+                0,
+        ),
+    };
+});
+
+const summaryMetrics = computed(() => [
+    {
+        label: 'Categoria',
+        value: editCategoryName.value,
+        tone: 'indigo',
+    },
+    {
+        label: 'Codigo',
+        value: form.value.sku_base || 'Pendiente',
+        tone: form.value.sku_base ? 'gray' : 'amber',
+    },
+    {
+        label: 'Variantes',
+        value: editVariantCount.value.toLocaleString('es-MX'),
+        tone: editVariantCount.value > 0 ? 'gray' : 'amber',
+    },
+    {
+        label: 'Stock',
+        value: editTotalStock.value.toLocaleString('es-MX'),
+        tone: editTotalStock.value > 0 ? 'emerald' : 'amber',
+    },
+    {
+        label: 'Costo',
+        value: `$${editPrimaryPricing.value.cost.toFixed(2)}`,
+        tone: 'gray',
+    },
+    {
+        label: 'Precio',
+        value: `$${editPrimaryPricing.value.price.toFixed(2)}`,
+        tone: 'emerald',
+    },
+]);
+
+const readinessItems = computed(() => [
+    {
+        label: 'Identidad',
+        ready: Boolean(form.value.name),
+    },
+    {
+        label: 'Categoria',
+        ready: Boolean(selectedCategoryId.value),
+    },
+    {
+        label: 'Codigo',
+        ready: Boolean(form.value.sku_base),
+    },
+    {
+        label: 'Variantes',
+        ready: editVariantCount.value > 0,
+    },
+    {
+        label: 'Stock',
+        ready: editTotalStock.value > 0,
+    },
+]);
+
+const validationErrorItems = computed(() =>
+    Object.entries(validationErrors.value).flatMap(([field, messages]) =>
+        messages.map((message) => ({ field, message })),
+    ),
+);
 </script>
 
 <template>
     <Head title="Editar Producto" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-6 p-4">
+        <div class="space-y-5 p-4">
             <!-- Header -->
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1
-                        class="text-2xl font-bold text-gray-900 dark:text-white"
+            <div
+                class="flex flex-col gap-4 border-b border-gray-200 pb-4 lg:flex-row lg:items-start lg:justify-between dark:border-border"
+            >
+                <div class="min-w-0">
+                    <div
+                        class="mb-2 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400"
                     >
-                        Editar Producto
+                        <span>Productos</span>
+                        <span class="text-gray-300 dark:text-gray-600">/</span>
+                        <span>Edicion operativa</span>
+                        <span
+                            class="rounded-md px-2 py-1"
+                            :class="
+                                form.status === 'active'
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300'
+                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
+                            "
+                        >
+                            {{ statusLabels[form.status ?? 'pending'] }}
+                        </span>
+                    </div>
+                    <h1
+                        class="text-2xl font-bold break-words text-gray-900 dark:text-white"
+                    >
+                        {{ form.name || currentProduct?.name || 'Producto' }}
                     </h1>
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                        Modifica los datos del producto y sus secciones
+                    <p
+                        class="mt-1 font-mono text-sm break-words text-gray-500 dark:text-gray-400"
+                    >
+                        {{
+                            form.sku_base ||
+                            currentProduct?.sku_base ||
+                            'Codigo pendiente'
+                        }}
                     </p>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex flex-wrap gap-2 lg:justify-end">
                     <button
                         type="button"
                         :disabled="duplicating"
@@ -850,6 +956,70 @@ const onChassisCreated = (chassis: any) => {
                 </div>
             </div>
 
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <div
+                    v-for="metric in summaryMetrics"
+                    :key="metric.label"
+                    class="rounded-lg border bg-white p-3 shadow-sm dark:border-border dark:bg-card"
+                    :class="{
+                        'border-amber-200 dark:border-amber-900/60':
+                            metric.tone === 'amber',
+                        'border-emerald-200 dark:border-emerald-900/60':
+                            metric.tone === 'emerald',
+                        'border-indigo-200 dark:border-indigo-900/60':
+                            metric.tone === 'indigo',
+                        'border-gray-200': metric.tone === 'gray',
+                    }"
+                >
+                    <p
+                        class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
+                    >
+                        {{ metric.label }}
+                    </p>
+                    <p
+                        class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white"
+                        :class="{ 'font-mono': metric.label === 'Codigo' }"
+                        :title="metric.value"
+                    >
+                        {{ metric.value }}
+                    </p>
+                </div>
+            </div>
+
+            <nav
+                class="sticky top-0 z-20 -mx-4 overflow-x-auto border-y border-gray-200 bg-white/95 px-4 py-2 backdrop-blur dark:border-border dark:bg-background/95"
+                aria-label="Secciones del producto"
+            >
+                <div class="flex min-w-max gap-2">
+                    <a
+                        v-for="section in workbenchSections"
+                        :key="section.id"
+                        :href="`#${section.id}`"
+                        class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                    >
+                        {{ section.label }}
+                    </a>
+                </div>
+            </nav>
+
+            <div
+                v-if="validationErrorItems.length"
+                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-200"
+            >
+                <div class="font-semibold">Revisa los datos del producto</div>
+                <ul class="mt-2 space-y-1">
+                    <li
+                        v-for="item in validationErrorItems"
+                        :key="`${item.field}-${item.message}`"
+                        class="break-words"
+                    >
+                        <span class="font-mono text-xs">{{ item.field }}</span>
+                        <span class="mx-1">-</span>
+                        <span>{{ item.message }}</span>
+                    </li>
+                </ul>
+            </div>
+
             <!-- Loading -->
             <div v-if="loading && !currentProduct" class="py-12 text-center">
                 <div
@@ -875,324 +1045,430 @@ const onChassisCreated = (chassis: any) => {
                     {{ error }}
                 </div>
 
-                <!-- SECTION 1: Descripcion -->
-                <form
-                    @submit.prevent="handleSubmit"
-                    @keydown.enter="
-                        (e: KeyboardEvent) => {
-                            if ((e.target as HTMLElement)?.tagName === 'INPUT')
-                                e.preventDefault();
-                        }
-                    "
-                    class="space-y-4"
-                >
-                    <div
-                        class="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                    >
-                        <h2
-                            class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+                    <div class="space-y-4">
+                        <!-- SECTION 1: Descripcion -->
+                        <form
+                            @submit.prevent="handleSubmit"
+                            @keydown.enter="
+                                (e: KeyboardEvent) => {
+                                    if (
+                                        (e.target as HTMLElement)?.tagName ===
+                                        'INPUT'
+                                    )
+                                        e.preventDefault();
+                                }
+                            "
+                            class="space-y-4"
                         >
-                            Descripción
-                        </h2>
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
-                                <label
-                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            <div
+                                id="identidad"
+                                class="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                            >
+                                <h2
+                                    class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
                                 >
-                                    Descripción
-                                    <span class="text-red-500">*</span>
-                                </label>
-                                <div class="mt-1 flex gap-2">
-                                    <input
-                                        v-model="form.name"
-                                        type="text"
-                                        required
-                                        class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                    />
-                                    <button
-                                        type="button"
-                                        :disabled="regenerating"
-                                        @click="handleRegenerateName"
-                                        class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted"
-                                        title="Regenerar descripción automática desde categoría + compatibilidad vehicular"
-                                    >
-                                        <RefreshCw
-                                            class="h-3.5 w-3.5"
-                                            :class="{
-                                                'animate-spin': regenerating,
-                                            }"
+                                    Identidad y clasificacion
+                                </h2>
+                                <div
+                                    class="grid grid-cols-1 gap-4 md:grid-cols-2"
+                                >
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                        >
+                                            Descripción
+                                            <span class="text-red-500">*</span>
+                                        </label>
+                                        <div class="mt-1 flex gap-2">
+                                            <input
+                                                v-model="form.name"
+                                                type="text"
+                                                required
+                                                class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                            />
+                                            <button
+                                                type="button"
+                                                :disabled="regenerating"
+                                                @click="handleRegenerateName"
+                                                class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted"
+                                                title="Regenerar descripción automática desde categoría + compatibilidad vehicular"
+                                            >
+                                                <RefreshCw
+                                                    class="h-3.5 w-3.5"
+                                                    :class="{
+                                                        'animate-spin':
+                                                            regenerating,
+                                                    }"
+                                                />
+                                                Auto
+                                            </button>
+                                        </div>
+                                        <p
+                                            v-if="validationErrors.name"
+                                            class="mt-1 text-sm text-red-600"
+                                        >
+                                            {{ validationErrors.name[0] }}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                            >Categoría</label
+                                        >
+                                        <SearchableSelect
+                                            :options="categoryOptions"
+                                            :model-value="selectedCategoryId"
+                                            @update:model-value="
+                                                (v) =>
+                                                    (selectedCategoryId =
+                                                        toCategoryId(v))
+                                            "
+                                            placeholder="-- Selecciona categoría --"
+                                            :loading="loadingCategories"
                                         />
-                                        Auto
-                                    </button>
+                                    </div>
                                 </div>
-                                <p
-                                    v-if="validationErrors.name"
-                                    class="mt-1 text-sm text-red-600"
-                                >
-                                    {{ validationErrors.name[0] }}
-                                </p>
+                                <div class="space-y-2">
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                        >Categorías extra</label
+                                    >
+                                    <div
+                                        class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]"
+                                    >
+                                        <SearchableSelect
+                                            :options="extraCategoryOptions"
+                                            :model-value="
+                                                selectedExtraCategoryId
+                                            "
+                                            @update:model-value="
+                                                (v) =>
+                                                    (selectedExtraCategoryId =
+                                                        toCategoryId(v))
+                                            "
+                                            placeholder="-- Selecciona categoría extra --"
+                                            :loading="loadingCategories"
+                                            :clearable="true"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="addExtraCategory"
+                                            :disabled="!selectedExtraCategoryId"
+                                            class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                                        >
+                                            <Plus class="h-4 w-4" /> Agregar
+                                        </button>
+                                    </div>
+                                    <div
+                                        v-if="
+                                            selectedExtraCategories.length > 0
+                                        "
+                                        class="flex flex-wrap gap-2"
+                                    >
+                                        <span
+                                            v-for="category in selectedExtraCategories"
+                                            :key="category.id"
+                                            class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
+                                        >
+                                            {{ category.name }}
+                                            <button
+                                                type="button"
+                                                @click="
+                                                    removeExtraCategory(
+                                                        category.id,
+                                                    )
+                                                "
+                                                class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
+                                                :aria-label="`Quitar ${category.name}`"
+                                            >
+                                                <X class="h-3 w-3" />
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Categoría</label
+
+                            <!-- SECTION 2: Código y Estado -->
+                            <div
+                                id="codigos"
+                                class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                            >
+                                <h2
+                                    class="mb-4 text-sm font-semibold tracking-wider text-gray-500 uppercase"
                                 >
-                                <SearchableSelect
-                                    :options="categoryOptions"
-                                    :model-value="selectedCategoryId"
-                                    @update:model-value="
-                                        (v) =>
-                                            (selectedCategoryId =
-                                                toCategoryId(v))
-                                    "
-                                    placeholder="-- Selecciona categoría --"
-                                    :loading="loadingCategories"
-                                />
+                                    Codigo y estado
+                                </h2>
+                                <div
+                                    class="grid grid-cols-1 gap-4 md:grid-cols-2"
+                                >
+                                    <div>
+                                        <label
+                                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                        >
+                                            Código
+                                            <span
+                                                class="text-xs font-normal text-gray-400"
+                                                >(opcional)</span
+                                            >
+                                        </label>
+                                        <input
+                                            v-model="form.sku_base"
+                                            type="text"
+                                            class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
+                                            placeholder="Ej: ALT-0012"
+                                        />
+                                        <p
+                                            v-if="validationErrors.sku_base"
+                                            class="mt-1 text-sm text-red-600"
+                                        >
+                                            {{ validationErrors.sku_base[0] }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label
+                                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                            >Estado</label
+                                        >
+                                        <select
+                                            v-model="form.status"
+                                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                        >
+                                            <option value="active">
+                                                Activo
+                                            </option>
+                                            <option value="discontinued">
+                                                Discontinuado
+                                            </option>
+                                            <option value="pending">
+                                                Pendiente
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+
+                        <!-- SECTION 3: Códigos Alternos -->
+                        <OemReferenceManager
+                            v-model="draftOemReferences"
+                            mode="draft"
+                            :product-id="props.productId"
+                        />
+
+                        <!-- SECTION 4: Compatibilidad Vehicular -->
+                        <VehicleCompatSection
+                            id="compatibilidad"
+                            ref="vehicleCompatRef"
+                            v-model="draftCompatibility"
+                            mode="draft"
+                            :product-id="props.productId"
+                            @open-inline="openVehicleInline"
+                        />
+
+                        <!-- SECTION 5: Variantes -->
+                        <VariantManager
+                            id="variantes"
+                            :product-id="props.productId"
+                            :category-id="
+                                selectedCategoryId ??
+                                currentProduct?.category_id ??
+                                currentProduct?.category?.id
+                            "
+                            :sku-base="currentProduct?.sku_base || ''"
+                            :product-name="currentProduct?.name || ''"
+                            :category-formula="categoryFormula"
+                            :category-applies-itbm="categoryAppliesItbm"
+                            :category-itbm-percent="categoryItbmPercent"
+                            :category-margin="categoryMargin"
+                            :initial-edit-variant-id="initialEditVariantId"
+                        />
+
+                        <!-- SECTION 6: Atributos -->
+                        <div
+                            id="atributos"
+                            class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="mb-3 flex items-center justify-between gap-3"
+                            >
+                                <h2
+                                    class="flex items-center gap-1 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                                >
+                                    <Wrench class="h-4 w-4" /> Atributos
+                                </h2>
+                            </div>
+                            <p
+                                class="mb-4 text-sm text-gray-500 dark:text-gray-400"
+                            >
+                                Agrega o edita atributos del producto a nivel
+                                base.
+                            </p>
+                            <AttributeManager
+                                ref="attributeManagerRef"
+                                v-model="draftAttributes"
+                                mode="draft"
+                                :product-id="props.productId"
+                            />
+                        </div>
+
+                        <!-- SECTION 7: Upsales -->
+                        <div
+                            id="relaciones"
+                            class="rounded-xl border border-l-4 border-gray-100 border-l-violet-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <h2
+                                class="mb-3 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                            >
+                                Upsales
+                            </h2>
+                            <AlternativeManager
+                                v-model="draftAlternatives"
+                                mode="draft"
+                                :product-id="props.productId"
+                            />
+                        </div>
+
+                        <!-- SECTION 8: Notas -->
+                        <div
+                            class="rounded-xl border border-l-4 border-gray-100 border-l-slate-400 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <h2
+                                class="mb-2 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                            >
+                                Notas internas
+                            </h2>
+                            <textarea
+                                v-model="form.description"
+                                rows="3"
+                                class="mt-1 w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                placeholder="Notas internas del producto..."
+                            ></textarea>
+                        </div>
+
+                        <!-- SECTION 9: Imagen del Producto -->
+                        <ProductImagesSection
+                            id="imagenes"
+                            mode="gallery"
+                            :product-id="props.productId"
+                            :product-name="currentProduct?.name"
+                            :category-ids="selectedCategoryIdsForImages"
+                            :category-name-map="categoryNameMapForImages"
+                        />
+                    </div>
+
+                    <aside class="space-y-4 xl:sticky xl:top-16 xl:self-start">
+                        <div
+                            class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <h2
+                                class="text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white"
+                            >
+                                Estado del producto
+                            </h2>
+                            <div class="mt-4 space-y-3">
+                                <div
+                                    v-for="item in readinessItems"
+                                    :key="item.label"
+                                    class="flex items-center justify-between gap-3 text-sm"
+                                >
+                                    <span
+                                        class="text-gray-600 dark:text-gray-300"
+                                    >
+                                        {{ item.label }}
+                                    </span>
+                                    <span
+                                        class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                                        :class="
+                                            item.ready
+                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300'
+                                                : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
+                                        "
+                                    >
+                                        {{ item.ready ? 'Listo' : 'Pendiente' }}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                        <div class="space-y-2">
-                            <label
-                                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >Categorías extra</label
+
+                        <div
+                            class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <h2
+                                class="text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white"
                             >
-                            <div
-                                class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]"
-                            >
-                                <SearchableSelect
-                                    :options="extraCategoryOptions"
-                                    :model-value="selectedExtraCategoryId"
-                                    @update:model-value="
-                                        (v) =>
-                                            (selectedExtraCategoryId =
-                                                toCategoryId(v))
-                                    "
-                                    placeholder="-- Selecciona categoría extra --"
-                                    :loading="loadingCategories"
-                                    :clearable="true"
-                                />
+                                Acciones
+                            </h2>
+                            <div class="mt-4 grid gap-2">
                                 <button
                                     type="button"
-                                    @click="addExtraCategory"
-                                    :disabled="!selectedExtraCategoryId"
-                                    class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                                    @click="handleSubmit"
+                                    :disabled="loading"
+                                    class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
                                 >
-                                    <Plus class="h-4 w-4" /> Agregar
+                                    {{
+                                        loading
+                                            ? 'Guardando...'
+                                            : 'Guardar cambios'
+                                    }}
+                                </button>
+                                <button
+                                    type="button"
+                                    :disabled="duplicating"
+                                    @click="handleDuplicate"
+                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-card dark:text-white"
+                                >
+                                    <Copy class="h-4 w-4" />
+                                    {{
+                                        duplicating
+                                            ? 'Duplicando...'
+                                            : 'Duplicar'
+                                    }}
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="cancel"
+                                    class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-white"
+                                >
+                                    Cancelar
                                 </button>
                             </div>
-                            <div
-                                v-if="selectedExtraCategories.length > 0"
-                                class="flex flex-wrap gap-2"
-                            >
-                                <span
-                                    v-for="category in selectedExtraCategories"
-                                    :key="category.id"
-                                    class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
-                                >
-                                    {{ category.name }}
-                                    <button
-                                        type="button"
-                                        @click="
-                                            removeExtraCategory(category.id)
-                                        "
-                                        class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
-                                        :aria-label="`Quitar ${category.name}`"
-                                    >
-                                        <X class="h-3 w-3" />
-                                    </button>
-                                </span>
-                            </div>
                         </div>
-                    </div>
 
-                    <!-- SECTION 2: Código y Estado -->
-                    <div
-                        class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                    >
-                        <h2
-                            class="mb-4 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                        <div
+                            class="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/20"
                         >
-                            Código y Estado
-                        </h2>
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >
-                                    Código
-                                    <span
-                                        class="text-xs font-normal text-gray-400"
-                                        >(opcional)</span
-                                    >
-                                </label>
-                                <input
-                                    v-model="form.sku_base"
-                                    type="text"
-                                    class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
-                                    placeholder="Ej: ALT-0012"
-                                />
-                                <p
-                                    v-if="validationErrors.sku_base"
-                                    class="mt-1 text-sm text-red-600"
-                                >
-                                    {{ validationErrors.sku_base[0] }}
-                                </p>
-                            </div>
-
-                            <div>
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Estado</label
-                                >
-                                <select
-                                    v-model="form.status"
-                                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="active">Activo</option>
-                                    <option value="discontinued">
-                                        Discontinuado
-                                    </option>
-                                    <option value="pending">Pendiente</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-
-                <!-- SECTION 3: Códigos Alternos -->
-                <OemReferenceManager
-                    v-model="draftOemReferences"
-                    mode="draft"
-                    :product-id="props.productId"
-                />
-
-                <!-- SECTION 4: Compatibilidad Vehicular -->
-                <VehicleCompatSection
-                    ref="vehicleCompatRef"
-                    v-model="draftCompatibility"
-                    mode="draft"
-                    :product-id="props.productId"
-                    @open-inline="openVehicleInline"
-                />
-
-                <!-- SECTION 5: Variantes -->
-                <VariantManager
-                    :product-id="props.productId"
-                    :category-id="
-                        selectedCategoryId ??
-                        currentProduct?.category_id ??
-                        currentProduct?.category?.id
-                    "
-                    :sku-base="currentProduct?.sku_base || ''"
-                    :product-name="currentProduct?.name || ''"
-                    :category-formula="categoryFormula"
-                    :category-applies-itbm="categoryAppliesItbm"
-                    :category-itbm-percent="categoryItbmPercent"
-                    :category-margin="categoryMargin"
-                    :initial-edit-variant-id="initialEditVariantId"
-                />
-
-                <!-- SECTION 6: Atributos -->
-                <div
-                    class="rounded-xl border border-l-4 border-gray-100 border-l-indigo-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                >
-                    <div class="mb-3 flex items-center justify-between gap-3">
-                        <h2
-                            class="flex items-center gap-1 text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                        >
-                            <Wrench class="h-4 w-4" /> Atributos
-                        </h2>
-                    </div>
-                    <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-                        Agrega o edita atributos del producto a nivel base.
-                    </p>
-                    <AttributeManager
-                        ref="attributeManagerRef"
-                        v-model="draftAttributes"
-                        mode="draft"
-                        :product-id="props.productId"
-                    />
-                </div>
-
-                <!-- SECTION 7: Upsales -->
-                <div
-                    class="rounded-xl border border-l-4 border-gray-100 border-l-violet-500 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                >
-                    <h2
-                        class="mb-3 text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                    >
-                        Upsales
-                    </h2>
-                    <AlternativeManager
-                        v-model="draftAlternatives"
-                        mode="draft"
-                        :product-id="props.productId"
-                    />
-                </div>
-
-                <!-- SECTION 8: Notas -->
-                <div
-                    class="rounded-xl border border-l-4 border-gray-100 border-l-slate-400 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
-                >
-                    <h2
-                        class="mb-2 text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                    >
-                        Notas
-                    </h2>
-                    <textarea
-                        v-model="form.description"
-                        rows="3"
-                        class="mt-1 w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="Notas internas del producto..."
-                    ></textarea>
-                </div>
-
-                <!-- SECTION 9: Imagen del Producto -->
-                <ProductImagesSection
-                    mode="gallery"
-                    :product-id="props.productId"
-                    :product-name="currentProduct?.name"
-                    :category-ids="selectedCategoryIdsForImages"
-                    :category-name-map="categoryNameMapForImages"
-                />
-
-                <div
-                    class="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/20"
-                >
-                    <div
-                        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                        <div>
                             <h2
-                                class="text-sm font-semibold tracking-wider text-amber-800 uppercase dark:text-amber-300"
+                                class="text-sm font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-300"
                             >
                                 Archivo
                             </h2>
                             <p
-                                class="mt-1 text-sm text-amber-700 dark:text-amber-200"
+                                class="mt-2 text-sm text-amber-700 dark:text-amber-200"
                             >
                                 Archivar oculta el producto del Punto de Venta
-                                sin afectar facturas históricas.
+                                sin afectar facturas historicas.
                             </p>
+                            <button
+                                type="button"
+                                :disabled="archiving"
+                                @click="handleArchive"
+                                class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-card dark:text-amber-300 dark:hover:bg-amber-950/40"
+                            >
+                                <Archive class="h-4 w-4" />
+                                {{
+                                    archiving
+                                        ? 'Archivando...'
+                                        : 'Archivar producto'
+                                }}
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            :disabled="archiving"
-                            @click="handleArchive"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-card dark:text-amber-300 dark:hover:bg-amber-950/40"
-                        >
-                            <Archive class="h-4 w-4" />
-                            {{
-                                archiving
-                                    ? 'Archivando...'
-                                    : 'Archivar producto'
-                            }}
-                        </button>
-                    </div>
+                    </aside>
                 </div>
             </div>
         </div>
     </AppLayout>
-
     <!-- Vehicle Inline Modals -->
     <VehicleInlineModals
         ref="vehicleModalsRef"

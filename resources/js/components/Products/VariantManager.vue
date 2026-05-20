@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -16,6 +16,43 @@ import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import { CircleDollarSign } from 'lucide-vue-next';
+
+type HeaderLotSyncState = {
+    revision: number;
+    warehouse_id: number | null;
+    quantity_available: number;
+    unit_cost_base: number;
+    cost_tax_rate: number;
+    misc_total: number;
+    sale_price: number;
+};
+type LotUpdatedPayload = {
+    lot: {
+        id: number;
+        warehouse_id: number;
+        quantity_available: number;
+        received_quantity?: number;
+        unit_cost_base: number;
+        tax_per_unit: number;
+        misc_per_unit: number;
+        misc_total?: number;
+        landed_unit_cost: number;
+        sale_price: number;
+        remaining_value?: number;
+    };
+    summary?: {
+        active_lot_id?: number | null;
+        stock_available?: number;
+        current_cost?: number;
+        current_sale_price?: number;
+        fifo_cost_current?: number;
+        fifo_sale_price_current?: number;
+    } | null;
+    warehouse_id: number | null;
+};
+type VariantFifoHistoryPanelRef = {
+    saveSyncedActiveLot: () => Promise<'saved' | 'skipped' | 'failed'>;
+};
 
 const props = defineProps<{
     productId?: number;
@@ -63,8 +100,11 @@ const isDraftMode = computed(() => !props.productId);
 const variants = ref<any[]>([]);
 const showModal = ref(false);
 const editingVariant = ref<any>(null);
+const variantHistoryPanel = ref<VariantFifoHistoryPanelRef | null>(null);
 const processing = ref(false);
 const initialEditVariantHandled = ref(false);
+const headerSyncRevision = ref(0);
+const suppressHeaderSync = ref(false);
 
 const modalInitialSnapshot = ref('');
 
@@ -106,8 +146,6 @@ const buildModalStateSnapshot = (): string => {
     return JSON.stringify({
         form: {
             brand_id: form.value.brand_id ?? null,
-            sku: form.value.sku ?? '',
-            upc: form.value.upc ?? '',
             status: form.value.status ?? 'active',
             pricing_formula: form.value.pricing_formula ?? '',
             pricing: {
@@ -188,6 +226,20 @@ const fetchBrands = async () => {
 const brandOptions = computed(() =>
     brands.value.map((b) => ({ value: b.id, label: b.name })),
 );
+
+const hasInitialStockForNewVariant = computed(
+    () =>
+        !editingVariant.value &&
+        toSafeNumber(form.value.initial_inventory?.[0]?.stock_available) > 0,
+);
+
+const submitButtonLabel = computed(() => {
+    if (processing.value) return 'Guardando...';
+
+    return hasInitialStockForNewVariant.value
+        ? 'Guardar variante y crear lote inicial'
+        : 'Guardar variante';
+});
 
 // Warehouses options — fetched from API
 const warehouses = ref<{ id: number; name: string }[]>([]);
@@ -309,6 +361,89 @@ const toSafeTaxRate = (value: any): number => {
     return Math.max(0, Math.min(100, Math.round(parsed)));
 };
 
+const cloneVariantForModal = (variant: any) => ({
+    ...variant,
+    brand: variant?.brand ? { ...variant.brand } : variant?.brand,
+    pricing: variant?.pricing ? { ...variant.pricing } : variant?.pricing,
+    inventory:
+        variant?.inventory?.map((item: any) => ({
+            ...item,
+            warehouse: item?.warehouse
+                ? { ...item.warehouse }
+                : item?.warehouse,
+        })) ?? [],
+});
+
+const updateEditingVariantWarehouse = (
+    warehouseId: number | null,
+    quantityAvailable: number,
+    currentCost?: number,
+    currentSalePrice?: number,
+) => {
+    if (!editingVariant.value || !warehouseId) return;
+
+    const inventory = [...(editingVariant.value.inventory ?? [])];
+    const index = inventory.findIndex(
+        (item: any) => Number(item.warehouse?.id) === Number(warehouseId),
+    );
+
+    if (index === -1) return;
+
+    inventory[index] = {
+        ...inventory[index],
+        quantity_available: quantityAvailable,
+        current_cost: currentCost ?? inventory[index].current_cost,
+        current_sale_price:
+            currentSalePrice ?? inventory[index].current_sale_price,
+        fifo_cost_current: currentCost ?? inventory[index].fifo_cost_current,
+        fifo_sale_price_current:
+            currentSalePrice ?? inventory[index].fifo_sale_price_current,
+    };
+    editingVariant.value = {
+        ...editingVariant.value,
+        inventory,
+        total_stock: inventory.reduce(
+            (sum: number, item: any) =>
+                sum + toSafeNumber(item.quantity_available),
+            0,
+        ),
+    };
+};
+
+const modalHistoryVariant = computed(() => {
+    if (!editingVariant.value) return null;
+
+    return {
+        ...editingVariant.value,
+        pricing: {
+            ...(editingVariant.value.pricing ?? {}),
+            ...form.value.pricing,
+        },
+    };
+});
+
+const modalLotSyncState = computed<HeaderLotSyncState | null>(() => {
+    if (!editingVariant.value) return null;
+
+    return {
+        revision: headerSyncRevision.value,
+        warehouse_id: currentWarehouseId.value,
+        quantity_available: getVariantStockForWarehouse(
+            editingVariant.value,
+            currentWarehouseId.value,
+        ),
+        unit_cost_base: toSafeNumber(form.value.pricing.cost_base),
+        cost_tax_rate: toSafeTaxRate(form.value.pricing.cost_tax_rate),
+        misc_total: toSafeNumber(form.value.pricing.cost_miscellaneous),
+        sale_price: toSafeNumber(form.value.pricing.base_price),
+    };
+});
+
+const markHeaderSyncDirty = () => {
+    if (!editingVariant.value || suppressHeaderSync.value) return;
+    headerSyncRevision.value += 1;
+};
+
 const resolveSaleTaxRate = (pricing: any): number => {
     return toSafeTaxRate(pricing?.sale_tax_rate ?? pricing?.tax_rate);
 };
@@ -394,6 +529,7 @@ const formatVariantDisplay = (variant: any): string => {
 // lo almacenamos directamente en base_price para que el payload sea correcto.
 const onFormulaTotalChange = (newTotal: number) => {
     form.value.pricing.base_price = newTotal;
+    markHeaderSyncDirty();
 };
 
 // SKU is now fully manual - no auto-generation
@@ -424,6 +560,7 @@ const recalculatePriceFromCategory = async () => {
             });
             if (data.price !== null) {
                 form.value.pricing.base_price = applyRounding(data.price);
+                markHeaderSyncDirty();
             }
         } catch {
             /* silencioso */
@@ -436,6 +573,7 @@ const recalculatePriceFromCategory = async () => {
             form.value.pricing.base_price = applyRounding(
                 Number(raw.toFixed(2)),
             );
+            markHeaderSyncDirty();
         }
     }
     priceManuallyEdited.value = false;
@@ -465,6 +603,7 @@ watch(
                 );
                 if (data.price !== null) {
                     form.value.pricing.base_price = applyRounding(data.price);
+                    markHeaderSyncDirty();
                 }
             } catch {
                 /* silencioso */
@@ -477,6 +616,7 @@ watch(
                 form.value.pricing.base_price = applyRounding(
                     Number(raw.toFixed(2)),
                 );
+                markHeaderSyncDirty();
             }
         }
     },
@@ -487,8 +627,10 @@ const loadVariants = async () => {
     try {
         const data = await fetchVariants(props.productId!);
         variants.value = data;
+        return data;
     } catch (e) {
         console.error('Error loading variants', e);
+        return [];
     }
 };
 
@@ -499,10 +641,16 @@ const displayVariants = computed(() =>
 
 const openCreateModal = () => {
     editingVariant.value = null;
+    headerSyncRevision.value = 0;
+    suppressHeaderSync.value = true;
+    const initialWarehouseId =
+        warehouses.value.find(
+            (warehouse) => warehouse.id === currentWarehouseId.value,
+        )?.id ?? warehouses.value[0]?.id;
 
     form.value = {
         brand_id: brands.value[0]?.id ?? 1,
-        sku: props.skuBase || '',
+        sku: '',
         upc: '',
         status: 'active',
         pricing_formula: props.categoryFormula || '',
@@ -519,10 +667,10 @@ const openCreateModal = () => {
             pricing_formula: props.categoryFormula || '',
         },
         initial_inventory:
-            warehouses.value.length > 0
+            initialWarehouseId !== undefined
                 ? [
                       {
-                          warehouse_id: warehouses.value[0].id,
+                          warehouse_id: initialWarehouseId,
                           stock_available: 0,
                           reorder_point: 5,
                           reorder_quantity: 10,
@@ -533,10 +681,15 @@ const openCreateModal = () => {
     priceManuallyEdited.value = false;
     showModal.value = true;
     captureModalInitialState();
+    nextTick(() => {
+        suppressHeaderSync.value = false;
+    });
 };
 
 const openEditModal = (variant: any) => {
-    editingVariant.value = variant;
+    editingVariant.value = cloneVariantForModal(variant);
+    headerSyncRevision.value = 0;
+    suppressHeaderSync.value = true;
 
     const p = variant.pricing ?? {};
     const costBase = hasExplicitCostBase(p)
@@ -575,6 +728,82 @@ const openEditModal = (variant: any) => {
     // base_price ya se carga directo en form.pricing.base_price desde el backend
 
     showModal.value = true;
+    captureModalInitialState();
+    nextTick(() => {
+        suppressHeaderSync.value = false;
+    });
+};
+
+const refreshEditingVariantFromList = async () => {
+    if (!editingVariant.value?.id || isDraftMode.value) return;
+
+    const freshVariants = await loadVariants();
+    const freshVariant = freshVariants?.find(
+        (variant: any) =>
+            Number(variant.id) === Number(editingVariant.value.id),
+    );
+
+    if (freshVariant) {
+        editingVariant.value = cloneVariantForModal(freshVariant);
+    }
+};
+
+const applyUpdatedLotToModal = (payload?: LotUpdatedPayload) => {
+    if (!payload?.lot || !editingVariant.value) return;
+
+    const activeLotId = payload.summary?.active_lot_id;
+    const updatedLotIsActive =
+        activeLotId !== null &&
+        activeLotId !== undefined &&
+        Number(payload.lot.id) === Number(activeLotId);
+
+    if (!updatedLotIsActive) {
+        return;
+    }
+
+    const unitCostBase = toSafeNumber(payload.lot.unit_cost_base);
+    const taxPerUnit = toSafeNumber(payload.lot.tax_per_unit);
+    const salePrice = toSafeNumber(
+        payload.summary?.current_sale_price ??
+            payload.summary?.fifo_sale_price_current ??
+            payload.lot.sale_price,
+    );
+    const quantityAvailable = toSafeNumber(
+        payload.summary?.stock_available ?? payload.lot.quantity_available,
+    );
+    const costTaxRate =
+        unitCostBase > 0
+            ? toSafeTaxRate((taxPerUnit / unitCostBase) * 100)
+            : toSafeTaxRate(form.value.pricing.cost_tax_rate);
+
+    form.value.pricing.cost_base = unitCostBase;
+    form.value.pricing.cost_miscellaneous = toSafeNumber(
+        payload.lot.misc_total ??
+            payload.lot.misc_per_unit *
+                Math.max(1, toSafeNumber(payload.lot.received_quantity, 1)),
+    );
+    form.value.pricing.cost_tax_rate = costTaxRate;
+    form.value.pricing.cost = getPricingCostTotal({
+        ...form.value.pricing,
+        cost_base: unitCostBase,
+        cost_miscellaneous: form.value.pricing.cost_miscellaneous,
+        cost_tax_rate: costTaxRate,
+    });
+    form.value.pricing.base_price = salePrice;
+
+    updateEditingVariantWarehouse(
+        payload.warehouse_id ?? payload.lot.warehouse_id,
+        quantityAvailable,
+        payload.summary?.current_cost ??
+            payload.summary?.fifo_cost_current ??
+            payload.lot.landed_unit_cost,
+        salePrice,
+    );
+};
+
+const handleHistoryPanelUpdated = async (payload?: LotUpdatedPayload) => {
+    await refreshEditingVariantFromList();
+    applyUpdatedLotToModal(payload);
     captureModalInitialState();
 };
 
@@ -631,6 +860,15 @@ const handleSubmit = async () => {
 
         form.value.pricing.cost = costTotal;
 
+        if (editingVariant.value && variantHistoryPanel.value) {
+            const syncedLotResult =
+                await variantHistoryPanel.value.saveSyncedActiveLot();
+
+            if (syncedLotResult === 'failed') {
+                throw new Error('No se pudo sincronizar el lote activo.');
+            }
+        }
+
         const pricingPayload = {
             ...form.value.pricing,
             cost: costTotal,
@@ -643,9 +881,11 @@ const handleSubmit = async () => {
         };
 
         const payload = {
-            ...form.value,
+            brand_id: form.value.brand_id,
+            status: form.value.status,
+            pricing_formula: form.value.pricing_formula || null,
             pricing: pricingPayload,
-            sku: form.value.sku || '',
+            initial_inventory: form.value.initial_inventory,
         };
 
         if (isDraftMode.value) {
@@ -983,7 +1223,7 @@ onMounted(async () => {
                                     }}
                                     · ITBM
                                     {{ resolveCostTaxRate(variant.pricing) }}% ·
-                                    Misc
+                                    Misc total
                                     {{
                                         formatCurrency(
                                             toSafeNumber(
@@ -1055,7 +1295,9 @@ onMounted(async () => {
 
         <!-- Create/Edit Modal -->
         <Dialog :open="showModal" @update:open="handleVariantModalOpenChange">
-            <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+            <DialogContent
+                class="max-h-[90vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] overflow-x-auto overflow-y-auto sm:max-w-[calc(100vw-3rem)] xl:max-w-7xl 2xl:max-w-[88rem]"
+            >
                 <DialogHeader>
                     <DialogTitle>{{
                         editingVariant ? 'Editar Variante' : 'Nueva Variante'
@@ -1069,81 +1311,191 @@ onMounted(async () => {
                     @submit.prevent.stop="handleSubmit"
                     class="space-y-4 py-4"
                 >
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <!-- Brand -->
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >Marca</label
+                    <section
+                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="mb-3 flex items-center justify-between gap-3"
+                        >
+                            <h4
+                                class="text-sm font-semibold text-gray-900 dark:text-white"
                             >
-                            <div class="flex gap-1">
-                                <SearchableSelect
-                                    :options="brandOptions"
-                                    :model-value="form.brand_id"
-                                    @update:model-value="
-                                        (v) => (form.brand_id = v as number)
-                                    "
-                                    placeholder="-- Selecciona marca --"
-                                    :loading="loadingBrands"
-                                />
-                                <button
-                                    type="button"
-                                    @click="openBrandModal"
-                                    class="flex-shrink-0 rounded-md border border-gray-300 bg-white p-2 text-gray-500 transition hover:border-blue-400 hover:text-blue-600 dark:border-border dark:bg-muted dark:hover:text-blue-400"
-                                    title="Crear nueva marca"
+                                Datos
+                            </h4>
+                            <span
+                                v-if="editingVariant"
+                                class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-muted dark:text-gray-300"
+                            >
+                                {{ currentWarehouseName || 'Almacen actual' }}
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+                            <div class="md:col-span-5">
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Producto</label
                                 >
-                                    <svg
-                                        class="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
+                                <input
+                                    :value="productName || 'Producto Base'"
+                                    type="text"
+                                    readonly
+                                    class="block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                                />
+                            </div>
+
+                            <div class="md:col-span-4">
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Marca</label
+                                >
+                                <div class="flex gap-1">
+                                    <SearchableSelect
+                                        :options="brandOptions"
+                                        :model-value="form.brand_id"
+                                        @update:model-value="
+                                            (v) => (form.brand_id = v as number)
+                                        "
+                                        placeholder="-- Selecciona marca --"
+                                        :loading="loadingBrands"
+                                    />
+                                    <button
+                                        type="button"
+                                        @click="openBrandModal"
+                                        class="flex-shrink-0 rounded-md border border-gray-300 bg-white p-2 text-gray-500 transition hover:border-blue-400 hover:text-blue-600 dark:border-border dark:bg-muted dark:hover:text-blue-400"
+                                        title="Crear nueva marca"
                                     >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M12 4v16m8-8H4"
-                                        />
-                                    </svg>
-                                </button>
+                                        <svg
+                                            class="h-4 w-4"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                                d="M12 4v16m8-8H4"
+                                            />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="md:col-span-3">
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Estado</label
+                                >
+                                <select
+                                    v-model="form.status"
+                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                >
+                                    <option value="active">Activo</option>
+                                    <option value="discontinued">
+                                        Discontinuado
+                                    </option>
+                                    <option value="pending">Pendiente</option>
+                                </select>
+                            </div>
+
+                            <div v-if="editingVariant" class="md:col-span-3">
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Stock actual</label
+                                >
+                                <input
+                                    :value="
+                                        getVariantStockForWarehouse(
+                                            editingVariant,
+                                            currentWarehouseId,
+                                        )
+                                    "
+                                    type="number"
+                                    readonly
+                                    class="block w-full rounded-md border-gray-200 bg-gray-100 text-right shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                                />
                             </div>
                         </div>
+                    </section>
 
-                        <!-- Status -->
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >Estado</label
+                    <section
+                        v-if="!editingVariant && form.initial_inventory[0]"
+                        class="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/10"
+                    >
+                        <div
+                            class="mb-3 flex flex-wrap items-center justify-between gap-2"
+                        >
+                            <h4
+                                class="text-sm font-semibold text-gray-900 dark:text-white"
                             >
-                            <select
-                                v-model="form.status"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                Stock inicial
+                            </h4>
+                            <span
+                                v-if="hasInitialStockForNewVariant"
+                                class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
                             >
-                                <option value="active">Activo</option>
-                                <option value="discontinued">
-                                    Discontinuado
-                                </option>
-                                <option value="pending">Pendiente</option>
-                            </select>
+                                Lote inicial
+                            </span>
                         </div>
-                    </div>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+                            <div class="md:col-span-7">
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Almacen</label
+                                >
+                                <select
+                                    v-model.number="
+                                        form.initial_inventory[0].warehouse_id
+                                    "
+                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                >
+                                    <option
+                                        v-for="warehouse in warehouses"
+                                        :key="warehouse.id"
+                                        :value="warehouse.id"
+                                    >
+                                        {{ warehouse.name }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="md:col-span-5">
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >Cantidad inicial</label
+                                >
+                                <input
+                                    v-model.number="
+                                        form.initial_inventory[0]
+                                            .stock_available
+                                    "
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    class="block w-full rounded-md border-gray-300 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                />
+                            </div>
+                        </div>
+                    </section>
 
                     <!-- ═══ Pricing Section ═══ -->
-                    <div
-                        class="border-t border-gray-200 pt-4 dark:border-border"
+                    <section
+                        class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-muted/30"
                     >
                         <h4
                             class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white"
                         >
                             <CircleDollarSign class="h-4 w-4 text-gray-500" />
-                            Precios de esta Variante
+                            Costos y precio
                         </h4>
 
                         <!-- Tax type toggle fue removido: ahora ITBM siempre es numérico y modificable con default de tienda -->
 
                         <!-- Costos: Base + ITBM% + Misceláneos => Costo Total -->
                         <div
-                            class="space-y-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 dark:border-border dark:bg-muted/50"
+                            class="space-y-3 rounded-lg border border-dashed border-gray-200 bg-white p-3 dark:border-border dark:bg-card"
                         >
                             <div
                                 class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
@@ -1152,62 +1504,7 @@ onMounted(async () => {
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >
-                                        Producto
-                                    </label>
-                                    <input
-                                        :value="productName || 'Producto Base'"
-                                        type="text"
-                                        readonly
-                                        class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
-                                    />
-                                </div>
-
-                                <div class="md:col-span-1">
-                                    <label
-                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >
-                                        Cantidad
-                                    </label>
-                                    <input
-                                        v-if="
-                                            !editingVariant &&
-                                            form.initial_inventory[0]
-                                        "
-                                        v-model.number="
-                                            form.initial_inventory[0]
-                                                .stock_available
-                                        "
-                                        type="number"
-                                        step="1"
-                                        min="0"
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                    />
-                                    <input
-                                        v-else-if="editingVariant"
-                                        :value="
-                                            getVariantStockForWarehouse(
-                                                editingVariant,
-                                                currentWarehouseId,
-                                            )
-                                        "
-                                        type="number"
-                                        readonly
-                                        class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
-                                    />
-                                    <input
-                                        v-else
-                                        value="0"
-                                        type="number"
-                                        readonly
-                                        class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
-                                    />
-                                </div>
-
-                                <div class="md:col-span-2">
-                                    <label
-                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >
-                                        Costo
+                                        Costo base
                                     </label>
                                     <div class="relative mt-1">
                                         <span
@@ -1221,6 +1518,7 @@ onMounted(async () => {
                                             type="number"
                                             step="0.01"
                                             min="0"
+                                            @input="markHeaderSyncDirty"
                                             :title="
                                                 props.categoryFormula
                                                     ? `Al cambiar el costo total, se recalculará precio usando: ${props.categoryFormula}`
@@ -1234,7 +1532,7 @@ onMounted(async () => {
                                 <div class="md:col-span-2">
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >ITBM</label
+                                        >ITBM costo</label
                                     >
                                     <input
                                         v-model.number="
@@ -1244,14 +1542,15 @@ onMounted(async () => {
                                         step="1"
                                         min="0"
                                         max="100"
+                                        @input="markHeaderSyncDirty"
                                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                                     />
                                 </div>
 
-                                <div class="md:col-span-2">
+                                <div class="md:col-span-3">
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >Miscelaneos</label
+                                        >Miscelaneos total</label
                                     >
                                     <div class="relative mt-1">
                                         <span
@@ -1265,15 +1564,16 @@ onMounted(async () => {
                                             type="number"
                                             step="0.01"
                                             min="0"
+                                            @input="markHeaderSyncDirty"
                                             class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                                         />
                                     </div>
                                 </div>
 
-                                <div class="md:col-span-2">
+                                <div class="md:col-span-4">
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >Total</label
+                                        >Costo total</label
                                     >
                                     <div class="relative mt-1">
                                         <span
@@ -1369,7 +1669,7 @@ onMounted(async () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </section>
 
                     <!-- Error display -->
                     <div v-if="error" class="mt-2 text-sm text-red-500">
@@ -1385,16 +1685,19 @@ onMounted(async () => {
                             Cancelar
                         </Button>
                         <Button type="submit" :disabled="processing">
-                            {{ processing ? 'Guardando...' : 'Guardar' }}
+                            {{ submitButtonLabel }}
                         </Button>
                     </div>
 
                     <VariantFifoHistoryPanel
-                        v-if="editingVariant?.id && props.productId"
+                        v-if="modalHistoryVariant?.id && props.productId"
+                        ref="variantHistoryPanel"
                         :product-id="props.productId"
-                        :variant="editingVariant"
+                        :variant="modalHistoryVariant"
                         :warehouses="warehouses"
                         :initial-warehouse-id="currentWarehouseId"
+                        :header-sync="modalLotSyncState"
+                        @updated="handleHistoryPanelUpdated"
                     />
                 </form>
             </DialogContent>

@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useProducts } from '@/composables/useProducts';
 import { useWarehouses } from '@/composables/useWarehouses';
 import { useCustomers } from '@/composables/useCustomers';
+import { CustomersApiService } from '@/services/customers';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-vue-next';
 import type { UpdateSalesOrderData } from '@/types/sales-order';
+import type { CustomerVehicle } from '@/types/customer';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -48,6 +50,8 @@ const fetchUsers = async () => {
 
 const form = ref<UpdateSalesOrderData>({
     customer_id: undefined,
+    customer_vehicle_id: null,
+    referred_by_customer_id: null,
     date: '',
     discount_amount: 0,
     shipping_cost: 0,
@@ -55,6 +59,7 @@ const form = ref<UpdateSalesOrderData>({
     notes: '',
     items: [],
 });
+const customerVehicles = ref<CustomerVehicle[]>([]);
 
 const newItem = ref({
     product_id: 0,
@@ -70,6 +75,16 @@ const normalizeTaxPercent = (value: unknown): number => {
     return resolveTaxRate(value);
 };
 
+const productSalePrice = (product: any): number => {
+    return Number(
+        product.pricing?.current_sale_price ??
+            product.pricing?.base_price ??
+            product.default_variant?.current_sale_price ??
+            product.default_variant?.base_price ??
+            0,
+    );
+};
+
 const productSearch = ref('');
 const filteredProducts = computed(() => {
     if (!productSearch.value) return products.value.slice(0, 10);
@@ -79,13 +94,31 @@ const filteredProducts = computed(() => {
                 p.name
                     .toLowerCase()
                     .includes(productSearch.value.toLowerCase()) ||
-                p.sku.toLowerCase().includes(productSearch.value.toLowerCase()),
+                p.sku_base
+                    .toLowerCase()
+                    .includes(productSearch.value.toLowerCase()),
         )
         .slice(0, 10);
 });
 
 const customerOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Sin cliente' },
+    ...customers.value.map((customer) => ({
+        value: customer.id,
+        label: customer.name,
+    })),
+]);
+const customerVehicleOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Sin carro' },
+    ...customerVehicles.value
+        .filter((vehicle) => vehicle.status === 'active')
+        .map((vehicle) => ({
+            value: vehicle.id,
+            label: `${vehicle.label || vehicle.display_name} · VIN ${vehicle.vin}`,
+        })),
+]);
+const referralCustomerOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Sin referencia' },
     ...customers.value.map((customer) => ({
         value: customer.id,
         label: customer.name,
@@ -106,6 +139,41 @@ const customerModel = computed<number | null>({
         form.value.customer_id = value === null ? undefined : Number(value);
     },
 });
+const customerVehicleModel = computed<number | null>({
+    get: () => form.value.customer_vehicle_id ?? null,
+    set: (value) => {
+        form.value.customer_vehicle_id = value === null ? null : Number(value);
+    },
+});
+const referredByCustomerModel = computed<number | null>({
+    get: () => form.value.referred_by_customer_id ?? null,
+    set: (value) => {
+        form.value.referred_by_customer_id =
+            value === null ? null : Number(value);
+    },
+});
+
+const loadCustomerVehicles = async (
+    customerId?: number,
+    resetSelection = true,
+) => {
+    customerVehicles.value = [];
+    if (resetSelection) {
+        form.value.customer_vehicle_id = null;
+    }
+
+    if (!customerId) return;
+
+    const response = await CustomersApiService.getVehicles(customerId);
+    customerVehicles.value = response.data.data;
+};
+
+watch(
+    () => form.value.customer_id,
+    (customerId) => {
+        loadCustomerVehicles(customerId);
+    },
+);
 
 const canEdit = computed(() => {
     return (
@@ -169,7 +237,7 @@ const addItem = () => {
         product_id: newItem.value.product_id,
         warehouse_id: newItem.value.warehouse_id,
         quantity: newItem.value.quantity,
-        unit_price: newItem.value.unit_price || product.price,
+        unit_price: newItem.value.unit_price || productSalePrice(product),
         discount_percent: newItem.value.discount_percent,
         tax_percent: normalizeTaxPercent(newItem.value.tax_percent),
         seller_id: newItem.value.seller_id,
@@ -193,7 +261,7 @@ const removeItem = (index: number) => {
 
 const selectProduct = (product: any) => {
     newItem.value.product_id = product.id;
-    newItem.value.unit_price = product.price;
+    newItem.value.unit_price = productSalePrice(product);
     productSearch.value = product.name;
 };
 
@@ -220,8 +288,8 @@ onMounted(async () => {
     await Promise.all([
         fetchSalesOrderById(props.id),
         fetchProducts({ per_page: 100 }),
-        fetchWarehouses({ per_page: 50 }),
-        fetchCustomers({ per_page: 100 }),
+        fetchWarehouses(),
+        fetchCustomers(),
         fetchUsers(),
         fetchStoreSettings(),
     ]);
@@ -231,6 +299,10 @@ onMounted(async () => {
     if (currentSalesOrder.value) {
         form.value = {
             customer_id: currentSalesOrder.value.customer_id,
+            customer_vehicle_id:
+                currentSalesOrder.value.customer_vehicle_id ?? null,
+            referred_by_customer_id:
+                currentSalesOrder.value.referred_by_customer_id ?? null,
             date: currentSalesOrder.value.date,
             discount_amount: currentSalesOrder.value.discount_amount,
             shipping_cost: currentSalesOrder.value.shipping_cost,
@@ -246,6 +318,9 @@ onMounted(async () => {
                 seller_id: item.seller_id,
             })),
         };
+        await loadCustomerVehicles(currentSalesOrder.value.customer_id, false);
+        form.value.customer_vehicle_id =
+            currentSalesOrder.value.customer_vehicle_id ?? null;
     }
 });
 </script>
@@ -308,7 +383,9 @@ onMounted(async () => {
                     Información General
                 </h2>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div
+                    class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
+                >
                     <div>
                         <label
                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -319,6 +396,32 @@ onMounted(async () => {
                             :options="customerOptions"
                             :disabled="!canEdit"
                             placeholder="Sin cliente"
+                        />
+                    </div>
+
+                    <div>
+                        <label
+                            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >Carro</label
+                        >
+                        <SearchableSelect
+                            v-model="customerVehicleModel"
+                            :options="customerVehicleOptions"
+                            :disabled="!canEdit || !form.customer_id"
+                            placeholder="Sin carro"
+                        />
+                    </div>
+
+                    <div>
+                        <label
+                            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >Referido por / Mecánico</label
+                        >
+                        <SearchableSelect
+                            v-model="referredByCustomerModel"
+                            :options="referralCustomerOptions"
+                            :disabled="!canEdit"
+                            placeholder="Sin referencia"
                         />
                     </div>
 
@@ -392,7 +495,9 @@ onMounted(async () => {
                                 <div
                                     class="text-sm text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ product.sku }} - ${{ product.price }}
+                                    {{ product.sku_base }} - ${{
+                                        productSalePrice(product)
+                                    }}
                                 </div>
                             </button>
                         </div>

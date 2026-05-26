@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useProducts } from '@/composables/useProducts';
 import { useWarehouses } from '@/composables/useWarehouses';
 import { useCustomers } from '@/composables/useCustomers';
+import { CustomersApiService } from '@/services/customers';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { ArrowLeft, Save, Plus, Trash2, Search } from 'lucide-vue-next';
 import type { CreateSalesOrderData } from '@/types/sales-order';
+import type { CustomerVehicle } from '@/types/customer';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -28,6 +30,8 @@ const {
 // Form data
 const form = ref<CreateSalesOrderData>({
     customer_id: undefined,
+    customer_vehicle_id: null,
+    referred_by_customer_id: null,
     date: new Date().toISOString().split('T')[0],
     status: 'draft',
     discount_amount: 0,
@@ -36,6 +40,7 @@ const form = ref<CreateSalesOrderData>({
     notes: '',
     items: [],
 });
+const customerVehicles = ref<CustomerVehicle[]>([]);
 
 // New item form
 const newItem = ref({
@@ -51,6 +56,16 @@ const normalizeTaxPercent = (value: unknown): number => {
     return resolveTaxRate(value);
 };
 
+const productSalePrice = (product: any): number => {
+    return Number(
+        product.pricing?.current_sale_price ??
+            product.pricing?.base_price ??
+            product.default_variant?.current_sale_price ??
+            product.default_variant?.base_price ??
+            0,
+    );
+};
+
 // Search
 const productSearch = ref('');
 const filteredProducts = computed(() => {
@@ -61,13 +76,31 @@ const filteredProducts = computed(() => {
                 p.name
                     .toLowerCase()
                     .includes(productSearch.value.toLowerCase()) ||
-                p.sku.toLowerCase().includes(productSearch.value.toLowerCase()),
+                p.sku_base
+                    .toLowerCase()
+                    .includes(productSearch.value.toLowerCase()),
         )
         .slice(0, 10);
 });
 
 const customerOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Sin cliente' },
+    ...customers.value.map((customer) => ({
+        value: customer.id,
+        label: customer.name,
+    })),
+]);
+const customerVehicleOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Sin carro' },
+    ...customerVehicles.value
+        .filter((vehicle) => vehicle.status === 'active')
+        .map((vehicle) => ({
+            value: vehicle.id,
+            label: `${vehicle.label || vehicle.display_name} · VIN ${vehicle.vin}`,
+        })),
+]);
+const referralCustomerOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Sin referencia' },
     ...customers.value.map((customer) => ({
         value: customer.id,
         label: customer.name,
@@ -88,6 +121,36 @@ const customerModel = computed<number | null>({
         form.value.customer_id = value === null ? undefined : Number(value);
     },
 });
+const customerVehicleModel = computed<number | null>({
+    get: () => form.value.customer_vehicle_id ?? null,
+    set: (value) => {
+        form.value.customer_vehicle_id = value === null ? null : Number(value);
+    },
+});
+const referredByCustomerModel = computed<number | null>({
+    get: () => form.value.referred_by_customer_id ?? null,
+    set: (value) => {
+        form.value.referred_by_customer_id =
+            value === null ? null : Number(value);
+    },
+});
+
+const loadCustomerVehicles = async (customerId?: number) => {
+    customerVehicles.value = [];
+    form.value.customer_vehicle_id = null;
+
+    if (!customerId) return;
+
+    const response = await CustomersApiService.getVehicles(customerId);
+    customerVehicles.value = response.data.data;
+};
+
+watch(
+    () => form.value.customer_id,
+    (customerId) => {
+        loadCustomerVehicles(customerId);
+    },
+);
 
 // Calculations
 const calculateItemTotal = (item: any) => {
@@ -146,7 +209,7 @@ const addItem = () => {
         product_id: newItem.value.product_id,
         warehouse_id: newItem.value.warehouse_id,
         quantity: newItem.value.quantity,
-        unit_price: newItem.value.unit_price || product.price,
+        unit_price: newItem.value.unit_price || productSalePrice(product),
         discount_percent: newItem.value.discount_percent,
         tax_percent: normalizeTaxPercent(newItem.value.tax_percent),
     });
@@ -169,7 +232,7 @@ const removeItem = (index: number) => {
 
 const selectProduct = (product: any) => {
     newItem.value.product_id = product.id;
-    newItem.value.unit_price = product.price;
+    newItem.value.unit_price = productSalePrice(product);
     productSearch.value = product.name;
 };
 
@@ -190,8 +253,8 @@ const handleSubmit = async () => {
 onMounted(async () => {
     await Promise.all([
         fetchProducts({ per_page: 100 }),
-        fetchWarehouses({ per_page: 50 }),
-        fetchCustomers({ per_page: 100 }),
+        fetchWarehouses(),
+        fetchCustomers(),
         fetchStoreSettings(),
     ]);
 
@@ -249,7 +312,9 @@ onMounted(async () => {
                     Información General
                 </h2>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div
+                    class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
+                >
                     <div>
                         <label
                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -259,6 +324,31 @@ onMounted(async () => {
                             v-model="customerModel"
                             :options="customerOptions"
                             placeholder="Sin cliente"
+                        />
+                    </div>
+
+                    <div>
+                        <label
+                            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >Carro</label
+                        >
+                        <SearchableSelect
+                            v-model="customerVehicleModel"
+                            :options="customerVehicleOptions"
+                            :disabled="!form.customer_id"
+                            placeholder="Sin carro"
+                        />
+                    </div>
+
+                    <div>
+                        <label
+                            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >Referido por / Mecánico</label
+                        >
+                        <SearchableSelect
+                            v-model="referredByCustomerModel"
+                            :options="referralCustomerOptions"
+                            placeholder="Sin referencia"
                         />
                     </div>
 
@@ -345,7 +435,9 @@ onMounted(async () => {
                                 <div
                                     class="text-sm text-gray-500 dark:text-gray-400"
                                 >
-                                    {{ product.sku }} - ${{ product.price }}
+                                    {{ product.sku_base }} - ${{
+                                        productSalePrice(product)
+                                    }}
                                 </div>
                             </button>
                         </div>

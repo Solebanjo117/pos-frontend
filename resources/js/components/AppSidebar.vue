@@ -369,6 +369,10 @@ const mainNavItems = computed<NavItem[]>(() => {
                     href: '/reports/financial',
                 },
                 {
+                    title: 'Clientes y referencias',
+                    href: '/reports/customer-references',
+                },
+                {
                     title: 'Cierre de Caja (Z-Report)',
                     href: '/reports/z-report',
                 },

@@ -135,6 +135,10 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
     Route::get('/financial', function () {
         return Inertia::render('Reports/Financial');
     })->name('financial');
+
+    Route::get('/customer-references', function () {
+        return Inertia::render('Reports/CustomerReferences');
+    })->name('customer-references');
     
     Route::get('/z-report', function () {
         return Inertia::render('Reports/ZReport');

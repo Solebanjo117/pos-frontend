@@ -5,6 +5,8 @@ import type {
     CustomerFormData,
     CustomerBalanceSummary,
     CustomerTransaction,
+    CustomerVehicle,
+    CustomerVehicleFormData,
 } from '@/types/customer';
 
 export const CustomersApiService = {
@@ -42,6 +44,36 @@ export const CustomersApiService = {
             customer: Customer;
             balance_summary: CustomerBalanceSummary;
         }>(`/customers/${id}`);
+    },
+
+    async getVehicles(id: number) {
+        return await apiClient.get<{ data: CustomerVehicle[] }>(
+            `/customers/${id}/vehicles`,
+        );
+    },
+
+    async createVehicle(id: number, data: CustomerVehicleFormData) {
+        return await apiClient.post<{ data: CustomerVehicle }>(
+            `/customers/${id}/vehicles`,
+            data,
+        );
+    },
+
+    async updateVehicle(
+        id: number,
+        vehicleId: number,
+        data: Partial<CustomerVehicleFormData>,
+    ) {
+        return await apiClient.put<{ data: CustomerVehicle }>(
+            `/customers/${id}/vehicles/${vehicleId}`,
+            data,
+        );
+    },
+
+    async deleteVehicle(id: number, vehicleId: number) {
+        return await apiClient.delete<{ data: CustomerVehicle }>(
+            `/customers/${id}/vehicles/${vehicleId}`,
+        );
     },
 
     /**

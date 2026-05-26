@@ -19,10 +19,19 @@ import {
     TrendingDown,
     AlertCircle,
     Gift,
+    Car,
+    Plus,
+    Trash2,
+    X,
 } from 'lucide-vue-next';
 import { useCustomers } from '@/composables/useCustomers';
 import { CustomersApiService } from '@/services/customers';
-import type { CustomerTransaction } from '@/types/customer';
+import apiClient from '@/services/api/client';
+import type {
+    CustomerTransaction,
+    CustomerVehicle,
+    CustomerVehicleFormData,
+} from '@/types/customer';
 
 const props = defineProps<{
     customerId: number;
@@ -38,6 +47,7 @@ const {
 } = useCustomers();
 
 const transactions = ref<CustomerTransaction[]>([]);
+const customerVehicles = ref<CustomerVehicle[]>([]);
 const transactionsLoading = ref(false);
 const transactionsPage = ref(1);
 const transactionsLastPage = ref(1);
@@ -55,6 +65,72 @@ const adjustForm = ref({
 });
 const adjustLoading = ref(false);
 
+const vehicleSaving = ref(false);
+const vehicleError = ref<string | null>(null);
+const editingVehicleId = ref<number | null>(null);
+const vehicleMakes = ref<Array<{ id: number; name: string }>>([]);
+const vehicleModels = ref<Array<any>>([]);
+const vehicleChassis = ref<Array<any>>([]);
+const vehicleEngines = ref<Array<any>>([]);
+const vehicleForm = ref<CustomerVehicleFormData>({
+    vehicle_model_id: 0,
+    vehicle_chassis_id: null,
+    vehicle_engine_id: 0,
+    vin: '',
+    label: '',
+    notes: '',
+    status: 'active',
+});
+const selectedMakeId = ref<number | null>(null);
+
+const selectedVehicleModel = computed(() =>
+    vehicleModels.value.find(
+        (model) => Number(model.id) === vehicleForm.value.vehicle_model_id,
+    ),
+);
+
+const formatVehicleModelOption = (model: any): string => {
+    const generation = model.generation ? ` ${model.generation}` : '';
+    const yearRange =
+        model.year_from || model.year_to
+            ? ` (${model.year_from || '?'}-${model.year_to || '?'})`
+            : '';
+
+    return `${model.name}${generation}${yearRange}`;
+};
+
+const vehicleChassisResolutionError = computed(() => {
+    if (!vehicleForm.value.vehicle_model_id) return null;
+    if (vehicleChassis.value.length > 1) {
+        return 'Este modelo tiene más de un chasis configurado. Corrige el catálogo en Vehículos antes de agregarlo al cliente.';
+    }
+    return null;
+});
+
+const vehicleChassisResolutionLabel = computed(() => {
+    if (
+        !vehicleForm.value.vehicle_model_id ||
+        vehicleChassisResolutionError.value
+    ) {
+        return null;
+    }
+
+    if (vehicleChassis.value.length === 0) {
+        return 'Sin chasis configurado; se guardará solo con modelo y motor.';
+    }
+
+    return 'Chasis resuelto automáticamente.';
+});
+
+const canSaveVehicle = computed(
+    () =>
+        Boolean(vehicleForm.value.vehicle_model_id) &&
+        Boolean(vehicleForm.value.vehicle_engine_id) &&
+        Boolean(vehicleForm.value.vin.trim()) &&
+        !vehicleChassisResolutionError.value &&
+        !vehicleSaving.value,
+);
+
 onMounted(async () => {
     await fetchCustomer(props.customerId);
     if (currentCustomer.value) {
@@ -64,6 +140,8 @@ onMounted(async () => {
         });
     }
     await loadTransactions();
+    customerVehicles.value = currentCustomer.value?.vehicles ?? [];
+    await loadVehicleMakes();
 });
 
 const loadTransactions = async (page = 1) => {
@@ -81,6 +159,166 @@ const loadTransactions = async (page = 1) => {
     } finally {
         transactionsLoading.value = false;
     }
+};
+
+const loadVehicleMakes = async () => {
+    const response = await apiClient.get('/vehicle-makes/all');
+    vehicleMakes.value = response.data.data ?? response.data ?? [];
+};
+
+const loadVehicleModels = async () => {
+    vehicleModels.value = [];
+    vehicleChassis.value = [];
+    vehicleEngines.value = [];
+    vehicleForm.value.vehicle_model_id = 0;
+    vehicleForm.value.vehicle_chassis_id = null;
+    vehicleForm.value.vehicle_engine_id = 0;
+
+    if (!selectedMakeId.value) return;
+
+    const response = await apiClient.get(
+        `/vehicle-makes/${selectedMakeId.value}/models`,
+    );
+    vehicleModels.value = response.data.data ?? response.data ?? [];
+};
+
+const loadVehicleConfiguration = async () => {
+    vehicleChassis.value = [];
+    vehicleEngines.value = [];
+    vehicleForm.value.vehicle_chassis_id = null;
+    vehicleForm.value.vehicle_engine_id = 0;
+
+    if (!vehicleForm.value.vehicle_model_id) return;
+
+    const [chassisResponse, enginesResponse] = await Promise.all([
+        apiClient.get(
+            `/vehicle-models/${vehicleForm.value.vehicle_model_id}/chassis`,
+        ),
+        apiClient.get(
+            `/vehicle-models/${vehicleForm.value.vehicle_model_id}/engines`,
+        ),
+    ]);
+    vehicleChassis.value =
+        chassisResponse.data.data ?? chassisResponse.data ?? [];
+    vehicleEngines.value =
+        enginesResponse.data.data ?? enginesResponse.data ?? [];
+
+    if (vehicleChassis.value.length === 1) {
+        vehicleForm.value.vehicle_chassis_id = Number(
+            vehicleChassis.value[0].id,
+        );
+    }
+};
+
+const resetVehicleForm = () => {
+    editingVehicleId.value = null;
+    selectedMakeId.value = null;
+    vehicleModels.value = [];
+    vehicleChassis.value = [];
+    vehicleEngines.value = [];
+    vehicleForm.value = {
+        vehicle_model_id: 0,
+        vehicle_chassis_id: null,
+        vehicle_engine_id: 0,
+        vin: '',
+        label: '',
+        notes: '',
+        status: 'active',
+    };
+    vehicleError.value = null;
+};
+
+const editVehicle = async (vehicle: CustomerVehicle) => {
+    editingVehicleId.value = vehicle.id;
+    selectedMakeId.value = vehicle.make?.id ?? vehicle.model?.make?.id ?? null;
+    vehicleForm.value = {
+        vehicle_model_id: vehicle.vehicle_model_id,
+        vehicle_chassis_id: vehicle.vehicle_chassis_id,
+        vehicle_engine_id: vehicle.vehicle_engine_id,
+        vin: vehicle.vin,
+        label: vehicle.label ?? '',
+        notes: vehicle.notes ?? '',
+        status: vehicle.status,
+    };
+    if (selectedMakeId.value) {
+        const modelsResponse = await apiClient.get(
+            `/vehicle-makes/${selectedMakeId.value}/models`,
+        );
+        vehicleModels.value =
+            modelsResponse.data.data ?? modelsResponse.data ?? [];
+    }
+    const [chassisResponse, enginesResponse] = await Promise.all([
+        apiClient.get(`/vehicle-models/${vehicle.vehicle_model_id}/chassis`),
+        apiClient.get(`/vehicle-models/${vehicle.vehicle_model_id}/engines`),
+    ]);
+    vehicleChassis.value =
+        chassisResponse.data.data ?? chassisResponse.data ?? [];
+    vehicleEngines.value =
+        enginesResponse.data.data ?? enginesResponse.data ?? [];
+
+    if (
+        !vehicleForm.value.vehicle_chassis_id &&
+        vehicleChassis.value.length === 1
+    ) {
+        vehicleForm.value.vehicle_chassis_id = Number(
+            vehicleChassis.value[0].id,
+        );
+    }
+};
+
+const saveVehicle = async () => {
+    if (!canSaveVehicle.value) {
+        vehicleError.value =
+            vehicleChassisResolutionError.value ||
+            'Completa la marca, modelo, motor y VIN del carro.';
+        return;
+    }
+
+    vehicleSaving.value = true;
+    vehicleError.value = null;
+
+    try {
+        const payload = {
+            ...vehicleForm.value,
+            vin: vehicleForm.value.vin.trim().toUpperCase(),
+            label: vehicleForm.value.label || null,
+            notes: vehicleForm.value.notes || null,
+        };
+
+        if (editingVehicleId.value) {
+            await CustomersApiService.updateVehicle(
+                props.customerId,
+                editingVehicleId.value,
+                payload,
+            );
+        } else {
+            await CustomersApiService.createVehicle(props.customerId, payload);
+        }
+
+        const response = await CustomersApiService.getVehicles(
+            props.customerId,
+        );
+        customerVehicles.value = response.data.data;
+        resetVehicleForm();
+    } catch (err: any) {
+        const firstValidationMessage = Object.values(
+            err.response?.data?.errors ?? {},
+        ).flat()[0] as string | undefined;
+        vehicleError.value =
+            err.response?.data?.message ||
+            firstValidationMessage ||
+            'No se pudo guardar el carro del cliente';
+    } finally {
+        vehicleSaving.value = false;
+    }
+};
+
+const removeVehicle = async (vehicle: CustomerVehicle) => {
+    if (!confirm('Desactivar este carro del cliente?')) return;
+
+    await CustomersApiService.deleteVehicle(props.customerId, vehicle.id);
+    const response = await CustomersApiService.getVehicles(props.customerId);
+    customerVehicles.value = response.data.data;
 };
 
 const handleAdjustBalance = async () => {
@@ -363,6 +601,250 @@ const goBack = () => {
                                     }}
                                     {{ currentCustomer.postal_code }}
                                 </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Vehicles -->
+                <div class="rounded-lg bg-white p-6 shadow-sm dark:bg-card">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <h2
+                            class="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100"
+                        >
+                            <Car :size="22" />
+                            Carros
+                        </h2>
+                        <button
+                            v-if="editingVehicleId"
+                            type="button"
+                            class="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                            @click="resetVehicleForm"
+                        >
+                            <X :size="16" />
+                            Cancelar edición
+                        </button>
+                    </div>
+
+                    <div
+                        v-if="vehicleError"
+                        class="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    >
+                        {{ vehicleError }}
+                    </div>
+
+                    <form
+                        class="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-2 dark:border-border dark:bg-muted/40"
+                        @submit.prevent="saveVehicle"
+                    >
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">
+                                Marca
+                            </label>
+                            <select
+                                v-model="selectedMakeId"
+                                required
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card"
+                                @change="loadVehicleModels"
+                            >
+                                <option :value="null">Seleccionar...</option>
+                                <option
+                                    v-for="make in vehicleMakes"
+                                    :key="make.id"
+                                    :value="make.id"
+                                >
+                                    {{ make.name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">
+                                Modelo
+                            </label>
+                            <select
+                                v-model.number="vehicleForm.vehicle_model_id"
+                                required
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card"
+                                @change="loadVehicleConfiguration"
+                            >
+                                <option :value="0">Seleccionar...</option>
+                                <option
+                                    v-for="model in vehicleModels"
+                                    :key="model.id"
+                                    :value="model.id"
+                                >
+                                    {{ formatVehicleModelOption(model) }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">
+                                Motor
+                            </label>
+                            <select
+                                v-model.number="vehicleForm.vehicle_engine_id"
+                                required
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card"
+                            >
+                                <option :value="0">Seleccionar...</option>
+                                <option
+                                    v-for="engine in vehicleEngines"
+                                    :key="engine.id"
+                                    :value="engine.id"
+                                >
+                                    {{ engine.engine_code }}
+                                    {{ engine.displacement || '' }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div
+                            v-if="
+                                selectedVehicleModel ||
+                                vehicleChassisResolutionError
+                            "
+                            class="md:col-span-2"
+                        >
+                            <div
+                                class="rounded-md border px-3 py-2 text-sm"
+                                :class="
+                                    vehicleChassisResolutionError
+                                        ? 'border-amber-200 bg-amber-50 text-amber-800'
+                                        : 'border-gray-200 bg-white text-gray-600 dark:border-border dark:bg-card dark:text-gray-300'
+                                "
+                            >
+                                <span class="font-medium">Modelo:</span>
+                                {{
+                                    selectedVehicleModel
+                                        ? formatVehicleModelOption(
+                                              selectedVehicleModel,
+                                          )
+                                        : 'Selecciona un modelo'
+                                }}
+                                <span
+                                    v-if="!vehicleChassisResolutionError"
+                                    class="ml-2 text-gray-500"
+                                >
+                                    {{ vehicleChassisResolutionLabel }}
+                                </span>
+                                <span v-else class="ml-2">
+                                    {{ vehicleChassisResolutionError }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">
+                                VIN
+                            </label>
+                            <input
+                                v-model="vehicleForm.vin"
+                                required
+                                maxlength="40"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm uppercase dark:border-border dark:bg-card"
+                                placeholder="1234ASDF"
+                            />
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-medium">
+                                Alias
+                            </label>
+                            <input
+                                v-model="vehicleForm.label"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card"
+                                placeholder="Yaris diario"
+                            />
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-sm font-medium">
+                                Notas
+                            </label>
+                            <textarea
+                                v-model="vehicleForm.notes"
+                                rows="2"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card"
+                            />
+                        </div>
+
+                        <div class="flex justify-end md:col-span-2">
+                            <button
+                                type="submit"
+                                :disabled="!canSaveVehicle"
+                                class="inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
+                            >
+                                <Plus :size="16" />
+                                {{
+                                    vehicleSaving
+                                        ? 'Guardando...'
+                                        : editingVehicleId
+                                          ? 'Actualizar carro'
+                                          : 'Agregar carro'
+                                }}
+                            </button>
+                        </div>
+                    </form>
+
+                    <div
+                        class="mt-4 divide-y divide-gray-100 dark:divide-border"
+                    >
+                        <div
+                            v-if="customerVehicles.length === 0"
+                            class="py-6 text-center text-sm text-gray-500"
+                        >
+                            Sin carros registrados
+                        </div>
+                        <div
+                            v-for="vehicle in customerVehicles"
+                            :key="vehicle.id"
+                            class="flex flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between"
+                        >
+                            <div>
+                                <div
+                                    class="font-medium text-gray-900 dark:text-gray-100"
+                                >
+                                    {{ vehicle.label || vehicle.display_name }}
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    {{ vehicle.display_name }}
+                                </div>
+                                <div class="font-mono text-xs text-gray-500">
+                                    VIN {{ vehicle.vin }}
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="rounded-full px-2 py-1 text-xs"
+                                    :class="
+                                        vehicle.status === 'active'
+                                            ? 'bg-green-100 text-green-700'
+                                            : 'bg-gray-100 text-gray-600'
+                                    "
+                                >
+                                    {{
+                                        vehicle.status === 'active'
+                                            ? 'Activo'
+                                            : 'Inactivo'
+                                    }}
+                                </span>
+                                <button
+                                    type="button"
+                                    class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-border dark:hover:bg-muted"
+                                    @click="editVehicle(vehicle)"
+                                >
+                                    Editar
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-md border border-red-200 px-2 py-1.5 text-red-600 hover:bg-red-50"
+                                    title="Desactivar"
+                                    @click="removeVehicle(vehicle)"
+                                >
+                                    <Trash2 :size="16" />
+                                </button>
                             </div>
                         </div>
                     </div>

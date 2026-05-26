@@ -21,8 +21,49 @@ export interface Customer {
     contact_phone: string | null;
     notes: string | null;
     status: 'active' | 'inactive' | 'blocked';
+    vehicles?: CustomerVehicle[];
     created_at: string;
     updated_at: string;
+}
+
+export interface CustomerVehicle {
+    id: number;
+    customer_id: number;
+    vehicle_model_id: number;
+    vehicle_chassis_id: number | null;
+    vehicle_engine_id: number;
+    vin: string;
+    label: string | null;
+    notes: string | null;
+    status: 'active' | 'inactive';
+    display_name: string;
+    make?: { id: number; name: string } | null;
+    model?: {
+        id: number;
+        name: string;
+        generation?: string | null;
+        year_from?: number | null;
+        year_to?: number | null;
+        make?: { id: number; name: string } | null;
+    } | null;
+    chassis?: { id: number; code: string; name?: string | null } | null;
+    engine?: {
+        id: number;
+        engine_code: string;
+        displacement?: string | null;
+    } | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CustomerVehicleFormData {
+    vehicle_model_id: number;
+    vehicle_chassis_id: number | null;
+    vehicle_engine_id: number;
+    vin: string;
+    label?: string | null;
+    notes?: string | null;
+    status?: 'active' | 'inactive';
 }
 
 export interface CustomerTransaction {

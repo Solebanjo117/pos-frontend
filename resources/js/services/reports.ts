@@ -5,6 +5,7 @@ import type {
     MovementHistoryReport,
     MovementHistoryFilters,
     FinancialReport,
+    CustomerReferenceReport,
 } from '@/types/report';
 
 export const ReportsApiService = {
@@ -75,6 +76,18 @@ export const ReportsApiService = {
         warehouse_id?: number | null;
     }): Promise<FinancialReport> {
         const response = await apiClient.get('/reports/financial', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getCustomerReferences(filters: {
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        customer_id?: number | null;
+    }): Promise<CustomerReferenceReport> {
+        const response = await apiClient.get('/reports/customer-references', {
             params: filters,
         });
         return response.data;

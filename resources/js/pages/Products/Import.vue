@@ -27,30 +27,23 @@ const importConfig: ImporterConfig = {
     description:
         'Descarga la plantilla, sube tu archivo Excel, edita los datos y enriquece cada producto con atributos y variantes.',
     templateFilename: 'plantilla_productos.xlsx',
+    fullFileImport: true,
     columns: [
         { key: 'nombre', label: 'Nombre', type: 'text', required: true },
-        { key: 'sku', label: 'SKU', type: 'text' },
-        { key: 'descripcion', label: 'Descripcion', type: 'text' },
+        { key: 'sku', label: 'SKU / Codigo', type: 'text' },
+        { key: 'system_id', label: 'System ID', type: 'text' },
+        { key: 'brand', label: 'Marca / Variante', type: 'text' },
         {
             key: 'categoria',
             label: 'Categoria',
             type: 'searchable',
             required: true,
             searchableEndpoint: '/categories/all',
-            creatable: true,
         },
-        {
-            key: 'categorias_extra',
-            label: 'Categorias Extra',
-            type: 'text',
-            placeholder: 'Motor, Servicio',
-        },
-        {
-            key: 'atributos',
-            label: 'Atributos Texto',
-            type: 'text',
-            placeholder: 'color:rojo,largo:15cm',
-        },
+        { key: 'costo', label: 'Costo', type: 'number' },
+        { key: 'precio', label: 'Precio', type: 'number' },
+        { key: 'cantidad', label: 'Cantidad', type: 'number' },
+        { key: 'descripcion', label: 'Descripcion', type: 'text' },
         { key: '__attributes', label: 'Atributos', actionType: 'attributes' },
         { key: '__variants', label: 'Variantes', actionType: 'variants' },
     ],
@@ -74,7 +67,7 @@ const categoryProcessing = ref(false);
 const categoryError = ref('');
 
 const attributesModal = ref(false);
-const currentAttributes = ref<{ name: string; value: string; unit: string }[]>(
+const currentAttributes = ref<{ name: string; value: string; unit?: string }[]>(
     [],
 );
 const variantsModal = ref(false);
@@ -97,6 +90,23 @@ const getEditingRow = () => {
     if (editingRowIdx.value === null || !rows) return null;
     return rows[editingRowIdx.value];
 };
+
+const currentVariantPreview = computed(() => {
+    const row = getEditingRow();
+    return row?.__variant_preview ?? null;
+});
+
+const currentVariantGroup = computed(() => {
+    const row = getEditingRow();
+    const groupKey = row?.__product_group_key;
+    if (!groupKey) return null;
+
+    return (
+        importerRef.value?.previewSummary?.groups?.find(
+            (group: any) => group.product_key === groupKey,
+        ) ?? null
+    );
+});
 
 const getRowCategoryId = (rowIdx: number): number | undefined => {
     const rows = importerRef.value?.editedRows;
@@ -338,18 +348,17 @@ const handleRowAction = (actionType: string, rowIdx: number) => {
                 </DialogHeader>
                 <div class="space-y-3 py-2">
                     <div
-                        class="grid grid-cols-3 gap-2 px-1 text-xs font-semibold text-gray-500 dark:text-gray-400"
+                        class="grid grid-cols-2 gap-2 px-1 text-xs font-semibold text-gray-500 dark:text-gray-400"
                     >
                         <span>Nombre</span>
                         <span>Valor</span>
-                        <span>Unidad</span>
                     </div>
                     <div
                         v-for="(attribute, index) in currentAttributes"
                         :key="index"
                         class="flex items-center gap-2"
                     >
-                        <div class="grid flex-1 grid-cols-3 gap-2">
+                        <div class="grid flex-1 grid-cols-2 gap-2">
                             <Input
                                 v-model="attribute.name"
                                 placeholder="Ej: Amperaje"
@@ -357,10 +366,6 @@ const handleRowAction = (actionType: string, rowIdx: number) => {
                             <Input
                                 v-model="attribute.value"
                                 placeholder="Ej: 90"
-                            />
-                            <Input
-                                v-model="attribute.unit"
-                                placeholder="Ej: A"
                             />
                         </div>
                         <button
@@ -413,7 +418,178 @@ const handleRowAction = (actionType: string, rowIdx: number) => {
                         }}</DialogTitle
                     >
                 </DialogHeader>
-                <div class="py-2">
+                <div class="space-y-4 py-2">
+                    <div
+                        v-if="currentVariantGroup"
+                        class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/30"
+                    >
+                        <div
+                            class="mb-2 flex items-center justify-between gap-3"
+                        >
+                            <div>
+                                <p
+                                    class="font-semibold text-emerald-900 dark:text-emerald-100"
+                                >
+                                    Grupo detectado del Excel
+                                </p>
+                                <p
+                                    class="text-xs text-emerald-700 dark:text-emerald-300"
+                                >
+                                    Estas filas se importaran como variantes del
+                                    mismo producto.
+                                </p>
+                            </div>
+                            <span
+                                class="rounded bg-white px-2 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100"
+                            >
+                                {{ currentVariantGroup.variant_count ?? 0 }}
+                                variantes
+                            </span>
+                        </div>
+                        <div
+                            class="grid gap-2 text-xs text-emerald-950 sm:grid-cols-4 dark:text-emerald-100"
+                        >
+                            <div>
+                                <span
+                                    class="block text-emerald-700 dark:text-emerald-300"
+                                    >Producto</span
+                                >
+                                {{ currentVariantGroup.product_name || '-' }}
+                            </div>
+                            <div>
+                                <span
+                                    class="block text-emerald-700 dark:text-emerald-300"
+                                    >Nombre original</span
+                                >
+                                {{ currentVariantGroup.original_name || '-' }}
+                            </div>
+                            <div>
+                                <span
+                                    class="block text-emerald-700 dark:text-emerald-300"
+                                    >Filas</span
+                                >
+                                {{ currentVariantGroup.rows ?? '-' }}
+                            </div>
+                            <div>
+                                <span
+                                    class="block text-emerald-700 dark:text-emerald-300"
+                                    >SKUs</span
+                                >
+                                {{
+                                    currentVariantGroup.variant_skus?.length
+                                        ? currentVariantGroup.variant_skus.join(
+                                              ', ',
+                                          )
+                                        : 'Sin SKU'
+                                }}
+                            </div>
+                        </div>
+                        <p
+                            v-if="currentVariantGroup.sku_warning"
+                            class="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                        >
+                            {{ currentVariantGroup.sku_warning }}
+                        </p>
+                        <div class="mt-3 overflow-x-auto">
+                            <table class="min-w-full text-left text-xs">
+                                <thead
+                                    class="border-b border-emerald-200 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                                >
+                                    <tr>
+                                        <th class="py-1 pr-3 font-semibold">
+                                            Marca
+                                        </th>
+                                        <th class="py-1 pr-3 font-semibold">
+                                            SKU
+                                        </th>
+                                        <th class="py-1 pr-3 font-semibold">
+                                            System ID
+                                        </th>
+                                        <th
+                                            class="py-1 pr-3 text-right font-semibold"
+                                        >
+                                            Cant.
+                                        </th>
+                                        <th
+                                            class="py-1 pr-3 text-right font-semibold"
+                                        >
+                                            Costo
+                                        </th>
+                                        <th
+                                            class="py-1 pr-3 text-right font-semibold"
+                                        >
+                                            Precio
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="variant in currentVariantGroup.variants ??
+                                        []"
+                                        :key="variant.variant_key"
+                                        class="border-b border-emerald-100 last:border-0 dark:border-emerald-900"
+                                    >
+                                        <td class="py-1 pr-3">
+                                            {{ variant.brand || 'Generica' }}
+                                        </td>
+                                        <td class="py-1 pr-3">
+                                            {{ variant.sku || '-' }}
+                                        </td>
+                                        <td class="py-1 pr-3">
+                                            {{ variant.system_id || '-' }}
+                                        </td>
+                                        <td class="py-1 pr-3 text-right">
+                                            {{ variant.cantidad ?? '-' }}
+                                        </td>
+                                        <td class="py-1 pr-3 text-right">
+                                            {{ variant.costo ?? '-' }}
+                                        </td>
+                                        <td class="py-1 pr-3 text-right">
+                                            {{ variant.precio ?? '-' }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div
+                        v-else-if="currentVariantPreview"
+                        class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/30"
+                    >
+                        <p
+                            class="font-semibold text-emerald-900 dark:text-emerald-100"
+                        >
+                            Variante detectada del Excel
+                        </p>
+                        <div
+                            class="mt-2 grid gap-2 text-xs text-emerald-950 sm:grid-cols-3 dark:text-emerald-100"
+                        >
+                            <div>
+                                <span
+                                    class="block text-emerald-700 dark:text-emerald-300"
+                                    >Marca</span
+                                >
+                                {{ currentVariantPreview.brand || 'Generica' }}
+                            </div>
+                            <div>
+                                <span
+                                    class="block text-emerald-700 dark:text-emerald-300"
+                                    >SKU</span
+                                >
+                                {{ currentVariantPreview.sku || 'Sin SKU' }}
+                            </div>
+                            <div>
+                                <span
+                                    class="block text-emerald-700 dark:text-emerald-300"
+                                    >System ID</span
+                                >
+                                {{
+                                    currentVariantPreview.system_id ||
+                                    'Sin System ID'
+                                }}
+                            </div>
+                        </div>
+                    </div>
                     <VariantManager
                         v-if="variantsModal && editingRowIdx !== null"
                         :category-id="getRowCategoryId(editingRowIdx)"

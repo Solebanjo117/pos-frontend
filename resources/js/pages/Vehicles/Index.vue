@@ -81,18 +81,9 @@ const treeEngineVinDraft = ref<Record<string, string>>({});
 const treeEngineVinAdding = ref<Record<string, boolean>>({});
 const treeEngineVinError = ref<Record<string, string | null>>({});
 const treeEngineVinApis: Record<string, ReturnType<typeof useVehicleVins>> = {};
-const selectedTreeChassisByModel = ref<Record<number, number>>({});
 
-const getTreeEngineVinKey = (
-    modelId: number,
-    chassisId: number,
-    engineId: number,
-): string => `${modelId}:${chassisId}:${engineId}`;
-
-const treeEngineVinKey = (modelId: number, engineId: number): string => {
-    const chassisId = resolveModelChassisId(modelId);
-    return getTreeEngineVinKey(modelId, chassisId ?? 0, engineId);
-};
+const treeEngineVinKey = (modelId: number, engineId: number): string =>
+    `${modelId}:${engineId}`;
 
 const clearRecordsForEngine = <T,>(
     source: Record<string, T>,
@@ -110,17 +101,12 @@ const setTreeEngineVinError = (key: string, message: string | null) => {
     };
 };
 
-const getTreeEngineVinApi = (
-    modelId: number,
-    engineId: number,
-    chassisId: number,
-) => {
-    const key = getTreeEngineVinKey(modelId, chassisId, engineId);
+const getTreeEngineVinApi = (modelId: number, engineId: number) => {
+    const key = treeEngineVinKey(modelId, engineId);
 
     if (!treeEngineVinApis[key]) {
         treeEngineVinApis[key] = useVehicleVins({
             modelId,
-            chassisId,
             engineId,
         });
     }
@@ -131,16 +117,15 @@ const getTreeEngineVinApi = (
 const loadTreeEngineVins = async (
     modelId: number,
     engineId: number,
-    chassisId: number,
     force = false,
 ) => {
-    const key = getTreeEngineVinKey(modelId, chassisId, engineId);
+    const key = treeEngineVinKey(modelId, engineId);
 
     if (!force && treeEngineVins.value[key]) {
         return;
     }
 
-    const api = getTreeEngineVinApi(modelId, engineId, chassisId);
+    const api = getTreeEngineVinApi(modelId, engineId);
     treeEngineVinsLoading.value = {
         ...treeEngineVinsLoading.value,
         [key]: true,
@@ -252,79 +237,12 @@ const toggleModel = async (modelId: number) => {
     expandedModels.value = new Set(expandedModels.value);
 };
 
-// Helper: resolve first chassis ID from model data in the tree
-const resolveModel = (modelId: number): VehicleModel | undefined => {
-    for (const models of Object.values(modelsByMake.value)) {
-        const model = models.find((m) => m.id === modelId);
-        if (model) {
-            return model;
-        }
-    }
-    return undefined;
-};
-
-const modelChassisOptions = (modelId: number): SelectOption[] => {
-    const model = resolveModel(modelId);
-    return (model?.chassis ?? []).map((chassis: any) => ({
-        value: chassis.id,
-        label: chassis.chassis_code || chassis.code || `Chasis #${chassis.id}`,
-        sublabel: chassis.name || chassis.description || undefined,
-    }));
-};
-
-const modelHasMultipleChassis = (modelId: number): boolean => {
-    return modelChassisOptions(modelId).length > 1;
-};
-
-const resolveModelChassisId = (modelId: number): number | undefined => {
-    const options = modelChassisOptions(modelId);
-
-    if (options.length === 0) {
-        return undefined;
-    }
-
-    if (options.length === 1) {
-        return Number(options[0].value);
-    }
-
-    return selectedTreeChassisByModel.value[modelId];
-};
-
-const handleTreeChassisChange = async (
-    modelId: number,
-    engineId: number,
-    value: string | number | null,
-) => {
-    const chassisId = value ? Number(value) : undefined;
-    const next = { ...selectedTreeChassisByModel.value };
-
-    if (chassisId) {
-        next[modelId] = chassisId;
-    } else {
-        delete next[modelId];
-    }
-
-    selectedTreeChassisByModel.value = next;
-
-    if (chassisId) {
-        await loadTreeEngineVins(modelId, engineId, chassisId, true);
-    }
-};
-
-const modelHasChassis = (modelId: number): boolean => {
-    return modelChassisOptions(modelId).length > 0;
-};
-
 const toggleEngine = async (modelId: number, engineId: number) => {
     if (expandedEngines.value.has(engineId)) {
         expandedEngines.value.delete(engineId);
     } else {
         expandedEngines.value.add(engineId);
-        const chassisId = resolveModelChassisId(modelId);
-        if (chassisId) {
-            await loadTreeEngineVins(modelId, engineId, chassisId);
-        }
-        // If no chassis, don't load VINs — the template will show a message
+        await loadTreeEngineVins(modelId, engineId);
     }
 
     expandedEngines.value = new Set(expandedEngines.value);
@@ -908,20 +826,11 @@ const handleDeleteEngine = async (engine: VehicleEngine) => {
 };
 
 const handleAddTreeEngineVin = async (modelId: number, engineId: number) => {
-    const chassisId = resolveModelChassisId(modelId);
-    if (!chassisId) {
-        setTreeEngineVinError(
-            getTreeEngineVinKey(modelId, 0, engineId),
-            'Selecciona un chasis antes de registrar VINs',
-        );
-        return;
-    }
-
-    const key = getTreeEngineVinKey(modelId, chassisId, engineId);
+    const key = treeEngineVinKey(modelId, engineId);
     const normalized = (treeEngineVinDraft.value[key] ?? '').trim();
     if (normalized.length < 1 || normalized.length > 40) return;
 
-    const api = getTreeEngineVinApi(modelId, engineId, chassisId);
+    const api = getTreeEngineVinApi(modelId, engineId);
     treeEngineVinAdding.value = {
         ...treeEngineVinAdding.value,
         [key]: true,
@@ -958,13 +867,8 @@ const handleRemoveTreeEngineVin = async (
     engineId: number,
     vinId: number,
 ) => {
-    const chassisId = resolveModelChassisId(modelId);
-    if (!chassisId) {
-        return;
-    }
-
-    const key = getTreeEngineVinKey(modelId, chassisId, engineId);
-    const api = getTreeEngineVinApi(modelId, engineId, chassisId);
+    const key = treeEngineVinKey(modelId, engineId);
+    const api = getTreeEngineVinApi(modelId, engineId);
     setTreeEngineVinError(key, null);
 
     try {
@@ -1294,146 +1198,34 @@ const handleRemoveTreeEngineVin = async (
                                             >
                                             <span
                                                 class="ml-auto text-[11px] text-gray-400"
-                                                >Modelo + Chasis + Motor</span
+                                                >Modelo + Motor</span
                                             >
                                         </div>
 
-                                        <!-- No chassis warning -->
-                                        <div
-                                            v-if="!modelHasChassis(model.id)"
-                                            class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
-                                        >
-                                            Agrega el chasis/generación del
-                                            modelo antes de registrar VINs.
-                                            <button
-                                                type="button"
-                                                class="ml-1 font-medium underline"
-                                                @click.stop="
-                                                    openModelEdit(model)
+                                        <div class="flex gap-2">
+                                            <Input
+                                                v-model="
+                                                    treeEngineVinDraft[
+                                                        treeEngineVinKey(
+                                                            model.id,
+                                                            engine.id,
+                                                        )
+                                                    ]
                                                 "
-                                            >
-                                                Editar modelo
-                                            </button>
-                                        </div>
-
-                                        <!-- VIN input (only when chassis exists) -->
-                                        <template v-else>
-                                            <div
-                                                v-if="
-                                                    modelHasMultipleChassis(
+                                                maxlength="40"
+                                                placeholder="VIN (hasta 40 caracteres)"
+                                                class="font-mono text-xs uppercase"
+                                                @keyup.enter="
+                                                    handleAddTreeEngineVin(
                                                         model.id,
+                                                        engine.id,
                                                     )
                                                 "
-                                                class="space-y-1"
-                                            >
-                                                <Label
-                                                    class="text-xs text-gray-500"
-                                                    >Chasis para VIN</Label
-                                                >
-                                                <SearchableSelect
-                                                    :model-value="
-                                                        selectedTreeChassisByModel[
-                                                            model.id
-                                                        ] ?? null
-                                                    "
-                                                    :options="
-                                                        modelChassisOptions(
-                                                            model.id,
-                                                        )
-                                                    "
-                                                    placeholder="Selecciona chasis"
-                                                    search-placeholder="Buscar chasis..."
-                                                    @update:model-value="
-                                                        (value) =>
-                                                            handleTreeChassisChange(
-                                                                model.id,
-                                                                engine.id,
-                                                                value,
-                                                            )
-                                                    "
-                                                />
-                                                <p
-                                                    v-if="
-                                                        !resolveModelChassisId(
-                                                            model.id,
-                                                        )
-                                                    "
-                                                    class="text-[11px] text-amber-600"
-                                                >
-                                                    Este modelo tiene varios
-                                                    chasis. Selecciona uno antes
-                                                    de registrar VINs.
-                                                </p>
-                                            </div>
-
-                                            <div class="flex gap-2">
-                                                <Input
-                                                    v-model="
-                                                        treeEngineVinDraft[
-                                                            treeEngineVinKey(
-                                                                model.id,
-                                                                engine.id,
-                                                            )
-                                                        ]
-                                                    "
-                                                    maxlength="40"
-                                                    placeholder="VIN (hasta 40 caracteres)"
-                                                    class="font-mono text-xs uppercase"
-                                                    :disabled="
-                                                        !resolveModelChassisId(
-                                                            model.id,
-                                                        )
-                                                    "
-                                                    @keyup.enter="
-                                                        handleAddTreeEngineVin(
-                                                            model.id,
-                                                            engine.id,
-                                                        )
-                                                    "
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    :disabled="
-                                                        (
-                                                            treeEngineVinDraft[
-                                                                treeEngineVinKey(
-                                                                    model.id,
-                                                                    engine.id,
-                                                                )
-                                                            ] ?? ''
-                                                        ).trim().length < 1 ||
-                                                        (
-                                                            treeEngineVinDraft[
-                                                                treeEngineVinKey(
-                                                                    model.id,
-                                                                    engine.id,
-                                                                )
-                                                            ] ?? ''
-                                                        ).trim().length > 40 ||
-                                                        !resolveModelChassisId(
-                                                            model.id,
-                                                        ) ||
-                                                        treeEngineVinAdding[
-                                                            treeEngineVinKey(
-                                                                model.id,
-                                                                engine.id,
-                                                            )
-                                                        ]
-                                                    "
-                                                    @click="
-                                                        handleAddTreeEngineVin(
-                                                            model.id,
-                                                            engine.id,
-                                                        )
-                                                    "
-                                                >
-                                                    <Plus class="h-4 w-4" />
-                                                </Button>
-                                            </div>
-
-                                            <p
-                                                v-if="
+                                            />
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                :disabled="
                                                     (
                                                         treeEngineVinDraft[
                                                             treeEngineVinKey(
@@ -1441,11 +1233,7 @@ const handleRemoveTreeEngineVin = async (
                                                                 engine.id,
                                                             )
                                                         ] ?? ''
-                                                    ).length > 0
-                                                "
-                                                class="text-[11px] text-gray-500"
-                                            >
-                                                {{
+                                                    ).trim().length < 1 ||
                                                     (
                                                         treeEngineVinDraft[
                                                             treeEngineVinKey(
@@ -1453,96 +1241,142 @@ const handleRemoveTreeEngineVin = async (
                                                                 engine.id,
                                                             )
                                                         ] ?? ''
-                                                    ).length
-                                                }}
-                                                / 40 caracteres
-                                            </p>
-                                            <p
-                                                v-if="
-                                                    treeEngineVinError[
+                                                    ).trim().length > 40 ||
+                                                    treeEngineVinAdding[
                                                         treeEngineVinKey(
                                                             model.id,
                                                             engine.id,
                                                         )
                                                     ]
                                                 "
-                                                class="text-[11px] text-red-600"
+                                                @click="
+                                                    handleAddTreeEngineVin(
+                                                        model.id,
+                                                        engine.id,
+                                                    )
+                                                "
                                             >
-                                                {{
-                                                    treeEngineVinError[
-                                                        treeEngineVinKey(
-                                                            model.id,
-                                                            engine.id,
-                                                        )
-                                                    ]
-                                                }}
-                                            </p>
+                                                <Plus class="h-4 w-4" />
+                                            </Button>
+                                        </div>
 
-                                            <div
-                                                v-if="
-                                                    treeEngineVinsLoading[
+                                        <p
+                                            v-if="
+                                                (
+                                                    treeEngineVinDraft[
                                                         treeEngineVinKey(
                                                             model.id,
                                                             engine.id,
                                                         )
-                                                    ]
-                                                "
-                                                class="py-1 text-xs text-gray-400"
-                                            >
-                                                Cargando VINs...
-                                            </div>
-                                            <div
-                                                v-else-if="
-                                                    (
-                                                        treeEngineVins[
-                                                            treeEngineVinKey(
-                                                                model.id,
-                                                                engine.id,
-                                                            )
-                                                        ] ?? []
-                                                    ).length === 0
-                                                "
-                                                class="py-1 text-xs text-gray-400"
-                                            >
-                                                Sin VINs registrados para esta
-                                                configuración.
-                                            </div>
-                                            <ul
-                                                v-else
-                                                class="max-h-40 divide-y divide-gray-100 overflow-y-auto rounded-md border border-gray-200 bg-white dark:divide-border dark:border-border dark:bg-background"
-                                            >
-                                                <li
-                                                    v-for="v in treeEngineVins[
+                                                    ] ?? ''
+                                                ).length > 0
+                                            "
+                                            class="text-[11px] text-gray-500"
+                                        >
+                                            {{
+                                                (
+                                                    treeEngineVinDraft[
                                                         treeEngineVinKey(
                                                             model.id,
                                                             engine.id,
                                                         )
-                                                    ] ?? []"
-                                                    :key="v.id"
-                                                    class="flex items-center justify-between px-3 py-1.5 text-xs"
+                                                    ] ?? ''
+                                                ).length
+                                            }}
+                                            / 40 caracteres
+                                        </p>
+                                        <p
+                                            v-if="
+                                                treeEngineVinError[
+                                                    treeEngineVinKey(
+                                                        model.id,
+                                                        engine.id,
+                                                    )
+                                                ]
+                                            "
+                                            class="text-[11px] text-red-600"
+                                        >
+                                            {{
+                                                treeEngineVinError[
+                                                    treeEngineVinKey(
+                                                        model.id,
+                                                        engine.id,
+                                                    )
+                                                ]
+                                            }}
+                                        </p>
+
+                                        <div
+                                            v-if="
+                                                treeEngineVinsLoading[
+                                                    treeEngineVinKey(
+                                                        model.id,
+                                                        engine.id,
+                                                    )
+                                                ]
+                                            "
+                                            class="py-1 text-xs text-gray-400"
+                                        >
+                                            Cargando VINs...
+                                        </div>
+                                        <div
+                                            v-else-if="
+                                                (
+                                                    treeEngineVins[
+                                                        treeEngineVinKey(
+                                                            model.id,
+                                                            engine.id,
+                                                        )
+                                                    ] ?? []
+                                                ).length === 0
+                                            "
+                                            class="py-1 text-xs text-gray-400"
+                                        >
+                                            Sin VINs registrados para esta
+                                            configuración.
+                                        </div>
+                                        <ul
+                                            v-else
+                                            class="max-h-40 divide-y divide-gray-100 overflow-y-auto rounded-md border border-gray-200 bg-white dark:divide-border dark:border-border dark:bg-background"
+                                        >
+                                            <li
+                                                v-for="v in treeEngineVins[
+                                                    treeEngineVinKey(
+                                                        model.id,
+                                                        engine.id,
+                                                    )
+                                                ] ?? []"
+                                                :key="v.id"
+                                                class="flex items-center justify-between px-3 py-1.5 text-xs"
+                                            >
+                                                <div
+                                                    class="min-w-0 flex-1 truncate"
                                                 >
                                                     <span
                                                         class="font-mono tracking-wide text-gray-800 dark:text-gray-200"
                                                         >{{ v.vin }}</span
                                                     >
-                                                    <button
-                                                        type="button"
-                                                        class="ml-2 text-red-500 hover:text-red-700"
-                                                        @click="
-                                                            handleRemoveTreeEngineVin(
-                                                                model.id,
-                                                                engine.id,
-                                                                v.id,
-                                                            )
-                                                        "
+                                                    <span
+                                                        v-if="v.notes"
+                                                        class="ml-2 text-gray-500 dark:text-gray-400"
+                                                        >{{ v.notes }}</span
                                                     >
-                                                        <X
-                                                            class="h-3.5 w-3.5"
-                                                        />
-                                                    </button>
-                                                </li>
-                                            </ul>
-                                        </template>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    class="ml-2 text-red-500 hover:text-red-700"
+                                                    @click="
+                                                        handleRemoveTreeEngineVin(
+                                                            model.id,
+                                                            engine.id,
+                                                            v.id,
+                                                        )
+                                                    "
+                                                >
+                                                    <X class="h-3.5 w-3.5" />
+                                                </button>
+                                            </li>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>

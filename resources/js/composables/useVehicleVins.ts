@@ -12,12 +12,11 @@ export interface VehicleVin {
 
 export interface VehicleVinScope {
     modelId: number;
-    chassisId: number;
     engineId: number;
 }
 
 const resolveBasePath = (scope: VehicleVinScope): string => {
-    return `/vehicle-models/${scope.modelId}/chassis/${scope.chassisId}/engines/${scope.engineId}/vins`;
+    return `/vehicle-models/${scope.modelId}/engines/${scope.engineId}/vins`;
 };
 
 export function useVehicleVins(scope: VehicleVinScope) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { importService, type ImporterConfig } from '@/services/import';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import {
@@ -14,6 +14,7 @@ import {
     Tag,
     Package,
     Car,
+    RefreshCw,
 } from 'lucide-vue-next';
 import apiClient from '@/services/api/client';
 
@@ -23,13 +24,31 @@ const file = ref<File | null>(null);
 const dragOver = ref(false);
 const previewRows = ref<any[]>([]);
 const editedRows = ref<any[]>([]);
+const previewSummary = ref<any | null>(null);
+const importSheets = ref<any[]>([]);
+const selectedSheetIndex = ref<number | null>(null);
+const detectedColumns = ref<any[]>([]);
+const fieldMapping = ref<Record<string, string>>({});
+const requiredFields = ref<string[]>([]);
+const importProfiles = ref<any[]>([]);
+const selectedProfileId = ref<number | null>(null);
+const importMode = ref('create_update');
+const validationRunning = ref(false);
+const validationCompleted = ref(false);
+const fullValidationReportActive = ref(false);
 const result = ref<any | null>(null);
 const error = ref<string | null>(null);
 const previewLoading = ref(false);
 const importRunning = ref(false);
+const fullImportRunning = ref(false);
+const activeImportRunId = ref<number | null>(null);
+const pendingPollCount = ref(0);
+const pendingFallbackAttempted = ref(false);
+const creatingBrands = ref<Record<string, boolean>>({});
+let importStatusTimer: ReturnType<typeof setInterval> | null = null;
 const searchableOptions = ref<Record<string, any[]>>({});
 const fileInputRef = ref<HTMLInputElement | null>(null);
-const MAX_IMPORT_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_IMPORT_FILE_BYTES = 100 * 1024 * 1024;
 
 const emit = defineEmits<{
     (e: 'create', columnKey: string, rowIndex: number): void;
@@ -61,8 +80,95 @@ const errorCount = computed(
 );
 const hasFile = computed(() => !!file.value);
 const hasPreview = computed(() => editedRows.value.length > 0);
+const hasMultipleSheets = computed(() => importSheets.value.length > 1);
+const selectedImportSheet = computed(() =>
+    importSheets.value.find(
+        (sheet) => sheet.index === selectedSheetIndex.value,
+    ),
+);
 const canImport = computed(
-    () => hasPreview.value && validCount.value > 0 && !importRunning.value,
+    () =>
+        hasPreview.value &&
+        validCount.value > 0 &&
+        !importRunning.value &&
+        !fullValidationReportActive.value,
+);
+const missingBrandReferences = computed<string[]>(() => {
+    const previewBrands =
+        previewSummary.value?.missing_references?.brands ??
+        previewSummary.value?.missingReferences?.brands;
+    const resultBrands =
+        result.value?.summary?.missing_references?.brands ??
+        result.value?.summary?.missingReferences?.brands;
+
+    return [...new Set([...(previewBrands ?? []), ...(resultBrands ?? [])])];
+});
+const canImportFullFile = computed(
+    () =>
+        props.config.fullFileImport === true &&
+        hasFile.value &&
+        !fullImportRunning.value &&
+        validationCompleted.value &&
+        missingBrandReferences.value.length === 0,
+);
+const isValidationResult = computed(
+    () =>
+        result.value?.run_type === 'validation' ||
+        result.value?.mode === 'validate_only',
+);
+const resultHasErrors = computed(
+    () =>
+        result.value?.status === 'failed' ||
+        Number(result.value?.error_count ?? 0) > 0,
+);
+const resultTitle = computed(() => {
+    if (
+        result.value?.status === 'pending' ||
+        result.value?.status === 'running'
+    ) {
+        return isValidationResult.value
+            ? 'Validacion en proceso'
+            : 'Importacion en proceso';
+    }
+
+    if (result.value?.status === 'failed') {
+        return isValidationResult.value
+            ? 'Validacion con error'
+            : 'Importacion con error';
+    }
+
+    if (isValidationResult.value) {
+        return Number(result.value?.error_count ?? 0) > 0
+            ? 'Validacion completada con errores'
+            : 'Validacion completada';
+    }
+
+    return 'Importacion completada';
+});
+const resultHeaderClass = computed(() => {
+    if (resultHasErrors.value) {
+        return isValidationResult.value
+            ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20'
+            : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20';
+    }
+
+    return 'border-gray-200 bg-emerald-50 dark:border-border dark:bg-emerald-900/20';
+});
+const resultIconClass = computed(() =>
+    resultHasErrors.value
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-emerald-600 dark:text-emerald-400',
+);
+const availableMappingFields = computed(() => [
+    { key: 'ignore', label: 'Ignorar' },
+    ...props.config.columns
+        .filter((column) => !column.actionType)
+        .map((column) => ({ key: column.key, label: column.label })),
+]);
+const importerShellClass = computed(() =>
+    props.config.fullFileImport
+        ? 'mx-auto w-full max-w-[96rem] space-y-6'
+        : 'mx-auto w-full max-w-7xl space-y-6',
 );
 
 const handleDrop = (e: DragEvent) => {
@@ -81,7 +187,7 @@ const setSelectedFile = (selectedFile: File) => {
 
     if (selectedFile.size > MAX_IMPORT_FILE_BYTES) {
         file.value = null;
-        error.value = 'El archivo no puede superar 25MB.';
+        error.value = 'El archivo no puede superar 100MB.';
         if (fileInputRef.value) fileInputRef.value.value = '';
         return;
     }
@@ -92,8 +198,19 @@ const setSelectedFile = (selectedFile: File) => {
 const resetPreview = () => {
     previewRows.value = [];
     editedRows.value = [];
+    previewSummary.value = null;
+    importSheets.value = [];
+    selectedSheetIndex.value = null;
+    detectedColumns.value = [];
+    fieldMapping.value = {};
+    requiredFields.value = [];
+    validationCompleted.value = false;
+    fullValidationReportActive.value = false;
     result.value = null;
     error.value = null;
+    activeImportRunId.value = null;
+    pendingFallbackAttempted.value = false;
+    stopImportStatusPolling();
 };
 
 const downloadTemplate = async () => {
@@ -114,26 +231,36 @@ const downloadTemplate = async () => {
     }
 };
 
-const previewImport = async () => {
+const previewImport = async (
+    sheetIndex: number | null = selectedSheetIndex.value,
+) => {
     if (!file.value) return;
     error.value = null;
     result.value = null;
+    fullValidationReportActive.value = false;
     previewLoading.value = true;
     try {
         const response = await importService.preview(
             props.config.entity,
             file.value,
+            {
+                ...(sheetIndex !== null ? { sheet_index: sheetIndex } : {}),
+                mapping: fieldMapping.value,
+                mode: importMode.value,
+                profile_id: selectedProfileId.value,
+            },
         );
         previewRows.value = response.data?.rows ?? [];
-        editedRows.value = previewRows.value.map((row) => ({
-            ...row.data,
-            __row: row.row,
-            __valid: row.is_valid,
-            __errors: row.errors ?? [],
-            __attributes: [],
-            __variants: [],
-            __compatibility: [],
-        }));
+        previewSummary.value = response.data?.summary ?? null;
+        importSheets.value = response.data?.sheets ?? [];
+        detectedColumns.value = response.data?.detected_columns ?? [];
+        requiredFields.value = response.data?.required_fields ?? [];
+        if (Object.keys(fieldMapping.value).length === 0) {
+            fieldMapping.value = response.data?.suggested_mapping ?? {};
+        }
+        selectedSheetIndex.value =
+            response.data?.selected_sheet?.index ?? sheetIndex ?? null;
+        applyPreviewRows(previewRows.value);
         await loadSearchableOptions();
         resolveSearchableValues();
     } catch (e: any) {
@@ -142,9 +269,69 @@ const previewImport = async () => {
             'No se pudo generar la previsualización.';
         previewRows.value = [];
         editedRows.value = [];
+        previewSummary.value = null;
+        importSheets.value = [];
+        selectedSheetIndex.value = null;
+        detectedColumns.value = [];
+        requiredFields.value = [];
     } finally {
         previewLoading.value = false;
     }
+};
+
+const applyPreviewRows = (rows: any[]) => {
+    editedRows.value = rows.map((row) => ({
+        ...row.data,
+        __row: row.row,
+        __valid: row.is_valid,
+        __errors: row.errors ?? [],
+        __warnings: row.warnings ?? row.data?.__warnings ?? [],
+        __attributes: row.data?.__attributes ?? [],
+        __variants: row.data?.__variants ?? [],
+        __variant_preview: row.data?.__variant_preview ?? null,
+        __product_group_key: row.data?.__product_group_key ?? null,
+        __compatibility: row.data?.__compatibility ?? [],
+    }));
+};
+
+const loadImportProfiles = async () => {
+    if (!props.config.fullFileImport) return;
+    try {
+        const response = await importService.listProfiles(props.config.entity);
+        importProfiles.value = response.data ?? [];
+    } catch {
+        importProfiles.value = [];
+    }
+};
+
+const applySelectedProfile = () => {
+    const profile = importProfiles.value.find(
+        (item) => item.id === selectedProfileId.value,
+    );
+    if (!profile) return;
+    fieldMapping.value = profile.mapping ?? {};
+    importMode.value = profile.mode ?? 'create_update';
+    selectedSheetIndex.value = profile.sheet_index ?? selectedSheetIndex.value;
+};
+
+const saveCurrentProfile = async () => {
+    const name = window.prompt('Nombre del perfil');
+    if (!name) return;
+    const response = await importService.saveProfile(props.config.entity, {
+        name,
+        mapping: fieldMapping.value,
+        sheet_index: selectedSheetIndex.value,
+        mode: importMode.value,
+    });
+    const profile = response.data ?? response;
+    await loadImportProfiles();
+    selectedProfileId.value = profile.id ?? null;
+};
+
+const handleSheetChange = async (event: Event) => {
+    const value = Number((event.target as HTMLSelectElement).value);
+    selectedSheetIndex.value = Number.isNaN(value) ? null : value;
+    await previewImport(selectedSheetIndex.value);
 };
 
 const loadSearchableOptions = async () => {
@@ -170,6 +357,28 @@ const loadSearchableOptions = async () => {
             );
             searchableOptions.value[endpoint] = [];
         }
+    }
+};
+
+const createMissingBrand = async (brandName: string) => {
+    if (!brandName || creatingBrands.value[brandName]) return;
+    creatingBrands.value = { ...creatingBrands.value, [brandName]: true };
+    error.value = null;
+
+    try {
+        await apiClient.post('/brands', {
+            name: brandName,
+            status: 'active',
+        });
+        await previewImport(selectedSheetIndex.value);
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message ||
+            `No se pudo crear la marca ${brandName}.`;
+    } finally {
+        const next = { ...creatingBrands.value };
+        delete next[brandName];
+        creatingBrands.value = next;
     }
 };
 
@@ -202,13 +411,16 @@ const resolveSearchableValues = () => {
 };
 
 onMounted(loadSearchableOptions);
+onMounted(loadImportProfiles);
 
 defineExpose({
     reloadSearchableOptions: () => {
         searchableOptions.value = {};
         return loadSearchableOptions();
     },
+    refreshPreview: () => previewImport(selectedSheetIndex.value),
     editedRows,
+    previewSummary,
 });
 
 const getOptionsForColumn = (col: any) => {
@@ -227,6 +439,25 @@ const getOptionsForColumn = (col: any) => {
         );
     }
     return [];
+};
+
+const getColumnInputWidthClass = (col: any): string => {
+    const widthByKey: Record<string, string> = {
+        nombre: 'min-w-[22rem]',
+        descripcion: 'min-w-[18rem]',
+        categoria: 'min-w-[14rem]',
+        categorias_extra: 'min-w-[14rem]',
+        atributos: 'min-w-[16rem]',
+        brand: 'min-w-[12rem]',
+        sku: 'min-w-[10rem]',
+        system_id: 'min-w-[10rem]',
+        warehouse: 'min-w-[10rem]',
+    };
+
+    return (
+        widthByKey[col.key] ??
+        (col.type === 'number' ? 'min-w-[6rem]' : 'min-w-[8rem]')
+    );
 };
 
 // When a searchable column changes, check if it's a category and autocomplete attributes
@@ -265,7 +496,16 @@ const onSearchableChange = async (col: any, rowIdx: number, newValue: any) => {
 // Action column helpers
 const getActionCount = (row: any, actionType: string): number => {
     if (actionType === 'attributes') return (row.__attributes ?? []).length;
-    if (actionType === 'variants') return (row.__variants ?? []).length;
+    if (actionType === 'variants') {
+        const group = previewSummary.value?.groups?.find(
+            (item: any) => item.product_key === row.__product_group_key,
+        );
+        if (group?.variant_count !== undefined) {
+            return Number(group.variant_count) || 0;
+        }
+
+        return (row.__variants ?? []).length + (row.__variant_preview ? 1 : 0);
+    }
     if (actionType === 'compatibility')
         return (row.__compatibility ?? []).length;
     return 0;
@@ -316,6 +556,213 @@ const runImport = async () => {
     }
 };
 
+const runFullFileImport = async () => {
+    if (!file.value || !canImportFullFile.value) return;
+    error.value = null;
+    result.value = null;
+    fullImportRunning.value = true;
+    try {
+        const response = await importService.importFile(
+            props.config.entity,
+            file.value,
+            selectedSheetIndex.value !== null
+                ? {
+                      sheet_index: selectedSheetIndex.value,
+                      mapping: fieldMapping.value,
+                      mode: importMode.value,
+                      profile_id: selectedProfileId.value,
+                  }
+                : {
+                      mapping: fieldMapping.value,
+                      mode: importMode.value,
+                      profile_id: selectedProfileId.value,
+                  },
+        );
+        activeImportRunId.value = response.data?.import_run_id ?? null;
+        result.value = {
+            status: response.data?.status ?? 'pending',
+            success_count: 0,
+            error_count: 0,
+            results: [],
+            errors: [],
+        };
+        if (activeImportRunId.value) {
+            await refreshImportRun();
+            startImportStatusPolling();
+        }
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message || 'Error al iniciar la importacion.';
+        fullImportRunning.value = false;
+    }
+};
+
+const runFullValidation = async () => {
+    if (!file.value || validationRunning.value) return;
+    error.value = null;
+    result.value = null;
+    fullValidationReportActive.value = false;
+    validationRunning.value = true;
+    validationCompleted.value = false;
+    pendingFallbackAttempted.value = false;
+    try {
+        const response = await importService.validateFile(
+            props.config.entity,
+            file.value,
+            {
+                ...(selectedSheetIndex.value !== null
+                    ? { sheet_index: selectedSheetIndex.value }
+                    : {}),
+                mapping: fieldMapping.value,
+                profile_id: selectedProfileId.value,
+            },
+        );
+        activeImportRunId.value = response.data?.import_run_id ?? null;
+        result.value = response.data ?? response;
+        if (activeImportRunId.value) {
+            await refreshImportRun();
+            startImportStatusPolling();
+        }
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message || 'Error al iniciar la validacion.';
+        validationRunning.value = false;
+    }
+};
+
+const cancelActiveRun = async () => {
+    if (!activeImportRunId.value) return;
+    await importService.cancelRun(props.config.entity, activeImportRunId.value);
+    await refreshImportRun();
+};
+
+const retryFailedRows = async () => {
+    if (!activeImportRunId.value) return;
+    const response = await importService.retryFailed(
+        props.config.entity,
+        activeImportRunId.value,
+    );
+    activeImportRunId.value = response.data?.import_run_id ?? null;
+    result.value = response.data ?? response;
+    if (activeImportRunId.value) startImportStatusPolling();
+};
+
+const applyCompletedValidationRows = () => {
+    const validationRows = result.value?.validation_rows ?? [];
+    if (validationRows.length === 0) return;
+
+    previewRows.value = validationRows;
+    previewSummary.value = result.value?.summary ?? null;
+    applyPreviewRows(validationRows);
+    fullValidationReportActive.value = true;
+};
+
+const downloadErrorReport = async () => {
+    if (!activeImportRunId.value) return;
+    const blob = await importService.downloadErrors(
+        props.config.entity,
+        activeImportRunId.value,
+    );
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `errores-importacion-${activeImportRunId.value}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+};
+
+const refreshImportRun = async () => {
+    if (!activeImportRunId.value) return;
+    const importRunId = activeImportRunId.value;
+    const response = await importService.getRun(
+        props.config.entity,
+        importRunId,
+    );
+    result.value = response.data ?? response;
+    let status = result.value?.status;
+    if (status === 'pending') {
+        pendingPollCount.value += 1;
+
+        if (
+            result.value?.run_type === 'validation' &&
+            !pendingFallbackAttempted.value &&
+            pendingPollCount.value >= 2
+        ) {
+            pendingFallbackAttempted.value = true;
+            error.value =
+                'La validacion sigue en cola. Intentando procesarla ahora...';
+
+            try {
+                const fallbackResponse = await importService.processRunNow(
+                    props.config.entity,
+                    importRunId,
+                );
+                result.value = fallbackResponse.data ?? fallbackResponse;
+                status = result.value?.status;
+                error.value = null;
+            } catch (e: any) {
+                error.value =
+                    e.response?.data?.message ||
+                    'La validacion sigue en cola. Se continuara consultando el avance.';
+            }
+        }
+
+        if (status === 'pending') {
+            if (pendingPollCount.value >= 6) {
+                error.value =
+                    'La validacion sigue en cola. Puedes mantener esta pantalla abierta; se seguira consultando el avance.';
+            }
+
+            return;
+        }
+    }
+
+    pendingPollCount.value = 0;
+    if (
+        status === 'completed' ||
+        status === 'failed' ||
+        status === 'cancelled'
+    ) {
+        fullImportRunning.value = false;
+        validationRunning.value = false;
+        if (result.value?.run_type === 'validation') {
+            validationCompleted.value =
+                status === 'completed' &&
+                Number(result.value?.error_count ?? 0) === 0;
+            if (status === 'completed') {
+                applyCompletedValidationRows();
+            }
+        }
+        stopImportStatusPolling();
+    }
+};
+
+const startImportStatusPolling = () => {
+    stopImportStatusPolling();
+    pendingPollCount.value = 0;
+    importStatusTimer = setInterval(() => {
+        refreshImportRun().catch(() => {
+            error.value = 'No se pudo actualizar el avance de la importacion.';
+            fullImportRunning.value = false;
+            validationRunning.value = false;
+            stopImportStatusPolling();
+        });
+    }, 2500);
+};
+
+const stopImportStatusPolling = () => {
+    if (importStatusTimer) {
+        clearInterval(importStatusTimer);
+        importStatusTimer = null;
+    }
+};
+
+onUnmounted(() => {
+    stopImportStatusPolling();
+});
+
 const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -324,7 +771,7 @@ const formatFileSize = (bytes: number) => {
 </script>
 
 <template>
-    <div class="mx-auto max-w-7xl space-y-6">
+    <div :class="importerShellClass">
         <div class="mb-4">
             <h1
                 class="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white"
@@ -383,7 +830,7 @@ const formatFileSize = (bytes: number) => {
                         Arrastra tu archivo aquí o haz clic para seleccionar
                     </p>
                     <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                        .xlsx, .xls, .csv — máx 25MB
+                        .xlsx, .xls, .csv - max 100MB
                     </p>
                 </div>
                 <div v-else class="mt-4">
@@ -410,7 +857,7 @@ const formatFileSize = (bytes: number) => {
                 <button
                     type="button"
                     :disabled="!hasFile || previewLoading"
-                    @click="previewImport"
+                    @click="() => previewImport()"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
                 >
                     <Eye class="h-4 w-4" />
@@ -427,6 +874,199 @@ const formatFileSize = (bytes: number) => {
                 >
                     <XIcon class="h-4 w-4" /> Limpiar
                 </button>
+
+                <button
+                    v-if="config.fullFileImport"
+                    type="button"
+                    :disabled="!file || validationRunning"
+                    @click="runFullValidation"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <RefreshCw
+                        class="h-4 w-4"
+                        :class="{ 'animate-spin': validationRunning }"
+                    />
+                    {{
+                        validationRunning
+                            ? 'Validando archivo...'
+                            : 'Validar archivo completo'
+                    }}
+                </button>
+
+                <button
+                    v-if="config.fullFileImport"
+                    type="button"
+                    :disabled="!canImportFullFile"
+                    @click="runFullFileImport"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <RefreshCw
+                        class="h-4 w-4"
+                        :class="{ 'animate-spin': fullImportRunning }"
+                    />
+                    {{
+                        fullImportRunning
+                            ? 'Importando archivo...'
+                            : 'Importar archivo completo'
+                    }}
+                </button>
+
+                <p
+                    v-if="
+                        config.fullFileImport && missingBrandReferences.length
+                    "
+                    class="basis-full text-xs font-medium text-red-700 dark:text-red-300"
+                >
+                    Crea o corrige las marcas faltantes antes de importar el
+                    archivo completo.
+                </p>
+
+                <button
+                    v-if="
+                        activeImportRunId &&
+                        (fullImportRunning || validationRunning)
+                    "
+                    type="button"
+                    @click="cancelActiveRun"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
+                >
+                    Cancelar
+                </button>
+            </div>
+
+            <div
+                v-if="hasMultipleSheets"
+                class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/20"
+            >
+                <label
+                    class="text-sm font-semibold text-amber-900 dark:text-amber-200"
+                    for="import-sheet-select"
+                >
+                    Hoja detectada
+                </label>
+                <div
+                    class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center"
+                >
+                    <select
+                        id="import-sheet-select"
+                        :value="selectedSheetIndex ?? ''"
+                        :disabled="previewLoading || fullImportRunning"
+                        class="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none disabled:opacity-60 dark:border-amber-700 dark:bg-background dark:text-white"
+                        @change="handleSheetChange"
+                    >
+                        <option
+                            v-for="sheet in importSheets"
+                            :key="sheet.index"
+                            :value="sheet.index"
+                        >
+                            {{ sheet.name }} - {{ sheet.row_count }} filas -
+                            {{ sheet.matched_headers?.length ?? 0 }} columnas
+                            {{ sheet.is_recommended ? ' - recomendada' : '' }}
+                        </option>
+                    </select>
+                    <p class="text-xs text-amber-800 dark:text-amber-300">
+                        La importacion completa usara esta misma hoja.
+                    </p>
+                </div>
+                <p
+                    v-if="
+                        selectedImportSheet &&
+                        !selectedImportSheet.is_compatible
+                    "
+                    class="mt-2 text-xs font-medium text-red-700 dark:text-red-300"
+                >
+                    Esta hoja no parece tener encabezados completos de
+                    productos.
+                </p>
+            </div>
+
+            <div
+                v-if="
+                    config.fullFileImport &&
+                    (importProfiles.length || detectedColumns.length)
+                "
+                class="mt-4 grid gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 lg:grid-cols-2 dark:border-border dark:bg-background"
+            >
+                <div>
+                    <p
+                        class="text-sm font-semibold text-gray-800 dark:text-gray-100"
+                    >
+                        Perfil y modo
+                    </p>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                        <select
+                            v-model="selectedProfileId"
+                            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card dark:text-white"
+                            @change="applySelectedProfile"
+                        >
+                            <option :value="null">Sin perfil</option>
+                            <option
+                                v-for="profile in importProfiles"
+                                :key="profile.id"
+                                :value="profile.id"
+                            >
+                                {{ profile.name }}
+                            </option>
+                        </select>
+                        <select
+                            v-model="importMode"
+                            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card dark:text-white"
+                        >
+                            <option value="create_update">
+                                Crear y actualizar
+                            </option>
+                            <option value="create_only">
+                                Solo crear nuevos
+                            </option>
+                            <option value="update_stock_price">
+                                Solo stock/precio
+                            </option>
+                        </select>
+                    </div>
+                    <button
+                        type="button"
+                        class="mt-2 text-xs font-medium text-blue-700 hover:underline dark:text-blue-300"
+                        @click="saveCurrentProfile"
+                    >
+                        Guardar mapping como perfil
+                    </button>
+                </div>
+
+                <div v-if="detectedColumns.length">
+                    <p
+                        class="text-sm font-semibold text-gray-800 dark:text-gray-100"
+                    >
+                        Mapeo de columnas
+                    </p>
+                    <div class="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
+                        <div
+                            v-for="column in detectedColumns"
+                            :key="column.key"
+                            class="grid grid-cols-[1fr,180px] items-center gap-2 text-xs"
+                        >
+                            <span
+                                class="truncate text-gray-600 dark:text-gray-300"
+                            >
+                                {{ column.label }}
+                            </span>
+                            <select
+                                v-model="fieldMapping[column.key]"
+                                class="rounded border border-gray-300 bg-white px-2 py-1 dark:border-border dark:bg-card dark:text-white"
+                            >
+                                <option
+                                    v-for="field in availableMappingFields"
+                                    :key="field.key"
+                                    :value="field.key"
+                                >
+                                    {{ field.label }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Requeridos: {{ requiredFields.join(', ') || 'Ninguno' }}
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -450,7 +1090,11 @@ const formatFileSize = (bytes: number) => {
                     <h2
                         class="text-lg font-semibold text-gray-900 dark:text-white"
                     >
-                        2. Revisar datos
+                        {{
+                            fullValidationReportActive
+                                ? '2. Revisar validacion completa'
+                                : '2. Revisar datos'
+                        }}
                     </h2>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Total: {{ editedRows.length }} filas ·
@@ -462,10 +1106,135 @@ const formatFileSize = (bytes: number) => {
                         >
                     </p>
                 </div>
-                <p class="text-xs text-gray-400">
-                    Edita las celdas y enriquece cada producto con atributos,
-                    variantes y compatibilidad
+                <p
+                    v-if="!fullValidationReportActive"
+                    class="text-xs text-gray-400"
+                >
+                    Muestra limitada del archivo. Usa "Importar archivo
+                    completo" para procesar todas las filas.
                 </p>
+                <p v-else class="text-xs text-gray-500 dark:text-gray-400">
+                    Resultado de validacion completa. La importacion completa
+                    usara el archivo original.
+                </p>
+            </div>
+
+            <div
+                v-if="fullValidationReportActive"
+                class="border-b border-sky-200 bg-sky-50 px-6 py-3 text-xs text-sky-900 dark:border-sky-800 dark:bg-sky-950/20 dark:text-sky-200"
+            >
+                Reporte de solo lectura: estas filas son para revisar errores y
+                advertencias. Editar aqui no cambia el archivo que se importara
+                con "Importar archivo completo".
+            </div>
+
+            <div
+                v-if="previewSummary"
+                class="grid gap-3 border-b border-gray-200 bg-white px-6 py-3 text-xs sm:grid-cols-4 dark:border-border dark:bg-card"
+            >
+                <div>
+                    <p class="font-semibold text-gray-700 dark:text-gray-200">
+                        Grupos detectados
+                    </p>
+                    <p class="text-gray-500 dark:text-gray-400">
+                        {{
+                            previewSummary.productos_estimados ??
+                            previewSummary.groups?.length ??
+                            0
+                        }}
+                        productos /
+                        {{ previewSummary.variantes_estimadas ?? 0 }}
+                        variantes
+                    </p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-700 dark:text-gray-200">
+                        Categorias faltantes
+                    </p>
+                    <p class="text-gray-500 dark:text-gray-400">
+                        {{
+                            previewSummary.missing_categories?.length
+                                ? previewSummary.missing_categories.join(', ')
+                                : 'Ninguna'
+                        }}
+                    </p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-700 dark:text-gray-200">
+                        Atributos tecnicos
+                    </p>
+                    <p class="text-gray-500 dark:text-gray-400">
+                        {{
+                            previewSummary.detected_attributes?.length
+                                ? previewSummary.detected_attributes.join(', ')
+                                : 'Ninguno'
+                        }}
+                    </p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-700 dark:text-gray-200">
+                        Marcas faltantes
+                    </p>
+                    <p class="text-gray-500 dark:text-gray-400">
+                        {{
+                            missingBrandReferences.length
+                                ? missingBrandReferences.join(', ')
+                                : 'Ninguna'
+                        }}
+                    </p>
+                </div>
+            </div>
+
+            <div
+                v-if="missingBrandReferences.length"
+                class="border-b border-red-200 bg-red-50 px-6 py-3 text-xs text-red-900 dark:border-red-800 dark:bg-red-950/20 dark:text-red-200"
+            >
+                <div class="mb-2 font-semibold">
+                    Marcas faltantes. Crea estas marcas antes de importar el
+                    archivo completo.
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        v-for="brandName in missingBrandReferences"
+                        :key="brandName"
+                        type="button"
+                        @click="createMissingBrand(brandName)"
+                        :disabled="creatingBrands[brandName]"
+                        class="inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 font-medium text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-700 dark:bg-red-950/40 dark:text-red-100"
+                    >
+                        <Plus class="h-3.5 w-3.5" />
+                        {{
+                            creatingBrands[brandName]
+                                ? 'Creando...'
+                                : `Crear ${brandName}`
+                        }}
+                    </button>
+                </div>
+            </div>
+
+            <div
+                v-if="
+                    previewSummary?.suggestions?.categories?.length ||
+                    previewSummary?.suggestions?.brands?.length
+                "
+                class="border-b border-amber-200 bg-amber-50 px-6 py-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200"
+            >
+                Sugerencias:
+                <span
+                    v-for="suggestion in previewSummary.suggestions.categories"
+                    :key="suggestion.value"
+                    class="mr-3"
+                >
+                    {{ suggestion.value }} -> {{ suggestion.suggestion }}
+                </span>
+                <span
+                    v-for="suggestion in previewSummary.suggestions.brands ??
+                    []"
+                    :key="`brand-${suggestion.value}`"
+                    class="mr-3"
+                >
+                    {{ suggestion.value }} -> {{ suggestion.suggestion }}
+                </span>
             </div>
 
             <div class="max-h-[600px] overflow-x-auto overflow-y-auto">
@@ -486,6 +1255,7 @@ const formatFileSize = (bytes: number) => {
                                 v-for="col in editableColumns"
                                 :key="col.key"
                                 class="px-3 py-2 text-left font-semibold text-gray-600 dark:text-gray-300"
+                                :class="getColumnInputWidthClass(col)"
                             >
                                 {{ col.label
                                 }}<span v-if="col.required" class="text-red-500"
@@ -533,8 +1303,10 @@ const formatFileSize = (bytes: number) => {
                                     v-if="col.type === 'text' || !col.type"
                                     v-model="row[col.key]"
                                     type="text"
+                                    :disabled="fullValidationReportActive"
                                     :placeholder="col.placeholder || ''"
-                                    class="w-full min-w-[80px] rounded border border-gray-200 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    class="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    :class="getColumnInputWidthClass(col)"
                                 />
 
                                 <input
@@ -542,13 +1314,17 @@ const formatFileSize = (bytes: number) => {
                                     v-model.number="row[col.key]"
                                     type="number"
                                     step="0.01"
-                                    class="w-full min-w-[70px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    :disabled="fullValidationReportActive"
+                                    class="w-full rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    :class="getColumnInputWidthClass(col)"
                                 />
 
                                 <select
                                     v-else-if="col.type === 'select'"
                                     v-model="row[col.key]"
-                                    class="w-full min-w-[80px] rounded border border-gray-200 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    :disabled="fullValidationReportActive"
+                                    class="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    :class="getColumnInputWidthClass(col)"
                                 >
                                     <option value="">—</option>
                                     <option
@@ -575,10 +1351,15 @@ const formatFileSize = (bytes: number) => {
                                         "
                                         :options="getOptionsForColumn(col)"
                                         placeholder="Buscar..."
-                                        class="min-w-[120px] flex-1"
+                                        :disabled="fullValidationReportActive"
+                                        class="flex-1"
+                                        :class="getColumnInputWidthClass(col)"
                                     />
                                     <button
-                                        v-if="col.creatable"
+                                        v-if="
+                                            col.creatable &&
+                                            !fullValidationReportActive
+                                        "
                                         type="button"
                                         @click="emit('create', col.key, rowIdx)"
                                         class="rounded p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30"
@@ -604,11 +1385,15 @@ const formatFileSize = (bytes: number) => {
                                             rowIdx,
                                         )
                                     "
+                                    :disabled="fullValidationReportActive"
                                     :class="[
                                         'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
                                         getActionCount(row, col.actionType!) > 0
-                                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                                            : 'border-gray-200 bg-white text-gray-500 hover:border-blue-400 hover:text-blue-600 dark:border-border dark:bg-muted/30 dark:text-gray-400',
+                                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                                            : 'border-gray-200 bg-white text-gray-500 hover:border-blue-400 hover:text-blue-600 disabled:hover:border-gray-200 disabled:hover:text-gray-500 dark:border-border dark:bg-muted/30 dark:text-gray-400',
+                                        fullValidationReportActive
+                                            ? 'cursor-not-allowed opacity-70'
+                                            : '',
                                     ]"
                                 >
                                     <component
@@ -669,7 +1454,10 @@ const formatFileSize = (bytes: number) => {
             <div
                 class="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-border dark:bg-background"
             >
-                <p class="text-xs text-gray-500 dark:text-gray-400">
+                <p
+                    v-if="!fullValidationReportActive"
+                    class="text-xs text-gray-500 dark:text-gray-400"
+                >
                     Se importarán
                     <span
                         class="font-semibold text-emerald-600 dark:text-emerald-400"
@@ -677,7 +1465,12 @@ const formatFileSize = (bytes: number) => {
                     >
                     de {{ editedRows.length }} filas
                 </p>
+                <p v-else class="text-xs text-gray-500 dark:text-gray-400">
+                    Reporte de validacion: {{ validCount }} filas validas y
+                    {{ errorCount }} con error.
+                </p>
                 <button
+                    v-if="!fullValidationReportActive"
                     type="button"
                     :disabled="!canImport"
                     @click="runImport"
@@ -694,17 +1487,30 @@ const formatFileSize = (bytes: number) => {
             v-if="result"
             class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
         >
-            <div
-                class="border-b border-gray-200 bg-emerald-50 px-6 py-4 dark:border-border dark:bg-emerald-900/20"
-            >
+            <div class="border-b px-6 py-4" :class="resultHeaderClass">
                 <h2
                     class="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
                 >
-                    <CheckCircle2 class="h-5 w-5 text-emerald-600" />
-                    Importación completada
+                    <component
+                        :is="resultHasErrors ? AlertCircle : CheckCircle2"
+                        class="h-5 w-5"
+                        :class="resultIconClass"
+                    />
+                    {{ resultTitle }}
                 </h2>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                    Importados:
+                    <template v-if="result.total_rows !== undefined">
+                        Procesadas:
+                        <span class="font-semibold">
+                            {{ result.processed_rows ?? 0 }}
+                        </span>
+                        de
+                        <span class="font-semibold">
+                            {{ result.total_rows ?? 0 }}
+                        </span>
+                        &middot;
+                    </template>
+                    {{ isValidationResult ? 'Validas:' : 'Importados:' }}
                     <span
                         class="font-semibold text-emerald-600 dark:text-emerald-400"
                         >{{ result.success_count ?? 0 }}</span
@@ -720,6 +1526,28 @@ const formatFileSize = (bytes: number) => {
                         >{{ result.error_count ?? 0 }}</span
                     >
                 </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button
+                        v-if="activeImportRunId && result.error_count"
+                        type="button"
+                        class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200"
+                        @click="downloadErrorReport"
+                    >
+                        Descargar errores
+                    </button>
+                    <button
+                        v-if="
+                            activeImportRunId &&
+                            result.error_count &&
+                            !isValidationResult
+                        "
+                        type="button"
+                        class="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300"
+                        @click="retryFailedRows"
+                    >
+                        Reintentar fallidas
+                    </button>
+                </div>
             </div>
             <div
                 v-if="result.errors?.length"
@@ -749,7 +1577,11 @@ const formatFileSize = (bytes: number) => {
                 <p
                     class="mb-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400"
                 >
-                    Importados correctamente:
+                    {{
+                        isValidationResult
+                            ? 'Filas validas en la validacion:'
+                            : 'Importados correctamente:'
+                    }}
                 </p>
                 <ul class="space-y-1">
                     <li
@@ -758,7 +1590,9 @@ const formatFileSize = (bytes: number) => {
                         class="text-xs text-emerald-700 dark:text-emerald-300"
                     >
                         Fila {{ res.row }}: {{ res.label }}
-                        <span class="text-gray-400">#{{ res.id }}</span>
+                        <span v-if="res.id" class="text-gray-400"
+                            >#{{ res.id }}</span
+                        >
                     </li>
                     <li
                         v-if="result.results.length > 20"

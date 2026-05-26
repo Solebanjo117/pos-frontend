@@ -44,6 +44,8 @@ export interface SalesOrder {
     id: number;
     order_number: string;
     customer_id?: number;
+    customer_vehicle_id?: number | null;
+    referred_by_customer_id?: number | null;
     customer_name?: string;
     customer_code?: string;
     user_id: number;
@@ -96,6 +98,8 @@ export interface SalesOrderStatistics {
 export interface CreateSalesOrderData {
     user_id?: number;
     customer_id?: number;
+    customer_vehicle_id?: number | null;
+    referred_by_customer_id?: number | null;
     date?: string;
     status?: 'draft' | 'pending' | 'confirmed';
     warehouse_id?: number;
@@ -134,6 +138,8 @@ export interface CreateSalesOrderData {
 
 export interface UpdateSalesOrderData {
     customer_id?: number;
+    customer_vehicle_id?: number | null;
+    referred_by_customer_id?: number | null;
     date?: string;
     discount_amount?: number;
     shipping_cost?: number;

@@ -167,3 +167,38 @@ export interface FinancialReport {
         }>;
     };
 }
+
+export interface CustomerReferenceReportOrder {
+    id: number;
+    order_number: string;
+    date: string | null;
+    status: string;
+    customer_id: number | null;
+    customer_name: string | null;
+    referred_by_customer_id: number | null;
+    referred_by_customer_name: string | null;
+    total: number;
+}
+
+export interface CustomerReferenceReportRow {
+    customer_id: number;
+    customer_code: string;
+    customer_name: string;
+    direct_revenue: number;
+    referred_revenue: number;
+    combined_revenue: number;
+    orders_count: number;
+    referred_orders_count: number;
+    direct_orders: CustomerReferenceReportOrder[];
+    referred_orders: CustomerReferenceReportOrder[];
+}
+
+export interface CustomerReferenceReport {
+    summary: {
+        direct_revenue: number;
+        referred_revenue: number;
+        combined_revenue: number;
+        customers_count: number;
+    };
+    data: CustomerReferenceReportRow[];
+}

@@ -104,18 +104,61 @@ const applyDate = async () => {
 const handleExport = async () => {
     exporting.value = true;
     try {
-        await exportZReport(selectedDate.value, selectedWarehouseId.value);
+        await exportZReport(
+            selectedDate.value,
+            selectedWarehouseId.value,
+            selectedUserId.value,
+        );
     } finally {
         exporting.value = false;
     }
 };
 
 const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('es-PA', {
         style: 'currency',
         currency: 'USD',
     }).format(value || 0);
 };
+
+const activeWarehouseName = computed(() => {
+    if (!selectedWarehouseId.value) {
+        return 'Todas las sucursales';
+    }
+
+    return (
+        warehouses.value.find(
+            (warehouse) => warehouse.id === selectedWarehouseId.value,
+        )?.name ?? 'Sucursal seleccionada'
+    );
+});
+
+const activeUserName = computed(() => {
+    if (!selectedUserId.value) {
+        return 'Todos los cajeros';
+    }
+
+    return (
+        users.value.find((user) => user.id === selectedUserId.value)?.name ??
+        'Cajero seleccionado'
+    );
+});
+
+const cashDifference = computed(() =>
+    Number(zReport.value?.cash_drawer?.difference || 0),
+);
+
+const differenceTone = computed(() => {
+    if (cashDifference.value > 0) {
+        return 'text-emerald-700 dark:text-emerald-300';
+    }
+
+    if (cashDifference.value < 0) {
+        return 'text-red-700 dark:text-red-300';
+    }
+
+    return 'text-gray-900 dark:text-white';
+});
 
 const profitColor = computed(() => {
     const gp = zReport.value?.gross_profit ?? 0;
@@ -130,18 +173,18 @@ const profitColor = computed(() => {
         <div class="space-y-6 p-4">
             <!-- Header -->
             <div
-                class="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center"
+                class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between dark:border-border dark:bg-card"
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
                     >
-                        <Receipt :size="32" class="text-indigo-500" />
-                        Cierre de Caja (Z-Report)
+                        <Receipt :size="24" class="text-indigo-500" />
+                        Cierre de caja
                     </h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Arqueo de efectivo · Estado de resultados diario ·
-                        Desglose de pagos
+                        {{ selectedDate }} · {{ activeWarehouseName }} ·
+                        {{ activeUserName }}
                     </p>
                 </div>
                 <button
@@ -243,7 +286,7 @@ const profitColor = computed(() => {
                         <Wallet :size="20" class="text-green-500" />
                         Arqueo de Efectivo
                     </h3>
-                    <div class="grid gap-3 sm:grid-cols-4">
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                         <!-- Fondo de Apertura -->
                         <div
                             class="rounded-lg border-l-4 border-gray-400 bg-gray-50 p-4 dark:bg-muted/50"
@@ -327,6 +370,49 @@ const profitColor = computed(() => {
                                 }}
                             </p>
                         </div>
+                        <div
+                            class="rounded-lg border-l-4 border-gray-500 bg-gray-50 p-4 dark:bg-muted/50"
+                        >
+                            <div
+                                class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+                            >
+                                <Wallet :size="14" />
+                                Contado / Cerrado
+                            </div>
+                            <p
+                                class="mt-1 text-xl font-bold text-gray-900 dark:text-white"
+                            >
+                                {{
+                                    formatCurrency(
+                                        zReport.cash_drawer?.declared_cash ||
+                                            zReport.cash_drawer
+                                                ?.closing_amount ||
+                                            0,
+                                    )
+                                }}
+                            </p>
+                        </div>
+                        <div
+                            class="rounded-lg border-l-4 border-slate-500 bg-slate-50 p-4 dark:bg-muted/50"
+                        >
+                            <div
+                                class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+                            >
+                                <Minus :size="14" />
+                                Diferencia
+                            </div>
+                            <p
+                                class="mt-1 text-xl font-bold"
+                                :class="differenceTone"
+                            >
+                                {{ cashDifference > 0 ? '+' : ''
+                                }}{{ formatCurrency(cashDifference) }}
+                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ zReport.cash_drawer?.sessions_count || 0 }}
+                                cierres
+                            </p>
+                        </div>
                     </div>
 
                     <!-- Cash Movements (Retiros / Ingresos extra) -->
@@ -387,6 +473,92 @@ const profitColor = computed(() => {
                                 }}
                             </p>
                         </div>
+                    </div>
+
+                    <div
+                        v-if="zReport.by_user?.length"
+                        class="mt-5 overflow-x-auto rounded-lg border border-gray-200 dark:border-border"
+                    >
+                        <table class="w-full">
+                            <thead class="bg-gray-50 dark:bg-muted">
+                                <tr>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-300"
+                                    >
+                                        Cajero
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-300"
+                                    >
+                                        Cierres
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-300"
+                                    >
+                                        Esperado
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-300"
+                                    >
+                                        Contado
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-300"
+                                    >
+                                        Diferencia
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody
+                                class="divide-y divide-gray-200 dark:divide-border"
+                            >
+                                <tr
+                                    v-for="row in zReport.by_user"
+                                    :key="row.user_id"
+                                    class="hover:bg-gray-50 dark:hover:bg-muted/50"
+                                >
+                                    <td
+                                        class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white"
+                                    >
+                                        {{ row.user_name || 'Sin usuario' }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300"
+                                    >
+                                        {{ row.sessions_count }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300"
+                                    >
+                                        {{ formatCurrency(row.expected_cash) }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300"
+                                    >
+                                        {{
+                                            formatCurrency(
+                                                row.declared_cash ||
+                                                    row.closing_amount ||
+                                                    0,
+                                            )
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right text-sm font-semibold"
+                                        :class="
+                                            row.difference > 0
+                                                ? 'text-emerald-700 dark:text-emerald-300'
+                                                : row.difference < 0
+                                                  ? 'text-red-700 dark:text-red-300'
+                                                  : 'text-gray-900 dark:text-white'
+                                        "
+                                    >
+                                        {{ row.difference > 0 ? '+' : ''
+                                        }}{{ formatCurrency(row.difference) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

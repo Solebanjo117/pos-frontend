@@ -36,6 +36,12 @@ interface StatementDocument {
     amount_paid: number;
     amount_due: number;
     payment_status: string;
+    payment_summary?: Array<{
+        method: string;
+        method_label: string;
+        amount: number;
+        count: number;
+    }>;
 }
 
 interface Statement {
@@ -162,6 +168,19 @@ const formatDate = (date?: string | null): string => {
     }
 
     return new Date(date).toLocaleDateString('es-PA');
+};
+
+const documentPaymentMethods = (document: StatementDocument): string => {
+    if (!document.payment_summary?.length) {
+        return document.payment_status === 'pending' ? 'Credito' : 'Sin pagos';
+    }
+
+    return document.payment_summary
+        .map(
+            (payment) =>
+                `${payment.method_label} ${formatCurrency(payment.amount)}`,
+        )
+        .join(' / ');
 };
 
 const extractDebtors = (response: any): Debtor[] => {
@@ -667,6 +686,13 @@ onMounted(async () => {
                                 class="flex items-center gap-2"
                             >
                                 <Link
+                                    :href="`/customers/${selectedCustomer.id}`"
+                                    class="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:text-indigo-200"
+                                >
+                                    <ExternalLink :size="15" />
+                                    Ficha cliente
+                                </Link>
+                                <Link
                                     :href="`/sales-orders?customer_id=${selectedCustomer.id}`"
                                     class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
                                 >
@@ -760,6 +786,9 @@ onMounted(async () => {
                                                 <th class="px-3 py-2 text-left">
                                                     Fecha
                                                 </th>
+                                                <th class="px-3 py-2 text-left">
+                                                    Metodo
+                                                </th>
                                                 <th
                                                     class="px-3 py-2 text-right"
                                                 >
@@ -782,7 +811,7 @@ onMounted(async () => {
                                         >
                                             <tr v-if="documents.length === 0">
                                                 <td
-                                                    colspan="5"
+                                                    colspan="6"
                                                     class="px-3 py-8 text-center text-gray-500"
                                                 >
                                                     No hay documentos pendientes
@@ -835,6 +864,17 @@ onMounted(async () => {
                                                             document.date,
                                                         )
                                                     }}
+                                                </td>
+                                                <td
+                                                    class="max-w-[14rem] px-3 py-2 text-gray-600 dark:text-gray-300"
+                                                >
+                                                    <span class="line-clamp-2">
+                                                        {{
+                                                            documentPaymentMethods(
+                                                                document,
+                                                            )
+                                                        }}
+                                                    </span>
                                                 </td>
                                                 <td
                                                     class="px-3 py-2 text-right font-mono"

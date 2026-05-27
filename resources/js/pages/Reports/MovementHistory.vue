@@ -7,6 +7,12 @@ import {
     TrendingUp,
     Download,
     Calendar,
+    ArrowDown,
+    ArrowUp,
+    DollarSign,
+    FileSpreadsheet,
+    PackageSearch,
+    X,
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -18,6 +24,7 @@ import { useProducts } from '@/composables/useProducts';
 import MovementTrendChart from '@/components/charts/MovementTrendChart.vue';
 import MovementTypeChart from '@/components/charts/MovementTypeChart.vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
+import Pagination from '@/components/Pagination.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -72,6 +79,7 @@ const userOptions = computed<SelectOption[]>(() => [
 ]);
 
 const exporting = ref(false);
+const currentPage = ref(1);
 
 const readInitialFilters = () => {
     const params = new URLSearchParams(window.location.search);
@@ -108,7 +116,7 @@ onMounted(async () => {
         filters.value.warehouse_id = currentWarehouseId.value;
     }
 
-    await fetchMovementHistory(filters.value);
+    await fetchMovementHistory(buildFilterParams(currentPage.value)!);
 });
 
 watch(currentWarehouseId, (val) => {
@@ -116,15 +124,16 @@ watch(currentWarehouseId, (val) => {
     applyFilters();
 });
 
-const applyFilters = async () => {
+const buildFilterParams = (page = 1) => {
     if (!filters.value.date_from || !filters.value.date_to) {
-        return;
+        return null;
     }
 
     const filterParams: any = {
         date_from: filters.value.date_from,
         date_to: filters.value.date_to,
         group_by: filters.value.group_by,
+        page,
     };
 
     if (filters.value.product_id)
@@ -135,10 +144,22 @@ const applyFilters = async () => {
     if (filters.value.movement_type)
         filterParams.movement_type = filters.value.movement_type;
 
+    return filterParams;
+};
+
+const applyFilters = async () => {
+    currentPage.value = 1;
+    const filterParams = buildFilterParams(currentPage.value);
+
+    if (!filterParams) {
+        return;
+    }
+
     await fetchMovementHistory(filterParams);
 };
 
 const clearFilters = async () => {
+    currentPage.value = 1;
     filters.value = {
         date_from: thirtyDaysAgo.toISOString().split('T')[0],
         date_to: today.toISOString().split('T')[0],
@@ -148,7 +169,18 @@ const clearFilters = async () => {
         movement_type: null,
         group_by: 'day',
     };
-    await fetchMovementHistory(filters.value);
+    await fetchMovementHistory(buildFilterParams(currentPage.value)!);
+};
+
+const handlePageChange = async (page: number) => {
+    currentPage.value = page;
+    const filterParams = buildFilterParams(page);
+
+    if (!filterParams) {
+        return;
+    }
+
+    await fetchMovementHistory(filterParams);
 };
 
 const handleExport = async (format: 'pdf' | 'excel') => {
@@ -199,10 +231,86 @@ const formatDate = (dateString: string) => {
 };
 
 const formatCurrency = (value: number | undefined) =>
-    new Intl.NumberFormat('es-MX', {
+    new Intl.NumberFormat('es-PA', {
         style: 'currency',
-        currency: 'MXN',
+        currency: 'USD',
     }).format(Number(value) || 0);
+
+const activeWarehouseName = computed(() => {
+    if (!filters.value.warehouse_id) {
+        return 'Todos los almacenes';
+    }
+
+    return (
+        warehouses.value.find(
+            (warehouse) => warehouse.id === filters.value.warehouse_id,
+        )?.name ?? 'Almacén seleccionado'
+    );
+});
+
+const reportTotal = computed(
+    () => movementHistoryReport.value?.pagination?.total ?? 0,
+);
+
+const activeFilterChips = computed(() => {
+    const chips: Array<{
+        key: 'warehouse_id' | 'user_id' | 'product_id' | 'movement_type';
+        label: string;
+    }> = [];
+
+    if (filters.value.warehouse_id) {
+        chips.push({ key: 'warehouse_id', label: activeWarehouseName.value });
+    }
+
+    if (filters.value.user_id) {
+        chips.push({
+            key: 'user_id',
+            label:
+                users.value.find((user) => user.id === filters.value.user_id)
+                    ?.name ?? 'Responsable seleccionado',
+        });
+    }
+
+    if (filters.value.product_id) {
+        chips.push({ key: 'product_id', label: 'Producto seleccionado' });
+    }
+
+    if (filters.value.movement_type) {
+        chips.push({
+            key: 'movement_type',
+            label: getTypeLabel(filters.value.movement_type),
+        });
+    }
+
+    return chips;
+});
+
+const removeFilter = async (
+    key: 'warehouse_id' | 'user_id' | 'product_id' | 'movement_type',
+) => {
+    filters.value[key] = null;
+    await applyFilters();
+};
+
+const movementLotAllocations = (movement: {
+    lot_allocations?: Array<{
+        lot_id: number;
+        quantity: number;
+        unit_cost: number;
+        total_cost: number;
+    }>;
+    fifo_allocations?: Array<{
+        lot_id: number;
+        quantity: number;
+        unit_cost: number;
+        total_cost: number;
+    }>;
+}) => movement.lot_allocations || movement.fifo_allocations || [];
+
+const movementAssignedCost = (movement: {
+    lot_total_cost?: number;
+    fifo_total_cost?: number;
+}) => movement.lot_total_cost ?? movement.fifo_total_cost;
 
 const inventoryProductHref = (productId: number, variantId?: number | null) => {
     const params = new URLSearchParams();
@@ -280,26 +388,31 @@ const sourceLabel = (movement: {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="space-y-6 p-4">
             <!-- Header -->
-            <div class="flex items-center justify-between">
+            <div
+                class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between dark:border-border dark:bg-card"
+            >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
                     >
-                        <Clock :size="32" />
-                        Histórico de Movimientos
+                        <Clock :size="24" />
+                        Histórico de movimientos
                     </h1>
-                    <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                        Análisis de movimientos de inventario
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        {{ activeWarehouseName }} ·
+                        {{ reportTotal }} movimientos ·
+                        {{ filters.date_from }} a
+                        {{ filters.date_to }}
                     </p>
                 </div>
 
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                     <button
                         @click="handleExport('pdf')"
                         :disabled="
                             exporting || loading || !movementHistoryReport
                         "
-                        class="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+                        class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
                     >
                         <Download :size="18" />
                         PDF
@@ -309,9 +422,9 @@ const sourceLabel = (movement: {
                         :disabled="
                             exporting || loading || !movementHistoryReport
                         "
-                        class="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
+                        class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
-                        <Download :size="18" />
+                        <FileSpreadsheet :size="18" />
                         Excel
                     </button>
                 </div>
@@ -334,6 +447,20 @@ const sourceLabel = (movement: {
                     <Calendar :size="20" />
                     Filtros
                 </h2>
+                <div
+                    v-if="activeFilterChips.length"
+                    class="mb-4 flex flex-wrap gap-2"
+                >
+                    <button
+                        v-for="chip in activeFilterChips"
+                        :key="chip.key"
+                        @click="removeFilter(chip.key)"
+                        class="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-border dark:bg-muted dark:text-gray-200"
+                    >
+                        {{ chip.label }}
+                        <X :size="12" />
+                    </button>
+                </div>
                 <div
                     class="grid items-end gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4"
                 >
@@ -450,7 +577,7 @@ const sourceLabel = (movement: {
             <!-- Summary Cards -->
             <div
                 v-if="movementHistoryReport"
-                class="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+                class="grid gap-4 md:grid-cols-2 xl:grid-cols-5"
             >
                 <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
@@ -503,6 +630,7 @@ const sourceLabel = (movement: {
                                 unidades
                             </p>
                         </div>
+                        <ArrowUp :size="32" class="text-green-600" />
                     </div>
                 </div>
 
@@ -529,6 +657,7 @@ const sourceLabel = (movement: {
                                 unidades
                             </p>
                         </div>
+                        <ArrowDown :size="32" class="text-red-600" />
                     </div>
                 </div>
 
@@ -562,6 +691,36 @@ const sourceLabel = (movement: {
                                 unidades
                             </p>
                         </div>
+                        <PackageSearch
+                            :size="32"
+                            class="text-blue-600 dark:text-primary"
+                        />
+                    </div>
+                </div>
+
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p
+                                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >
+                                Costo asignado
+                            </p>
+                            <p
+                                class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                            >
+                                {{
+                                    formatCurrency(
+                                        movementHistoryReport.summary
+                                            .total_assigned_cost || 0,
+                                    )
+                                }}
+                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Según lotes consumidos
+                            </p>
+                        </div>
+                        <DollarSign :size="32" class="text-emerald-600" />
                     </div>
                 </div>
             </div>
@@ -598,7 +757,7 @@ const sourceLabel = (movement: {
                 <h3
                     class="mb-4 text-lg font-semibold text-gray-900 dark:text-white"
                 >
-                    Top 10 Productos con Más Movimientos
+                    Productos con más movimientos
                 </h3>
                 <div class="overflow-x-auto">
                     <table class="w-full">
@@ -710,7 +869,7 @@ const sourceLabel = (movement: {
                         Detalle de Movimientos
                     </h3>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Mostrando los últimos 100 movimientos
+                        Mostrando 25 movimientos por página
                     </p>
                 </div>
                 <div class="overflow-x-auto">
@@ -872,9 +1031,11 @@ const sourceLabel = (movement: {
                                     class="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white"
                                 >
                                     {{
-                                        movement.fifo_total_cost
+                                        movementAssignedCost(movement)
                                             ? formatCurrency(
-                                                  movement.fifo_total_cost,
+                                                  movementAssignedCost(
+                                                      movement,
+                                                  ),
                                               )
                                             : '-'
                                     }}
@@ -883,11 +1044,16 @@ const sourceLabel = (movement: {
                                     class="px-6 py-4 text-xs text-gray-600 dark:text-gray-300"
                                 >
                                     <div
-                                        v-if="movement.fifo_allocations?.length"
+                                        v-if="
+                                            movementLotAllocations(movement)
+                                                .length
+                                        "
                                         class="space-y-1"
                                     >
                                         <div
-                                            v-for="allocation in movement.fifo_allocations"
+                                            v-for="allocation in movementLotAllocations(
+                                                movement,
+                                            )"
                                             :key="`${movement.id}-${allocation.lot_id}`"
                                         >
                                             Lote #{{ allocation.lot_id }} ·
@@ -905,6 +1071,12 @@ const sourceLabel = (movement: {
                         </tbody>
                     </table>
                 </div>
+                <Pagination
+                    v-if="movementHistoryReport.pagination"
+                    :pagination="movementHistoryReport.pagination"
+                    :loading="loading"
+                    @page-change="handlePageChange"
+                />
             </div>
 
             <!-- Loading State -->

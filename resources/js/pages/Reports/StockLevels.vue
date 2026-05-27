@@ -7,9 +7,17 @@ import {
     TrendingUp,
     Package,
     Download,
+    DollarSign,
+    Warehouse,
+    FileSpreadsheet,
+    ChevronDown,
+    ChevronUp,
+    ChevronsUpDown,
+    X,
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
+import type { StockLevelsFilters } from '@/types/report';
 import { useReports } from '@/composables/useReports';
 import { useWarehouses } from '@/composables/useWarehouses';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -18,6 +26,7 @@ import { useCategories } from '@/composables/useCategories';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import Pagination from '@/components/Pagination.vue';
 import StockStatusChart from '@/components/charts/StockStatusChart.vue';
 import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue';
 import TopProductsChart from '@/components/charts/TopProductsChart.vue';
@@ -72,6 +81,10 @@ watch(currentWarehouseId, (val) => {
 });
 
 const exporting = ref(false);
+const currentPage = ref(1);
+const sortBy = ref<NonNullable<StockLevelsFilters['sort_by']>>('name');
+const sortDirection =
+    ref<NonNullable<StockLevelsFilters['sort_direction']>>('asc');
 
 onMounted(async () => {
     await Promise.all([
@@ -81,15 +94,16 @@ onMounted(async () => {
         fetchCategories(),
     ]);
     filters.value.warehouse_id = currentWarehouseId.value;
-    await fetchStockLevels(
-        filters.value.warehouse_id
-            ? { warehouse_id: filters.value.warehouse_id }
-            : {},
-    );
+    await fetchStockLevels(buildFilterParams(currentPage.value));
 });
 
-const applyFilters = async () => {
-    const filterParams: any = {};
+const buildFilterParams = (page = 1) => {
+    const filterParams: StockLevelsFilters = {
+        page,
+        sort_by: sortBy.value,
+        sort_direction: sortDirection.value,
+    };
+
     if (filters.value.warehouse_id)
         filterParams.warehouse_id = filters.value.warehouse_id;
     if (filters.value.brand_id) filterParams.brand_id = filters.value.brand_id;
@@ -97,18 +111,57 @@ const applyFilters = async () => {
         filterParams.category_id = filters.value.category_id;
     if (filters.value.status) filterParams.status = filters.value.status;
 
+    return filterParams;
+};
+
+const applyFilters = async () => {
+    currentPage.value = 1;
+    const filterParams = buildFilterParams(currentPage.value);
+
     await fetchStockLevels(filterParams);
 };
 
 const clearFilters = async () => {
+    currentPage.value = 1;
     filters.value = {
         warehouse_id: null,
         brand_id: null,
         category_id: null,
         status: null,
     };
-    await fetchStockLevels();
+    await fetchStockLevels(buildFilterParams(currentPage.value));
 };
+
+const handlePageChange = async (page: number) => {
+    currentPage.value = page;
+
+    await fetchStockLevels(buildFilterParams(page));
+};
+
+const handleSort = async (key: NonNullable<StockLevelsFilters['sort_by']>) => {
+    if (sortBy.value === key) {
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortBy.value = key;
+        sortDirection.value = 'asc';
+    }
+
+    currentPage.value = 1;
+    await fetchStockLevels(buildFilterParams(currentPage.value));
+};
+
+const sortHeaderClass = (
+    key: NonNullable<StockLevelsFilters['sort_by']>,
+    align: 'left' | 'right' | 'center' = 'left',
+) => [
+    'inline-flex w-full items-center gap-1 text-xs font-medium uppercase text-gray-700 hover:text-gray-950 dark:text-gray-300 dark:hover:text-white',
+    align === 'right'
+        ? 'justify-end'
+        : align === 'center'
+          ? 'justify-center'
+          : 'justify-start',
+    sortBy.value === key ? 'text-gray-950 dark:text-white' : '',
+];
 
 const handleExport = async (format: 'pdf' | 'excel') => {
     exporting.value = true;
@@ -152,10 +205,74 @@ const getStatusLabel = (status: string) => {
 };
 
 const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-MX', {
+    return new Intl.NumberFormat('es-PA', {
         style: 'currency',
-        currency: 'MXN',
+        currency: 'USD',
     }).format(value);
+};
+
+const reportTotal = computed(
+    () => stockLevelsReport.value?.pagination?.total ?? 0,
+);
+
+const atRiskCount = computed(() => {
+    const summary = stockLevelsReport.value?.summary;
+
+    return (summary?.critical_stock ?? 0) + (summary?.low_stock ?? 0);
+});
+
+const activeWarehouseName = computed(() => {
+    if (!filters.value.warehouse_id) {
+        return 'Todos los almacenes';
+    }
+
+    return (
+        warehouses.value.find(
+            (warehouse) => warehouse.id === filters.value.warehouse_id,
+        )?.name ?? 'Almacén seleccionado'
+    );
+});
+
+const activeFilterChips = computed(() => {
+    const chips: Array<{ key: keyof typeof filters.value; label: string }> = [];
+
+    if (filters.value.warehouse_id) {
+        chips.push({ key: 'warehouse_id', label: activeWarehouseName.value });
+    }
+
+    if (filters.value.brand_id) {
+        chips.push({
+            key: 'brand_id',
+            label:
+                brands.value.find(
+                    (brand) => brand.id === filters.value.brand_id,
+                )?.name ?? 'Marca seleccionada',
+        });
+    }
+
+    if (filters.value.category_id) {
+        chips.push({
+            key: 'category_id',
+            label:
+                categories.value.find(
+                    (category) => category.id === filters.value.category_id,
+                )?.name ?? 'Categoría seleccionada',
+        });
+    }
+
+    if (filters.value.status) {
+        chips.push({
+            key: 'status',
+            label: getStatusLabel(filters.value.status),
+        });
+    }
+
+    return chips;
+});
+
+const removeFilter = async (key: keyof typeof filters.value) => {
+    filters.value[key] = null;
+    await applyFilters();
 };
 
 const inventoryProductHref = (product: {
@@ -185,24 +302,27 @@ const inventoryProductHref = (product: {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="space-y-6 p-4">
             <!-- Header -->
-            <div class="flex items-center justify-between">
+            <div
+                class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between dark:border-border dark:bg-card"
+            >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
                     >
-                        <BarChart3 :size="32" />
-                        Reporte de Niveles de Stock
+                        <BarChart3 :size="24" />
+                        Niveles de stock
                     </h1>
-                    <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                        Análisis del estado actual del inventario
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        {{ activeWarehouseName }} · {{ reportTotal }} registros
+                        · {{ atRiskCount }} en atención
                     </p>
                 </div>
 
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                     <button
                         @click="handleExport('pdf')"
                         :disabled="exporting || loading"
-                        class="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+                        class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
                     >
                         <Download :size="18" />
                         PDF
@@ -210,9 +330,9 @@ const inventoryProductHref = (product: {
                     <button
                         @click="handleExport('excel')"
                         :disabled="exporting || loading"
-                        class="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
+                        class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
-                        <Download :size="18" />
+                        <FileSpreadsheet :size="18" />
                         Excel
                     </button>
                 </div>
@@ -230,7 +350,7 @@ const inventoryProductHref = (product: {
             <!-- Summary Cards -->
             <div
                 v-if="stockLevelsReport"
-                class="grid gap-4 md:grid-cols-2 lg:grid-cols-5"
+                class="grid gap-4 md:grid-cols-2 xl:grid-cols-6"
             >
                 <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                     <div class="flex items-center justify-between">
@@ -266,6 +386,14 @@ const inventoryProductHref = (product: {
                             >
                                 {{ stockLevelsReport.summary.critical_stock }}
                             </p>
+                            <p class="text-xs text-red-700 dark:text-red-300">
+                                {{
+                                    formatCurrency(
+                                        stockLevelsReport.summary
+                                            .critical_value || 0,
+                                    )
+                                }}
+                            </p>
                         </div>
                         <AlertCircle :size="32" class="text-red-600" />
                     </div>
@@ -285,6 +413,16 @@ const inventoryProductHref = (product: {
                                 class="mt-2 text-3xl font-bold text-yellow-900 dark:text-yellow-200"
                             >
                                 {{ stockLevelsReport.summary.low_stock }}
+                            </p>
+                            <p
+                                class="text-xs text-yellow-700 dark:text-yellow-300"
+                            >
+                                {{
+                                    formatCurrency(
+                                        stockLevelsReport.summary.low_value ||
+                                            0,
+                                    )
+                                }}
                             </p>
                         </div>
                         <TrendingUp :size="32" class="text-yellow-600" />
@@ -333,6 +471,39 @@ const inventoryProductHref = (product: {
                         <Package :size="32" class="text-green-600" />
                     </div>
                 </div>
+
+                <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p
+                                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >
+                                Valor inventario
+                            </p>
+                            <p
+                                class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                            >
+                                {{
+                                    formatCurrency(
+                                        stockLevelsReport.summary.total_value,
+                                    )
+                                }}
+                            </p>
+                            <p
+                                class="text-xs text-amber-700 dark:text-amber-300"
+                            >
+                                Riesgo:
+                                {{
+                                    formatCurrency(
+                                        stockLevelsReport.summary
+                                            .at_risk_value || 0,
+                                    )
+                                }}
+                            </p>
+                        </div>
+                        <DollarSign :size="32" class="text-emerald-600" />
+                    </div>
+                </div>
             </div>
 
             <!-- Charts Section -->
@@ -377,10 +548,25 @@ const inventoryProductHref = (product: {
             <!-- Filters -->
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
                 <h2
-                    class="mb-4 text-lg font-semibold text-gray-900 dark:text-white"
+                    class="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
                 >
+                    <Warehouse :size="18" />
                     Filtros
                 </h2>
+                <div
+                    v-if="activeFilterChips.length"
+                    class="mb-4 flex flex-wrap gap-2"
+                >
+                    <button
+                        v-for="chip in activeFilterChips"
+                        :key="chip.key"
+                        @click="removeFilter(chip.key)"
+                        class="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-border dark:bg-muted dark:text-gray-200"
+                    >
+                        {{ chip.label }}
+                        <X :size="12" />
+                    </button>
+                </div>
                 <div class="grid items-end gap-4 md:grid-cols-4 lg:grid-cols-5">
                     <!-- Warehouse -->
                     <div>
@@ -461,49 +647,294 @@ const inventoryProductHref = (product: {
                 v-if="stockLevelsReport"
                 class="rounded-lg bg-white shadow dark:bg-card"
             >
+                <div class="border-b border-gray-200 p-6 dark:border-border">
+                    <h3
+                        class="text-lg font-semibold text-gray-900 dark:text-white"
+                    >
+                        Productos en inventario
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Mostrando 25 productos por página
+                    </p>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="bg-gray-50 dark:bg-muted">
                             <tr>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
-                                >
-                                    SKU
+                                <th class="px-6 py-3 text-left">
+                                    <button
+                                        type="button"
+                                        :class="sortHeaderClass('sku')"
+                                        @click="handleSort('sku')"
+                                    >
+                                        SKU
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'sku' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="sortBy === 'sku'"
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
-                                >
-                                    Producto
+                                <th class="px-6 py-3 text-left">
+                                    <button
+                                        type="button"
+                                        :class="sortHeaderClass('name')"
+                                        @click="handleSort('name')"
+                                    >
+                                        Producto
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'name' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="sortBy === 'name'"
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
-                                >
-                                    Marca
+                                <th class="px-6 py-3 text-left">
+                                    <button
+                                        type="button"
+                                        :class="sortHeaderClass('brand')"
+                                        @click="handleSort('brand')"
+                                    >
+                                        Marca
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'brand' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="sortBy === 'brand'"
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
-                                >
-                                    Almacén
+                                <th class="px-6 py-3 text-left">
+                                    <button
+                                        type="button"
+                                        :class="sortHeaderClass('warehouse')"
+                                        @click="handleSort('warehouse')"
+                                    >
+                                        Almacén
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'warehouse' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="sortBy === 'warehouse'"
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
-                                >
-                                    Stock
+                                <th class="px-6 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        :class="
+                                            sortHeaderClass(
+                                                'current_stock',
+                                                'right',
+                                            )
+                                        "
+                                        @click="handleSort('current_stock')"
+                                    >
+                                        Stock
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'current_stock' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="
+                                                sortBy === 'current_stock'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
-                                >
-                                    Reorden
+                                <th class="px-6 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        :class="
+                                            sortHeaderClass(
+                                                'reorder_point',
+                                                'right',
+                                            )
+                                        "
+                                        @click="handleSort('reorder_point')"
+                                    >
+                                        Reorden
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'reorder_point' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="
+                                                sortBy === 'reorder_point'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
-                                >
-                                    Estado
+                                <th class="px-6 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        :class="
+                                            sortHeaderClass(
+                                                'target_level',
+                                                'right',
+                                            )
+                                        "
+                                        @click="handleSort('target_level')"
+                                    >
+                                        Objetivo
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'target_level' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="
+                                                sortBy === 'target_level'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
-                                >
-                                    Valor
+                                <th class="px-6 py-3 text-center">
+                                    <button
+                                        type="button"
+                                        :class="
+                                            sortHeaderClass('status', 'center')
+                                        "
+                                        @click="handleSort('status')"
+                                    >
+                                        Estado
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'status' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="sortBy === 'status'"
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
+                                </th>
+                                <th class="px-6 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        :class="
+                                            sortHeaderClass(
+                                                'current_cost',
+                                                'right',
+                                            )
+                                        "
+                                        @click="handleSort('current_cost')"
+                                    >
+                                        Costo actual
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'current_cost' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="
+                                                sortBy === 'current_cost'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
+                                </th>
+                                <th class="px-6 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        :class="
+                                            sortHeaderClass(
+                                                'stock_value',
+                                                'right',
+                                            )
+                                        "
+                                        @click="handleSort('stock_value')"
+                                    >
+                                        Valor
+                                        <ChevronUp
+                                            v-if="
+                                                sortBy === 'stock_value' &&
+                                                sortDirection === 'asc'
+                                            "
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronDown
+                                            v-else-if="sortBy === 'stock_value'"
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <ChevronsUpDown
+                                            v-else
+                                            class="h-3.5 w-3.5 text-gray-400"
+                                        />
+                                    </button>
                                 </th>
                             </tr>
                         </thead>
@@ -561,6 +992,11 @@ const inventoryProductHref = (product: {
                                 >
                                     {{ product.reorder_point }}
                                 </td>
+                                <td
+                                    class="px-6 py-4 text-right text-sm text-gray-700 dark:text-gray-300"
+                                >
+                                    {{ product.target_level }}
+                                </td>
                                 <td class="px-6 py-4 text-center">
                                     <span
                                         :class="getStatusColor(product.status)"
@@ -572,12 +1008,29 @@ const inventoryProductHref = (product: {
                                 <td
                                     class="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white"
                                 >
+                                    {{
+                                        formatCurrency(
+                                            product.current_cost ||
+                                                product.fifo_cost_current ||
+                                                0,
+                                        )
+                                    }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white"
+                                >
                                     {{ formatCurrency(product.stock_value) }}
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+                <Pagination
+                    v-if="stockLevelsReport.pagination"
+                    :pagination="stockLevelsReport.pagination"
+                    :loading="loading"
+                    @page-change="handlePageChange"
+                />
             </div>
 
             <!-- Loading State -->

@@ -24,9 +24,22 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { InventoryApiService } from '@/services/inventory';
 import { type BreadcrumbItem } from '@/types';
-import { type FinancialReport } from '@/types/report';
+import {
+    type AgingBuckets,
+    type CreditDocument,
+    type CreditMovement,
+    type FinancialReport,
+} from '@/types/report';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
+type FinancialReportTab =
+    | 'income_statement'
+    | 'financial_position'
+    | 'credits'
+    | 'comparison';
+type IncomeBasis = 'cash' | 'accrual_operational';
+type PositionMode = 'current_snapshot' | 'as_of';
+type SummaryKey = keyof FinancialReport['summary'];
 type StatementView = 'net_profit' | 'income' | 'expenses' | 'categories';
 type StatementTone = 'income' | 'expense' | 'profit' | 'balance' | 'neutral';
 type OperationalExpenseCategory =
@@ -54,21 +67,28 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const {
-    financialReport,
+    incomeStatementReport,
+    financialPositionReport,
     brandProfitabilityReport,
     categoryProfitabilityReport,
     loading,
     error,
-    fetchFinancialReport,
+    fetchIncomeStatement,
+    fetchFinancialPosition,
     fetchBrandProfitability,
     fetchCategoryProfitability,
 } = useReports();
+
+const financialReport = incomeStatementReport;
 
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 
 const warehouses = ref<any[]>([]);
 const activePreset = ref<DatePreset>('month');
+const activeReportTab = ref<FinancialReportTab>('income_statement');
 const activeView = ref<StatementView>('net_profit');
+const incomeBasis = ref<IncomeBasis>('cash');
+const positionMode = ref<PositionMode>('current_snapshot');
 const expandedRows = ref<Set<string>>(
     new Set(['income', 'expenses', 'operational-expenses']),
 );
@@ -87,6 +107,13 @@ const statementViews: Array<{ key: StatementView; label: string }> = [
     { key: 'income', label: 'Ingresos' },
     { key: 'expenses', label: 'Gastos' },
     { key: 'categories', label: 'Categorias' },
+];
+
+const reportTabs: Array<{ key: FinancialReportTab; label: string }> = [
+    { key: 'income_statement', label: 'Resultados' },
+    { key: 'financial_position', label: 'Situacion financiera' },
+    { key: 'credits', label: 'Creditos' },
+    { key: 'comparison', label: 'Comparativo' },
 ];
 
 const loadWarehouses = async () => {
@@ -165,13 +192,26 @@ const applyFilters = async () => {
     }
 
     await Promise.all([
-        fetchFinancialReport(filters.value),
+        fetchIncomeStatement({
+            ...filters.value,
+            basis: incomeBasis.value,
+            compare: 'previous_period',
+        }),
+        fetchFinancialPosition({
+            warehouse_id: filters.value.warehouse_id,
+            date_to: filters.value.date_to,
+            mode: positionMode.value,
+        }),
         fetchBrandProfitability(filters.value),
         fetchCategoryProfitability(filters.value),
     ]);
 };
 
 const onWarehouseChange = () => {
+    applyFilters();
+};
+
+const onReportModeChange = () => {
     applyFilters();
 };
 
@@ -190,6 +230,9 @@ const formatShortDate = (date: string) =>
     }).format(new Date(`${date}T00:00:00`));
 
 const summary = computed(() => financialReport.value?.summary);
+const financialPositionSummary = computed(
+    () => financialPositionReport.value?.summary,
+);
 
 const operationalExpenseCategories = computed<OperationalExpenseCategory[]>(
     () => financialReport.value?.operational_expenses?.by_category || [],
@@ -202,14 +245,87 @@ const creditBalances = computed(
                 total_open_balance: 0,
                 open_documents_count: 0,
                 accounts_count: 0,
+                aging_buckets: null,
+                documents: [],
+                recent_movements: [],
             },
             accounts_payable: {
                 total_open_balance: 0,
                 open_documents_count: 0,
                 accounts_count: 0,
+                aging_buckets: null,
+                documents: [],
+                recent_movements: [],
             },
         },
 );
+
+const incomeComparison = computed(() => financialReport.value?.comparison);
+const reportBreakdowns = computed(
+    () =>
+        financialReport.value?.breakdowns ?? {
+            by_brand: [],
+            by_category: [],
+            by_warehouse: [],
+        },
+);
+
+const agingBucketLabels: Record<keyof AgingBuckets, string> = {
+    current: 'Actual',
+    '1_30': '1-30 dias',
+    '31_60': '31-60 dias',
+    '61_90': '61-90 dias',
+    '90_plus': '90+ dias',
+};
+
+const agingRows = computed(() => {
+    const receivable =
+        creditBalances.value.accounts_receivable.aging_buckets ?? {};
+    const payable = creditBalances.value.accounts_payable.aging_buckets ?? {};
+
+    return (Object.keys(agingBucketLabels) as Array<keyof AgingBuckets>).map(
+        (key) => ({
+            key,
+            label: agingBucketLabels[key],
+            receivableAmount: receivable[key]?.amount ?? 0,
+            receivableCount: receivable[key]?.count ?? 0,
+            payableAmount: payable[key]?.amount ?? 0,
+            payableCount: payable[key]?.count ?? 0,
+        }),
+    );
+});
+
+const creditDocuments = computed<CreditDocument[]>(() => [
+    ...(creditBalances.value.accounts_receivable.documents ?? []),
+    ...(creditBalances.value.accounts_payable.documents ?? []),
+]);
+
+const creditMovements = computed<CreditMovement[]>(() => [
+    ...(creditBalances.value.accounts_receivable.recent_movements ?? []),
+    ...(creditBalances.value.accounts_payable.recent_movements ?? []),
+]);
+
+const comparisonMetricLabels: Array<[SummaryKey, string]> = [
+    ['total_revenue', 'Ingresos'],
+    ['total_cogs', 'Costo de ventas'],
+    ['total_operational_expenses', 'Gastos operativos'],
+    ['gross_profit', 'Utilidad bruta'],
+    ['net_profit', 'Utilidad neta'],
+    ['margin_percentage', 'Margen'],
+];
+
+const comparisonRows = computed(() => {
+    const variance = incomeComparison.value?.variance ?? {};
+
+    return comparisonMetricLabels.map(([key, label]) => ({
+        key,
+        label,
+        current: summary.value?.[key] ?? 0,
+        previous: incomeComparison.value?.previous?.summary?.[key] ?? 0,
+        amount: variance[key]?.amount ?? 0,
+        percentage: variance[key]?.percentage,
+    }));
+});
 
 const reportQuery = computed(() => {
     const query: Record<string, string | number> = {
@@ -233,6 +349,21 @@ const goToDetail = (
             ...reportQuery.value,
             ...extra,
         },
+    });
+};
+
+const goToCreditDocument = (document: CreditDocument) => {
+    const path =
+        document.document_type === 'sales_order'
+            ? '/accounts-receivable'
+            : '/accounts-payable';
+
+    goToDetail(path, {
+        document_id: document.id,
+        ...(document.account_id ? { account_id: document.account_id } : {}),
+        ...(document.warehouse_id
+            ? { warehouse_id: document.warehouse_id }
+            : {}),
     });
 };
 
@@ -444,6 +575,80 @@ const openBalanceRows = computed<StatementRow[]>(() => [
     },
 ]);
 
+const financialPositionMetrics = computed(() => {
+    if (!financialPositionSummary.value) {
+        return [];
+    }
+
+    return [
+        {
+            label: 'Activos',
+            value: financialPositionSummary.value.total_assets,
+            detail: 'Caja, credito cliente e inventario',
+            icon: DollarSign,
+            tone: 'blue',
+        },
+        {
+            label: 'Pasivos',
+            value: financialPositionSummary.value.total_liabilities,
+            detail: 'Credito proveedor abierto',
+            icon: ReceiptText,
+            tone: 'amber',
+        },
+        {
+            label: 'Patrimonio operativo',
+            value: financialPositionSummary.value.operational_equity,
+            detail: 'Activos menos pasivos',
+            icon:
+                financialPositionSummary.value.operational_equity >= 0
+                    ? TrendingUp
+                    : TrendingDown,
+            tone:
+                financialPositionSummary.value.operational_equity >= 0
+                    ? 'emerald'
+                    : 'rose',
+        },
+    ];
+});
+
+const financialPositionSections = computed(
+    () => financialPositionReport.value?.sections ?? [],
+);
+
+const financialPositionRowPath = (key: string) => {
+    const paths: Record<string, string> = {
+        'accounts-receivable': '/accounts-receivable',
+        'accounts-payable': '/accounts-payable',
+        inventory: '/reports/stock-levels',
+    };
+
+    return paths[key] ?? null;
+};
+
+const goToFinancialPositionRow = (key: string) => {
+    const path = financialPositionRowPath(key);
+
+    if (path) {
+        goToDetail(path);
+    }
+};
+
+const financialPositionTone = (type: string): StatementTone => {
+    if (type === 'liability') {
+        return 'expense';
+    }
+
+    if (type === 'equity') {
+        return 'profit';
+    }
+
+    if (type === 'asset') {
+        return 'balance';
+    }
+
+    return 'neutral';
+};
+
 const timelineRows = computed<FinancialTimelineRow[]>(() => {
     const rows = (
         (financialReport.value?.timeline ?? []) as FinancialTimelineRow[]
@@ -634,6 +839,42 @@ const topCategories = computed(() =>
                         />
                     </div>
 
+                    <div>
+                        <label
+                            class="mb-1 block text-[11px] font-semibold text-gray-500 uppercase dark:text-gray-400"
+                        >
+                            Base
+                        </label>
+                        <select
+                            v-model="incomeBasis"
+                            class="h-10 rounded-md border border-gray-300 px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                            @change="onReportModeChange"
+                        >
+                            <option value="cash">Caja</option>
+                            <option value="accrual_operational">
+                                Devengo operativo
+                            </option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label
+                            class="mb-1 block text-[11px] font-semibold text-gray-500 uppercase dark:text-gray-400"
+                        >
+                            Corte
+                        </label>
+                        <select
+                            v-model="positionMode"
+                            class="h-10 rounded-md border border-gray-300 px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
+                            @change="onReportModeChange"
+                        >
+                            <option value="current_snapshot">
+                                Foto actual
+                            </option>
+                            <option value="as_of">Historico al corte</option>
+                        </select>
+                    </div>
+
                     <button
                         v-if="activePreset === 'custom'"
                         type="button"
@@ -654,6 +895,25 @@ const topCategories = computed(() =>
                 {{ error }}
             </div>
 
+            <div
+                class="inline-flex w-full overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-1 md:w-auto dark:border-border dark:bg-muted"
+            >
+                <button
+                    v-for="tab in reportTabs"
+                    :key="tab.key"
+                    type="button"
+                    class="rounded-md px-4 py-2 text-sm font-semibold whitespace-nowrap transition"
+                    :class="
+                        activeReportTab === tab.key
+                            ? 'bg-white text-gray-900 shadow-sm dark:bg-background dark:text-white'
+                            : 'text-gray-600 hover:text-gray-900 dark:text-gray-300'
+                    "
+                    @click="activeReportTab = tab.key"
+                >
+                    {{ tab.label }}
+                </button>
+            </div>
+
             <div v-if="loading" class="flex items-center justify-center py-16">
                 <div
                     class="flex items-center gap-3 text-gray-500 dark:text-gray-400"
@@ -664,394 +924,769 @@ const topCategories = computed(() =>
             </div>
 
             <template v-else-if="financialReport?.summary">
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <button
-                        v-for="metric in topMetrics"
-                        :key="metric.label"
-                        type="button"
-                        class="rounded-lg border border-gray-200 bg-white p-4 text-left transition dark:border-border dark:bg-card"
-                        :class="
-                            metric.path
-                                ? 'hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20'
-                                : ''
-                        "
-                        @click="metric.path ? goToDetail(metric.path) : null"
-                    >
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <p
-                                    class="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    {{ metric.label }}
-                                </p>
-                                <p
-                                    class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white"
-                                >
-                                    {{ formatCurrency(metric.value) }}
-                                </p>
-                            </div>
-                            <component
-                                :is="metric.icon"
-                                :size="22"
-                                :class="{
-                                    'text-blue-600': metric.tone === 'blue',
-                                    'text-emerald-600':
-                                        metric.tone === 'emerald',
-                                    'text-rose-600': metric.tone === 'rose',
-                                    'text-amber-600': metric.tone === 'amber',
-                                }"
-                            />
-                        </div>
-                        <p
-                            class="mt-2 text-xs text-gray-500 dark:text-gray-400"
-                        >
-                            {{ metric.detail }}
-                        </p>
-                    </button>
-                </div>
-
-                <div
-                    class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                >
-                    <div
-                        class="flex flex-col gap-3 border-b border-gray-200 p-4 lg:flex-row lg:items-center lg:justify-between dark:border-border"
-                    >
-                        <div>
-                            <h2
-                                class="text-sm font-semibold text-gray-500 uppercase dark:text-gray-400"
-                            >
-                                Tendencia del periodo
-                            </h2>
-                            <p
-                                class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                            >
-                                {{
-                                    activeView === 'income'
-                                        ? 'Ingresos cobrados'
-                                        : activeView === 'expenses'
-                                          ? 'Costos y gastos'
-                                          : 'Utilidad neta diaria'
-                                }}
-                            </p>
-                        </div>
-
-                        <div
-                            class="inline-flex w-full overflow-x-auto rounded-md border border-gray-200 bg-gray-50 p-1 lg:w-auto dark:border-border dark:bg-muted"
-                        >
-                            <button
-                                v-for="view in statementViews"
-                                :key="view.key"
-                                type="button"
-                                class="rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap transition"
-                                :class="
-                                    activeView === view.key
-                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-background dark:text-white'
-                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300'
-                                "
-                                @click="activeView = view.key"
-                            >
-                                {{ view.label }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div
-                        class="flex h-56 items-end gap-1 overflow-x-auto px-4 pt-6 pb-4"
-                    >
-                        <div
-                            v-for="day in visibleTimelineRows"
-                            :key="day.date"
-                            class="flex min-w-10 flex-1 flex-col items-center justify-end gap-2"
-                            :title="`${formatShortDate(day.date)} · ${day.label}: ${formatCurrency(day.value)}`"
+                <template v-if="activeReportTab === 'income_statement'">
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <button
+                            v-for="metric in topMetrics"
+                            :key="metric.label"
+                            type="button"
+                            class="rounded-lg border border-gray-200 bg-white p-4 text-left transition dark:border-border dark:bg-card"
+                            :class="
+                                metric.path
+                                    ? 'hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20'
+                                    : ''
+                            "
+                            @click="
+                                metric.path ? goToDetail(metric.path) : null
+                            "
                         >
                             <div
-                                class="flex h-40 w-full items-end justify-center border-b border-gray-200 dark:border-border"
+                                class="flex items-center justify-between gap-3"
                             >
-                                <div
-                                    class="w-full max-w-8 rounded-t"
-                                    :class="
-                                        day.value >= 0
-                                            ? activeView === 'income'
-                                                ? 'bg-blue-500'
-                                                : 'bg-emerald-500'
-                                            : 'bg-rose-500'
-                                    "
-                                    :style="{
-                                        height: `${Math.max(
-                                            8,
-                                            (Math.abs(day.value) /
-                                                maxTimelineValue) *
-                                                150,
-                                        )}px`,
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400"
+                                    >
+                                        {{ metric.label }}
+                                    </p>
+                                    <p
+                                        class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white"
+                                    >
+                                        {{ formatCurrency(metric.value) }}
+                                    </p>
+                                </div>
+                                <component
+                                    :is="metric.icon"
+                                    :size="22"
+                                    :class="{
+                                        'text-blue-600': metric.tone === 'blue',
+                                        'text-emerald-600':
+                                            metric.tone === 'emerald',
+                                        'text-rose-600': metric.tone === 'rose',
+                                        'text-amber-600':
+                                            metric.tone === 'amber',
                                     }"
-                                ></div>
+                                />
                             </div>
-                            <span
-                                class="text-[11px] text-gray-500 dark:text-gray-400"
+                            <p
+                                class="mt-2 text-xs text-gray-500 dark:text-gray-400"
                             >
-                                {{ formatShortDate(day.date) }}
-                            </span>
-                        </div>
+                                {{ metric.detail }}
+                            </p>
+                        </button>
                     </div>
-                </div>
 
-                <div class="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                    <section
+                    <div
                         class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                     >
                         <div
-                            class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-border dark:bg-muted"
+                            class="flex flex-col gap-3 border-b border-gray-200 p-4 lg:flex-row lg:items-center lg:justify-between dark:border-border"
                         >
-                            <h2
-                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                            <div>
+                                <h2
+                                    class="text-sm font-semibold text-gray-500 uppercase dark:text-gray-400"
+                                >
+                                    Tendencia del periodo
+                                </h2>
+                                <p
+                                    class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                                >
+                                    {{
+                                        activeView === 'income'
+                                            ? 'Ingresos cobrados'
+                                            : activeView === 'expenses'
+                                              ? 'Costos y gastos'
+                                              : 'Utilidad neta diaria'
+                                    }}
+                                </p>
+                            </div>
+
+                            <div
+                                class="inline-flex w-full overflow-x-auto rounded-md border border-gray-200 bg-gray-50 p-1 lg:w-auto dark:border-border dark:bg-muted"
                             >
-                                {{ statementColumns.leftTitle }}
-                            </h2>
+                                <button
+                                    v-for="view in statementViews"
+                                    :key="view.key"
+                                    type="button"
+                                    class="rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap transition"
+                                    :class="
+                                        activeView === view.key
+                                            ? 'bg-white text-gray-900 shadow-sm dark:bg-background dark:text-white'
+                                            : 'text-gray-600 hover:text-gray-900 dark:text-gray-300'
+                                    "
+                                    @click="activeView = view.key"
+                                >
+                                    {{ view.label }}
+                                </button>
+                            </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[520px] text-sm">
-                                <tbody>
-                                    <template
-                                        v-for="row in statementColumns.leftRows"
-                                        :key="row.key"
-                                    >
-                                        <tr
-                                            class="border-b border-gray-100 dark:border-border/60"
+
+                        <div
+                            class="flex h-56 items-end gap-1 overflow-x-auto px-4 pt-6 pb-4"
+                        >
+                            <div
+                                v-for="day in visibleTimelineRows"
+                                :key="day.date"
+                                class="flex min-w-10 flex-1 flex-col items-center justify-end gap-2"
+                                :title="`${formatShortDate(day.date)} · ${day.label}: ${formatCurrency(day.value)}`"
+                            >
+                                <div
+                                    class="flex h-40 w-full items-end justify-center border-b border-gray-200 dark:border-border"
+                                >
+                                    <div
+                                        class="w-full max-w-8 rounded-t"
+                                        :class="
+                                            day.value >= 0
+                                                ? activeView === 'income'
+                                                    ? 'bg-blue-500'
+                                                    : 'bg-emerald-500'
+                                                : 'bg-rose-500'
+                                        "
+                                        :style="{
+                                            height: `${Math.max(
+                                                8,
+                                                (Math.abs(day.value) /
+                                                    maxTimelineValue) *
+                                                    150,
+                                            )}px`,
+                                        }"
+                                    ></div>
+                                </div>
+                                <span
+                                    class="text-[11px] text-gray-500 dark:text-gray-400"
+                                >
+                                    {{ formatShortDate(day.date) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 xl:grid-cols-[1fr_1fr]">
+                        <section
+                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-border dark:bg-muted"
+                            >
+                                <h2
+                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                                >
+                                    {{ statementColumns.leftTitle }}
+                                </h2>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-[520px] text-sm">
+                                    <tbody>
+                                        <template
+                                            v-for="row in statementColumns.leftRows"
+                                            :key="row.key"
                                         >
-                                            <td class="px-4 py-2">
-                                                <button
-                                                    v-if="row.children?.length"
-                                                    type="button"
-                                                    class="mr-1 inline-flex align-middle text-gray-500"
-                                                    @click="toggleRow(row.key)"
-                                                >
-                                                    <ChevronDown
+                                            <tr
+                                                class="border-b border-gray-100 dark:border-border/60"
+                                            >
+                                                <td class="px-4 py-2">
+                                                    <button
                                                         v-if="
+                                                            row.children?.length
+                                                        "
+                                                        type="button"
+                                                        class="mr-1 inline-flex align-middle text-gray-500"
+                                                        @click="
+                                                            toggleRow(row.key)
+                                                        "
+                                                    >
+                                                        <ChevronDown
+                                                            v-if="
+                                                                expandedRows.has(
+                                                                    row.key,
+                                                                )
+                                                            "
+                                                            :size="15"
+                                                        />
+                                                        <ChevronRight
+                                                            v-else
+                                                            :size="15"
+                                                        />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        class="font-medium"
+                                                        :class="[
+                                                            rowToneClass(
+                                                                row.tone,
+                                                            ),
+                                                            row.path
+                                                                ? 'hover:underline'
+                                                                : '',
+                                                        ]"
+                                                        @click="
+                                                            row.path
+                                                                ? goToDetail(
+                                                                      row.path,
+                                                                  )
+                                                                : null
+                                                        "
+                                                    >
+                                                        {{ row.label }}
+                                                    </button>
+                                                    <p
+                                                        v-if="row.detail"
+                                                        class="mt-0.5 pl-6 text-xs text-gray-500 dark:text-gray-400"
+                                                    >
+                                                        {{ row.detail }}
+                                                    </p>
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-right font-mono font-semibold"
+                                                    :class="
+                                                        amountToneClass(row)
+                                                    "
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            row.amount,
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+
+                                            <template
+                                                v-if="
+                                                    row.children?.length &&
+                                                    expandedRows.has(row.key)
+                                                "
+                                            >
+                                                <template
+                                                    v-for="child in row.children"
+                                                    :key="child.key"
+                                                >
+                                                    <tr
+                                                        class="border-b border-gray-100 bg-gray-50/60 dark:border-border/60 dark:bg-muted/40"
+                                                    >
+                                                        <td
+                                                            class="px-4 py-2 pl-10"
+                                                        >
+                                                            <button
+                                                                v-if="
+                                                                    child
+                                                                        .children
+                                                                        ?.length
+                                                                "
+                                                                type="button"
+                                                                class="mr-1 inline-flex align-middle text-gray-500"
+                                                                @click="
+                                                                    toggleRow(
+                                                                        child.key,
+                                                                    )
+                                                                "
+                                                            >
+                                                                <ChevronDown
+                                                                    v-if="
+                                                                        expandedRows.has(
+                                                                            child.key,
+                                                                        )
+                                                                    "
+                                                                    :size="14"
+                                                                />
+                                                                <ChevronRight
+                                                                    v-else
+                                                                    :size="14"
+                                                                />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                class="font-medium"
+                                                                :class="[
+                                                                    rowToneClass(
+                                                                        child.tone,
+                                                                    ),
+                                                                    child.path
+                                                                        ? 'hover:underline'
+                                                                        : '',
+                                                                ]"
+                                                                @click="
+                                                                    child.path
+                                                                        ? goToDetail(
+                                                                              child.path,
+                                                                          )
+                                                                        : null
+                                                                "
+                                                            >
+                                                                {{
+                                                                    child.label
+                                                                }}
+                                                            </button>
+                                                            <p
+                                                                v-if="
+                                                                    child.detail
+                                                                "
+                                                                class="mt-0.5 pl-5 text-xs text-gray-500 dark:text-gray-400"
+                                                            >
+                                                                {{
+                                                                    child.detail
+                                                                }}
+                                                            </p>
+                                                        </td>
+                                                        <td
+                                                            class="px-4 py-2 text-right font-mono font-semibold"
+                                                            :class="
+                                                                amountToneClass(
+                                                                    child,
+                                                                )
+                                                            "
+                                                        >
+                                                            {{
+                                                                formatCurrency(
+                                                                    child.amount,
+                                                                )
+                                                            }}
+                                                        </td>
+                                                    </tr>
+
+                                                    <tr
+                                                        v-for="grandchild in child.children ||
+                                                        []"
+                                                        v-show="
                                                             expandedRows.has(
-                                                                row.key,
+                                                                child.key,
                                                             )
                                                         "
-                                                        :size="15"
-                                                    />
-                                                    <ChevronRight
-                                                        v-else
-                                                        :size="15"
-                                                    />
-                                                </button>
-                                                <button
-                                                    type="button"
+                                                        :key="grandchild.key"
+                                                        class="border-b border-gray-100 dark:border-border/60"
+                                                    >
+                                                        <td
+                                                            class="px-4 py-2 pl-16"
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                class="font-medium"
+                                                                :class="[
+                                                                    rowToneClass(
+                                                                        grandchild.tone,
+                                                                    ),
+                                                                    grandchild.path
+                                                                        ? 'hover:underline'
+                                                                        : '',
+                                                                ]"
+                                                                @click="
+                                                                    grandchild.path
+                                                                        ? goToDetail(
+                                                                              grandchild.path,
+                                                                          )
+                                                                        : null
+                                                                "
+                                                            >
+                                                                {{
+                                                                    grandchild.label
+                                                                }}
+                                                            </button>
+                                                            <p
+                                                                v-if="
+                                                                    grandchild.detail
+                                                                "
+                                                                class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
+                                                            >
+                                                                {{
+                                                                    grandchild.detail
+                                                                }}
+                                                            </p>
+                                                        </td>
+                                                        <td
+                                                            class="px-4 py-2 text-right font-mono font-semibold"
+                                                            :class="
+                                                                amountToneClass(
+                                                                    grandchild,
+                                                                )
+                                                            "
+                                                        >
+                                                            {{
+                                                                formatCurrency(
+                                                                    grandchild.amount,
+                                                                )
+                                                            }}
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </template>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section
+                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-border dark:bg-muted"
+                            >
+                                <h2
+                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                                >
+                                    {{ statementColumns.rightTitle }}
+                                </h2>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-[420px] text-sm">
+                                    <tbody>
+                                        <tr
+                                            v-for="row in statementColumns.rightRows"
+                                            :key="row.key"
+                                            class="border-b border-gray-100 dark:border-border/60"
+                                        >
+                                            <td class="px-4 py-3">
+                                                <div
                                                     class="font-medium"
-                                                    :class="[
-                                                        rowToneClass(row.tone),
-                                                        row.path
-                                                            ? 'hover:underline'
-                                                            : '',
-                                                    ]"
-                                                    @click="
-                                                        row.path
-                                                            ? goToDetail(
-                                                                  row.path,
-                                                              )
-                                                            : null
+                                                    :class="
+                                                        rowToneClass(row.tone)
                                                     "
                                                 >
                                                     {{ row.label }}
-                                                </button>
+                                                </div>
                                                 <p
                                                     v-if="row.detail"
-                                                    class="mt-0.5 pl-6 text-xs text-gray-500 dark:text-gray-400"
+                                                    class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
                                                 >
                                                     {{ row.detail }}
                                                 </p>
                                             </td>
                                             <td
-                                                class="px-4 py-2 text-right font-mono font-semibold"
+                                                class="px-4 py-3 text-right font-mono text-base font-semibold"
                                                 :class="amountToneClass(row)"
                                             >
                                                 {{ formatCurrency(row.amount) }}
                                             </td>
                                         </tr>
-
-                                        <template
-                                            v-if="
-                                                row.children?.length &&
-                                                expandedRows.has(row.key)
-                                            "
-                                        >
-                                            <template
-                                                v-for="child in row.children"
-                                                :key="child.key"
-                                            >
-                                                <tr
-                                                    class="border-b border-gray-100 bg-gray-50/60 dark:border-border/60 dark:bg-muted/40"
-                                                >
-                                                    <td class="px-4 py-2 pl-10">
-                                                        <button
-                                                            v-if="
-                                                                child.children
-                                                                    ?.length
-                                                            "
-                                                            type="button"
-                                                            class="mr-1 inline-flex align-middle text-gray-500"
-                                                            @click="
-                                                                toggleRow(
-                                                                    child.key,
-                                                                )
-                                                            "
-                                                        >
-                                                            <ChevronDown
-                                                                v-if="
-                                                                    expandedRows.has(
-                                                                        child.key,
-                                                                    )
-                                                                "
-                                                                :size="14"
-                                                            />
-                                                            <ChevronRight
-                                                                v-else
-                                                                :size="14"
-                                                            />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            class="font-medium"
-                                                            :class="[
-                                                                rowToneClass(
-                                                                    child.tone,
-                                                                ),
-                                                                child.path
-                                                                    ? 'hover:underline'
-                                                                    : '',
-                                                            ]"
-                                                            @click="
-                                                                child.path
-                                                                    ? goToDetail(
-                                                                          child.path,
-                                                                      )
-                                                                    : null
-                                                            "
-                                                        >
-                                                            {{ child.label }}
-                                                        </button>
-                                                        <p
-                                                            v-if="child.detail"
-                                                            class="mt-0.5 pl-5 text-xs text-gray-500 dark:text-gray-400"
-                                                        >
-                                                            {{ child.detail }}
-                                                        </p>
-                                                    </td>
-                                                    <td
-                                                        class="px-4 py-2 text-right font-mono font-semibold"
-                                                        :class="
-                                                            amountToneClass(
-                                                                child,
-                                                            )
-                                                        "
-                                                    >
-                                                        {{
-                                                            formatCurrency(
-                                                                child.amount,
-                                                            )
-                                                        }}
-                                                    </td>
-                                                </tr>
-
-                                                <tr
-                                                    v-for="grandchild in child.children ||
-                                                    []"
-                                                    v-show="
-                                                        expandedRows.has(
-                                                            child.key,
-                                                        )
-                                                    "
-                                                    :key="grandchild.key"
-                                                    class="border-b border-gray-100 dark:border-border/60"
-                                                >
-                                                    <td class="px-4 py-2 pl-16">
-                                                        <button
-                                                            type="button"
-                                                            class="font-medium"
-                                                            :class="[
-                                                                rowToneClass(
-                                                                    grandchild.tone,
-                                                                ),
-                                                                grandchild.path
-                                                                    ? 'hover:underline'
-                                                                    : '',
-                                                            ]"
-                                                            @click="
-                                                                grandchild.path
-                                                                    ? goToDetail(
-                                                                          grandchild.path,
-                                                                      )
-                                                                    : null
-                                                            "
-                                                        >
-                                                            {{
-                                                                grandchild.label
-                                                            }}
-                                                        </button>
-                                                        <p
-                                                            v-if="
-                                                                grandchild.detail
-                                                            "
-                                                            class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
-                                                        >
-                                                            {{
-                                                                grandchild.detail
-                                                            }}
-                                                        </p>
-                                                    </td>
-                                                    <td
-                                                        class="px-4 py-2 text-right font-mono font-semibold"
-                                                        :class="
-                                                            amountToneClass(
-                                                                grandchild,
-                                                            )
-                                                        "
-                                                    >
-                                                        {{
-                                                            formatCurrency(
-                                                                grandchild.amount,
-                                                            )
-                                                        }}
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                        </template>
-                                    </template>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
 
                     <section
                         class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                     >
                         <div
-                            class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-border dark:bg-muted"
+                            class="flex flex-col gap-1 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-border"
                         >
-                            <h2
-                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                            >
-                                {{ statementColumns.rightTitle }}
-                            </h2>
+                            <div>
+                                <h2
+                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                                >
+                                    Saldos abiertos
+                                </h2>
+                                <p
+                                    class="text-xs text-gray-500 dark:text-gray-400"
+                                >
+                                    Informativo y separado del estado de
+                                    resultados
+                                </p>
+                            </div>
                         </div>
+
+                        <div class="grid gap-3 p-4 md:grid-cols-2">
+                            <button
+                                v-for="row in openBalanceRows"
+                                :key="row.key"
+                                type="button"
+                                class="rounded-lg border border-gray-200 p-4 text-left transition hover:border-cyan-300 hover:bg-cyan-50/40 dark:border-border dark:hover:border-cyan-700 dark:hover:bg-cyan-950/20"
+                                @click="row.path ? goToDetail(row.path) : null"
+                            >
+                                <div
+                                    class="flex items-center justify-between gap-3"
+                                >
+                                    <div>
+                                        <p
+                                            class="text-sm font-semibold text-gray-900 dark:text-white"
+                                        >
+                                            {{ row.label }}
+                                        </p>
+                                        <p
+                                            class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                        >
+                                            {{ row.detail }}
+                                        </p>
+                                    </div>
+                                    <CreditCard
+                                        v-if="row.key === 'ar-open-balance'"
+                                        :size="22"
+                                        class="text-cyan-600"
+                                    />
+                                    <ReceiptText
+                                        v-else
+                                        :size="22"
+                                        class="text-violet-600"
+                                    />
+                                </div>
+                                <p
+                                    class="mt-3 text-right font-mono text-2xl font-semibold"
+                                    :class="rowToneClass(row.tone)"
+                                >
+                                    {{ formatCurrency(row.amount) }}
+                                </p>
+                            </button>
+                        </div>
+                    </section>
+
+                    <section class="grid gap-4 xl:grid-cols-2">
+                        <div
+                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="flex items-center gap-2 border-b border-gray-200 px-4 py-3 dark:border-border"
+                            >
+                                <Tag :size="18" class="text-indigo-600" />
+                                <h2
+                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                                >
+                                    Top marcas por rentabilidad
+                                </h2>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-[420px] text-sm">
+                                    <thead>
+                                        <tr
+                                            class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
+                                        >
+                                            <th class="px-4 py-2 text-left">
+                                                Marca
+                                            </th>
+                                            <th class="px-4 py-2 text-right">
+                                                Ganancia
+                                            </th>
+                                            <th class="px-4 py-2 text-right">
+                                                Margen
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr
+                                            v-for="brand in topBrands"
+                                            :key="
+                                                brand.brand_id ||
+                                                brand.brand_name
+                                            "
+                                            class="border-b border-gray-100 dark:border-border/60"
+                                        >
+                                            <td class="px-4 py-2 font-medium">
+                                                {{ brand.brand_name }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
+                                            >
+                                                {{
+                                                    formatCurrency(brand.profit)
+                                                }}
+                                            </td>
+                                            <td class="px-4 py-2 text-right">
+                                                {{
+                                                    formatPercent(brand.margin)
+                                                }}
+                                            </td>
+                                        </tr>
+                                        <tr v-if="!topBrands.length">
+                                            <td
+                                                colspan="3"
+                                                class="px-4 py-8 text-center text-gray-500"
+                                            >
+                                                Sin datos de marcas para este
+                                                periodo
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="flex items-center gap-2 border-b border-gray-200 px-4 py-3 dark:border-border"
+                            >
+                                <Box :size="18" class="text-amber-600" />
+                                <h2
+                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                                >
+                                    Top categorias por rentabilidad
+                                </h2>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-[420px] text-sm">
+                                    <thead>
+                                        <tr
+                                            class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
+                                        >
+                                            <th class="px-4 py-2 text-left">
+                                                Categoria
+                                            </th>
+                                            <th class="px-4 py-2 text-right">
+                                                Ganancia
+                                            </th>
+                                            <th class="px-4 py-2 text-right">
+                                                Margen
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr
+                                            v-for="category in topCategories"
+                                            :key="
+                                                category.category_id ||
+                                                category.category_name
+                                            "
+                                            class="border-b border-gray-100 dark:border-border/60"
+                                        >
+                                            <td class="px-4 py-2 font-medium">
+                                                {{ category.category_name }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        category.profit,
+                                                    )
+                                                }}
+                                            </td>
+                                            <td class="px-4 py-2 text-right">
+                                                {{
+                                                    formatPercent(
+                                                        category.margin,
+                                                    )
+                                                }}
+                                            </td>
+                                        </tr>
+                                        <tr v-if="!topCategories.length">
+                                            <td
+                                                colspan="3"
+                                                class="px-4 py-8 text-center text-gray-500"
+                                            >
+                                                Sin datos de categorias para
+                                                este periodo
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </template>
+
+                <template v-else-if="activeReportTab === 'financial_position'">
+                    <div class="grid gap-3 md:grid-cols-3">
+                        <div
+                            v-for="metric in financialPositionMetrics"
+                            :key="metric.label"
+                            class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400"
+                                    >
+                                        {{ metric.label }}
+                                    </p>
+                                    <p
+                                        class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white"
+                                    >
+                                        {{ formatCurrency(metric.value) }}
+                                    </p>
+                                </div>
+                                <component
+                                    :is="metric.icon"
+                                    :size="22"
+                                    :class="{
+                                        'text-blue-600': metric.tone === 'blue',
+                                        'text-emerald-600':
+                                            metric.tone === 'emerald',
+                                        'text-rose-600': metric.tone === 'rose',
+                                        'text-amber-600':
+                                            metric.tone === 'amber',
+                                    }"
+                                />
+                            </div>
+                            <p
+                                class="mt-2 text-xs text-gray-500 dark:text-gray-400"
+                            >
+                                {{ metric.detail }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <section
+                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="flex flex-col gap-1 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-border"
+                        >
+                            <div>
+                                <h2
+                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                                >
+                                    Situacion financiera operativa
+                                </h2>
+                                <p
+                                    class="text-xs text-gray-500 dark:text-gray-400"
+                                >
+                                    Foto actual; no reconstruye saldos
+                                    historicos al corte
+                                    {{ financialPositionReport?.as_of }}
+                                </p>
+                            </div>
+                        </div>
+
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[420px] text-sm">
-                                <tbody>
+                            <table class="w-full min-w-[680px] text-sm">
+                                <tbody
+                                    v-for="section in financialPositionSections"
+                                    :key="section.key"
+                                >
                                     <tr
-                                        v-for="row in statementColumns.rightRows"
+                                        class="border-b border-gray-200 bg-gray-50 dark:border-border dark:bg-muted"
+                                    >
+                                        <td
+                                            class="px-4 py-3 text-sm font-semibold text-gray-700 uppercase dark:text-gray-200"
+                                        >
+                                            {{ section.label }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 text-right font-mono text-base font-semibold text-gray-900 dark:text-white"
+                                        >
+                                            {{ formatCurrency(section.amount) }}
+                                        </td>
+                                    </tr>
+                                    <tr
+                                        v-for="row in section.rows"
                                         :key="row.key"
                                         class="border-b border-gray-100 dark:border-border/60"
                                     >
-                                        <td class="px-4 py-3">
-                                            <div
+                                        <td class="px-4 py-3 pl-8">
+                                            <button
+                                                type="button"
                                                 class="font-medium"
-                                                :class="rowToneClass(row.tone)"
+                                                :class="[
+                                                    rowToneClass(
+                                                        financialPositionTone(
+                                                            row.type,
+                                                        ),
+                                                    ),
+                                                    financialPositionRowPath(
+                                                        row.key,
+                                                    )
+                                                        ? 'hover:underline'
+                                                        : '',
+                                                ]"
+                                                @click="
+                                                    goToFinancialPositionRow(
+                                                        row.key,
+                                                    )
+                                                "
                                             >
                                                 {{ row.label }}
-                                            </div>
+                                            </button>
                                             <p
                                                 v-if="row.detail"
                                                 class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
@@ -1060,8 +1695,14 @@ const topCategories = computed(() =>
                                             </p>
                                         </td>
                                         <td
-                                            class="px-4 py-3 text-right font-mono text-base font-semibold"
-                                            :class="amountToneClass(row)"
+                                            class="px-4 py-3 text-right font-mono font-semibold"
+                                            :class="
+                                                rowToneClass(
+                                                    financialPositionTone(
+                                                        row.type,
+                                                    ),
+                                                )
+                                            "
                                         >
                                             {{ formatCurrency(row.amount) }}
                                         </td>
@@ -1070,202 +1711,477 @@ const topCategories = computed(() =>
                             </table>
                         </div>
                     </section>
-                </div>
+                </template>
 
-                <section
-                    class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                >
-                    <div
-                        class="flex flex-col gap-1 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-border"
-                    >
-                        <div>
-                            <h2
-                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                            >
-                                Saldos abiertos
-                            </h2>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                Informativo y separado del estado de resultados
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="grid gap-3 p-4 md:grid-cols-2">
-                        <button
-                            v-for="row in openBalanceRows"
-                            :key="row.key"
-                            type="button"
-                            class="rounded-lg border border-gray-200 p-4 text-left transition hover:border-cyan-300 hover:bg-cyan-50/40 dark:border-border dark:hover:border-cyan-700 dark:hover:bg-cyan-950/20"
-                            @click="row.path ? goToDetail(row.path) : null"
-                        >
-                            <div
-                                class="flex items-center justify-between gap-3"
-                            >
-                                <div>
-                                    <p
-                                        class="text-sm font-semibold text-gray-900 dark:text-white"
-                                    >
-                                        {{ row.label }}
-                                    </p>
-                                    <p
-                                        class="mt-1 text-xs text-gray-500 dark:text-gray-400"
-                                    >
-                                        {{ row.detail }}
-                                    </p>
-                                </div>
-                                <CreditCard
-                                    v-if="row.key === 'ar-open-balance'"
-                                    :size="22"
-                                    class="text-cyan-600"
-                                />
-                                <ReceiptText
-                                    v-else
-                                    :size="22"
-                                    class="text-violet-600"
-                                />
-                            </div>
-                            <p
-                                class="mt-3 text-right font-mono text-2xl font-semibold"
-                                :class="rowToneClass(row.tone)"
-                            >
-                                {{ formatCurrency(row.amount) }}
-                            </p>
-                        </button>
-                    </div>
-                </section>
-
-                <section class="grid gap-4 xl:grid-cols-2">
-                    <div
+                <template v-else-if="activeReportTab === 'credits'">
+                    <section
                         class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                     >
                         <div
-                            class="flex items-center gap-2 border-b border-gray-200 px-4 py-3 dark:border-border"
+                            class="border-b border-gray-200 px-4 py-3 dark:border-border"
                         >
-                            <Tag :size="18" class="text-indigo-600" />
                             <h2
                                 class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
                             >
-                                Top marcas por rentabilidad
+                                Antiguedad de saldos
                             </h2>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[420px] text-sm">
+                            <table class="w-full min-w-[720px] text-sm">
                                 <thead>
                                     <tr
                                         class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
                                     >
                                         <th class="px-4 py-2 text-left">
-                                            Marca
+                                            Rango
                                         </th>
                                         <th class="px-4 py-2 text-right">
-                                            Ganancia
+                                            CxC
                                         </th>
                                         <th class="px-4 py-2 text-right">
-                                            Margen
+                                            Docs CxC
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            CxP
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Docs CxP
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr
-                                        v-for="brand in topBrands"
-                                        :key="
-                                            brand.brand_id || brand.brand_name
-                                        "
+                                        v-for="row in agingRows"
+                                        :key="row.key"
                                         class="border-b border-gray-100 dark:border-border/60"
                                     >
                                         <td class="px-4 py-2 font-medium">
-                                            {{ brand.brand_name }}
+                                            {{ row.label }}
                                         </td>
                                         <td
-                                            class="px-4 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
-                                        >
-                                            {{ formatCurrency(brand.profit) }}
-                                        </td>
-                                        <td class="px-4 py-2 text-right">
-                                            {{ formatPercent(brand.margin) }}
-                                        </td>
-                                    </tr>
-                                    <tr v-if="!topBrands.length">
-                                        <td
-                                            colspan="3"
-                                            class="px-4 py-8 text-center text-gray-500"
-                                        >
-                                            Sin datos de marcas para este
-                                            periodo
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div
-                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="flex items-center gap-2 border-b border-gray-200 px-4 py-3 dark:border-border"
-                        >
-                            <Box :size="18" class="text-amber-600" />
-                            <h2
-                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                            >
-                                Top categorias por rentabilidad
-                            </h2>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[420px] text-sm">
-                                <thead>
-                                    <tr
-                                        class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
-                                    >
-                                        <th class="px-4 py-2 text-left">
-                                            Categoria
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Ganancia
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Margen
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="category in topCategories"
-                                        :key="
-                                            category.category_id ||
-                                            category.category_name
-                                        "
-                                        class="border-b border-gray-100 dark:border-border/60"
-                                    >
-                                        <td class="px-4 py-2 font-medium">
-                                            {{ category.category_name }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
+                                            class="px-4 py-2 text-right font-mono text-cyan-700 dark:text-cyan-300"
                                         >
                                             {{
-                                                formatCurrency(category.profit)
+                                                formatCurrency(
+                                                    row.receivableAmount,
+                                                )
                                             }}
                                         </td>
                                         <td class="px-4 py-2 text-right">
-                                            {{ formatPercent(category.margin) }}
+                                            {{ row.receivableCount }}
                                         </td>
-                                    </tr>
-                                    <tr v-if="!topCategories.length">
                                         <td
-                                            colspan="3"
-                                            class="px-4 py-8 text-center text-gray-500"
+                                            class="px-4 py-2 text-right font-mono text-rose-700 dark:text-rose-300"
                                         >
-                                            Sin datos de categorias para este
-                                            periodo
+                                            {{
+                                                formatCurrency(
+                                                    row.payableAmount,
+                                                )
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-2 text-right">
+                                            {{ row.payableCount }}
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                </section>
+                    </section>
+
+                    <section
+                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="border-b border-gray-200 px-4 py-3 dark:border-border"
+                        >
+                            <h2
+                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                            >
+                                Documentos abiertos
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[900px] text-sm">
+                                <thead>
+                                    <tr
+                                        class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
+                                    >
+                                        <th class="px-4 py-2 text-left">
+                                            Documento
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Tipo
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Cuenta
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Fecha
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Total
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Pagado
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Saldo
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Dias
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Accion
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="document in creditDocuments"
+                                        :key="`${document.document_type}-${document.id}`"
+                                        class="border-b border-gray-100 dark:border-border/60"
+                                    >
+                                        <td class="px-4 py-2 font-medium">
+                                            {{ document.document_number }}
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            <span
+                                                class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                                                :class="
+                                                    document.document_type ===
+                                                    'sales_order'
+                                                        ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300'
+                                                        : 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'
+                                                "
+                                            >
+                                                {{
+                                                    document.document_type ===
+                                                    'sales_order'
+                                                        ? 'CxC'
+                                                        : 'CxP'
+                                                }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            {{ document.account_name || 'N/A' }}
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            {{ document.date }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-mono"
+                                        >
+                                            {{ formatCurrency(document.total) }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-mono"
+                                        >
+                                            {{
+                                                formatCurrency(
+                                                    document.amount_paid,
+                                                )
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-mono font-semibold"
+                                        >
+                                            {{
+                                                formatCurrency(
+                                                    document.amount_due,
+                                                )
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-2 text-right">
+                                            {{ document.days_overdue }}
+                                        </td>
+                                        <td class="px-4 py-2 text-right">
+                                            <button
+                                                type="button"
+                                                class="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
+                                                @click="
+                                                    goToCreditDocument(document)
+                                                "
+                                            >
+                                                Ver
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="!creditDocuments.length">
+                                        <td
+                                            colspan="9"
+                                            class="px-4 py-8 text-center text-gray-500"
+                                        >
+                                            Sin documentos abiertos para los
+                                            filtros seleccionados
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section
+                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="border-b border-gray-200 px-4 py-3 dark:border-border"
+                        >
+                            <h2
+                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                            >
+                                Movimientos recientes
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[760px] text-sm">
+                                <thead>
+                                    <tr
+                                        class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
+                                    >
+                                        <th class="px-4 py-2 text-left">
+                                            Lote
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Tipo
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Metodo
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Fecha
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Referencia
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Monto
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="movement in creditMovements"
+                                        :key="`${movement.account_type}-${movement.id}`"
+                                        class="border-b border-gray-100 dark:border-border/60"
+                                    >
+                                        <td class="px-4 py-2 font-medium">
+                                            {{ movement.batch_number }}
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            {{
+                                                movement.account_type ===
+                                                'customer'
+                                                    ? 'Abono cliente'
+                                                    : 'Pago proveedor'
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            {{ movement.method }}
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            {{
+                                                movement.paid_at
+                                                    ? formatShortDate(
+                                                          movement.paid_at.slice(
+                                                              0,
+                                                              10,
+                                                          ),
+                                                      )
+                                                    : 'N/A'
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            {{
+                                                movement.reference_number ||
+                                                'Sin referencia'
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-mono font-semibold"
+                                            :class="
+                                                movement.account_type ===
+                                                'customer'
+                                                    ? 'text-cyan-700 dark:text-cyan-300'
+                                                    : 'text-rose-700 dark:text-rose-300'
+                                            "
+                                        >
+                                            {{
+                                                formatCurrency(movement.amount)
+                                            }}
+                                        </td>
+                                    </tr>
+                                    <tr v-if="!creditMovements.length">
+                                        <td
+                                            colspan="6"
+                                            class="px-4 py-8 text-center text-gray-500"
+                                        >
+                                            Sin movimientos recientes para los
+                                            filtros seleccionados
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </template>
+
+                <template v-else>
+                    <section
+                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="border-b border-gray-200 px-4 py-3 dark:border-border"
+                        >
+                            <h2
+                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                            >
+                                Comparativo contra periodo anterior
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[760px] text-sm">
+                                <thead>
+                                    <tr
+                                        class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
+                                    >
+                                        <th class="px-4 py-2 text-left">
+                                            Metrica
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Actual
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Anterior
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Variacion
+                                        </th>
+                                        <th class="px-4 py-2 text-right">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="row in comparisonRows"
+                                        :key="row.key"
+                                        class="border-b border-gray-100 dark:border-border/60"
+                                    >
+                                        <td class="px-4 py-2 font-medium">
+                                            {{ row.label }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-mono"
+                                        >
+                                            {{
+                                                row.key === 'margin_percentage'
+                                                    ? formatPercent(row.current)
+                                                    : formatCurrency(
+                                                          row.current,
+                                                      )
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-mono"
+                                        >
+                                            {{
+                                                row.key === 'margin_percentage'
+                                                    ? formatPercent(
+                                                          row.previous,
+                                                      )
+                                                    : formatCurrency(
+                                                          row.previous,
+                                                      )
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-mono font-semibold"
+                                            :class="
+                                                row.amount >= 0
+                                                    ? 'text-emerald-700 dark:text-emerald-300'
+                                                    : 'text-rose-700 dark:text-rose-300'
+                                            "
+                                        >
+                                            {{
+                                                row.key === 'margin_percentage'
+                                                    ? formatPercent(row.amount)
+                                                    : formatCurrency(row.amount)
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-2 text-right">
+                                            {{
+                                                row.percentage === null
+                                                    ? 'N/A'
+                                                    : formatPercent(
+                                                          row.percentage,
+                                                      )
+                                            }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="grid gap-4 xl:grid-cols-3">
+                        <div
+                            v-for="group in [
+                                {
+                                    title: 'Marcas',
+                                    rows: reportBreakdowns.by_brand,
+                                    label: 'brand_name',
+                                },
+                                {
+                                    title: 'Categorias',
+                                    rows: reportBreakdowns.by_category,
+                                    label: 'category_name',
+                                },
+                                {
+                                    title: 'Sucursales',
+                                    rows: reportBreakdowns.by_warehouse,
+                                    label: 'name',
+                                },
+                            ]"
+                            :key="group.title"
+                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-gray-200 px-4 py-3 dark:border-border"
+                            >
+                                <h3
+                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                                >
+                                    {{ group.title }}
+                                </h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-[320px] text-sm">
+                                    <tbody>
+                                        <tr
+                                            v-for="row in group.rows.slice(
+                                                0,
+                                                6,
+                                            )"
+                                            :key="row.id || row[group.label]"
+                                            class="border-b border-gray-100 dark:border-border/60"
+                                        >
+                                            <td class="px-4 py-2 font-medium">
+                                                {{ row[group.label] }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        row.profit ?? 0,
+                                                    )
+                                                }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </template>
             </template>
         </div>
     </AppLayout>

@@ -5,6 +5,8 @@ import type {
     MovementHistoryReport,
     MovementHistoryFilters,
     FinancialReport,
+    IncomeStatementReport,
+    FinancialPositionReport,
     CustomerReferenceReport,
 } from '@/types/report';
 
@@ -76,6 +78,30 @@ export const ReportsApiService = {
         warehouse_id?: number | null;
     }): Promise<FinancialReport> {
         const response = await apiClient.get('/reports/financial', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getIncomeStatement(filters: {
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        basis?: 'cash' | 'accrual_operational';
+        compare?: 'previous_period' | 'none';
+    }): Promise<IncomeStatementReport> {
+        const response = await apiClient.get('/reports/income-statement', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getFinancialPosition(filters: {
+        warehouse_id?: number | null;
+        date_to?: string | null;
+        mode?: 'current_snapshot' | 'as_of';
+    }): Promise<FinancialPositionReport> {
+        const response = await apiClient.get('/reports/financial-position', {
             params: filters,
         });
         return response.data;

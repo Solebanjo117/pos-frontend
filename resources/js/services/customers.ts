@@ -7,6 +7,8 @@ import type {
     CustomerTransaction,
     CustomerVehicle,
     CustomerVehicleFormData,
+    CustomerSalesHistory,
+    CustomerSalesHistoryFilters,
 } from '@/types/customer';
 
 export const CustomersApiService = {
@@ -44,6 +46,16 @@ export const CustomersApiService = {
             customer: Customer;
             balance_summary: CustomerBalanceSummary;
         }>(`/customers/${id}`);
+    },
+
+    async getSalesHistory(
+        id: number,
+        filters: CustomerSalesHistoryFilters = {},
+    ) {
+        return await apiClient.get<CustomerSalesHistory>(
+            `/customers/${id}/sales-history`,
+            { params: filters },
+        );
     },
 
     async getVehicles(id: number) {

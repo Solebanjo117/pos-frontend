@@ -94,6 +94,8 @@ export function useReports() {
     };
 
     const financialReport = ref<any>(null);
+    const incomeStatementReport = ref<any>(null);
+    const financialPositionReport = ref<any>(null);
     const brandProfitabilityReport = ref<any[] | null>(null);
     const categoryProfitabilityReport = ref<any[] | null>(null);
     const zReport = ref<any>(null);
@@ -117,6 +119,51 @@ export function useReports() {
                 err.response?.data?.message ||
                 'Error fetching financial report';
             console.error('Error fetching financial report:', err);
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const fetchIncomeStatement = async (filters: {
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        basis?: 'cash' | 'accrual_operational';
+        compare?: 'previous_period' | 'none';
+    }) => {
+        loading.value = true;
+        error.value = null;
+
+        try {
+            incomeStatementReport.value =
+                await ReportsApiService.getIncomeStatement(filters);
+            financialReport.value = incomeStatementReport.value;
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message ||
+                'Error fetching income statement';
+            console.error('Error fetching income statement:', err);
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const fetchFinancialPosition = async (filters: {
+        warehouse_id?: number | null;
+        date_to?: string | null;
+        mode?: 'current_snapshot' | 'as_of';
+    }) => {
+        loading.value = true;
+        error.value = null;
+
+        try {
+            financialPositionReport.value =
+                await ReportsApiService.getFinancialPosition(filters);
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message ||
+                'Error fetching financial position';
+            console.error('Error fetching financial position:', err);
         } finally {
             loading.value = false;
         }
@@ -234,6 +281,8 @@ export function useReports() {
         stockLevelsReport,
         movementHistoryReport,
         financialReport,
+        incomeStatementReport,
+        financialPositionReport,
         brandProfitabilityReport,
         categoryProfitabilityReport,
         zReport,
@@ -243,6 +292,8 @@ export function useReports() {
         fetchMovementHistory,
         exportReport,
         fetchFinancialReport,
+        fetchIncomeStatement,
+        fetchFinancialPosition,
         fetchBrandProfitability,
         fetchCategoryProfitability,
         fetchZReport,

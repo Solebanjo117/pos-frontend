@@ -95,6 +95,84 @@ export interface CustomerBalanceSummary {
     is_over_limit: boolean;
 }
 
+export interface CustomerOrderPaymentSummary {
+    method: string;
+    method_label: string;
+    amount: number;
+    count: number;
+}
+
+export interface CustomerOrderPayment {
+    id: number;
+    method: string;
+    method_label: string;
+    amount: number;
+    paid_at: string | null;
+    notes: string | null;
+    creator_name: string | null;
+}
+
+export interface CustomerPurchasedItem {
+    id: number;
+    product_id: number | null;
+    variant_id: number | null;
+    product_name: string | null;
+    product_sku: string | null;
+    variant_sku: string | null;
+    brand_name: string | null;
+    warehouse_name: string | null;
+    seller_name: string | null;
+    quantity: number;
+    unit_price: number;
+    discount_amount: number;
+    tax_percent: number;
+    tax_amount: number;
+    subtotal: number;
+    total: number;
+    notes: string | null;
+    is_custom_line: boolean;
+}
+
+export interface CustomerSalesHistoryOrder {
+    id: number;
+    order_number: string;
+    date: string | null;
+    status: string;
+    status_label: string;
+    payment_status: string;
+    subtotal: number;
+    discount_amount: number;
+    tax_amount: number;
+    shipping_cost: number;
+    total: number;
+    amount_paid: number;
+    amount_due: number;
+    total_returned: number;
+    payment_summary: CustomerOrderPaymentSummary[];
+    items: CustomerPurchasedItem[];
+    payments: CustomerOrderPayment[];
+}
+
+export interface CustomerSalesHistory {
+    data: CustomerSalesHistoryOrder[];
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+}
+
+export interface CustomerSalesHistoryFilters {
+    date_from?: string;
+    date_to?: string;
+    status?: string;
+    payment_status?: string;
+    search?: string;
+    page?: number;
+    per_page?: number;
+}
+
 export interface CustomerFilters {
     search?: string;
     type?: 'individual' | 'business';

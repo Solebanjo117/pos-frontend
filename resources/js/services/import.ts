@@ -51,6 +51,7 @@ export const importService = {
             formData,
             {
                 headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 120000,
             },
         );
         return response.data;
@@ -82,6 +83,16 @@ export const importService = {
         const response = await apiClient.get(
             `/${entity}/import/runs/${importRunId}`,
         );
+        return response.data;
+    },
+
+    async listRuns(
+        entity: string,
+        params: Record<string, any> = {},
+    ): Promise<any> {
+        const response = await apiClient.get(`/${entity}/import/runs`, {
+            params,
+        });
         return response.data;
     },
 
@@ -143,6 +154,14 @@ export const importService = {
     async downloadErrors(entity: string, importRunId: number): Promise<Blob> {
         const response = await apiClient.get(
             `/${entity}/import/runs/${importRunId}/errors.xlsx`,
+            { responseType: 'blob' },
+        );
+        return response.data;
+    },
+
+    async downloadSource(entity: string, importRunId: number): Promise<Blob> {
+        const response = await apiClient.get(
+            `/${entity}/import/runs/${importRunId}/source`,
             { responseType: 'blob' },
         );
         return response.data;

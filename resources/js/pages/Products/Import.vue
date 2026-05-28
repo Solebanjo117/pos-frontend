@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Plus, X } from 'lucide-vue-next';
+import { Car, Loader2, Plus, X } from 'lucide-vue-next';
 import { useToast } from '@/composables/useToast';
 import apiClient from '@/services/api/client';
 
@@ -44,9 +44,24 @@ const importConfig: ImporterConfig = {
         { key: 'precio', label: 'Precio', type: 'number' },
         { key: 'cantidad', label: 'Cantidad', type: 'number' },
         { key: 'descripcion', label: 'Descripcion', type: 'text' },
+        {
+            key: '__compatibility',
+            label: 'Vehiculos',
+            actionType: 'compatibility',
+        },
         { key: '__attributes', label: 'Atributos', actionType: 'attributes' },
         { key: '__variants', label: 'Variantes', actionType: 'variants' },
     ],
+};
+
+type VehicleCreationCandidate = {
+    make_id?: number | null;
+    make?: string | null;
+    model_id?: number | null;
+    model?: string | null;
+    chassis?: string | null;
+    engine?: string | null;
+    label?: string | null;
 };
 
 const importerRef = ref<any>(null);
@@ -71,6 +86,7 @@ const currentAttributes = ref<{ name: string; value: string; unit?: string }[]>(
     [],
 );
 const variantsModal = ref(false);
+const creatingVehicleCandidates = ref<Record<string, boolean>>({});
 
 const loadCategories = async () => {
     loadingCategories.value = true;
@@ -107,6 +123,23 @@ const currentVariantGroup = computed(() => {
         ) ?? null
     );
 });
+
+const missingVehicleCandidates = computed<VehicleCreationCandidate[]>(() => {
+    return (
+        importerRef.value?.previewSummary?.missing_vehicle_candidates ?? []
+    ).filter(
+        (candidate: VehicleCreationCandidate) =>
+            candidate?.make && candidate?.model,
+    );
+});
+
+const vehicleCandidateKey = (candidate: VehicleCreationCandidate) =>
+    [
+        candidate.make_id ?? candidate.make ?? '',
+        candidate.model_id ?? candidate.model ?? '',
+        candidate.chassis ?? '',
+        candidate.engine ?? '',
+    ].join('|');
 
 const getRowCategoryId = (rowIdx: number): number | undefined => {
     const rows = importerRef.value?.editedRows;
@@ -205,6 +238,62 @@ const handleRowAction = (actionType: string, rowIdx: number) => {
     if (actionType === 'attributes') openAttributesModal(rowIdx);
     if (actionType === 'variants') openVariantsModal(rowIdx);
 };
+
+const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
+    const key = vehicleCandidateKey(candidate);
+    creatingVehicleCandidates.value[key] = true;
+
+    try {
+        let makeId = candidate.make_id ?? null;
+        if (!makeId && candidate.make) {
+            const { data } = await apiClient.post('/vehicle-makes', {
+                name: candidate.make,
+            });
+            makeId = (data.data ?? data).id;
+        }
+
+        let modelId = candidate.model_id ?? null;
+        if (!modelId && candidate.model && makeId) {
+            const currentYear = new Date().getFullYear();
+            const { data } = await apiClient.post('/vehicle-models', {
+                make_id: makeId,
+                name: candidate.model,
+                year_from: currentYear,
+                year_to: currentYear,
+            });
+            modelId = (data.data ?? data).id;
+        }
+
+        if (candidate.chassis) {
+            await apiClient.post('/vehicle-chassis', {
+                code: candidate.chassis,
+                name: candidate.chassis,
+                model_id: modelId,
+                model_ids: modelId ? [modelId] : [],
+            });
+        }
+
+        if (candidate.engine) {
+            await apiClient.post('/vehicle-engines', {
+                make_id: makeId,
+                model_id: modelId,
+                model_ids: modelId ? [modelId] : [],
+                engine_code: candidate.engine,
+                fuel_type: 'Gasoline',
+            });
+        }
+
+        toast.success('Vehiculo creado. Actualizando previsualizacion.');
+        await importerRef.value?.refreshPreview?.();
+    } catch (error: any) {
+        toast.error(
+            error.response?.data?.message ||
+                'No se pudo crear el vehiculo detectado.',
+        );
+    } finally {
+        creatingVehicleCandidates.value[key] = false;
+    }
+};
 </script>
 
 <template>
@@ -217,6 +306,68 @@ const handleRowAction = (actionType: string, rowIdx: number) => {
                 @create="handleCreate"
                 @row-action="handleRowAction"
             />
+
+            <div
+                v-if="missingVehicleCandidates.length"
+                class="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950/30"
+            >
+                <div class="mb-3 flex items-start gap-3">
+                    <Car
+                        class="mt-0.5 h-5 w-5 text-amber-700 dark:text-amber-300"
+                    />
+                    <div>
+                        <h2
+                            class="font-semibold text-amber-950 dark:text-amber-100"
+                        >
+                            Vehiculos detectados sin catalogo completo
+                        </h2>
+                        <p class="text-amber-800 dark:text-amber-200">
+                            Crea los chasis o motores faltantes y el preview se
+                            actualiza para validar esas filas.
+                        </p>
+                    </div>
+                </div>
+                <div class="grid gap-2 md:grid-cols-2">
+                    <div
+                        v-for="candidate in missingVehicleCandidates"
+                        :key="vehicleCandidateKey(candidate)"
+                        class="flex items-center justify-between gap-3 rounded border border-amber-200 bg-white p-3 dark:border-amber-900 dark:bg-background"
+                    >
+                        <div class="min-w-0">
+                            <p class="truncate font-medium text-foreground">
+                                {{
+                                    candidate.label ||
+                                    `${candidate.make} ${candidate.model}`
+                                }}
+                            </p>
+                            <p class="text-xs text-muted-foreground">
+                                Chasis {{ candidate.chassis || '-' }} · Motor
+                                {{ candidate.engine || '-' }}
+                            </p>
+                        </div>
+                        <Button
+                            size="sm"
+                            :disabled="
+                                creatingVehicleCandidates[
+                                    vehicleCandidateKey(candidate)
+                                ]
+                            "
+                            @click="createVehicleCandidate(candidate)"
+                        >
+                            <Loader2
+                                v-if="
+                                    creatingVehicleCandidates[
+                                        vehicleCandidateKey(candidate)
+                                    ]
+                                "
+                                class="mr-2 h-4 w-4 animate-spin"
+                            />
+                            <Plus v-else class="mr-2 h-4 w-4" />
+                            Crear
+                        </Button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <Dialog

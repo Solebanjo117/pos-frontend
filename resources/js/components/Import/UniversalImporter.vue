@@ -14,6 +14,10 @@ import {
     Tag,
     Package,
     Car,
+    History,
+    RefreshCw,
+    RotateCcw,
+    ChevronDown,
 } from 'lucide-vue-next';
 import apiClient from '@/services/api/client';
 
@@ -41,9 +45,13 @@ const importRunning = ref(false);
 const fullImportRunning = ref(false);
 const activeImportRunId = ref<number | null>(null);
 const pendingPollCount = ref(0);
-const pendingFallbackAttempted = ref(false);
+const processNowAttempted = ref(false);
+const importRuns = ref<any[]>([]);
+const importRunsLoading = ref(false);
+const importHistoryExpanded = ref(false);
 const creatingBrands = ref<Record<string, boolean>>({});
 let importStatusTimer: ReturnType<typeof setInterval> | null = null;
+let importStatusRefreshInFlight = false;
 const searchableOptions = ref<Record<string, any[]>>({});
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const MAX_IMPORT_FILE_BYTES = 100 * 1024 * 1024;
@@ -89,7 +97,16 @@ const canImport = computed(
         hasPreview.value &&
         validCount.value > 0 &&
         !importRunning.value &&
-        !fullValidationReportActive.value,
+        !fullValidationReportActive.value &&
+        !props.config.fullFileImport,
+);
+const canRunFullFile = computed(
+    () =>
+        props.config.fullFileImport &&
+        hasFile.value &&
+        !previewLoading.value &&
+        !fullImportRunning.value &&
+        !validationRunning.value,
 );
 const missingBrandReferences = computed<string[]>(() => {
     const previewBrands =
@@ -160,6 +177,13 @@ const importerShellClass = computed(() =>
         ? 'mx-auto w-full max-w-[96rem] space-y-6'
         : 'mx-auto w-full max-w-7xl space-y-6',
 );
+const activeHistoryRun = computed(() =>
+    importRuns.value.find((run) => run.id === activeImportRunId.value),
+);
+const activeImportRunsCount = computed(
+    () =>
+        importRuns.value.filter((run) => isActiveRunStatus(run.status)).length,
+);
 
 const handleDrop = (e: DragEvent) => {
     dragOver.value = false;
@@ -198,7 +222,6 @@ const resetPreview = () => {
     result.value = null;
     error.value = null;
     activeImportRunId.value = null;
-    pendingFallbackAttempted.value = false;
     stopImportStatusPolling();
 };
 
@@ -239,6 +262,27 @@ const previewImport = async (
                 profile_id: selectedProfileId.value,
             },
         );
+        if (response.data?.async && response.data?.import_run_id) {
+            activeImportRunId.value = response.data.import_run_id;
+            importHistoryExpanded.value = true;
+            result.value = response.data;
+            validationRunning.value = true;
+            previewRows.value = [];
+            editedRows.value = [];
+            previewSummary.value = response.data?.summary ?? null;
+            importSheets.value = response.data?.sheets ?? [];
+            detectedColumns.value = response.data?.detected_columns ?? [];
+            requiredFields.value = response.data?.required_fields ?? [];
+            if (Object.keys(fieldMapping.value).length === 0) {
+                fieldMapping.value = response.data?.suggested_mapping ?? {};
+            }
+            selectedSheetIndex.value =
+                response.data?.selected_sheet?.index ?? sheetIndex ?? null;
+            await loadImportRuns(false);
+            startImportStatusPolling();
+            return;
+        }
+
         previewRows.value = response.data?.rows ?? [];
         previewSummary.value = response.data?.summary ?? null;
         importSheets.value = response.data?.sheets ?? [];
@@ -255,6 +299,9 @@ const previewImport = async (
     } catch (e: any) {
         error.value =
             e.response?.data?.message ||
+            (e.code === 'ECONNABORTED'
+                ? 'La previsualizacion tardo demasiado. Se debe procesar en cola para evitar el timeout.'
+                : null) ||
             'No se pudo generar la previsualización.';
         previewRows.value = [];
         editedRows.value = [];
@@ -279,7 +326,12 @@ const applyPreviewRows = (rows: any[]) => {
         __variants: row.data?.__variants ?? [],
         __variant_preview: row.data?.__variant_preview ?? null,
         __product_group_key: row.data?.__product_group_key ?? null,
-        __compatibility: row.data?.__compatibility ?? [],
+        __compatibility:
+            row.data?.__compatibility ??
+            row.data?.__vehicle_compatibility ??
+            [],
+        __vehicle_creation_candidate:
+            row.data?.__vehicle_creation_candidate ?? null,
     }));
 };
 
@@ -291,6 +343,38 @@ const loadImportProfiles = async () => {
     } catch {
         importProfiles.value = [];
     }
+};
+
+const isActiveRunStatus = (status: string | undefined) =>
+    ['pending', 'running', 'cancel_requested'].includes(status ?? '');
+
+const loadImportRuns = async (resumeActive = false) => {
+    if (!props.config.fullFileImport) return;
+    importRunsLoading.value = true;
+    try {
+        const response = await importService.listRuns(props.config.entity, {
+            per_page: 10,
+        });
+        importRuns.value = response.data ?? [];
+
+        if (resumeActive && !activeImportRunId.value) {
+            const activeRun = importRuns.value.find((run) =>
+                isActiveRunStatus(run.status),
+            );
+            if (activeRun) {
+                importHistoryExpanded.value = true;
+                await openImportRun(activeRun);
+            }
+        }
+    } catch {
+        importRuns.value = [];
+    } finally {
+        importRunsLoading.value = false;
+    }
+};
+
+const toggleImportHistory = () => {
+    importHistoryExpanded.value = !importHistoryExpanded.value;
 };
 
 const applySelectedProfile = () => {
@@ -316,6 +400,15 @@ const saveCurrentProfile = async () => {
     await loadImportProfiles();
     selectedProfileId.value = profile.id ?? null;
 };
+
+const currentImportOptions = () => ({
+    ...(selectedSheetIndex.value !== null
+        ? { sheet_index: selectedSheetIndex.value }
+        : {}),
+    mapping: fieldMapping.value,
+    mode: importMode.value,
+    profile_id: selectedProfileId.value,
+});
 
 const handleSheetChange = async (event: Event) => {
     const value = Number((event.target as HTMLSelectElement).value);
@@ -401,6 +494,7 @@ const resolveSearchableValues = () => {
 
 onMounted(loadSearchableOptions);
 onMounted(loadImportProfiles);
+onMounted(() => loadImportRuns(true));
 
 defineExpose({
     reloadSearchableOptions: () => {
@@ -495,8 +589,10 @@ const getActionCount = (row: any, actionType: string): number => {
 
         return (row.__variants ?? []).length + (row.__variant_preview ? 1 : 0);
     }
-    if (actionType === 'compatibility')
-        return (row.__compatibility ?? []).length;
+    if (actionType === 'compatibility') {
+        const compatibilityCount = (row.__compatibility ?? []).length;
+        return compatibilityCount || (row.__vehicle_creation_candidate ? 1 : 0);
+    }
     return 0;
 };
 
@@ -545,9 +641,42 @@ const runImport = async () => {
     }
 };
 
+const importFullFile = async () => {
+    if (!file.value || !canRunFullFile.value) return;
+    error.value = null;
+    result.value = null;
+    fullImportRunning.value = true;
+    validationRunning.value = false;
+    fullValidationReportActive.value = false;
+
+    try {
+        const response = await importService.importFile(
+            props.config.entity,
+            file.value,
+            currentImportOptions(),
+        );
+        activeImportRunId.value = response.data?.import_run_id ?? null;
+        result.value = response.data ?? response;
+
+        if (activeImportRunId.value) {
+            importHistoryExpanded.value = true;
+            await loadImportRuns(false);
+            startImportStatusPolling();
+        } else {
+            fullImportRunning.value = false;
+        }
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message ||
+            'No se pudo iniciar la importacion completa.';
+        fullImportRunning.value = false;
+    }
+};
+
 const cancelActiveRun = async () => {
     if (!activeImportRunId.value) return;
     await importService.cancelRun(props.config.entity, activeImportRunId.value);
+    await loadImportRuns(false);
     await refreshImportRun();
 };
 
@@ -559,33 +688,113 @@ const retryFailedRows = async () => {
     );
     activeImportRunId.value = response.data?.import_run_id ?? null;
     result.value = response.data ?? response;
+    await loadImportRuns(false);
     if (activeImportRunId.value) startImportStatusPolling();
 };
 
-const applyCompletedValidationRows = () => {
+const applyCompletedValidationRows = async () => {
     const validationRows = result.value?.validation_rows ?? [];
     if (validationRows.length === 0) return;
 
     previewRows.value = validationRows;
     previewSummary.value = result.value?.summary ?? null;
     applyPreviewRows(validationRows);
+    await loadSearchableOptions();
+    resolveSearchableValues();
     fullValidationReportActive.value = true;
 };
 
 const downloadErrorReport = async () => {
     if (!activeImportRunId.value) return;
-    const blob = await importService.downloadErrors(
+    await downloadRunErrors(activeImportRunId.value);
+};
+
+const downloadRunErrors = async (importRunId: number) => {
+    error.value = null;
+    try {
+        const blob = await importService.downloadErrors(
+            props.config.entity,
+            importRunId,
+        );
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `errores-importacion-${importRunId}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message ||
+            'No se pudo descargar el archivo de errores.';
+    }
+};
+
+const downloadRunSource = async (run: any) => {
+    error.value = null;
+    try {
+        const blob = await importService.downloadSource(
+            props.config.entity,
+            run.id,
+        );
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = run.original_filename || `importacion-${run.id}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message ||
+            'No se pudo descargar el archivo original.';
+    }
+};
+
+const openImportRun = async (run: any) => {
+    error.value = null;
+    activeImportRunId.value = run.id;
+    const response = await importService.getRun(props.config.entity, run.id);
+    result.value = response.data ?? response;
+    const status = result.value?.status;
+
+    validationRunning.value =
+        result.value?.run_type === 'validation' && isActiveRunStatus(status);
+    fullImportRunning.value =
+        result.value?.run_type !== 'validation' && isActiveRunStatus(status);
+
+    if (result.value?.run_type === 'validation' && status === 'completed') {
+        await applyCompletedValidationRows();
+    }
+
+    if (isActiveRunStatus(status)) {
+        startImportStatusPolling();
+    } else {
+        stopImportStatusPolling();
+    }
+};
+
+const cancelHistoryRun = async (run: any) => {
+    await importService.cancelRun(props.config.entity, run.id);
+    await loadImportRuns(false);
+    if (activeImportRunId.value === run.id) {
+        await refreshImportRun();
+    }
+};
+
+const retryHistoryRun = async (run: any) => {
+    const response = await importService.retryFailed(
         props.config.entity,
-        activeImportRunId.value,
+        run.id,
     );
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `errores-importacion-${activeImportRunId.value}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    activeImportRunId.value = response.data?.import_run_id ?? null;
+    result.value = response.data ?? response;
+    await loadImportRuns(false);
+    if (activeImportRunId.value) {
+        startImportStatusPolling();
+    }
 };
 
 const refreshImportRun = async () => {
@@ -596,40 +805,33 @@ const refreshImportRun = async () => {
         importRunId,
     );
     result.value = response.data ?? response;
+    await loadImportRuns(false);
     let status = result.value?.status;
     if (status === 'pending') {
         pendingPollCount.value += 1;
 
-        if (
-            result.value?.run_type === 'validation' &&
-            !pendingFallbackAttempted.value &&
-            pendingPollCount.value >= 2
-        ) {
-            pendingFallbackAttempted.value = true;
-            error.value =
-                'La validacion sigue en cola. Intentando procesarla ahora...';
+        if (pendingPollCount.value >= 6 && !processNowAttempted.value) {
+            processNowAttempted.value = true;
 
             try {
-                const fallbackResponse = await importService.processRunNow(
+                const processResponse = await importService.processRunNow(
                     props.config.entity,
                     importRunId,
                 );
-                result.value = fallbackResponse.data ?? fallbackResponse;
+                result.value = processResponse.data ?? processResponse;
+                await loadImportRuns(false);
                 status = result.value?.status;
-                error.value = null;
             } catch (e: any) {
                 error.value =
                     e.response?.data?.message ||
-                    'La validacion sigue en cola. Se continuara consultando el avance.';
+                    'El proceso sigue en cola. Puedes mantener esta pantalla abierta; se seguira consultando el avance.';
             }
+        } else if (pendingPollCount.value >= 6) {
+            error.value =
+                'El proceso sigue en cola. Puedes mantener esta pantalla abierta; se seguira consultando el avance.';
         }
 
         if (status === 'pending') {
-            if (pendingPollCount.value >= 6) {
-                error.value =
-                    'La validacion sigue en cola. Puedes mantener esta pantalla abierta; se seguira consultando el avance.';
-            }
-
             return;
         }
     }
@@ -644,7 +846,7 @@ const refreshImportRun = async () => {
         validationRunning.value = false;
         if (result.value?.run_type === 'validation') {
             if (status === 'completed') {
-                applyCompletedValidationRows();
+                await applyCompletedValidationRows();
             }
         }
         stopImportStatusPolling();
@@ -654,12 +856,18 @@ const refreshImportRun = async () => {
 const startImportStatusPolling = () => {
     stopImportStatusPolling();
     pendingPollCount.value = 0;
+    processNowAttempted.value = false;
     importStatusTimer = setInterval(() => {
+        if (importStatusRefreshInFlight) return;
+
+        importStatusRefreshInFlight = true;
         refreshImportRun().catch(() => {
             error.value = 'No se pudo actualizar el avance de la importacion.';
             fullImportRunning.value = false;
             validationRunning.value = false;
             stopImportStatusPolling();
+        }).finally(() => {
+            importStatusRefreshInFlight = false;
         });
     }, 2500);
 };
@@ -674,6 +882,65 @@ const stopImportStatusPolling = () => {
 onUnmounted(() => {
     stopImportStatusPolling();
 });
+
+const runTypeLabel = (run: any): string => {
+    if (run.preview_async) return 'Preview';
+    if (run.run_type === 'validation') return 'Validacion';
+    if (run.mode === 'retry_failed') return 'Reintento';
+    return 'Importacion';
+};
+
+const statusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+        pending: 'En cola',
+        running: 'Procesando',
+        completed: 'Completado',
+        failed: 'Fallido',
+        cancel_requested: 'Cancelando',
+        cancelled: 'Cancelado',
+    };
+
+    return labels[status] ?? status;
+};
+
+const statusClass = (status: string): string => {
+    if (status === 'completed') {
+        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
+    }
+    if (status === 'failed' || status === 'cancelled') {
+        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+    }
+    if (status === 'running') {
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+    }
+
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+};
+
+const formatRunDate = (value: string | null | undefined): string => {
+    if (!value) return 'Sin fecha';
+
+    return new Intl.DateTimeFormat('es-PA', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+    }).format(new Date(value));
+};
+
+const runProgressPercent = (run: any): number => {
+    const total = Number(run.total_rows ?? 0);
+    if (total <= 0) {
+        return isActiveRunStatus(run.status)
+            ? 5
+            : run.status === 'completed'
+              ? 100
+              : 0;
+    }
+
+    return Math.min(
+        100,
+        Math.round((Number(run.processed_rows ?? 0) / total) * 100),
+    );
+};
 
 const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -785,6 +1052,21 @@ const formatFileSize = (bytes: number) => {
                     class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-500 transition hover:bg-gray-50 dark:border-border dark:text-gray-400 dark:hover:bg-muted/30"
                 >
                     <XIcon class="h-4 w-4" /> Limpiar
+                </button>
+
+                <button
+                    v-if="config.fullFileImport"
+                    type="button"
+                    :disabled="!canRunFullFile"
+                    @click="importFullFile"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <UploadCloud class="h-4 w-4" />
+                    {{
+                        fullImportRunning
+                            ? 'Importando archivo...'
+                            : 'Importar archivo completo'
+                    }}
                 </button>
 
                 <p
@@ -946,6 +1228,259 @@ const formatFileSize = (bytes: number) => {
             </div>
         </div>
 
+        <div
+            v-if="config.fullFileImport"
+            class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+        >
+            <div
+                class="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between"
+                :class="{
+                    'border-b border-gray-200 dark:border-border':
+                        importHistoryExpanded,
+                }"
+            >
+                <button
+                    type="button"
+                    class="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    :aria-expanded="importHistoryExpanded"
+                    @click="toggleImportHistory"
+                >
+                    <span
+                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-muted dark:text-gray-300"
+                    >
+                        <History class="h-5 w-5" />
+                    </span>
+                    <span class="min-w-0">
+                        <span
+                            class="flex flex-wrap items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
+                        >
+                            Historial de importaciones
+                            <span
+                                v-if="activeImportRunsCount > 0"
+                                class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            >
+                                {{ activeImportRunsCount }} activo{{
+                                    activeImportRunsCount === 1 ? '' : 's'
+                                }}
+                            </span>
+                        </span>
+                        <span
+                            class="mt-1 block text-xs text-gray-500 dark:text-gray-400"
+                        >
+                            {{
+                                importHistoryExpanded
+                                    ? 'Click para minimizar el historial.'
+                                    : 'Click para ver procesos, descargas y reintentos.'
+                            }}
+                        </span>
+                    </span>
+                    <ChevronDown
+                        class="ml-auto h-5 w-5 shrink-0 text-gray-400 transition-transform"
+                        :class="{ 'rotate-180': importHistoryExpanded }"
+                    />
+                </button>
+                <button
+                    type="button"
+                    :disabled="importRunsLoading"
+                    @click="loadImportRuns(false)"
+                    class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:text-gray-300 dark:hover:bg-muted/30"
+                >
+                    <RefreshCw
+                        class="h-4 w-4"
+                        :class="{ 'animate-spin': importRunsLoading }"
+                    />
+                    Actualizar
+                </button>
+            </div>
+
+            <div
+                v-if="
+                    importHistoryExpanded &&
+                    importRunsLoading &&
+                    importRuns.length === 0
+                "
+                class="px-6 py-6 text-sm text-gray-500 dark:text-gray-400"
+            >
+                Cargando historial...
+            </div>
+            <div
+                v-else-if="importHistoryExpanded && importRuns.length === 0"
+                class="px-6 py-6 text-sm text-gray-500 dark:text-gray-400"
+            >
+                Aun no hay importaciones guardadas.
+            </div>
+            <div v-else-if="importHistoryExpanded" class="overflow-x-auto">
+                <table
+                    class="min-w-full divide-y divide-gray-200 text-sm dark:divide-border"
+                >
+                    <thead class="bg-gray-50 dark:bg-background">
+                        <tr>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300"
+                            >
+                                Archivo
+                            </th>
+                            <th
+                                class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300"
+                            >
+                                Tipo
+                            </th>
+                            <th
+                                class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300"
+                            >
+                                Estado
+                            </th>
+                            <th
+                                class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300"
+                            >
+                                Progreso
+                            </th>
+                            <th
+                                class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300"
+                            >
+                                Fecha
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300"
+                            >
+                                Acciones
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-border">
+                        <tr
+                            v-for="run in importRuns"
+                            :key="run.id"
+                            :class="[
+                                activeHistoryRun?.id === run.id
+                                    ? 'bg-blue-50/70 dark:bg-blue-950/20'
+                                    : 'bg-white dark:bg-card',
+                            ]"
+                        >
+                            <td class="px-6 py-4">
+                                <div
+                                    class="max-w-[24rem] truncate font-medium text-gray-900 dark:text-white"
+                                    :title="run.original_filename"
+                                >
+                                    {{
+                                        run.original_filename ||
+                                        `Importacion #${run.id}`
+                                    }}
+                                </div>
+                                <p
+                                    class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                >
+                                    #{{ run.id }}
+                                    <span v-if="run.user?.name">
+                                        · {{ run.user.name }}</span
+                                    >
+                                </p>
+                            </td>
+                            <td
+                                class="px-4 py-4 text-gray-700 dark:text-gray-300"
+                            >
+                                {{ runTypeLabel(run) }}
+                            </td>
+                            <td class="px-4 py-4">
+                                <span
+                                    class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                                    :class="statusClass(run.status)"
+                                >
+                                    {{ statusLabel(run.status) }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-4">
+                                <div class="w-36">
+                                    <div
+                                        class="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-muted"
+                                    >
+                                        <div
+                                            class="h-full rounded-full bg-blue-500"
+                                            :style="{
+                                                width: `${runProgressPercent(run)}%`,
+                                            }"
+                                        ></div>
+                                    </div>
+                                    <p
+                                        class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                    >
+                                        {{ run.processed_rows ?? 0 }} /
+                                        {{ run.total_rows ?? 0 }} filas
+                                        <span
+                                            v-if="
+                                                Number(run.error_count ?? 0) > 0
+                                            "
+                                            class="text-red-600 dark:text-red-300"
+                                        >
+                                            · {{ run.error_count }} errores
+                                        </span>
+                                    </p>
+                                </div>
+                            </td>
+                            <td
+                                class="px-4 py-4 text-xs text-gray-500 dark:text-gray-400"
+                            >
+                                {{ formatRunDate(run.created_at) }}
+                            </td>
+                            <td class="px-6 py-4">
+                                <div
+                                    class="flex flex-wrap items-center justify-end gap-2"
+                                >
+                                    <button
+                                        type="button"
+                                        @click="openImportRun(run)"
+                                        class="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/30"
+                                    >
+                                        <Eye class="h-3.5 w-3.5" />
+                                        Abrir
+                                    </button>
+                                    <button
+                                        v-if="run.has_source_file"
+                                        type="button"
+                                        @click="downloadRunSource(run)"
+                                        class="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/30"
+                                    >
+                                        <Download class="h-3.5 w-3.5" />
+                                        Original
+                                    </button>
+                                    <button
+                                        v-if="
+                                            run.has_errors ||
+                                            Number(run.error_count ?? 0) > 0
+                                        "
+                                        type="button"
+                                        @click="downloadRunErrors(run.id)"
+                                        class="inline-flex items-center gap-1 rounded-md border border-amber-300 px-2 py-1 text-xs font-medium text-amber-700 transition hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/20"
+                                    >
+                                        <Download class="h-3.5 w-3.5" />
+                                        Errores
+                                    </button>
+                                    <button
+                                        v-if="run.can_cancel"
+                                        type="button"
+                                        @click="cancelHistoryRun(run)"
+                                        class="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/20"
+                                    >
+                                        <XIcon class="h-3.5 w-3.5" />
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        v-if="run.can_retry_failed"
+                                        type="button"
+                                        @click="retryHistoryRun(run)"
+                                        class="inline-flex items-center gap-1 rounded-md border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950/20"
+                                    >
+                                        <RotateCcw class="h-3.5 w-3.5" />
+                                        Reintentar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Error message -->
         <div
             v-if="error"
@@ -983,7 +1518,10 @@ const formatFileSize = (bytes: number) => {
                     </p>
                 </div>
                 <p
-                    v-if="!fullValidationReportActive"
+                    v-if="
+                        !fullValidationReportActive &&
+                        previewResult?.preview_limited
+                    "
                     class="text-xs text-gray-400"
                 >
                     Muestra limitada del archivo. Usa "Importar archivo
@@ -1346,7 +1884,7 @@ const formatFileSize = (bytes: number) => {
                     {{ errorCount }} con error.
                 </p>
                 <button
-                    v-if="!fullValidationReportActive"
+                    v-if="!fullValidationReportActive && !config.fullFileImport"
                     type="button"
                     :disabled="!canImport"
                     @click="runImport"

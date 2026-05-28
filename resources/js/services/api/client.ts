@@ -92,6 +92,16 @@ apiClient.interceptors.response.use(
                         error.response.data,
                     );
             }
+        } else if (error.code === 'ECONNABORTED') {
+            console.error('[API] Request timed out');
+            window.dispatchEvent(
+                new CustomEvent('api:network-error', {
+                    detail: {
+                        message:
+                            'La solicitud tardo demasiado. Intenta con la importacion en cola.',
+                    },
+                }),
+            );
         } else if (error.request) {
             // Network error — no response received
             console.error('[API] No response from server');

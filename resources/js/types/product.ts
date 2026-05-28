@@ -530,6 +530,244 @@ export interface ProductFilters {
     sortDirection?: 'asc' | 'desc';
 }
 
+export interface ProductProfileFilters {
+    warehouse_id: number;
+    variant_id?: number;
+    per_page?: number;
+    date_from?: string;
+    date_to?: string;
+}
+
+export interface ProductOperationalProfile {
+    product: {
+        id: number;
+        system_id?: string | null;
+        sku_base: string;
+        name: string;
+        status: string;
+        category?: { id: number; name: string } | null;
+        product_line?: { id: number; name: string } | null;
+        pricing?: {
+            configuration?: ProductOperationalPricingConfiguration | null;
+        };
+    };
+    warehouse_id: number;
+    variants: ProductVariantOperationalProfile[];
+    customers: ProductOperationalCustomer[];
+    suppliers: ProductOperationalSupplier[];
+    compatibility: VehicleCompatibility[];
+}
+
+export interface ProductVariantOperationalProfile {
+    id: number;
+    system_id?: string | null;
+    sku?: string | null;
+    upc?: string | null;
+    status: string;
+    is_default: boolean;
+    brand?: { id: number; name: string } | null;
+    pricing: {
+        configuration?: ProductOperationalPricingConfiguration | null;
+        current: ProductOperationalCurrentPricing;
+        price_family?: {
+            visible_price_source: 'active_lot' | 'configuration_fallback';
+            surfaces: string[];
+        };
+    };
+    inventory: {
+        summary: ProductOperationalInventorySummary;
+        warehouses: ProductOperationalWarehouseInventory[];
+    };
+    lots: ProductOperationalLot[];
+    movements: ProductOperationalMovementSection;
+    sales: ProductOperationalSalesSection;
+    quotes: ProductOperationalQuotesSection;
+    purchases: ProductOperationalPurchasesSection;
+    suppliers: ProductOperationalSupplier[];
+}
+
+export interface ProductOperationalPricingConfiguration {
+    base_price: number;
+    calculated_price: number;
+    cost: number;
+    cost_base: number;
+    cost_miscellaneous: number;
+    cost_total: number;
+    sale_tax_rate: number;
+    cost_tax_rate: number;
+    tax_type?: string;
+    pricing_formula?: string | null;
+}
+
+export interface ProductOperationalCurrentPricing {
+    warehouse_id: number;
+    active_lot_id?: number | null;
+    current_cost: number;
+    current_sale_price: number;
+    inventory_value: number;
+    fifo_cost_current: number;
+    fifo_sale_price_current: number;
+}
+
+export interface ProductOperationalInventorySummary {
+    warehouse_id: number;
+    stock_available: number;
+    stock_reserved: number;
+    active_lot_id?: number | null;
+    current_cost: number;
+    current_sale_price: number;
+    fifo_cost_current: number;
+    fifo_sale_price_current: number;
+    inventory_value: number;
+}
+
+export interface ProductOperationalWarehouseInventory {
+    warehouse?: { id: number; name: string; code?: string | null } | null;
+    quantity_available: number;
+    quantity_reserved: number;
+    reorder_point: number;
+    reorder_quantity: number;
+    location_in_warehouse?: string | null;
+    last_restocked_at?: string | null;
+}
+
+export interface ProductOperationalLot {
+    id: number;
+    warehouse_id: number;
+    warehouse?: { id: number; name: string; code?: string | null } | null;
+    source_type?: string | null;
+    source_id?: number | null;
+    batch_number?: string | null;
+    received_quantity: number;
+    quantity_available: number;
+    unit_cost_base: number;
+    tax_per_unit: number;
+    misc_per_unit: number;
+    landed_unit_cost: number;
+    sale_price: number;
+    remaining_value: number;
+    received_at?: string | null;
+}
+
+export interface ProductOperationalMovementSection {
+    summary: {
+        total_movements: number;
+        inbound_movements: number;
+        outbound_movements: number;
+        transfer_movements: number;
+    };
+    recent: ProductOperationalMovement[];
+}
+
+export interface ProductOperationalMovement {
+    id: number;
+    movement_type: string;
+    reason?: string | null;
+    quantity: number;
+    reference_type?: string | null;
+    reference_id?: number | null;
+    warehouse?: { id: number; name: string; code?: string | null } | null;
+    destination_warehouse?: {
+        id: number;
+        name: string;
+        code?: string | null;
+    } | null;
+    created_at?: string | null;
+}
+
+export interface ProductOperationalSalesSection {
+    summary: {
+        orders_count: number;
+        units_sold: number;
+        total_revenue: number;
+        customers_count: number;
+    };
+    recent: ProductOperationalSale[];
+}
+
+export interface ProductOperationalSale {
+    id?: number | null;
+    order_number?: string | null;
+    date?: string | null;
+    status?: string | null;
+    customer?: { id: number; code?: string | null; name: string } | null;
+    quantity: number;
+    unit_price: number;
+    unit_cost?: number;
+    total: number;
+}
+
+export interface ProductOperationalQuotesSection {
+    summary: {
+        quotes_count: number;
+        units_quoted: number;
+        total_quoted: number;
+        customers_count: number;
+    };
+    recent: ProductOperationalQuote[];
+}
+
+export interface ProductOperationalQuote {
+    id?: number | null;
+    quote_number?: string | null;
+    date?: string | null;
+    status?: string | null;
+    customer?: { id: number; code?: string | null; name: string } | null;
+    quantity: number;
+    unit_price: number;
+    total: number;
+}
+
+export interface ProductOperationalPurchasesSection {
+    summary: {
+        orders_count: number;
+        units_ordered: number;
+        units_received: number;
+        total_ordered: number;
+    };
+    recent: ProductOperationalPurchase[];
+}
+
+export interface ProductOperationalPurchase {
+    id?: number | null;
+    po_number?: string | null;
+    supplier_invoice_number?: string | null;
+    order_date?: string | null;
+    received_date?: string | null;
+    status?: string | null;
+    payment_status?: string | null;
+    supplier?: { id: number; name: string } | null;
+    quantity_ordered: number;
+    units_per_package: number;
+    total_units_ordered: number;
+    total_units_received: number;
+    unit_cost: number;
+    total: number;
+}
+
+export interface ProductOperationalCustomer {
+    id: number;
+    code?: string | null;
+    name: string;
+    email?: string | null;
+    orders_count: number;
+    units_purchased: number;
+    total_spent: number;
+    last_purchased_at?: string | null;
+}
+
+export interface ProductOperationalSupplier {
+    id: number;
+    name: string;
+    variant_id?: number | null;
+    variant_sku?: string | null;
+    brand_name?: string | null;
+    supplier_cost: number;
+    lead_time_days?: number | null;
+    minimum_order_quantity?: number | null;
+    is_preferred: boolean;
+    source?: 'configured' | 'purchase_order';
+}
 // API Response Types
 export interface PaginatedResponse<T> {
     data: T[];

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import {
     X,
     RotateCcw,
     AlertCircle,
     Package,
+    Search,
     Banknote,
     CreditCard,
     Landmark,
@@ -64,6 +65,9 @@ const refundMethod = ref<string>('cash');
 const refundNotes = ref('');
 const quantities = ref<Record<number, number>>({});
 const returnUsers = ref<Record<number, number | null>>({});
+const returnSearchQuery = ref('');
+const showReturnSearchModal = ref(false);
+const returnSearchInput = ref<HTMLInputElement | null>(null);
 
 // Reset state when modal opens
 watch(
@@ -74,6 +78,8 @@ watch(
             reason.value = '';
             refundMethod.value = 'cash';
             refundNotes.value = '';
+            returnSearchQuery.value = '';
+            showReturnSearchModal.value = false;
             quantities.value = {};
             returnUsers.value = {};
             props.items.forEach((item) => {
@@ -86,7 +92,14 @@ watch(
 
 // Escape key
 const handleKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && props.show) emit('close');
+    if (e.key === 'Escape' && props.show) {
+        if (showReturnSearchModal.value) {
+            showReturnSearchModal.value = false;
+            return;
+        }
+
+        emit('close');
+    }
 };
 onMounted(() => window.addEventListener('keydown', handleKeydown));
 onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
@@ -98,6 +111,57 @@ const hasSelectedItems = computed(() =>
 const selectedCount = computed(
     () => Object.values(quantities.value).filter((q) => q > 0).length,
 );
+
+const normalizedReturnSearch = computed(() =>
+    returnSearchQuery.value.trim().toLowerCase(),
+);
+
+const filteredReturnItems = computed(() => {
+    const query = normalizedReturnSearch.value;
+
+    if (!query) {
+        return props.items;
+    }
+
+    return props.items.filter((item) =>
+        [
+            item.product_name,
+            item.product_sku,
+            item.seller_name,
+            String(item.id),
+            String(item.product_id),
+        ]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(query)),
+    );
+});
+
+const openReturnSearchModal = () => {
+    showReturnSearchModal.value = true;
+    nextTick(() => returnSearchInput.value?.focus());
+};
+
+const handleReturnSearchKeydown = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter') return;
+
+    e.preventDefault();
+    openReturnSearchModal();
+};
+
+const addReturnItemFromSearch = (item: OrderItem) => {
+    const currentQuantity = quantities.value[item.id] ?? 0;
+    const maxQuantity = Number(item.quantity || 0);
+
+    quantities.value[item.id] = Math.min(maxQuantity, currentQuantity + 1);
+    returnUsers.value[item.id] =
+        returnUsers.value[item.id] ?? props.currentUserId ?? null;
+};
+
+const removeReturnItemFromSearch = (item: OrderItem) => {
+    const currentQuantity = quantities.value[item.id] ?? 0;
+
+    quantities.value[item.id] = Math.max(0, currentQuantity - 1);
+};
 
 const estimatedRefund = computed(() => {
     let total = 0;
@@ -271,6 +335,44 @@ const refundMethodColor = (method: string, color: string) => {
 
                             <!-- ── Items Table ── -->
                             <div>
+                                <div class="mb-5">
+                                    <label
+                                        class="mb-2 block text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                                    >
+                                        Buscar artículos de la factura
+                                    </label>
+                                    <div class="flex gap-2">
+                                        <div class="relative flex-1">
+                                            <Search
+                                                class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400"
+                                            />
+                                            <input
+                                                v-model="returnSearchQuery"
+                                                type="text"
+                                                placeholder="SKU, nombre o línea vendida... (Enter para buscar)"
+                                                class="w-full rounded-lg border border-gray-300 bg-white py-2.5 pr-3 pl-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-red-500 focus:ring-2 focus:ring-red-500 dark:border-border dark:bg-muted dark:text-white"
+                                                @keydown="
+                                                    handleReturnSearchKeydown
+                                                "
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                                            @click="openReturnSearchModal"
+                                        >
+                                            <Search class="h-4 w-4" />
+                                            Buscar
+                                        </button>
+                                    </div>
+                                    <p
+                                        class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                    >
+                                        Enter abre el selector con los artículos
+                                        de esta factura.
+                                    </p>
+                                </div>
+
                                 <label
                                     class="mb-3 block text-xs font-semibold tracking-wider text-gray-500 uppercase"
                                 >
@@ -549,6 +651,230 @@ const refundMethodColor = (method: string, color: string) => {
                         </div>
 
                         <!-- ═══════════ FOOTER ═══════════ -->
+                        <div
+                            v-if="showReturnSearchModal"
+                            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+                            @click.self="showReturnSearchModal = false"
+                        >
+                            <div
+                                class="flex max-h-[82vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200 dark:bg-card dark:ring-gray-700"
+                            >
+                                <div
+                                    class="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-border"
+                                >
+                                    <div>
+                                        <h3
+                                            class="text-base font-bold text-gray-900 dark:text-white"
+                                        >
+                                            Seleccionar artículos de la factura
+                                        </h3>
+                                        <p
+                                            class="text-xs text-gray-500 dark:text-gray-400"
+                                        >
+                                            Orden {{ orderNumber }} · solo
+                                            líneas vendidas
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-muted/50"
+                                        @click="showReturnSearchModal = false"
+                                    >
+                                        <X class="h-5 w-5" />
+                                    </button>
+                                </div>
+
+                                <div
+                                    class="border-b border-gray-200 p-4 dark:border-border"
+                                >
+                                    <div class="relative">
+                                        <Search
+                                            class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400"
+                                        />
+                                        <input
+                                            ref="returnSearchInput"
+                                            v-model="returnSearchQuery"
+                                            type="text"
+                                            placeholder="Filtrar por SKU, nombre o vendedor"
+                                            class="w-full rounded-lg border border-gray-300 bg-white py-2.5 pr-3 pl-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-red-500 focus:ring-2 focus:ring-red-500 dark:border-border dark:bg-muted dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="min-h-0 flex-1 overflow-y-auto">
+                                    <table class="w-full text-left text-sm">
+                                        <thead
+                                            class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-xs font-semibold tracking-wider text-gray-500 uppercase dark:border-border dark:bg-background dark:text-gray-400"
+                                        >
+                                            <tr>
+                                                <th class="px-4 py-3">
+                                                    Producto
+                                                </th>
+                                                <th class="px-3 py-3">SKU</th>
+                                                <th
+                                                    class="px-3 py-3 text-right"
+                                                >
+                                                    Precio
+                                                </th>
+                                                <th
+                                                    class="px-3 py-3 text-center"
+                                                >
+                                                    Seleccionado
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-right"
+                                                >
+                                                    Acción
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody
+                                            class="divide-y divide-gray-100 dark:divide-border/50"
+                                        >
+                                            <tr
+                                                v-for="item in filteredReturnItems"
+                                                :key="`return-search-${item.id}`"
+                                                class="bg-white transition hover:bg-red-50/60 dark:bg-card dark:hover:bg-red-900/10"
+                                            >
+                                                <td class="px-4 py-3">
+                                                    <p
+                                                        class="font-semibold text-gray-900 dark:text-white"
+                                                    >
+                                                        {{ item.product_name }}
+                                                    </p>
+                                                    <p
+                                                        class="text-xs text-gray-500 dark:text-gray-400"
+                                                    >
+                                                        Vendido:
+                                                        {{ item.quantity }}
+                                                        <span
+                                                            v-if="
+                                                                item.seller_name
+                                                            "
+                                                        >
+                                                            ·
+                                                            {{
+                                                                item.seller_name
+                                                            }}
+                                                        </span>
+                                                    </p>
+                                                </td>
+                                                <td class="px-3 py-3">
+                                                    <span
+                                                        class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 dark:bg-muted dark:text-gray-400"
+                                                    >
+                                                        {{
+                                                            item.product_sku ||
+                                                            '—'
+                                                        }}
+                                                    </span>
+                                                </td>
+                                                <td
+                                                    class="px-3 py-3 text-right font-medium text-gray-900 dark:text-white"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            item.unit_price,
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-3 py-3 text-center"
+                                                >
+                                                    <span
+                                                        class="font-mono text-sm font-bold text-red-600 dark:text-red-400"
+                                                    >
+                                                        {{
+                                                            quantities[
+                                                                item.id
+                                                            ] ?? 0
+                                                        }}
+                                                    </span>
+                                                    <span
+                                                        class="text-xs text-gray-400"
+                                                    >
+                                                        / {{ item.quantity }}
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <div
+                                                        class="flex justify-end gap-1.5"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            class="rounded-md border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                                                            :disabled="
+                                                                (quantities[
+                                                                    item.id
+                                                                ] ?? 0) <= 0
+                                                            "
+                                                            @click="
+                                                                removeReturnItemFromSearch(
+                                                                    item,
+                                                                )
+                                                            "
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            class="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-40"
+                                                            :disabled="
+                                                                (quantities[
+                                                                    item.id
+                                                                ] ?? 0) >=
+                                                                item.quantity
+                                                            "
+                                                            @click="
+                                                                addReturnItemFromSearch(
+                                                                    item,
+                                                                )
+                                                            "
+                                                        >
+                                                            Seleccionar
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr
+                                                v-if="
+                                                    filteredReturnItems.length ===
+                                                    0
+                                                "
+                                            >
+                                                <td
+                                                    colspan="5"
+                                                    class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
+                                                >
+                                                    No hay artículos de esta
+                                                    factura que coincidan.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div
+                                    class="flex shrink-0 items-center justify-between border-t border-gray-200 px-5 py-4 dark:border-border"
+                                >
+                                    <span
+                                        class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                                    >
+                                        {{ selectedCount }} seleccionado{{
+                                            selectedCount === 1 ? '' : 's'
+                                        }}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                                        @click="showReturnSearchModal = false"
+                                    >
+                                        Listo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div
                             class="shrink-0 border-t border-gray-200 px-6 py-4 dark:border-border"
                         >

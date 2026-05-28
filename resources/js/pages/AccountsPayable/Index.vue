@@ -43,6 +43,7 @@ const error = ref<string | null>(null);
 const selectedSupplier = ref<any | null>(null);
 const supplierStatement = ref<any | null>(null);
 const loadingStatement = ref(false);
+const initialSupplierId = ref<number | null>(null);
 const showPaymentModal = ref(false);
 const paymentLoading = ref(false);
 const paymentError = ref<string | null>(null);
@@ -157,6 +158,27 @@ async function loadAccountsPayable() {
             params: reportFilters.value,
         });
         suppliers.value = res.data.data || res.data;
+
+        if (initialSupplierId.value && !selectedSupplier.value) {
+            const linkedSupplier = suppliers.value.find(
+                (supplier: any) =>
+                    Number(supplier.id) === Number(initialSupplierId.value),
+            );
+
+            if (linkedSupplier) {
+                await loadSupplierStatement(linkedSupplier);
+            } else {
+                const supplierRes = await apiClient.get(
+                    `/suppliers/${initialSupplierId.value}`,
+                );
+                const supplier = supplierRes.data.data || supplierRes.data;
+                await loadSupplierStatement({
+                    ...supplier,
+                    total_debt: 0,
+                    pending_orders_count: 0,
+                });
+            }
+        }
     } catch (e: any) {
         error.value =
             e.response?.data?.message ||
@@ -323,6 +345,10 @@ async function handlePaymentFinish(payments: Payment[], meta: PaymentMeta) {
 
 onMounted(() => {
     reportFilters.value = readReportFilters();
+    const supplierId = Number(
+        new URLSearchParams(window.location.search).get('supplier_id'),
+    );
+    initialSupplierId.value = supplierId > 0 ? supplierId : null;
     loadAccountsPayable();
 });
 </script>
@@ -567,6 +593,13 @@ onMounted(() => {
                                 v-if="selectedSupplier"
                                 class="flex items-center gap-2"
                             >
+                                <Link
+                                    :href="`/suppliers/${selectedSupplier.id}`"
+                                    class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
+                                >
+                                    <Building2 :size="15" />
+                                    Ver proveedor
+                                </Link>
                                 <Link
                                     :href="`/purchase-orders?supplier_id=${selectedSupplier.id}`"
                                     class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"

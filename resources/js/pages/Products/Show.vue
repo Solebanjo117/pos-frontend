@@ -12,6 +12,7 @@ import type {
     AlternativeProduct,
     ProductDetail,
     ProductImage,
+    ProductOperationalProfile,
     ProductPricing,
     ProductVariant,
 } from '@/types/product';
@@ -46,6 +47,8 @@ const { currentProduct, loading, error, fetchProduct } = useProducts();
 const toast = useToast();
 
 const duplicating = ref(false);
+const operationalProfile = ref<ProductOperationalProfile | null>(null);
+const operationalProfileError = ref<string | null>(null);
 const currentImageIndex = ref(0);
 const selectedFifoVariantId = ref<number | null>(null);
 
@@ -61,6 +64,34 @@ const product = computed<ProductDetail | null>(() => currentProduct.value);
 const variants = computed<ProductVariant[]>(() => {
     return product.value?.variants ?? [];
 });
+
+const operationalVariants = computed(
+    () => operationalProfile.value?.variants ?? [],
+);
+
+const operationalLots = computed(() =>
+    operationalVariants.value.flatMap((variant) =>
+        variant.lots.map((lot) => ({ ...lot, variant })),
+    ),
+);
+
+const operationalSales = computed(() =>
+    operationalVariants.value.flatMap((variant) =>
+        variant.sales.recent.map((sale) => ({ ...sale, variant })),
+    ),
+);
+
+const operationalPurchases = computed(() =>
+    operationalVariants.value.flatMap((variant) =>
+        variant.purchases.recent.map((purchase) => ({ ...purchase, variant })),
+    ),
+);
+
+function operationalVariantFor(variant: ProductVariant) {
+    return operationalVariants.value.find(
+        (operationalVariant) => operationalVariant.id === variant.id,
+    );
+}
 
 const productWarehouseOptions = computed(() => {
     const inventoryWarehouses =
@@ -275,7 +306,22 @@ function formatPercent(value?: number | string | null): string {
     return `${Number(value || 0).toFixed(2)}%`;
 }
 
+function formatDate(value?: string | null): string {
+    if (!value) {
+        return '-';
+    }
+
+    return new Date(value).toLocaleDateString('es-PA');
+}
+
 function inventoryStockForVariant(variant: ProductVariant): number {
+    const operationalSummary =
+        operationalVariantFor(variant)?.inventory.summary;
+
+    if (operationalSummary) {
+        return Number(operationalSummary.stock_available ?? 0);
+    }
+
     if (!resolvedWarehouseId.value) {
         return Number(variant.total_stock ?? 0);
     }
@@ -290,6 +336,15 @@ function inventoryStockForVariant(variant: ProductVariant): number {
 }
 
 function fifoCostForVariant(variant: ProductVariant): number | undefined {
+    const operationalPricing = operationalVariantFor(variant)?.pricing.current;
+
+    if (operationalPricing) {
+        return Number(
+            operationalPricing.current_cost ??
+                operationalPricing.fifo_cost_current,
+        );
+    }
+
     const inventory = activeInventoryForVariant(variant);
     const value = inventory?.current_cost ?? inventory?.fifo_cost_current;
 
@@ -297,6 +352,15 @@ function fifoCostForVariant(variant: ProductVariant): number | undefined {
 }
 
 function fifoSalePriceForVariant(variant: ProductVariant): number | undefined {
+    const operationalPricing = operationalVariantFor(variant)?.pricing.current;
+
+    if (operationalPricing) {
+        return Number(
+            operationalPricing.current_sale_price ??
+                operationalPricing.fifo_sale_price_current,
+        );
+    }
+
     const inventory = activeInventoryForVariant(variant);
     const value =
         inventory?.current_sale_price ?? inventory?.fifo_sale_price_current;
@@ -322,7 +386,29 @@ function relationLabel(type?: string): string {
 }
 
 async function loadProduct() {
-    await fetchProduct(props.productId, resolvedWarehouseId.value || undefined);
+    const warehouseId = resolvedWarehouseId.value || undefined;
+
+    await fetchProduct(props.productId, warehouseId);
+
+    operationalProfile.value = null;
+    operationalProfileError.value = null;
+
+    if (!warehouseId) {
+        operationalProfileError.value =
+            'Selecciona una sucursal para ver el historial operativo.';
+        return;
+    }
+
+    try {
+        const response = await productsApi.getProductProfile(props.productId, {
+            warehouse_id: warehouseId,
+        });
+        operationalProfile.value = response.data;
+    } catch (err: any) {
+        operationalProfileError.value =
+            err.response?.data?.message ||
+            'No se pudo cargar el historial operativo del producto.';
+    }
 }
 
 async function handleDuplicate() {
@@ -699,6 +785,9 @@ watch(effectiveImages, () => {
                                 ['#resumen', 'Resumen'],
                                 ['#variantes', 'Variantes'],
                                 ['#inventario', 'Inventario'],
+                                ['#lotes', 'Lotes'],
+                                ['#ventas', 'Ventas'],
+                                ['#compras', 'Compras'],
                                 ['#proveedores', 'Proveedores'],
                                 ['#referencias', 'Referencias'],
                                 ['#compatibilidad', 'Compatibilidad'],
@@ -984,6 +1073,329 @@ watch(effectiveImages, () => {
                         </div>
                     </section>
 
+                    <div
+                        v-if="operationalProfileError"
+                        class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+                    >
+                        {{ operationalProfileError }}
+                    </div>
+
+                    <section
+                        id="lotes"
+                        class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="border-b border-gray-100 px-4 py-3 dark:border-border"
+                        >
+                            <div class="flex items-center gap-2">
+                                <Package :size="18" class="text-emerald-600" />
+                                <h2
+                                    class="font-semibold text-gray-950 dark:text-white"
+                                >
+                                    Lotes activos
+                                </h2>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead
+                                    class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                                >
+                                    <tr>
+                                        <th class="px-4 py-2 text-left">
+                                            Variante
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Lote
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Disponible
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Costo aterr.
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Precio
+                                        </th>
+                                        <th class="px-4 py-2 text-left">
+                                            Recibido
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="lot in operationalLots"
+                                        :key="lot.id"
+                                        class="border-t border-gray-100 dark:border-border"
+                                    >
+                                        <td class="px-4 py-3">
+                                            {{ lot.variant.brand?.name || '-' }}
+                                            <p
+                                                class="font-mono text-xs text-gray-500"
+                                            >
+                                                {{ lot.variant.sku || '-' }}
+                                            </p>
+                                        </td>
+                                        <td class="px-4 py-3 font-mono">
+                                            {{
+                                                lot.batch_number || `#${lot.id}`
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 text-right font-semibold"
+                                        >
+                                            {{ lot.quantity_available }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 text-right font-mono"
+                                        >
+                                            {{
+                                                formatCurrency(
+                                                    lot.landed_unit_cost,
+                                                )
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 text-right font-mono font-semibold"
+                                        >
+                                            {{ formatCurrency(lot.sale_price) }}
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-600">
+                                            {{ formatDate(lot.received_at) }}
+                                        </td>
+                                    </tr>
+                                    <tr v-if="operationalLots.length === 0">
+                                        <td
+                                            colspan="6"
+                                            class="px-4 py-8 text-center text-sm text-gray-500"
+                                        >
+                                            Sin lotes activos para la sucursal
+                                            actual.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section id="ventas" class="grid gap-4 lg:grid-cols-2">
+                        <div
+                            class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-gray-100 px-4 py-3 dark:border-border"
+                            >
+                                <h2
+                                    class="font-semibold text-gray-950 dark:text-white"
+                                >
+                                    Ventas recientes
+                                </h2>
+                            </div>
+                            <div
+                                class="divide-y divide-gray-100 dark:divide-border"
+                            >
+                                <div
+                                    v-for="sale in operationalSales.slice(0, 8)"
+                                    :key="`${sale.variant.id}-${sale.id}`"
+                                    class="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 text-sm"
+                                >
+                                    <div class="min-w-0">
+                                        <Link
+                                            v-if="sale.id"
+                                            :href="`/sales-orders/${sale.id}`"
+                                            class="font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                                        >
+                                            {{
+                                                sale.order_number ||
+                                                `Venta #${sale.id}`
+                                            }}
+                                        </Link>
+                                        <p
+                                            class="truncate text-xs text-gray-500"
+                                        >
+                                            {{
+                                                sale.customer?.name ||
+                                                'Cliente no registrado'
+                                            }}
+                                        </p>
+                                    </div>
+                                    <div class="text-right font-mono">
+                                        <p class="font-semibold">
+                                            {{ formatCurrency(sale.total) }}
+                                        </p>
+                                        <p class="text-xs text-gray-500">
+                                            {{ sale.quantity }} und.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div
+                                    v-if="operationalSales.length === 0"
+                                    class="px-4 py-8 text-center text-sm text-gray-500"
+                                >
+                                    Sin ventas recientes para la sucursal
+                                    actual.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <div
+                                class="border-b border-gray-100 px-4 py-3 dark:border-border"
+                            >
+                                <h2
+                                    class="font-semibold text-gray-950 dark:text-white"
+                                >
+                                    Clientes que compraron
+                                </h2>
+                            </div>
+                            <div
+                                class="divide-y divide-gray-100 dark:divide-border"
+                            >
+                                <div
+                                    v-for="customer in operationalProfile?.customers.slice(
+                                        0,
+                                        8,
+                                    ) ?? []"
+                                    :key="customer.id"
+                                    class="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 text-sm"
+                                >
+                                    <div class="min-w-0">
+                                        <Link
+                                            :href="`/customers/${customer.id}`"
+                                            class="font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                                        >
+                                            {{ customer.name }}
+                                        </Link>
+                                        <p class="text-xs text-gray-500">
+                                            Ultima compra
+                                            {{
+                                                formatDate(
+                                                    customer.last_purchased_at,
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                    <div class="text-right font-mono">
+                                        <p class="font-semibold">
+                                            {{
+                                                formatCurrency(
+                                                    customer.total_spent,
+                                                )
+                                            }}
+                                        </p>
+                                        <p class="text-xs text-gray-500">
+                                            {{ customer.units_purchased }} und.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div
+                                    v-if="!operationalProfile?.customers.length"
+                                    class="px-4 py-8 text-center text-sm text-gray-500"
+                                >
+                                    Sin clientes en el historial cargado.
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section
+                        id="compras"
+                        class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="border-b border-gray-100 px-4 py-3 dark:border-border"
+                        >
+                            <h2
+                                class="font-semibold text-gray-950 dark:text-white"
+                            >
+                                Compras recientes
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead
+                                    class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                                >
+                                    <tr>
+                                        <th class="px-4 py-2 text-left">OC</th>
+                                        <th class="px-4 py-2 text-left">
+                                            Proveedor
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Ordenado
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Recibido
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Total
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="purchase in operationalPurchases.slice(
+                                            0,
+                                            10,
+                                        )"
+                                        :key="`${purchase.variant.id}-${purchase.id}`"
+                                        class="border-t border-gray-100 dark:border-border"
+                                    >
+                                        <td class="px-4 py-3">
+                                            <Link
+                                                v-if="purchase.id"
+                                                :href="`/purchase-orders/${purchase.id}`"
+                                                class="font-mono font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                                            >
+                                                {{
+                                                    purchase.po_number ||
+                                                    `#${purchase.id}`
+                                                }}
+                                            </Link>
+                                            <p class="text-xs text-gray-500">
+                                                {{
+                                                    formatDate(
+                                                        purchase.order_date,
+                                                    )
+                                                }}
+                                            </p>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            {{ purchase.supplier?.name || '-' }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 text-right font-mono"
+                                        >
+                                            {{ purchase.total_units_ordered }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 text-right font-mono"
+                                        >
+                                            {{ purchase.total_units_received }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 text-right font-mono font-semibold"
+                                        >
+                                            {{ formatCurrency(purchase.total) }}
+                                        </td>
+                                    </tr>
+                                    <tr
+                                        v-if="operationalPurchases.length === 0"
+                                    >
+                                        <td
+                                            colspan="5"
+                                            class="px-4 py-8 text-center text-sm text-gray-500"
+                                        >
+                                            Sin compras recientes para este
+                                            producto.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                     <section
                         id="proveedores"
                         class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"

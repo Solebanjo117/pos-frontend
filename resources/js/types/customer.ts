@@ -32,7 +32,7 @@ export interface CustomerVehicle {
     vehicle_model_id: number;
     vehicle_chassis_id: number | null;
     vehicle_engine_id: number;
-    vin: string;
+    vin: string | null;
     label: string | null;
     notes: string | null;
     status: 'active' | 'inactive';
@@ -60,7 +60,7 @@ export interface CustomerVehicleFormData {
     vehicle_model_id: number;
     vehicle_chassis_id: number | null;
     vehicle_engine_id: number;
-    vin: string;
+    vin: string | null;
     label?: string | null;
     notes?: string | null;
     status?: 'active' | 'inactive';
@@ -151,6 +151,17 @@ export interface CustomerSalesHistoryOrder {
     payment_summary: CustomerOrderPaymentSummary[];
     items: CustomerPurchasedItem[];
     payments: CustomerOrderPayment[];
+    returns: Array<{
+        id: number;
+        return_number: string;
+        status: string;
+        status_label: string;
+        refund_method?: string | null;
+        total_amount: number;
+        reason?: string | null;
+        created_at?: string | null;
+        href: string;
+    }>;
 }
 
 export interface CustomerSalesHistory {

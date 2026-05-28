@@ -100,7 +100,6 @@ const vehicleForm = ref<CustomerVehicleFormData>({
     vehicle_chassis_id: null,
     vehicle_engine_id: 0,
     vin: '',
-    label: '',
     notes: '',
     status: 'active',
 });
@@ -136,7 +135,6 @@ const canSaveVehicle = computed(
     () =>
         Boolean(vehicleForm.value.vehicle_model_id) &&
         Boolean(vehicleForm.value.vehicle_engine_id) &&
-        Boolean(vehicleForm.value.vin.trim()) &&
         !vehicleChassisResolutionError.value &&
         !vehicleSaving.value,
 );
@@ -218,6 +216,27 @@ const paymentMethodsLabel = (order: CustomerSalesHistoryOrder): string => {
         )
         .join(' / ');
 };
+
+const vehiclePrimaryLabel = (vehicle: CustomerVehicle): string => {
+    const parts = [
+        vehicle.model?.make?.name ?? vehicle.make?.name,
+        vehicle.model?.name,
+        vehicle.model?.generation,
+        vehicle.chassis?.code,
+        vehicle.engine?.engine_code,
+        vehicle.engine?.displacement,
+    ].filter(Boolean);
+
+    return parts.join(' ') || vehicle.display_name || 'Carro sin datos';
+};
+
+const vehicleStatusLabel = (status: CustomerVehicle['status']): string =>
+    status === 'active' ? 'Activo' : 'Inactivo';
+
+const vehicleStatusClass = (status: CustomerVehicle['status']): string =>
+    status === 'active'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        : 'border-gray-200 bg-gray-50 text-gray-600';
 
 const toggleOrder = (orderId: number): void => {
     const next = new Set(expandedOrders.value);
@@ -369,7 +388,6 @@ const resetVehicleForm = (): void => {
         vehicle_chassis_id: null,
         vehicle_engine_id: 0,
         vin: '',
-        label: '',
         notes: '',
         status: 'active',
     };
@@ -383,8 +401,7 @@ const editVehicle = async (vehicle: CustomerVehicle): Promise<void> => {
         vehicle_model_id: vehicle.vehicle_model_id,
         vehicle_chassis_id: vehicle.vehicle_chassis_id,
         vehicle_engine_id: vehicle.vehicle_engine_id,
-        vin: vehicle.vin,
-        label: vehicle.label ?? '',
+        vin: vehicle.vin ?? '',
         notes: vehicle.notes ?? '',
         status: vehicle.status,
     };
@@ -416,7 +433,7 @@ const saveVehicle = async (): Promise<void> => {
     if (!canSaveVehicle.value) {
         vehicleError.value =
             vehicleChassisResolutionError.value ||
-            'Completa la marca, modelo, motor y VIN del carro.';
+            'Completa la marca, modelo y motor del carro.';
         return;
     }
 
@@ -424,11 +441,14 @@ const saveVehicle = async (): Promise<void> => {
     vehicleError.value = null;
 
     try {
-        const payload = {
-            ...vehicleForm.value,
-            vin: vehicleForm.value.vin.trim().toUpperCase(),
-            label: vehicleForm.value.label || null,
-            notes: vehicleForm.value.notes || null,
+        const normalizedVin = vehicleForm.value.vin?.trim().toUpperCase() ?? '';
+        const payload: CustomerVehicleFormData = {
+            vehicle_model_id: vehicleForm.value.vehicle_model_id,
+            vehicle_chassis_id: vehicleForm.value.vehicle_chassis_id,
+            vehicle_engine_id: vehicleForm.value.vehicle_engine_id,
+            vin: normalizedVin || null,
+            notes: vehicleForm.value.notes?.trim() || null,
+            status: vehicleForm.value.status,
         };
 
         if (editingVehicleId.value) {
@@ -1312,6 +1332,75 @@ onMounted(async () => {
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    <div
+                                                        class="rounded-md border border-gray-200 bg-white dark:border-border dark:bg-card"
+                                                    >
+                                                        <div
+                                                            class="border-b border-gray-200 px-3 py-2 text-xs font-bold text-gray-500 uppercase"
+                                                        >
+                                                            Devoluciones
+                                                        </div>
+                                                        <div
+                                                            v-if="
+                                                                !order.returns ||
+                                                                order.returns
+                                                                    .length ===
+                                                                    0
+                                                            "
+                                                            class="p-3 text-sm text-gray-500"
+                                                        >
+                                                            Sin devoluciones.
+                                                        </div>
+                                                        <div
+                                                            v-else
+                                                            class="divide-y divide-gray-100"
+                                                        >
+                                                            <Link
+                                                                v-for="ret in order.returns"
+                                                                :key="ret.id"
+                                                                :href="ret.href"
+                                                                class="block p-3 hover:bg-gray-50"
+                                                            >
+                                                                <div
+                                                                    class="flex items-center justify-between gap-3"
+                                                                >
+                                                                    <div>
+                                                                        <p
+                                                                            class="text-sm font-semibold text-cyan-700"
+                                                                        >
+                                                                            {{
+                                                                                ret.return_number
+                                                                            }}
+                                                                        </p>
+                                                                        <p
+                                                                            class="text-xs text-gray-500"
+                                                                        >
+                                                                            {{
+                                                                                ret.status_label ||
+                                                                                ret.status
+                                                                            }}
+                                                                            ·
+                                                                            {{
+                                                                                formatDateTime(
+                                                                                    ret.created_at,
+                                                                                )
+                                                                            }}
+                                                                        </p>
+                                                                    </div>
+                                                                    <p
+                                                                        class="font-mono text-sm font-bold text-red-600"
+                                                                    >
+                                                                        {{
+                                                                            formatCurrency(
+                                                                                ret.total_amount,
+                                                                            )
+                                                                        }}
+                                                                    </p>
+                                                                </div>
+                                                            </Link>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1672,20 +1761,46 @@ onMounted(async () => {
                                     :key="vehicle.id"
                                     class="flex items-start justify-between gap-3 p-4"
                                 >
-                                    <div class="min-w-0">
-                                        <p
-                                            class="font-semibold text-gray-900 dark:text-white"
+                                    <div class="min-w-0 space-y-1">
+                                        <div
+                                            class="flex flex-wrap items-center gap-2"
                                         >
-                                            {{ vehicle.display_name }}
-                                        </p>
+                                            <p
+                                                class="font-semibold text-gray-900 dark:text-white"
+                                            >
+                                                {{
+                                                    vehiclePrimaryLabel(vehicle)
+                                                }}
+                                            </p>
+                                            <span
+                                                class="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold"
+                                                :class="
+                                                    vehicleStatusClass(
+                                                        vehicle.status,
+                                                    )
+                                                "
+                                            >
+                                                {{
+                                                    vehicleStatusLabel(
+                                                        vehicle.status,
+                                                    )
+                                                }}
+                                            </span>
+                                        </div>
                                         <p
                                             class="font-mono text-sm text-gray-500"
                                         >
-                                            VIN {{ vehicle.vin }}
+                                            {{
+                                                vehicle.vin
+                                                    ? `VIN ${vehicle.vin}`
+                                                    : 'Sin VIN'
+                                            }}
                                         </p>
-                                        <p class="text-sm text-gray-500">
-                                            {{ vehicle.label || 'Sin alias' }} -
-                                            {{ vehicle.status }}
+                                        <p
+                                            v-if="vehicle.notes"
+                                            class="text-sm text-gray-500"
+                                        >
+                                            {{ vehicle.notes }}
                                         </p>
                                     </div>
                                     <div class="flex gap-2">
@@ -1827,11 +1942,11 @@ onMounted(async () => {
                                 <div>
                                     <label
                                         class="text-xs font-semibold text-gray-500 uppercase"
-                                        >Alias</label
+                                        >Notas</label
                                     >
-                                    <input
-                                        v-model="vehicleForm.label"
-                                        type="text"
+                                    <textarea
+                                        v-model="vehicleForm.notes"
+                                        rows="3"
                                         class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                                     />
                                 </div>

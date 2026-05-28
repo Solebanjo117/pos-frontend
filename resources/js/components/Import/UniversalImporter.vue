@@ -14,7 +14,6 @@ import {
     Tag,
     Package,
     Car,
-    RefreshCw,
 } from 'lucide-vue-next';
 import apiClient from '@/services/api/client';
 
@@ -34,7 +33,6 @@ const importProfiles = ref<any[]>([]);
 const selectedProfileId = ref<number | null>(null);
 const importMode = ref('create_update');
 const validationRunning = ref(false);
-const validationCompleted = ref(false);
 const fullValidationReportActive = ref(false);
 const result = ref<any | null>(null);
 const error = ref<string | null>(null);
@@ -103,14 +101,6 @@ const missingBrandReferences = computed<string[]>(() => {
 
     return [...new Set([...(previewBrands ?? []), ...(resultBrands ?? [])])];
 });
-const canImportFullFile = computed(
-    () =>
-        props.config.fullFileImport === true &&
-        hasFile.value &&
-        !fullImportRunning.value &&
-        validationCompleted.value &&
-        missingBrandReferences.value.length === 0,
-);
 const isValidationResult = computed(
     () =>
         result.value?.run_type === 'validation' ||
@@ -204,7 +194,6 @@ const resetPreview = () => {
     detectedColumns.value = [];
     fieldMapping.value = {};
     requiredFields.value = [];
-    validationCompleted.value = false;
     fullValidationReportActive.value = false;
     result.value = null;
     error.value = null;
@@ -556,80 +545,6 @@ const runImport = async () => {
     }
 };
 
-const runFullFileImport = async () => {
-    if (!file.value || !canImportFullFile.value) return;
-    error.value = null;
-    result.value = null;
-    fullImportRunning.value = true;
-    try {
-        const response = await importService.importFile(
-            props.config.entity,
-            file.value,
-            selectedSheetIndex.value !== null
-                ? {
-                      sheet_index: selectedSheetIndex.value,
-                      mapping: fieldMapping.value,
-                      mode: importMode.value,
-                      profile_id: selectedProfileId.value,
-                  }
-                : {
-                      mapping: fieldMapping.value,
-                      mode: importMode.value,
-                      profile_id: selectedProfileId.value,
-                  },
-        );
-        activeImportRunId.value = response.data?.import_run_id ?? null;
-        result.value = {
-            status: response.data?.status ?? 'pending',
-            success_count: 0,
-            error_count: 0,
-            results: [],
-            errors: [],
-        };
-        if (activeImportRunId.value) {
-            await refreshImportRun();
-            startImportStatusPolling();
-        }
-    } catch (e: any) {
-        error.value =
-            e.response?.data?.message || 'Error al iniciar la importacion.';
-        fullImportRunning.value = false;
-    }
-};
-
-const runFullValidation = async () => {
-    if (!file.value || validationRunning.value) return;
-    error.value = null;
-    result.value = null;
-    fullValidationReportActive.value = false;
-    validationRunning.value = true;
-    validationCompleted.value = false;
-    pendingFallbackAttempted.value = false;
-    try {
-        const response = await importService.validateFile(
-            props.config.entity,
-            file.value,
-            {
-                ...(selectedSheetIndex.value !== null
-                    ? { sheet_index: selectedSheetIndex.value }
-                    : {}),
-                mapping: fieldMapping.value,
-                profile_id: selectedProfileId.value,
-            },
-        );
-        activeImportRunId.value = response.data?.import_run_id ?? null;
-        result.value = response.data ?? response;
-        if (activeImportRunId.value) {
-            await refreshImportRun();
-            startImportStatusPolling();
-        }
-    } catch (e: any) {
-        error.value =
-            e.response?.data?.message || 'Error al iniciar la validacion.';
-        validationRunning.value = false;
-    }
-};
-
 const cancelActiveRun = async () => {
     if (!activeImportRunId.value) return;
     await importService.cancelRun(props.config.entity, activeImportRunId.value);
@@ -728,9 +643,6 @@ const refreshImportRun = async () => {
         fullImportRunning.value = false;
         validationRunning.value = false;
         if (result.value?.run_type === 'validation') {
-            validationCompleted.value =
-                status === 'completed' &&
-                Number(result.value?.error_count ?? 0) === 0;
             if (status === 'completed') {
                 applyCompletedValidationRows();
             }
@@ -873,42 +785,6 @@ const formatFileSize = (bytes: number) => {
                     class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-500 transition hover:bg-gray-50 dark:border-border dark:text-gray-400 dark:hover:bg-muted/30"
                 >
                     <XIcon class="h-4 w-4" /> Limpiar
-                </button>
-
-                <button
-                    v-if="config.fullFileImport"
-                    type="button"
-                    :disabled="!file || validationRunning"
-                    @click="runFullValidation"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    <RefreshCw
-                        class="h-4 w-4"
-                        :class="{ 'animate-spin': validationRunning }"
-                    />
-                    {{
-                        validationRunning
-                            ? 'Validando archivo...'
-                            : 'Validar archivo completo'
-                    }}
-                </button>
-
-                <button
-                    v-if="config.fullFileImport"
-                    type="button"
-                    :disabled="!canImportFullFile"
-                    @click="runFullFileImport"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    <RefreshCw
-                        class="h-4 w-4"
-                        :class="{ 'animate-spin': fullImportRunning }"
-                    />
-                    {{
-                        fullImportRunning
-                            ? 'Importando archivo...'
-                            : 'Importar archivo completo'
-                    }}
                 </button>
 
                 <p
@@ -1125,7 +1001,7 @@ const formatFileSize = (bytes: number) => {
             >
                 Reporte de solo lectura: estas filas son para revisar errores y
                 advertencias. Editar aqui no cambia el archivo que se importara
-                con "Importar archivo completo".
+                con "Importar".
             </div>
 
             <div

@@ -8,6 +8,14 @@ export interface VehicleVin {
     engine_id?: number | null;
     vin: string;
     notes?: string | null;
+    is_customer_linked?: boolean;
+    customer_vehicle_count?: number;
+    linked_customers?: Array<{
+        id: number;
+        name: string;
+        code?: string | null;
+        customer_vehicle_id: number;
+    }>;
 }
 
 export interface VehicleVinScope {

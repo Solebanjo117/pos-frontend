@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import {
     Plus,
     Pencil,
@@ -1361,8 +1361,53 @@ const handleRemoveTreeEngineVin = async (
                                                         class="ml-2 text-gray-500 dark:text-gray-400"
                                                         >{{ v.notes }}</span
                                                     >
+                                                    <span
+                                                        v-if="
+                                                            v.is_customer_linked &&
+                                                            !v.linked_customers
+                                                                ?.length
+                                                        "
+                                                        class="ml-2 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                                                        title="Este VIN se elimina desde la ficha del cliente"
+                                                        >Cliente</span
+                                                    >
+                                                    <span
+                                                        v-else-if="
+                                                            v.linked_customers
+                                                                ?.length
+                                                        "
+                                                        class="ml-2 inline-flex items-center gap-1 align-middle"
+                                                    >
+                                                        <Link
+                                                            :href="`/customers/${v.linked_customers[0].id}`"
+                                                            class="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 underline-offset-2 hover:border-amber-300 hover:bg-amber-100 hover:underline"
+                                                            title="Abrir ficha del cliente"
+                                                        >
+                                                            {{
+                                                                v
+                                                                    .linked_customers[0]
+                                                                    .name
+                                                            }}
+                                                        </Link>
+                                                        <span
+                                                            v-if="
+                                                                v
+                                                                    .linked_customers
+                                                                    .length > 1
+                                                            "
+                                                            class="rounded-full border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600"
+                                                            :title="`${v.linked_customers.length} clientes activos con este VIN`"
+                                                        >
+                                                            +{{
+                                                                v
+                                                                    .linked_customers
+                                                                    .length - 1
+                                                            }}
+                                                        </span>
+                                                    </span>
                                                 </div>
                                                 <button
+                                                    v-if="!v.is_customer_linked"
                                                     type="button"
                                                     class="ml-2 text-red-500 hover:text-red-700"
                                                     @click="

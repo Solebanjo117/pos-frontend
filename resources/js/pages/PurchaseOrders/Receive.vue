@@ -3,9 +3,17 @@ import { computed, ref, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
-import { PackageCheck, Save } from 'lucide-vue-next';
+import {
+    ClipboardCheck,
+    CreditCard,
+    DollarSign,
+    FileText,
+    Package,
+    PackageCheck,
+    Save,
+    UserRound,
+} from 'lucide-vue-next';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
-import PurchaseOrderSideNav from '@/components/PurchaseOrders/PurchaseOrderSideNav.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
 
 const props = defineProps<{ purchaseOrderId: number }>();
@@ -13,6 +21,24 @@ const { purchaseOrder, loading, error, fetchPurchaseOrderById, receiveItems } =
     usePurchaseOrders();
 
 const receiveData = ref<{ item_id: number; quantity_received: number }[]>([]);
+
+const tabs = [
+    { key: 'summary', label: 'Resumen', icon: FileText },
+    { key: 'items', label: 'Items', icon: Package },
+    { key: 'receiving', label: 'Recepcion', icon: ClipboardCheck },
+    { key: 'payments', label: 'Pagos', icon: DollarSign },
+    { key: 'supplier', label: 'Proveedor', icon: UserRound },
+    { key: 'costs', label: 'Costos/Misc/ITBM', icon: CreditCard },
+    { key: 'impact', label: 'Inventario/AP', icon: PackageCheck },
+] as const;
+
+function tabHref(key: (typeof tabs)[number]['key']): string {
+    if (key === 'receiving') {
+        return `/purchase-orders/${props.purchaseOrderId}/receive`;
+    }
+
+    return `/purchase-orders/${props.purchaseOrderId}#${key}`;
+}
 
 const hasPreAppliedStock = computed(
     () =>
@@ -144,6 +170,24 @@ function formatCurrency(value: number | string | undefined): string {
     return `$${Number(value || 0).toFixed(2)}`;
 }
 
+function lineTaxTotal(itemId: number): number {
+    const item = itemFor(itemId) as any;
+
+    return Number(item?.line_cost_summary?.tax_total ?? item?.tax_amount ?? 0);
+}
+
+function lineMiscTotal(itemId: number): number {
+    const item = itemFor(itemId) as any;
+
+    return Number(item?.line_cost_summary?.misc_total ?? item?.misc_cost ?? 0);
+}
+
+function landedUnitCost(itemId: number): number {
+    const item = itemFor(itemId) as any;
+
+    return Number(item?.line_cost_summary?.landed_unit_cost ?? 0);
+}
+
 onMounted(async () => {
     await fetchPurchaseOrderById(props.purchaseOrderId);
     if (purchaseOrder.value) {
@@ -201,12 +245,28 @@ async function handleSubmit() {
             class="min-h-[calc(100vh-4.25rem)] bg-gray-50/60 dark:bg-background"
         >
             <main class="mx-auto max-w-7xl min-w-0 p-4">
-                <PurchaseOrderSideNav
+                <div
                     v-if="purchaseOrder"
-                    :purchase-order-id="purchaseOrder.id"
-                    active="check-in"
-                    :can-edit="purchaseOrder.status === 'draft'"
-                />
+                    class="mb-3 overflow-x-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm dark:border-border dark:bg-card"
+                >
+                    <nav class="flex min-w-max items-center gap-1 text-sm">
+                        <Link
+                            v-for="tab in tabs"
+                            :key="tab.key"
+                            :href="tabHref(tab.key)"
+                            class="inline-flex items-center gap-2 rounded-md px-3 py-2 transition"
+                            :class="
+                                tab.key === 'receiving'
+                                    ? 'bg-emerald-600 font-semibold text-white shadow-sm dark:bg-emerald-500 dark:text-emerald-950'
+                                    : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-800 dark:text-gray-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-200'
+                            "
+                        >
+                            <component :is="tab.icon" :size="15" />
+                            {{ tab.label }}
+                        </Link>
+                    </nav>
+                </div>
+
                 <div
                     v-if="error"
                     class="mb-3 border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400"
@@ -363,6 +423,15 @@ async function handleSubmit() {
                                             <th class="px-3 py-2 text-right">
                                                 Costo
                                             </th>
+                                            <th class="px-3 py-2 text-right">
+                                                ITBM
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                Misc
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                Costo aterr.
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -478,6 +547,37 @@ async function handleSubmit() {
                                                         itemFor(rd.item_id)
                                                             ?.unit_cost,
                                                     )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        lineTaxTotal(
+                                                            rd.item_id,
+                                                        ),
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        lineMiscTotal(
+                                                            rd.item_id,
+                                                        ),
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono"
+                                            >
+                                                ${{
+                                                    landedUnitCost(
+                                                        rd.item_id,
+                                                    ).toFixed(4)
                                                 }}
                                             </td>
                                         </tr>

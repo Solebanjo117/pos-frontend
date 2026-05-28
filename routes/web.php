@@ -204,8 +204,12 @@ Route::middleware(['auth'])->get('/returns', function () {
     return Inertia::render('Returns/Index');
 })->name('returns.index');
 
+Route::middleware(['auth'])->get('/returns/{id}', function ($id) {
+    return Inertia::render('Returns/Show', ['id' => (int) $id]);
+})->whereNumber('id')->name('returns.show');
+
 // Returns (POS in return mode)
-Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/{orderId}', fn($orderId) =>
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/orders/{orderId}', fn($orderId) =>
     Inertia::render('SalesOrders/ReturnEditor', [
         'orderId' => (int) $orderId
     ])
@@ -463,13 +467,13 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('SalesQuotes/Index');
     })->name('sales-quotes.index');
     Route::get('/sales-quotes/create', function () {
-        return Inertia::render('SalesQuotes/Create');
+        return Inertia::render('SalesQuotes/Editor');
     })->name('sales-quotes.create');
     Route::get('/sales-quotes/{id}', function ($id) {
         return Inertia::render('SalesQuotes/Show', ['id' => (int) $id]);
     })->name('sales-quotes.show');
     Route::get('/sales-quotes/{id}/edit', function ($id) {
-        return Inertia::render('SalesQuotes/Edit', ['id' => (int) $id]);
+        return Inertia::render('SalesQuotes/Editor', ['quoteId' => (int) $id]);
     })->name('sales-quotes.edit');
 
     // Quote Editor (POS in quote-only mode)

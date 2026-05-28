@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import {
     AlertCircle,
@@ -20,7 +20,9 @@ import type {
     AccountPaymentRecord,
     CashMovementRecord,
     OperationalExpenseRecord,
+    PosSessionDocument,
     PosSessionRecord,
+    PosSessionTimelineEvent,
     PurchasePaymentRecord,
     SessionSalesOrder,
 } from '@/services/posSessions';
@@ -68,6 +70,8 @@ const props = defineProps<{
     purchasePayments: PurchasePaymentRecord[];
     accountPayments: AccountPaymentRecord[];
     operationalExpenses: OperationalExpenseRecord[];
+    documents?: PosSessionDocument[];
+    timeline?: PosSessionTimelineEvent[];
     loading: boolean;
 }>();
 
@@ -76,6 +80,18 @@ const emit = defineEmits<{ close: [] }>();
 const { fetchMethods, getMethodName } = usePaymentMethods();
 
 onMounted(fetchMethods);
+
+const activeTab = ref('summary');
+const detailTabs = [
+    { id: 'summary', label: 'Resumen' },
+    { id: 'reconciliation', label: 'Conciliacion' },
+    { id: 'sales', label: 'Ventas' },
+    { id: 'ar', label: 'Cobros AR' },
+    { id: 'ap', label: 'Pagos AP' },
+    { id: 'expenses', label: 'Gastos' },
+    { id: 'movements', label: 'Movimientos' },
+    { id: 'audit', label: 'Auditoria' },
+];
 
 const moneyValue = (value: string | number | null | undefined): number => {
     const parsed =
@@ -198,6 +214,8 @@ const receivablePayments = computed(() =>
         (payment) => payment.account_type === 'customer',
     ),
 );
+const documentRows = computed(() => props.documents ?? []);
+const timelineRows = computed(() => props.timeline ?? []);
 const cashRow = computed(
     () => reconciliationRows.value.find((row) => row.code === 'cash') ?? null,
 );
@@ -471,213 +489,340 @@ const handlePrint = () => {
                 v-else-if="session"
                 class="min-h-0 flex-1 overflow-y-auto p-5 print:overflow-visible print:p-0"
             >
-                <section
-                    class="hidden border-b border-slate-300 pb-3 text-center print:block"
+                <nav
+                    class="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200 pb-2 dark:border-border print:hidden"
                 >
-                    <h1 class="text-lg font-black tracking-wide uppercase">
-                        Reporte de cierre de caja
-                    </h1>
-                    <p class="text-sm font-semibold">
-                        {{ session.warehouse?.name || 'General' }}
-                    </p>
-                    <p class="text-xs text-slate-600">
-                        Sesión #{{ session.id }} - Cajero:
-                        {{ session.user?.name || 'Sin cajero' }}
-                    </p>
-                </section>
+                    <button
+                        v-for="tab in detailTabs"
+                        :key="tab.id"
+                        type="button"
+                        class="shrink-0 rounded-md px-3 py-1.5 text-xs font-bold transition"
+                        :class="
+                            activeTab === tab.id
+                                ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-muted'
+                        "
+                        @click="activeTab = tab.id"
+                    >
+                        {{ tab.label }}
+                    </button>
+                </nav>
 
-                <section
-                    class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 print:grid-cols-5 print:gap-2"
-                >
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                <div v-show="activeTab !== 'audit'" class="space-y-4">
+                    <section
+                        class="hidden border-b border-slate-300 pb-3 text-center print:block"
                     >
-                        <p class="text-xs font-bold text-slate-500 uppercase">
-                            Total esperado
+                        <h1 class="text-lg font-black tracking-wide uppercase">
+                            Reporte de cierre de caja
+                        </h1>
+                        <p class="text-sm font-semibold">
+                            {{ session.warehouse?.name || 'General' }}
                         </p>
-                        <p
-                            class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
-                        >
-                            {{ formatCurrency(expectedTotal) }}
+                        <p class="text-xs text-slate-600">
+                            Sesión #{{ session.id }} - Cajero:
+                            {{ session.user?.name || 'Sin cajero' }}
                         </p>
-                    </div>
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
-                    >
-                        <p class="text-xs font-bold text-slate-500 uppercase">
-                            Total declarado
-                        </p>
-                        <p
-                            class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
-                        >
-                            {{ formatCurrency(declaredTotal) }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
-                    >
-                        <p class="text-xs font-bold text-slate-500 uppercase">
-                            Diferencia
-                        </p>
-                        <p
-                            class="mt-1 text-xl font-bold tabular-nums print:text-sm"
-                            :class="
-                                differenceTone === 'missing'
-                                    ? 'text-red-700 dark:text-red-300'
-                                    : differenceTone === 'surplus'
-                                      ? 'text-emerald-700 dark:text-emerald-300'
-                                      : 'text-slate-950 dark:text-white'
-                            "
-                        >
-                            {{ totalDifference > 0 ? '+' : ''
-                            }}{{ formatCurrency(totalDifference) }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
-                    >
-                        <p class="text-xs font-bold text-slate-500 uppercase">
-                            Efectivo esperado
-                        </p>
-                        <p
-                            class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
-                        >
-                            {{
-                                formatCurrency(
-                                    cashRow?.expected_total ??
-                                        summary?.expected_cash,
-                                )
-                            }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
-                    >
-                        <p class="text-xs font-bold text-slate-500 uppercase">
-                            Ventas cobradas
-                        </p>
-                        <p
-                            class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
-                        >
-                            {{ formatCurrency(totalSales) }}
-                        </p>
-                    </div>
-                </section>
+                    </section>
 
-                <section
-                    class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] print:mt-3 print:grid-cols-2 print:gap-3"
-                >
-                    <div class="space-y-4 print:space-y-3">
+                    <section
+                        class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 print:grid-cols-5 print:gap-2"
+                    >
                         <div
-                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                            class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
                         >
-                            <div
-                                class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            <p
+                                class="text-xs font-bold text-slate-500 uppercase"
                             >
-                                <h3
-                                    class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                Total esperado
+                            </p>
+                            <p
+                                class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
+                            >
+                                {{ formatCurrency(expectedTotal) }}
+                            </p>
+                        </div>
+                        <div
+                            class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                        >
+                            <p
+                                class="text-xs font-bold text-slate-500 uppercase"
+                            >
+                                Total declarado
+                            </p>
+                            <p
+                                class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
+                            >
+                                {{ formatCurrency(declaredTotal) }}
+                            </p>
+                        </div>
+                        <div
+                            class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                        >
+                            <p
+                                class="text-xs font-bold text-slate-500 uppercase"
+                            >
+                                Diferencia
+                            </p>
+                            <p
+                                class="mt-1 text-xl font-bold tabular-nums print:text-sm"
+                                :class="
+                                    differenceTone === 'missing'
+                                        ? 'text-red-700 dark:text-red-300'
+                                        : differenceTone === 'surplus'
+                                          ? 'text-emerald-700 dark:text-emerald-300'
+                                          : 'text-slate-950 dark:text-white'
+                                "
+                            >
+                                {{ totalDifference > 0 ? '+' : ''
+                                }}{{ formatCurrency(totalDifference) }}
+                            </p>
+                        </div>
+                        <div
+                            class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                        >
+                            <p
+                                class="text-xs font-bold text-slate-500 uppercase"
+                            >
+                                Efectivo esperado
+                            </p>
+                            <p
+                                class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
+                            >
+                                {{
+                                    formatCurrency(
+                                        cashRow?.expected_total ??
+                                            summary?.expected_cash,
+                                    )
+                                }}
+                            </p>
+                        </div>
+                        <div
+                            class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card print:shadow-none"
+                        >
+                            <p
+                                class="text-xs font-bold text-slate-500 uppercase"
+                            >
+                                Ventas cobradas
+                            </p>
+                            <p
+                                class="mt-1 text-xl font-bold text-slate-950 tabular-nums dark:text-white print:text-sm"
+                            >
+                                {{ formatCurrency(totalSales) }}
+                            </p>
+                        </div>
+                    </section>
+
+                    <section
+                        class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] print:mt-3 print:grid-cols-2 print:gap-3"
+                    >
+                        <div class="space-y-4 print:space-y-3">
+                            <div
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                            >
+                                <div
+                                    class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
                                 >
-                                    <CreditCard
-                                        :size="14"
-                                        class="print:hidden"
-                                    />
-                                    Conciliación por método
-                                </h3>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm print:text-[10px]">
-                                    <thead>
-                                        <tr
-                                            class="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-border"
+                                    <h3
+                                        class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                    >
+                                        <CreditCard
+                                            :size="14"
+                                            class="print:hidden"
+                                        />
+                                        Conciliación por método
+                                    </h3>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table
+                                        class="w-full text-sm print:text-[10px]"
+                                    >
+                                        <thead>
+                                            <tr
+                                                class="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-border"
+                                            >
+                                                <th
+                                                    class="px-4 py-2 text-left font-bold"
+                                                >
+                                                    Método
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-right font-bold"
+                                                >
+                                                    Inicio + ingresos
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-right font-bold"
+                                                >
+                                                    Pagos
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-right font-bold"
+                                                >
+                                                    Retiros
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-right font-bold"
+                                                >
+                                                    Esperado
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-right font-bold"
+                                                >
+                                                    Declarado
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-right font-bold"
+                                                >
+                                                    Diferencia
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody
+                                            class="divide-y divide-slate-100 dark:divide-border/60"
                                         >
-                                            <th
-                                                class="px-4 py-2 text-left font-bold"
+                                            <tr
+                                                v-for="row in countableRows"
+                                                :key="row.code"
                                             >
-                                                Método
-                                            </th>
-                                            <th
-                                                class="px-4 py-2 text-right font-bold"
+                                                <td class="px-4 py-2">
+                                                    <div
+                                                        class="font-semibold text-slate-950 dark:text-white"
+                                                    >
+                                                        {{
+                                                            row.label ||
+                                                            paymentMethodLabel(
+                                                                row.code,
+                                                            )
+                                                        }}
+                                                    </div>
+                                                    <div
+                                                        class="font-mono text-[11px] text-slate-400 uppercase"
+                                                    >
+                                                        {{ row.code }}
+                                                    </div>
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            row.start_adds,
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            row.payments,
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            row.withdrawals,
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-right font-semibold text-slate-950 tabular-nums dark:text-white"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            row.expected_total,
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-right font-semibold text-slate-950 tabular-nums dark:text-white"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            row.declared_total ??
+                                                                0,
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-right font-bold tabular-nums"
+                                                    :class="
+                                                        moneyValue(
+                                                            row.difference,
+                                                        ) < -0.005
+                                                            ? 'text-red-700 dark:text-red-300'
+                                                            : moneyValue(
+                                                                    row.difference,
+                                                                ) > 0.005
+                                                              ? 'text-emerald-700 dark:text-emerald-300'
+                                                              : 'text-slate-500 dark:text-slate-400'
+                                                    "
+                                                >
+                                                    {{
+                                                        moneyValue(
+                                                            row.difference,
+                                                        ) > 0
+                                                            ? '+'
+                                                            : ''
+                                                    }}{{
+                                                        formatCurrency(
+                                                            row.difference ?? 0,
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+                                            <tr
+                                                v-if="
+                                                    countableRows.length === 0
+                                                "
                                             >
-                                                Inicio + ingresos
-                                            </th>
-                                            <th
-                                                class="px-4 py-2 text-right font-bold"
-                                            >
-                                                Pagos
-                                            </th>
-                                            <th
-                                                class="px-4 py-2 text-right font-bold"
-                                            >
-                                                Retiros
-                                            </th>
-                                            <th
-                                                class="px-4 py-2 text-right font-bold"
-                                            >
-                                                Esperado
-                                            </th>
-                                            <th
-                                                class="px-4 py-2 text-right font-bold"
-                                            >
-                                                Declarado
-                                            </th>
-                                            <th
-                                                class="px-4 py-2 text-right font-bold"
-                                            >
-                                                Diferencia
-                                            </th>
-                                        </tr>
-                                    </thead>
+                                                <td
+                                                    colspan="7"
+                                                    class="px-4 py-6 text-center text-slate-500"
+                                                >
+                                                    No hay datos de
+                                                    conciliación.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div
+                                v-if="informationalRows.length > 0"
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                            >
+                                <div
+                                    class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                                >
+                                    <h3
+                                        class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                    >
+                                        Métodos informativos
+                                    </h3>
+                                </div>
+                                <table class="w-full text-sm print:text-[10px]">
                                     <tbody
                                         class="divide-y divide-slate-100 dark:divide-border/60"
                                     >
                                         <tr
-                                            v-for="row in countableRows"
+                                            v-for="row in informationalRows"
                                             :key="row.code"
                                         >
-                                            <td class="px-4 py-2">
-                                                <div
-                                                    class="font-semibold text-slate-950 dark:text-white"
-                                                >
-                                                    {{
-                                                        row.label ||
-                                                        paymentMethodLabel(
-                                                            row.code,
-                                                        )
-                                                    }}
-                                                </div>
-                                                <div
-                                                    class="font-mono text-[11px] text-slate-400 uppercase"
-                                                >
-                                                    {{ row.code }}
-                                                </div>
-                                            </td>
                                             <td
-                                                class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                                class="px-4 py-2 font-semibold text-slate-700 dark:text-slate-200"
                                             >
                                                 {{
-                                                    formatCurrency(
-                                                        row.start_adds,
-                                                    )
+                                                    row.label ||
+                                                    paymentMethodLabel(row.code)
                                                 }}
                                             </td>
                                             <td
-                                                class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
-                                            >
-                                                {{
-                                                    formatCurrency(row.payments)
-                                                }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-2 text-right text-slate-600 tabular-nums dark:text-slate-300"
-                                            >
-                                                {{
-                                                    formatCurrency(
-                                                        row.withdrawals,
-                                                    )
-                                                }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-2 text-right font-semibold text-slate-950 tabular-nums dark:text-white"
+                                                class="px-4 py-2 text-right font-bold text-slate-950 tabular-nums dark:text-white"
                                             >
                                                 {{
                                                     formatCurrency(
@@ -685,191 +830,272 @@ const handlePrint = () => {
                                                     )
                                                 }}
                                             </td>
-                                            <td
-                                                class="px-4 py-2 text-right font-semibold text-slate-950 tabular-nums dark:text-white"
-                                            >
-                                                {{
-                                                    formatCurrency(
-                                                        row.declared_total ?? 0,
-                                                    )
-                                                }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-2 text-right font-bold tabular-nums"
-                                                :class="
-                                                    moneyValue(row.difference) <
-                                                    -0.005
-                                                        ? 'text-red-700 dark:text-red-300'
-                                                        : moneyValue(
-                                                                row.difference,
-                                                            ) > 0.005
-                                                          ? 'text-emerald-700 dark:text-emerald-300'
-                                                          : 'text-slate-500 dark:text-slate-400'
-                                                "
-                                            >
-                                                {{
-                                                    moneyValue(row.difference) >
-                                                    0
-                                                        ? '+'
-                                                        : ''
-                                                }}{{
-                                                    formatCurrency(
-                                                        row.difference ?? 0,
-                                                    )
-                                                }}
-                                            </td>
-                                        </tr>
-                                        <tr v-if="countableRows.length === 0">
-                                            <td
-                                                colspan="7"
-                                                class="px-4 py-6 text-center text-slate-500"
-                                            >
-                                                No hay datos de conciliación.
-                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
 
-                        <div
-                            v-if="informationalRows.length > 0"
-                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
-                        >
                             <div
-                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
-                            >
-                                <h3
-                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
-                                >
-                                    Métodos informativos
-                                </h3>
-                            </div>
-                            <table class="w-full text-sm print:text-[10px]">
-                                <tbody
-                                    class="divide-y divide-slate-100 dark:divide-border/60"
-                                >
-                                    <tr
-                                        v-for="row in informationalRows"
-                                        :key="row.code"
-                                    >
-                                        <td
-                                            class="px-4 py-2 font-semibold text-slate-700 dark:text-slate-200"
-                                        >
-                                            {{
-                                                row.label ||
-                                                paymentMethodLabel(row.code)
-                                            }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-bold text-slate-950 tabular-nums dark:text-white"
-                                        >
-                                            {{
-                                                formatCurrency(
-                                                    row.expected_total,
-                                                )
-                                            }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div
-                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
-                            >
-                                <h3
-                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
-                                >
-                                    Cobros de clientes
-                                </h3>
-                            </div>
-                            <div
-                                v-if="receivablePayments.length > 0"
-                                class="divide-y divide-slate-100 dark:divide-border/60"
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
                             >
                                 <div
-                                    v-for="payment in receivablePayments"
-                                    :key="payment.id"
-                                    class="px-4 py-3"
+                                    class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                                >
+                                    <h3
+                                        class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                    >
+                                        Cobros de clientes
+                                    </h3>
+                                </div>
+                                <div
+                                    v-if="receivablePayments.length > 0"
+                                    class="divide-y divide-slate-100 dark:divide-border/60"
                                 >
                                     <div
-                                        class="flex items-start justify-between gap-3"
+                                        v-for="payment in receivablePayments"
+                                        :key="payment.id"
+                                        class="px-4 py-3"
                                     >
-                                        <div>
-                                            <p
-                                                class="text-sm font-semibold text-slate-950 dark:text-white"
+                                        <div
+                                            class="flex items-start justify-between gap-3"
+                                        >
+                                            <div>
+                                                <p
+                                                    class="text-sm font-semibold text-slate-950 dark:text-white"
+                                                >
+                                                    {{
+                                                        accountPaymentTitle(
+                                                            payment,
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p
+                                                    class="text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{
+                                                        paymentMethodLabel(
+                                                            payment.method,
+                                                        )
+                                                    }}
+                                                    -
+                                                    {{
+                                                        formatTime(
+                                                            payment.paid_at,
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p
+                                                    v-if="
+                                                        payment.reference_number
+                                                    "
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    Número de recibo:
+                                                    {{
+                                                        payment.reference_number
+                                                    }}
+                                                </p>
+                                                <p
+                                                    v-if="payment.notes"
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{ payment.notes }}
+                                                </p>
+                                            </div>
+                                            <span
+                                                class="shrink-0 text-sm font-bold tabular-nums"
+                                                :class="
+                                                    accountPaymentClass(payment)
+                                                "
                                             >
-                                                {{
-                                                    accountPaymentTitle(payment)
-                                                }}
-                                            </p>
-                                            <p
-                                                class="text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{
-                                                    paymentMethodLabel(
-                                                        payment.method,
+                                                +{{
+                                                    formatCurrency(
+                                                        payment.amount,
                                                     )
                                                 }}
-                                                -
-                                                {{
-                                                    formatTime(payment.paid_at)
-                                                }}
-                                            </p>
-                                            <p
-                                                v-if="payment.reference_number"
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                Número de recibo:
-                                                {{ payment.reference_number }}
-                                            </p>
-                                            <p
-                                                v-if="payment.notes"
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{ payment.notes }}
-                                            </p>
+                                            </span>
                                         </div>
-                                        <span
-                                            class="shrink-0 text-sm font-bold tabular-nums"
-                                            :class="
-                                                accountPaymentClass(payment)
-                                            "
-                                        >
-                                            +{{
-                                                formatCurrency(payment.amount)
-                                            }}
-                                        </span>
                                     </div>
                                 </div>
+                                <div
+                                    v-else
+                                    class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                                >
+                                    No hubo cobros de clientes asociados al
+                                    cierre.
+                                </div>
                             </div>
+
                             <div
-                                v-else
-                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
                             >
-                                No hubo cobros de clientes asociados al cierre.
+                                <div
+                                    class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                                >
+                                    <h3
+                                        class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                    >
+                                        <Receipt
+                                            :size="14"
+                                            class="print:hidden"
+                                        />
+                                        Ventas del turno ({{
+                                            salesOrders.length
+                                        }})
+                                    </h3>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table
+                                        class="w-full text-sm print:text-[10px]"
+                                    >
+                                        <thead>
+                                            <tr
+                                                class="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-border"
+                                            >
+                                                <th
+                                                    class="px-4 py-2 text-left font-bold"
+                                                >
+                                                    Nro. venta
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-left font-bold"
+                                                >
+                                                    Hora
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-left font-bold"
+                                                >
+                                                    Cliente
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-left font-bold"
+                                                >
+                                                    Pago
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-left font-bold"
+                                                >
+                                                    Estado
+                                                </th>
+                                                <th
+                                                    class="px-4 py-2 text-right font-bold"
+                                                >
+                                                    Total
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody
+                                            class="divide-y divide-slate-100 dark:divide-border/60"
+                                        >
+                                            <tr
+                                                v-for="order in salesOrders"
+                                                :key="order.id"
+                                            >
+                                                <td
+                                                    class="px-4 py-2 font-mono text-xs font-semibold text-slate-950 dark:text-white"
+                                                >
+                                                    <Link
+                                                        :href="`/sales-orders/${order.id}`"
+                                                        class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-950 print:no-underline"
+                                                        title="Ver venta"
+                                                    >
+                                                        {{ order.order_number }}
+                                                    </Link>
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-xs text-slate-600 dark:text-slate-300"
+                                                >
+                                                    {{
+                                                        formatTime(
+                                                            order.created_at,
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-slate-600 dark:text-slate-300"
+                                                >
+                                                    <Link
+                                                        v-if="order.customer_id"
+                                                        :href="`/customers/${order.customer_id}`"
+                                                        class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-600 print:no-underline"
+                                                        title="Ver cliente"
+                                                    >
+                                                        {{
+                                                            order.customer
+                                                                ?.name ||
+                                                            'Cliente registrado'
+                                                        }}
+                                                    </Link>
+                                                    <span v-else
+                                                        >Público General</span
+                                                    >
+                                                </td>
+                                                <td class="px-4 py-2">
+                                                    <span
+                                                        class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:bg-muted dark:text-slate-300"
+                                                    >
+                                                        {{
+                                                            paymentMethodLabel(
+                                                                order.payment_method,
+                                                            )
+                                                        }}
+                                                    </span>
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-xs text-slate-600 dark:text-slate-300"
+                                                >
+                                                    {{
+                                                        statusLabel(
+                                                            order.status,
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-2 text-right font-bold text-slate-950 tabular-nums dark:text-white"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            order.total,
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+                                            <tr v-if="salesOrders.length === 0">
+                                                <td
+                                                    colspan="6"
+                                                    class="px-4 py-6 text-center text-slate-500"
+                                                >
+                                                    No se registraron ventas en
+                                                    esta sesión.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
-                        <div
-                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
-                        >
+                        <aside class="space-y-4 print:space-y-3">
                             <div
-                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
                             >
-                                <h3
-                                    class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                <div
+                                    class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
                                 >
-                                    <Receipt :size="14" class="print:hidden" />
-                                    Ventas del turno ({{ salesOrders.length }})
-                                </h3>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm print:text-[10px]">
+                                    <h3
+                                        class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                    >
+                                        <Banknote
+                                            :size="14"
+                                            class="print:hidden"
+                                        />
+                                        Arqueo de denominaciones
+                                    </h3>
+                                </div>
+                                <table
+                                    v-if="denomData.length > 0"
+                                    class="w-full text-sm print:text-[10px]"
+                                >
                                     <thead>
                                         <tr
                                             class="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-border"
@@ -877,32 +1103,22 @@ const handlePrint = () => {
                                             <th
                                                 class="px-4 py-2 text-left font-bold"
                                             >
-                                                Nro. venta
+                                                Denominación
                                             </th>
                                             <th
-                                                class="px-4 py-2 text-left font-bold"
+                                                class="px-4 py-2 text-center font-bold"
                                             >
-                                                Hora
+                                                Sueltas
                                             </th>
                                             <th
-                                                class="px-4 py-2 text-left font-bold"
+                                                class="px-4 py-2 text-center font-bold"
                                             >
-                                                Cliente
-                                            </th>
-                                            <th
-                                                class="px-4 py-2 text-left font-bold"
-                                            >
-                                                Pago
-                                            </th>
-                                            <th
-                                                class="px-4 py-2 text-left font-bold"
-                                            >
-                                                Estado
+                                                Fajos
                                             </th>
                                             <th
                                                 class="px-4 py-2 text-right font-bold"
                                             >
-                                                Total
+                                                Subtotal
                                             </th>
                                         </tr>
                                     </thead>
@@ -910,125 +1126,571 @@ const handlePrint = () => {
                                         class="divide-y divide-slate-100 dark:divide-border/60"
                                     >
                                         <tr
-                                            v-for="order in salesOrders"
-                                            :key="order.id"
+                                            v-for="denomination in denomData"
+                                            :key="denomination.id"
                                         >
                                             <td
-                                                class="px-4 py-2 font-mono text-xs font-semibold text-slate-950 dark:text-white"
+                                                class="px-4 py-2 font-semibold text-slate-700 dark:text-slate-200"
                                             >
-                                                <Link
-                                                    :href="`/sales-orders/${order.id}`"
-                                                    class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-950 print:no-underline"
-                                                    title="Ver venta"
-                                                >
-                                                    {{ order.order_number }}
-                                                </Link>
+                                                {{ denomination.label }}
                                             </td>
                                             <td
-                                                class="px-4 py-2 text-xs text-slate-600 dark:text-slate-300"
+                                                class="px-4 py-2 text-center font-mono text-slate-600 dark:text-slate-300"
                                             >
                                                 {{
-                                                    formatTime(order.created_at)
+                                                    denomination.unitCount ||
+                                                    '-'
                                                 }}
                                             </td>
                                             <td
-                                                class="px-4 py-2 text-slate-600 dark:text-slate-300"
+                                                class="px-4 py-2 text-center font-mono text-slate-600 dark:text-slate-300"
                                             >
-                                                <Link
-                                                    v-if="order.customer_id"
-                                                    :href="`/customers/${order.customer_id}`"
-                                                    class="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300 print:text-slate-600 print:no-underline"
-                                                    title="Ver cliente"
-                                                >
-                                                    {{
-                                                        order.customer?.name ||
-                                                        'Cliente registrado'
-                                                    }}
-                                                </Link>
-                                                <span v-else
-                                                    >Público General</span
-                                                >
-                                            </td>
-                                            <td class="px-4 py-2">
-                                                <span
-                                                    class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:bg-muted dark:text-slate-300"
-                                                >
-                                                    {{
-                                                        paymentMethodLabel(
-                                                            order.payment_method,
-                                                        )
-                                                    }}
-                                                </span>
-                                            </td>
-                                            <td
-                                                class="px-4 py-2 text-xs text-slate-600 dark:text-slate-300"
-                                            >
-                                                {{ statusLabel(order.status) }}
+                                                {{
+                                                    denomination.packCount ||
+                                                    '-'
+                                                }}
                                             </td>
                                             <td
                                                 class="px-4 py-2 text-right font-bold text-slate-950 tabular-nums dark:text-white"
                                             >
                                                 {{
-                                                    formatCurrency(order.total)
+                                                    formatCurrency(
+                                                        denomination.subtotal,
+                                                    )
                                                 }}
                                             </td>
                                         </tr>
-                                        <tr v-if="salesOrders.length === 0">
+                                    </tbody>
+                                    <tfoot>
+                                        <tr
+                                            class="border-t border-slate-300 bg-slate-50 dark:bg-muted/50"
+                                        >
                                             <td
-                                                colspan="6"
-                                                class="px-4 py-6 text-center text-slate-500"
+                                                colspan="3"
+                                                class="px-4 py-2 text-right text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
                                             >
-                                                No se registraron ventas en esta
-                                                sesión.
+                                                Total contado
+                                            </td>
+                                            <td
+                                                class="px-4 py-2 text-right font-black text-slate-950 tabular-nums dark:text-white"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        totalDenominations,
+                                                    )
+                                                }}
                                             </td>
                                         </tr>
-                                    </tbody>
+                                    </tfoot>
                                 </table>
+                                <div
+                                    v-else
+                                    class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                                >
+                                    No se registró conteo de denominaciones.
+                                </div>
                             </div>
+
+                            <div
+                                class="rounded-lg border border-slate-200 bg-white p-4 dark:border-border dark:bg-card"
+                            >
+                                <h3
+                                    class="mb-3 flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                >
+                                    <Clock :size="14" class="print:hidden" />
+                                    Datos del turno
+                                </h3>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between gap-4">
+                                        <span
+                                            class="text-slate-500 dark:text-slate-400"
+                                            >Apertura</span
+                                        >
+                                        <span
+                                            class="text-right font-semibold text-slate-950 dark:text-white"
+                                            >{{
+                                                formatDate(session.opened_at)
+                                            }}</span
+                                        >
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <span
+                                            class="text-slate-500 dark:text-slate-400"
+                                            >Cierre</span
+                                        >
+                                        <span
+                                            class="text-right font-semibold text-slate-950 dark:text-white"
+                                            >{{
+                                                formatDate(session.closed_at)
+                                            }}</span
+                                        >
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <span
+                                            class="text-slate-500 dark:text-slate-400"
+                                            >Fondo inicial</span
+                                        >
+                                        <span
+                                            class="font-semibold text-slate-950 tabular-nums dark:text-white"
+                                            >{{
+                                                formatCurrency(
+                                                    session.opening_amount,
+                                                )
+                                            }}</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                            >
+                                <div
+                                    class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                                >
+                                    <h3
+                                        class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                    >
+                                        Movimientos de caja
+                                    </h3>
+                                </div>
+                                <div
+                                    v-if="cashMovements.length > 0"
+                                    class="divide-y divide-slate-100 dark:divide-border/60"
+                                >
+                                    <div
+                                        v-for="movement in cashMovements"
+                                        :key="movement.id"
+                                        class="px-4 py-3"
+                                    >
+                                        <div
+                                            class="flex items-start justify-between gap-3"
+                                        >
+                                            <div>
+                                                <p
+                                                    class="text-sm font-semibold text-slate-950 dark:text-white"
+                                                >
+                                                    {{ movement.reason }}
+                                                </p>
+                                                <p
+                                                    class="text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{
+                                                        movementLabel(movement)
+                                                    }}
+                                                    -
+                                                    {{
+                                                        formatTime(
+                                                            movement.created_at,
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p
+                                                    v-if="movement.notes"
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{ movement.notes }}
+                                                </p>
+                                            </div>
+                                            <span
+                                                class="shrink-0 text-sm font-bold tabular-nums"
+                                                :class="movementClass(movement)"
+                                            >
+                                                {{
+                                                    movement.type === 'in'
+                                                        ? '+'
+                                                        : '-'
+                                                }}{{
+                                                    formatCurrency(
+                                                        movement.amount,
+                                                    )
+                                                }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div
+                                    v-else
+                                    class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                                >
+                                    No hubo ingresos extra ni retiros.
+                                </div>
+                            </div>
+
+                            <div
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                            >
+                                <div
+                                    class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                                >
+                                    <h3
+                                        class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                    >
+                                        Pagos de compras
+                                    </h3>
+                                </div>
+                                <div
+                                    v-if="purchasePayments.length > 0"
+                                    class="divide-y divide-slate-100 dark:divide-border/60"
+                                >
+                                    <div
+                                        v-for="payment in purchasePayments"
+                                        :key="payment.id"
+                                        class="px-4 py-3"
+                                    >
+                                        <div
+                                            class="flex items-start justify-between gap-3"
+                                        >
+                                            <div>
+                                                <p
+                                                    class="text-sm font-semibold text-slate-950 dark:text-white"
+                                                >
+                                                    {{
+                                                        purchasePaymentTitle(
+                                                            payment,
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p
+                                                    class="text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{
+                                                        paymentMethodLabel(
+                                                            payment.method,
+                                                        )
+                                                    }}
+                                                    -
+                                                    {{
+                                                        formatTime(
+                                                            payment.paid_at,
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p
+                                                    v-if="
+                                                        payment.purchase_order
+                                                            ?.supplier?.name
+                                                    "
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{
+                                                        payment.purchase_order
+                                                            .supplier.name
+                                                    }}
+                                                </p>
+                                                <p
+                                                    v-if="
+                                                        payment.reference_number
+                                                    "
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    Número de recibo:
+                                                    {{
+                                                        payment.reference_number
+                                                    }}
+                                                </p>
+                                                <p
+                                                    v-if="payment.notes"
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{ payment.notes }}
+                                                </p>
+                                            </div>
+                                            <span
+                                                class="shrink-0 text-sm font-bold text-red-700 tabular-nums dark:text-red-300"
+                                            >
+                                                -{{
+                                                    formatCurrency(
+                                                        payment.amount,
+                                                    )
+                                                }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div
+                                    v-else
+                                    class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                                >
+                                    No hubo pagos de compras asociados al
+                                    cierre.
+                                </div>
+                            </div>
+
+                            <div
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                            >
+                                <div
+                                    class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                                >
+                                    <h3
+                                        class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                                    >
+                                        Gastos operativos
+                                    </h3>
+                                </div>
+                                <div
+                                    v-if="operationalExpenses.length > 0"
+                                    class="divide-y divide-slate-100 dark:divide-border/60"
+                                >
+                                    <div
+                                        v-for="expense in operationalExpenses"
+                                        :key="expense.id"
+                                        class="px-4 py-3"
+                                    >
+                                        <div
+                                            class="flex items-start justify-between gap-3"
+                                        >
+                                            <div>
+                                                <p
+                                                    class="text-sm font-semibold text-slate-950 dark:text-white"
+                                                >
+                                                    {{
+                                                        operationalExpenseTitle(
+                                                            expense,
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p
+                                                    class="text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{
+                                                        expense.category_label ||
+                                                        expense.category
+                                                    }}
+                                                    -
+                                                    {{
+                                                        paymentMethodLabel(
+                                                            expense.payment_method ||
+                                                                'other',
+                                                        )
+                                                    }}
+                                                    -
+                                                    {{
+                                                        formatTime(
+                                                            expense.created_at,
+                                                        )
+                                                    }}
+                                                </p>
+                                                <span
+                                                    class="mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-bold ring-1"
+                                                    :class="
+                                                        isCashOperationalExpense(
+                                                            expense,
+                                                        )
+                                                            ? 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800'
+                                                            : 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-muted dark:text-slate-300 dark:ring-border'
+                                                    "
+                                                >
+                                                    {{
+                                                        operationalExpenseBadge(
+                                                            expense,
+                                                        )
+                                                    }}
+                                                </span>
+                                                <p
+                                                    v-if="
+                                                        expense.reference_number
+                                                    "
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    Número de recibo:
+                                                    {{
+                                                        expense.reference_number
+                                                    }}
+                                                </p>
+                                                <p
+                                                    v-if="expense.creator?.name"
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    Registrado por
+                                                    {{ expense.creator.name }}
+                                                </p>
+                                                <p
+                                                    v-if="expense.notes"
+                                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                >
+                                                    {{ expense.notes }}
+                                                </p>
+                                            </div>
+                                            <span
+                                                class="shrink-0 text-sm font-bold tabular-nums"
+                                                :class="
+                                                    operationalExpenseAmountClass(
+                                                        expense,
+                                                    )
+                                                "
+                                            >
+                                                <template
+                                                    v-if="
+                                                        isCashOperationalExpense(
+                                                            expense,
+                                                        )
+                                                    "
+                                                >
+                                                    - </template
+                                                >{{
+                                                    formatCurrency(
+                                                        expense.amount,
+                                                    )
+                                                }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div
+                                    v-else
+                                    class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                                >
+                                    No hubo gastos operativos asociados al
+                                    cierre.
+                                </div>
+                            </div>
+
+                            <div
+                                v-if="session.notes"
+                                class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
+                            >
+                                <h3
+                                    class="mb-1 flex items-center gap-2 text-xs font-bold uppercase"
+                                >
+                                    <AlertCircle
+                                        :size="14"
+                                        class="print:hidden"
+                                    />
+                                    Nota del cierre
+                                </h3>
+                                <p class="text-sm">{{ session.notes }}</p>
+                            </div>
+                        </aside>
+                    </section>
+
+                    <section
+                        class="hidden print:mt-8 print:grid print:grid-cols-2 print:gap-16"
+                    >
+                        <div
+                            class="border-t border-slate-400 pt-1 text-center text-[10px] text-slate-600"
+                        >
+                            Firma del cajero
+                        </div>
+                        <div
+                            class="border-t border-slate-400 pt-1 text-center text-[10px] text-slate-600"
+                        >
+                            Firma del supervisor
+                        </div>
+                    </section>
+                </div>
+
+                <section
+                    v-show="activeTab === 'audit'"
+                    class="space-y-4 print:hidden"
+                >
+                    <div
+                        class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                        >
+                            <h3
+                                class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
+                            >
+                                Linea de tiempo
+                            </h3>
+                        </div>
+                        <div
+                            v-if="timelineRows.length > 0"
+                            class="divide-y divide-slate-100 dark:divide-border/60"
+                        >
+                            <div
+                                v-for="event in timelineRows"
+                                :key="event.id"
+                                class="grid gap-3 px-4 py-3 text-sm md:grid-cols-[140px_minmax(0,1fr)_140px]"
+                            >
+                                <div
+                                    class="font-mono text-xs text-slate-500 dark:text-slate-400"
+                                >
+                                    {{ formatDate(event.occurred_at) }}
+                                </div>
+                                <div class="min-w-0">
+                                    <Link
+                                        v-if="event.href"
+                                        :href="event.href"
+                                        class="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300"
+                                    >
+                                        {{ event.label }}
+                                    </Link>
+                                    <span
+                                        v-else
+                                        class="font-semibold text-slate-950 dark:text-white"
+                                    >
+                                        {{ event.label }}
+                                    </span>
+                                    <p
+                                        v-if="
+                                            event.document?.number ||
+                                            event.document?.reference
+                                        "
+                                        class="truncate text-xs text-slate-500 dark:text-slate-400"
+                                    >
+                                        {{
+                                            event.document.number ||
+                                            event.document.reference
+                                        }}
+                                    </p>
+                                </div>
+                                <div
+                                    class="text-right font-bold tabular-nums"
+                                    :class="
+                                        event.direction === 'out'
+                                            ? 'text-red-700 dark:text-red-300'
+                                            : 'text-emerald-700 dark:text-emerald-300'
+                                    "
+                                >
+                                    {{ event.direction === 'out' ? '-' : '+'
+                                    }}{{ formatCurrency(event.amount) }}
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            v-else
+                            class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                        >
+                            No hay eventos normalizados para esta sesion.
                         </div>
                     </div>
 
-                    <aside class="space-y-4 print:space-y-3">
+                    <div
+                        class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                    >
                         <div
-                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
+                            class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
                         >
-                            <div
-                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
+                            <h3
+                                class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
                             >
-                                <h3
-                                    class="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
-                                >
-                                    <Banknote :size="14" class="print:hidden" />
-                                    Arqueo de denominaciones
-                                </h3>
-                            </div>
-                            <table
-                                v-if="denomData.length > 0"
-                                class="w-full text-sm print:text-[10px]"
-                            >
+                                Documentos del turno
+                            </h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
                                 <thead>
                                     <tr
                                         class="border-b border-slate-200 text-xs text-slate-500 uppercase dark:border-border"
                                     >
-                                        <th
-                                            class="px-4 py-2 text-left font-bold"
-                                        >
-                                            Denominación
+                                        <th class="px-4 py-2 text-left">
+                                            Tipo
                                         </th>
-                                        <th
-                                            class="px-4 py-2 text-center font-bold"
-                                        >
-                                            Sueltas
+                                        <th class="px-4 py-2 text-left">
+                                            Referencia
                                         </th>
-                                        <th
-                                            class="px-4 py-2 text-center font-bold"
-                                        >
-                                            Fajos
+                                        <th class="px-4 py-2 text-left">
+                                            Metodo
                                         </th>
-                                        <th
-                                            class="px-4 py-2 text-right font-bold"
-                                        >
-                                            Subtotal
+                                        <th class="px-4 py-2 text-left">
+                                            Hora
+                                        </th>
+                                        <th class="px-4 py-2 text-right">
+                                            Monto
                                         </th>
                                     </tr>
                                 </thead>
@@ -1036,427 +1698,84 @@ const handlePrint = () => {
                                     class="divide-y divide-slate-100 dark:divide-border/60"
                                 >
                                     <tr
-                                        v-for="denomination in denomData"
-                                        :key="denomination.id"
+                                        v-for="document in documentRows"
+                                        :key="document.id"
                                     >
                                         <td
-                                            class="px-4 py-2 font-semibold text-slate-700 dark:text-slate-200"
+                                            class="px-4 py-2 font-semibold text-slate-950 dark:text-white"
                                         >
-                                            {{ denomination.label }}
+                                            {{ document.type_label }}
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            <Link
+                                                v-if="document.href"
+                                                :href="document.href"
+                                                class="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300"
+                                            >
+                                                {{
+                                                    document.document_number ||
+                                                    document.reference ||
+                                                    `#${document.document_id}`
+                                                }}
+                                            </Link>
+                                            <span v-else>
+                                                {{
+                                                    document.document_number ||
+                                                    document.reference ||
+                                                    `#${document.document_id}`
+                                                }}
+                                            </span>
                                         </td>
                                         <td
-                                            class="px-4 py-2 text-center font-mono text-slate-600 dark:text-slate-300"
-                                        >
-                                            {{ denomination.unitCount || '-' }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-center font-mono text-slate-600 dark:text-slate-300"
-                                        >
-                                            {{ denomination.packCount || '-' }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-bold text-slate-950 tabular-nums dark:text-white"
+                                            class="px-4 py-2 text-slate-600 dark:text-slate-300"
                                         >
                                             {{
-                                                formatCurrency(
-                                                    denomination.subtotal,
-                                                )
+                                                document.method_label ||
+                                                document.method ||
+                                                'Sin metodo'
                                             }}
+                                            <span
+                                                v-if="!document.is_cash_counted"
+                                                class="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-muted dark:text-slate-300"
+                                            >
+                                                Informativo
+                                            </span>
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-xs text-slate-500"
+                                        >
+                                            {{
+                                                formatTime(document.occurred_at)
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-2 text-right font-bold tabular-nums"
+                                            :class="
+                                                document.direction === 'out'
+                                                    ? 'text-red-700 dark:text-red-300'
+                                                    : 'text-emerald-700 dark:text-emerald-300'
+                                            "
+                                        >
+                                            {{
+                                                document.direction === 'out'
+                                                    ? '-'
+                                                    : '+'
+                                            }}{{
+                                                formatCurrency(document.amount)
+                                            }}
+                                        </td>
+                                    </tr>
+                                    <tr v-if="documentRows.length === 0">
+                                        <td
+                                            colspan="5"
+                                            class="px-4 py-6 text-center text-slate-500"
+                                        >
+                                            No hay documentos normalizados.
                                         </td>
                                     </tr>
                                 </tbody>
-                                <tfoot>
-                                    <tr
-                                        class="border-t border-slate-300 bg-slate-50 dark:bg-muted/50"
-                                    >
-                                        <td
-                                            colspan="3"
-                                            class="px-4 py-2 text-right text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
-                                        >
-                                            Total contado
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-black text-slate-950 tabular-nums dark:text-white"
-                                        >
-                                            {{
-                                                formatCurrency(
-                                                    totalDenominations,
-                                                )
-                                            }}
-                                        </td>
-                                    </tr>
-                                </tfoot>
                             </table>
-                            <div
-                                v-else
-                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
-                            >
-                                No se registró conteo de denominaciones.
-                            </div>
                         </div>
-
-                        <div
-                            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-border dark:bg-card"
-                        >
-                            <h3
-                                class="mb-3 flex items-center gap-2 text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
-                            >
-                                <Clock :size="14" class="print:hidden" />
-                                Datos del turno
-                            </h3>
-                            <div class="space-y-2 text-sm">
-                                <div class="flex justify-between gap-4">
-                                    <span
-                                        class="text-slate-500 dark:text-slate-400"
-                                        >Apertura</span
-                                    >
-                                    <span
-                                        class="text-right font-semibold text-slate-950 dark:text-white"
-                                        >{{
-                                            formatDate(session.opened_at)
-                                        }}</span
-                                    >
-                                </div>
-                                <div class="flex justify-between gap-4">
-                                    <span
-                                        class="text-slate-500 dark:text-slate-400"
-                                        >Cierre</span
-                                    >
-                                    <span
-                                        class="text-right font-semibold text-slate-950 dark:text-white"
-                                        >{{
-                                            formatDate(session.closed_at)
-                                        }}</span
-                                    >
-                                </div>
-                                <div class="flex justify-between gap-4">
-                                    <span
-                                        class="text-slate-500 dark:text-slate-400"
-                                        >Fondo inicial</span
-                                    >
-                                    <span
-                                        class="font-semibold text-slate-950 tabular-nums dark:text-white"
-                                        >{{
-                                            formatCurrency(
-                                                session.opening_amount,
-                                            )
-                                        }}</span
-                                    >
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
-                            >
-                                <h3
-                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
-                                >
-                                    Movimientos de caja
-                                </h3>
-                            </div>
-                            <div
-                                v-if="cashMovements.length > 0"
-                                class="divide-y divide-slate-100 dark:divide-border/60"
-                            >
-                                <div
-                                    v-for="movement in cashMovements"
-                                    :key="movement.id"
-                                    class="px-4 py-3"
-                                >
-                                    <div
-                                        class="flex items-start justify-between gap-3"
-                                    >
-                                        <div>
-                                            <p
-                                                class="text-sm font-semibold text-slate-950 dark:text-white"
-                                            >
-                                                {{ movement.reason }}
-                                            </p>
-                                            <p
-                                                class="text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{ movementLabel(movement) }} -
-                                                {{
-                                                    formatTime(
-                                                        movement.created_at,
-                                                    )
-                                                }}
-                                            </p>
-                                            <p
-                                                v-if="movement.notes"
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{ movement.notes }}
-                                            </p>
-                                        </div>
-                                        <span
-                                            class="shrink-0 text-sm font-bold tabular-nums"
-                                            :class="movementClass(movement)"
-                                        >
-                                            {{
-                                                movement.type === 'in'
-                                                    ? '+'
-                                                    : '-'
-                                            }}{{
-                                                formatCurrency(movement.amount)
-                                            }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div
-                                v-else
-                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
-                            >
-                                No hubo ingresos extra ni retiros.
-                            </div>
-                        </div>
-
-                        <div
-                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
-                            >
-                                <h3
-                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
-                                >
-                                    Pagos de compras
-                                </h3>
-                            </div>
-                            <div
-                                v-if="purchasePayments.length > 0"
-                                class="divide-y divide-slate-100 dark:divide-border/60"
-                            >
-                                <div
-                                    v-for="payment in purchasePayments"
-                                    :key="payment.id"
-                                    class="px-4 py-3"
-                                >
-                                    <div
-                                        class="flex items-start justify-between gap-3"
-                                    >
-                                        <div>
-                                            <p
-                                                class="text-sm font-semibold text-slate-950 dark:text-white"
-                                            >
-                                                {{
-                                                    purchasePaymentTitle(
-                                                        payment,
-                                                    )
-                                                }}
-                                            </p>
-                                            <p
-                                                class="text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{
-                                                    paymentMethodLabel(
-                                                        payment.method,
-                                                    )
-                                                }}
-                                                -
-                                                {{
-                                                    formatTime(payment.paid_at)
-                                                }}
-                                            </p>
-                                            <p
-                                                v-if="
-                                                    payment.purchase_order
-                                                        ?.supplier?.name
-                                                "
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{
-                                                    payment.purchase_order
-                                                        .supplier.name
-                                                }}
-                                            </p>
-                                            <p
-                                                v-if="payment.reference_number"
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                Número de recibo:
-                                                {{ payment.reference_number }}
-                                            </p>
-                                            <p
-                                                v-if="payment.notes"
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{ payment.notes }}
-                                            </p>
-                                        </div>
-                                        <span
-                                            class="shrink-0 text-sm font-bold text-red-700 tabular-nums dark:text-red-300"
-                                        >
-                                            -{{
-                                                formatCurrency(payment.amount)
-                                            }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div
-                                v-else
-                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
-                            >
-                                No hubo pagos de compras asociados al cierre.
-                            </div>
-                        </div>
-
-                        <div
-                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted/50"
-                            >
-                                <h3
-                                    class="text-xs font-bold text-slate-600 uppercase dark:text-slate-300"
-                                >
-                                    Gastos operativos
-                                </h3>
-                            </div>
-                            <div
-                                v-if="operationalExpenses.length > 0"
-                                class="divide-y divide-slate-100 dark:divide-border/60"
-                            >
-                                <div
-                                    v-for="expense in operationalExpenses"
-                                    :key="expense.id"
-                                    class="px-4 py-3"
-                                >
-                                    <div
-                                        class="flex items-start justify-between gap-3"
-                                    >
-                                        <div>
-                                            <p
-                                                class="text-sm font-semibold text-slate-950 dark:text-white"
-                                            >
-                                                {{
-                                                    operationalExpenseTitle(
-                                                        expense,
-                                                    )
-                                                }}
-                                            </p>
-                                            <p
-                                                class="text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{
-                                                    expense.category_label ||
-                                                    expense.category
-                                                }}
-                                                -
-                                                {{
-                                                    paymentMethodLabel(
-                                                        expense.payment_method ||
-                                                            'other',
-                                                    )
-                                                }}
-                                                -
-                                                {{
-                                                    formatTime(
-                                                        expense.created_at,
-                                                    )
-                                                }}
-                                            </p>
-                                            <span
-                                                class="mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-bold ring-1"
-                                                :class="
-                                                    isCashOperationalExpense(
-                                                        expense,
-                                                    )
-                                                        ? 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800'
-                                                        : 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-muted dark:text-slate-300 dark:ring-border'
-                                                "
-                                            >
-                                                {{
-                                                    operationalExpenseBadge(
-                                                        expense,
-                                                    )
-                                                }}
-                                            </span>
-                                            <p
-                                                v-if="expense.reference_number"
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                Número de recibo:
-                                                {{ expense.reference_number }}
-                                            </p>
-                                            <p
-                                                v-if="expense.creator?.name"
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                Registrado por
-                                                {{ expense.creator.name }}
-                                            </p>
-                                            <p
-                                                v-if="expense.notes"
-                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                                            >
-                                                {{ expense.notes }}
-                                            </p>
-                                        </div>
-                                        <span
-                                            class="shrink-0 text-sm font-bold tabular-nums"
-                                            :class="
-                                                operationalExpenseAmountClass(
-                                                    expense,
-                                                )
-                                            "
-                                        >
-                                            <template
-                                                v-if="
-                                                    isCashOperationalExpense(
-                                                        expense,
-                                                    )
-                                                "
-                                            >
-                                                - </template
-                                            >{{
-                                                formatCurrency(expense.amount)
-                                            }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div
-                                v-else
-                                class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
-                            >
-                                No hubo gastos operativos asociados al cierre.
-                            </div>
-                        </div>
-
-                        <div
-                            v-if="session.notes"
-                            class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
-                        >
-                            <h3
-                                class="mb-1 flex items-center gap-2 text-xs font-bold uppercase"
-                            >
-                                <AlertCircle :size="14" class="print:hidden" />
-                                Nota del cierre
-                            </h3>
-                            <p class="text-sm">{{ session.notes }}</p>
-                        </div>
-                    </aside>
-                </section>
-
-                <section
-                    class="hidden print:mt-8 print:grid print:grid-cols-2 print:gap-16"
-                >
-                    <div
-                        class="border-t border-slate-400 pt-1 text-center text-[10px] text-slate-600"
-                    >
-                        Firma del cajero
-                    </div>
-                    <div
-                        class="border-t border-slate-400 pt-1 text-center text-[10px] text-slate-600"
-                    >
-                        Firma del supervisor
                     </div>
                 </section>
             </main>

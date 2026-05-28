@@ -6,6 +6,10 @@ import type {
     UpdateSupplierData,
     SupplierProduct,
     SupplierVariantPayload,
+    SupplierPurchaseHistoryFilters,
+    SupplierPurchaseHistory,
+    SupplierCommercialDashboard,
+    SupplierCommercialDashboardFilters,
 } from '@/types/supplier';
 
 const BASE_URL = '/suppliers';
@@ -69,6 +73,29 @@ export const suppliersService = {
             `${BASE_URL}/${id}/purchase-orders`,
         );
         return data;
+    },
+
+    async getPurchaseHistory(
+        id: number,
+        filters?: SupplierPurchaseHistoryFilters,
+    ): Promise<SupplierPurchaseHistory> {
+        const { data } = await apiClient.get(
+            `${BASE_URL}/${id}/purchase-history`,
+            { params: filters },
+        );
+        return data;
+    },
+
+    async getCommercialDashboard(
+        filters?: SupplierCommercialDashboardFilters,
+    ): Promise<SupplierCommercialDashboard> {
+        const { data } = await apiClient.get(
+            `${BASE_URL}/commercial-dashboard`,
+            {
+                params: filters,
+            },
+        );
+        return data.data;
     },
 
     /**

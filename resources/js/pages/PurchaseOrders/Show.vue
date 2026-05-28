@@ -6,7 +6,9 @@ import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { usePosSettings } from '@/composables/usePosSettings';
 import {
+    ClipboardCheck,
     Copy,
+    CreditCard,
     DollarSign,
     FileText,
     Package,
@@ -15,12 +17,12 @@ import {
     Plus,
     Send,
     Trash2,
+    UserRound,
     XCircle,
 } from 'lucide-vue-next';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
-import PurchaseOrderSideNav from '@/components/PurchaseOrders/PurchaseOrderSideNav.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 
@@ -44,6 +46,28 @@ const amountDue = ref<number>(0);
 const showPaymentModal = ref(false);
 const paymentLoading = ref(false);
 const paymentError = ref<string | null>(null);
+const activeTab = ref<
+    | 'summary'
+    | 'items'
+    | 'receiving'
+    | 'payments'
+    | 'supplier'
+    | 'costs'
+    | 'impact'
+>('summary');
+
+const tabs = [
+    { key: 'summary', label: 'Resumen', icon: FileText },
+    { key: 'items', label: 'Items', icon: Package },
+    { key: 'receiving', label: 'Recepcion', icon: ClipboardCheck },
+    { key: 'payments', label: 'Pagos', icon: DollarSign },
+    { key: 'supplier', label: 'Proveedor', icon: UserRound },
+    { key: 'costs', label: 'Costos/Misc/ITBM', icon: CreditCard },
+    { key: 'impact', label: 'Inventario/AP', icon: PackageCheck },
+] as const;
+
+type DetailTabKey = (typeof tabs)[number]['key'];
+const detailTabKeys = tabs.map((tab) => tab.key);
 
 const statusColors: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-300',
@@ -104,6 +128,12 @@ const pendingQuantity = computed(() =>
     Math.max(0, orderedQuantity.value - receivedQuantity.value),
 );
 
+const canReceive = computed(
+    () =>
+        !!purchaseOrder.value &&
+        ['sent', 'partial', 'open'].includes(purchaseOrder.value.status),
+);
+
 function isDailyPO(): boolean {
     return !purchaseOrder.value?.supplier;
 }
@@ -128,8 +158,18 @@ function formatDate(value?: string | null): string {
 function itemLineTotal(item: any): number {
     return (
         Number(item.total ?? 0) ||
-        Number(item.subtotal || 0) + Number(item.tax_amount || 0)
+        Number(item.subtotal || 0) +
+            Number(item.tax_amount || 0) +
+            Number(item.misc_cost || 0)
     );
+}
+
+function formatCurrency(value: number | string | undefined | null): string {
+    return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function lineLandedUnitCost(item: any): number {
+    return Number(item.line_cost_summary?.landed_unit_cost || 0);
 }
 
 function openPdf(mode: 'standard' | 'worksheet' = 'worksheet') {
@@ -237,6 +277,10 @@ onMounted(async () => {
         initWarehouse(),
         fetchPurchaseOrderById(props.purchaseOrderId),
     ]);
+    const hashTab = window.location.hash.replace('#', '') as DetailTabKey;
+    if (detailTabKeys.includes(hashTab) && hashTab !== 'receiving') {
+        activeTab.value = hashTab;
+    }
     await loadPayments();
 });
 </script>
@@ -330,12 +374,6 @@ onMounted(async () => {
             class="min-h-[calc(100vh-4.25rem)] bg-gray-50/60 dark:bg-background"
         >
             <main class="mx-auto max-w-7xl min-w-0 p-4">
-                <PurchaseOrderSideNav
-                    v-if="purchaseOrder"
-                    :purchase-order-id="purchaseOrder.id"
-                    active="details"
-                    :can-edit="purchaseOrder.status === 'draft'"
-                />
                 <div v-if="loading" class="flex justify-center py-12">
                     <div
                         class="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"
@@ -359,8 +397,40 @@ onMounted(async () => {
                         cantidades.
                     </div>
 
+                    <div
+                        class="mb-3 overflow-x-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm dark:border-border dark:bg-card"
+                    >
+                        <nav class="flex min-w-max items-center gap-1 text-sm">
+                            <template v-for="tab in tabs" :key="tab.key">
+                                <Link
+                                    v-if="tab.key === 'receiving'"
+                                    :href="`/purchase-orders/${purchaseOrder.id}/receive`"
+                                    class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-gray-600 transition hover:bg-emerald-50 hover:text-emerald-800 dark:text-gray-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-200"
+                                >
+                                    <component :is="tab.icon" :size="15" />
+                                    {{ tab.label }}
+                                </Link>
+                                <button
+                                    v-else
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-md px-3 py-2 transition"
+                                    :class="
+                                        activeTab === tab.key
+                                            ? 'bg-emerald-600 font-semibold text-white shadow-sm dark:bg-emerald-500 dark:text-emerald-950'
+                                            : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-800 dark:text-gray-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-200'
+                                    "
+                                    @click="activeTab = tab.key"
+                                >
+                                    <component :is="tab.icon" :size="15" />
+                                    {{ tab.label }}
+                                </button>
+                            </template>
+                        </nav>
+                    </div>
+
                     <div class="space-y-3">
                         <PurchaseOrderSection
+                            v-show="activeTab === 'summary'"
                             title="Resumen de la orden"
                             subtitle="Proveedor, fechas, recepcion y costos principales"
                             default-open
@@ -611,6 +681,7 @@ onMounted(async () => {
                         </PurchaseOrderSection>
 
                         <PurchaseOrderSection
+                            v-show="activeTab === 'items'"
                             id="items"
                             title="Articulos"
                             subtitle="Cantidades, costos y avance de recepcion"
@@ -662,6 +733,12 @@ onMounted(async () => {
                                             </th>
                                             <th class="px-3 py-2 text-right">
                                                 ITBM
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                Misc
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                Costo aterr.
                                             </th>
                                             <th class="px-3 py-2 text-right">
                                                 Total
@@ -810,6 +887,24 @@ onMounted(async () => {
                                                 }}
                                             </td>
                                             <td
+                                                class="px-3 py-2 text-right font-mono"
+                                            >
+                                                ${{
+                                                    Number(
+                                                        item.misc_cost || 0,
+                                                    ).toFixed(2)
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono"
+                                            >
+                                                ${{
+                                                    lineLandedUnitCost(
+                                                        item,
+                                                    ).toFixed(4)
+                                                }}
+                                            </td>
+                                            <td
                                                 class="px-3 py-2 text-right font-mono font-semibold"
                                             >
                                                 ${{
@@ -825,6 +920,464 @@ onMounted(async () => {
                         </PurchaseOrderSection>
 
                         <PurchaseOrderSection
+                            v-show="activeTab === 'receiving'"
+                            title="Recepcion"
+                            subtitle="Avance recibido y lotes generados por esta OC"
+                            :count="
+                                purchaseOrder.receipt_summary
+                                    ?.received_packages ?? receivedQuantity
+                            "
+                            default-open
+                        >
+                            <div
+                                class="flex flex-col gap-2 border-b border-gray-200 bg-emerald-50/50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-emerald-950/20"
+                            >
+                                <div>
+                                    <p
+                                        class="text-sm font-semibold text-emerald-900 dark:text-emerald-100"
+                                    >
+                                        Check In de productos
+                                    </p>
+                                    <p
+                                        class="text-xs text-emerald-700 dark:text-emerald-300"
+                                    >
+                                        {{
+                                            canReceive
+                                                ? 'Registrar cantidades recibidas y actualizar inventario.'
+                                                : 'Consultar el flujo de recepcion de esta OC.'
+                                        }}
+                                    </p>
+                                </div>
+                                <Link
+                                    :href="`/purchase-orders/${purchaseOrder.id}/receive`"
+                                    class="inline-flex items-center justify-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+                                >
+                                    <ClipboardCheck :size="16" />
+                                    {{
+                                        canReceive
+                                            ? 'Recibir productos'
+                                            : 'Ver Check In'
+                                    }}
+                                </Link>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead
+                                        class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/50 dark:text-gray-300"
+                                    >
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">
+                                                Metrica
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                Paquetes
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                Unidades
+                                            </th>
+                                            <th class="px-3 py-2 text-right">
+                                                Avance
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="border-t dark:border-border">
+                                            <td class="px-3 py-2">Ordenado</td>
+                                            <td class="px-3 py-2 text-right">
+                                                {{
+                                                    purchaseOrder
+                                                        .receipt_summary
+                                                        ?.ordered_packages ??
+                                                    orderedQuantity
+                                                }}
+                                            </td>
+                                            <td class="px-3 py-2 text-right">
+                                                {{
+                                                    purchaseOrder
+                                                        .receipt_summary
+                                                        ?.ordered_units ?? '-'
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono"
+                                            >
+                                                100%
+                                            </td>
+                                        </tr>
+                                        <tr class="border-t dark:border-border">
+                                            <td class="px-3 py-2">Recibido</td>
+                                            <td class="px-3 py-2 text-right">
+                                                {{
+                                                    purchaseOrder
+                                                        .receipt_summary
+                                                        ?.received_packages ??
+                                                    receivedQuantity
+                                                }}
+                                            </td>
+                                            <td class="px-3 py-2 text-right">
+                                                {{
+                                                    purchaseOrder
+                                                        .receipt_summary
+                                                        ?.received_units ?? '-'
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
+                                            >
+                                                {{
+                                                    Number(
+                                                        purchaseOrder
+                                                            .receipt_summary
+                                                            ?.received_percent ??
+                                                            0,
+                                                    ).toFixed(2)
+                                                }}%
+                                            </td>
+                                        </tr>
+                                        <tr class="border-t dark:border-border">
+                                            <td class="px-3 py-2">Pendiente</td>
+                                            <td class="px-3 py-2 text-right">
+                                                {{
+                                                    purchaseOrder
+                                                        .receipt_summary
+                                                        ?.pending_packages ??
+                                                    pendingQuantity
+                                                }}
+                                            </td>
+                                            <td class="px-3 py-2 text-right">
+                                                {{
+                                                    purchaseOrder
+                                                        .receipt_summary
+                                                        ?.pending_units ?? '-'
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-mono text-amber-700 dark:text-amber-300"
+                                            >
+                                                Pend.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </PurchaseOrderSection>
+
+                        <PurchaseOrderSection
+                            v-show="activeTab === 'supplier'"
+                            title="Proveedor"
+                            subtitle="Cuenta, factura y contexto de abastecimiento"
+                            default-open
+                        >
+                            <div class="grid grid-cols-[11rem_1fr] text-sm">
+                                <div
+                                    class="border-r border-b border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
+                                >
+                                    Proveedor
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 dark:border-border"
+                                >
+                                    {{
+                                        purchaseOrder.supplier_summary?.name ||
+                                        purchaseOrder.supplier?.name ||
+                                        'OC diaria general'
+                                    }}
+                                </div>
+                                <div
+                                    class="border-r border-b border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
+                                >
+                                    Factura
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 font-mono dark:border-border"
+                                >
+                                    {{
+                                        purchaseOrder.supplier_invoice_number ||
+                                        '-'
+                                    }}
+                                </div>
+                                <div
+                                    class="border-r border-b border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
+                                >
+                                    Contacto
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 dark:border-border"
+                                >
+                                    {{
+                                        [
+                                            purchaseOrder.supplier_summary
+                                                ?.email,
+                                            purchaseOrder.supplier_summary
+                                                ?.phone,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' | ') || '-'
+                                    }}
+                                </div>
+                                <div
+                                    class="border-r border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
+                                >
+                                    Sucursal
+                                </div>
+                                <div class="px-3 py-2">
+                                    {{ purchaseOrder.warehouse?.name || '-' }}
+                                </div>
+                            </div>
+                        </PurchaseOrderSection>
+
+                        <PurchaseOrderSection
+                            v-show="activeTab === 'costs'"
+                            title="Costos/Misc/ITBM"
+                            subtitle="Totales derivados de las lineas de la OC"
+                            default-open
+                        >
+                            <div class="grid grid-cols-[1fr_10rem] text-sm">
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 dark:border-border"
+                                >
+                                    Subtotal
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 text-right font-mono dark:border-border"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            purchaseOrder.cost_summary
+                                                ?.subtotal ??
+                                                purchaseOrder.subtotal,
+                                        )
+                                    }}
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 dark:border-border"
+                                >
+                                    ITBM
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 text-right font-mono dark:border-border"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            purchaseOrder.cost_summary
+                                                ?.tax_total ??
+                                                purchaseOrder.tax_amount,
+                                        )
+                                    }}
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 dark:border-border"
+                                >
+                                    Misc
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 text-right font-mono dark:border-border"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            purchaseOrder.cost_summary
+                                                ?.misc_total,
+                                        )
+                                    }}
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 dark:border-border"
+                                >
+                                    Costo extra
+                                </div>
+                                <div
+                                    class="border-b border-gray-200 px-3 py-2 text-right font-mono dark:border-border"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            purchaseOrder.cost_summary
+                                                ?.shipping_total ??
+                                                purchaseOrder.shipping_cost,
+                                        )
+                                    }}
+                                </div>
+                                <div class="px-3 py-2 font-semibold">Total</div>
+                                <div
+                                    class="px-3 py-2 text-right font-mono font-semibold"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            purchaseOrder.cost_summary
+                                                ?.grand_total ??
+                                                purchaseOrder.total,
+                                        )
+                                    }}
+                                </div>
+                            </div>
+                        </PurchaseOrderSection>
+
+                        <PurchaseOrderSection
+                            v-show="activeTab === 'impact'"
+                            title="Impacto inventario/AP"
+                            subtitle="Lotes FIFO recibidos y saldo que permanece en cuentas por pagar"
+                            :count="
+                                purchaseOrder.inventory_impact?.lots_count ?? 0
+                            "
+                            default-open
+                        >
+                            <div
+                                class="grid grid-cols-1 gap-3 p-3 lg:grid-cols-2"
+                            >
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <tbody>
+                                            <tr
+                                                class="border-b dark:border-border"
+                                            >
+                                                <td class="py-2">Estado AP</td>
+                                                <td
+                                                    class="py-2 text-right font-semibold"
+                                                >
+                                                    {{
+                                                        purchaseOrder.ap_impact
+                                                            ?.status ===
+                                                        'settled'
+                                                            ? 'Liquidado'
+                                                            : purchaseOrder
+                                                                    .ap_impact
+                                                                    ?.status ===
+                                                                'cancelled'
+                                                              ? 'Cancelado'
+                                                              : 'Abierto'
+                                                    }}
+                                                </td>
+                                            </tr>
+                                            <tr
+                                                class="border-b dark:border-border"
+                                            >
+                                                <td class="py-2">
+                                                    Total documento
+                                                </td>
+                                                <td
+                                                    class="py-2 text-right font-mono"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            purchaseOrder
+                                                                .ap_impact
+                                                                ?.amount_total,
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+                                            <tr
+                                                class="border-b dark:border-border"
+                                            >
+                                                <td class="py-2">Pagado</td>
+                                                <td
+                                                    class="py-2 text-right font-mono"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            purchaseOrder
+                                                                .ap_impact
+                                                                ?.amount_paid,
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="py-2 font-semibold">
+                                                    Saldo AP
+                                                </td>
+                                                <td
+                                                    class="py-2 text-right font-mono font-semibold"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            purchaseOrder
+                                                                .ap_impact
+                                                                ?.amount_due,
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <tbody>
+                                            <tr
+                                                class="border-b dark:border-border"
+                                            >
+                                                <td class="py-2">
+                                                    Lotes recibidos
+                                                </td>
+                                                <td
+                                                    class="py-2 text-right font-mono"
+                                                >
+                                                    {{
+                                                        purchaseOrder
+                                                            .inventory_impact
+                                                            ?.lots_count ?? 0
+                                                    }}
+                                                </td>
+                                            </tr>
+                                            <tr
+                                                class="border-b dark:border-border"
+                                            >
+                                                <td class="py-2">
+                                                    Unidades recibidas
+                                                </td>
+                                                <td
+                                                    class="py-2 text-right font-mono"
+                                                >
+                                                    {{
+                                                        purchaseOrder
+                                                            .inventory_impact
+                                                            ?.received_units ??
+                                                        0
+                                                    }}
+                                                </td>
+                                            </tr>
+                                            <tr
+                                                class="border-b dark:border-border"
+                                            >
+                                                <td class="py-2">
+                                                    Valor aterrizado
+                                                </td>
+                                                <td
+                                                    class="py-2 text-right font-mono"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            purchaseOrder
+                                                                .inventory_impact
+                                                                ?.landed_value,
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="py-2">
+                                                    Valor disponible
+                                                </td>
+                                                <td
+                                                    class="py-2 text-right font-mono"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            purchaseOrder
+                                                                .inventory_impact
+                                                                ?.available_value,
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </PurchaseOrderSection>
+
+                        <PurchaseOrderSection
+                            v-show="activeTab === 'payments'"
                             title="Pagos"
                             subtitle="Estado de pago, saldo y registros"
                             :count="payments.length"

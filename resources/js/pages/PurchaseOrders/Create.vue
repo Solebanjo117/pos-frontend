@@ -803,6 +803,7 @@ async function handleSubmit() {
                 quantity_ordered: item.quantity_ordered,
                 units_per_package: item.units_per_package || 1,
                 unit_cost: item.unit_cost,
+                tax_rate: normalizeTaxRate(item.tax_rate ?? null),
                 misc_cost: item.misc_cost || 0,
                 tax_amount: itemTaxAmount(item),
                 notes: item.notes || '',

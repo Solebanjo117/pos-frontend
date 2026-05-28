@@ -1,31 +1,41 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
-import apiClient from '@/services/api/client';
-import { CheckCircle2, RotateCcw, XCircle } from 'lucide-vue-next';
+import { SalesReturnsApiService } from '@/services/sales-returns';
+import type {
+    SalesReturnListRow,
+    SalesReturnRefundMethod,
+    SalesReturnStatus,
+} from '@/types/sales-return';
+import {
+    CheckCircle2,
+    ChevronDown,
+    ChevronRight,
+    ExternalLink,
+    RotateCcw,
+    Search,
+    XCircle,
+} from 'lucide-vue-next';
 
 defineOptions({ layout: AppLayout });
 
-type ReturnStatus = 'pending' | 'approved' | 'rejected';
-
-type SalesReturnRow = {
-    id: number;
-    return_number: string;
-    sales_order_id: number;
-    total_amount: number | string;
-    status: ReturnStatus;
-    created_at: string;
-    sales_order?: { id: number; order_number: string } | null;
-    customer?: { id: number; name: string } | null;
-    user?: { id: number; name: string } | null;
-};
-
-const returns = ref<SalesReturnRow[]>([]);
-const statusFilter = ref<'all' | ReturnStatus>('all');
+const returns = ref<SalesReturnListRow[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const processingId = ref<number | null>(null);
+const expandedId = ref<number | null>(null);
+
+const filters = ref({
+    status: '' as '' | SalesReturnStatus,
+    refund_method: '' as '' | SalesReturnRefundMethod,
+    search: '',
+    customer_id: '',
+    sales_order_id: '',
+    warehouse_id: '',
+    date_from: '',
+    date_to: '',
+});
 
 const pagination = ref({
     current_page: 1,
@@ -34,7 +44,24 @@ const pagination = ref({
     total: 0,
 });
 
-const fetchReturns = async (page = 1) => {
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const metrics = computed(() => {
+    const rows = returns.value;
+    return {
+        pending: rows.filter((row) => row.status === 'pending').length,
+        approved: rows.filter((row) => row.status === 'approved').length,
+        rejected: rows.filter((row) => row.status === 'rejected').length,
+        approvedAmount: rows
+            .filter((row) => row.status === 'approved')
+            .reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
+        pendingAmount: rows
+            .filter((row) => row.status === 'pending')
+            .reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
+    };
+});
+
+const fetchReturns = async (page = 1): Promise<void> => {
     loading.value = true;
     error.value = null;
 
@@ -44,11 +71,11 @@ const fetchReturns = async (page = 1) => {
             per_page: pagination.value.per_page,
         };
 
-        if (statusFilter.value !== 'all') {
-            params.status = statusFilter.value;
-        }
+        Object.entries(filters.value).forEach(([key, value]) => {
+            if (value !== '') params[key] = value;
+        });
 
-        const { data } = await apiClient.get('/sales-returns', { params });
+        const data = await SalesReturnsApiService.list(params);
         returns.value = data.data ?? [];
         pagination.value = {
             current_page: data.current_page ?? 1,
@@ -56,32 +83,46 @@ const fetchReturns = async (page = 1) => {
             per_page: data.per_page ?? pagination.value.per_page,
             total: data.total ?? 0,
         };
-    } catch (e: any) {
+    } catch (err: any) {
         error.value =
-            e.response?.data?.message || 'Error cargando devoluciones';
+            err.response?.data?.message || 'Error cargando devoluciones';
     } finally {
         loading.value = false;
     }
 };
 
-watch(statusFilter, () => {
-    fetchReturns(1);
-});
+watch(
+    () => [
+        filters.value.status,
+        filters.value.refund_method,
+        filters.value.customer_id,
+        filters.value.sales_order_id,
+        filters.value.warehouse_id,
+        filters.value.date_from,
+        filters.value.date_to,
+    ],
+    () => fetchReturns(1),
+);
 
-onMounted(() => {
-    fetchReturns(1);
-});
+watch(
+    () => filters.value.search,
+    () => {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => fetchReturns(1), 300);
+    },
+);
 
-const formatCurrency = (value: number | string) => {
-    const numeric = Number(value || 0);
-    return new Intl.NumberFormat('es-PA', {
+onMounted(() => fetchReturns(1));
+
+const formatCurrency = (value: number | string | null | undefined): string =>
+    new Intl.NumberFormat('es-PA', {
         style: 'currency',
         currency: 'USD',
         minimumFractionDigits: 2,
-    }).format(numeric);
-};
+    }).format(Number(value || 0));
 
-const formatDate = (value: string) => {
+const formatDate = (value?: string | null): string => {
+    if (!value) return 'N/A';
     return new Date(value).toLocaleString('es-PA', {
         year: 'numeric',
         month: 'short',
@@ -91,263 +132,438 @@ const formatDate = (value: string) => {
     });
 };
 
-const getStatusClasses = (status: ReturnStatus) => {
+const statusLabel = (status: SalesReturnStatus): string =>
+    ({
+        pending: 'Pendiente',
+        approved: 'Aprobada',
+        rejected: 'Rechazada',
+    })[status];
+
+const methodLabel = (method?: string | null): string =>
+    ({
+        cash: 'Efectivo',
+        card: 'Tarjeta',
+        transfer: 'Transferencia',
+        balance: 'Saldo a favor',
+    })[method || ''] ||
+    method ||
+    'N/A';
+
+const statusClasses = (status: SalesReturnStatus): string => {
     if (status === 'approved') {
-        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
+        return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
     }
-    if (status === 'rejected') {
-        return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
-    }
-    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+    if (status === 'rejected') return 'bg-red-50 text-red-700 ring-red-200';
+    return 'bg-amber-50 text-amber-700 ring-amber-200';
 };
 
-const processReturn = async (id: number, action: 'approve' | 'reject') => {
+const processReturn = async (
+    id: number,
+    action: 'approve' | 'reject',
+): Promise<void> => {
     const message =
         action === 'approve'
-            ? 'Aprobar esta devolucion?'
-            : 'Rechazar esta devolucion?';
+            ? '¿Aprobar esta devolución?'
+            : '¿Rechazar esta devolución?';
     if (!confirm(message)) return;
 
     processingId.value = id;
     try {
-        await apiClient.post(`/sales-returns/${id}/${action}`);
+        if (action === 'approve') {
+            await SalesReturnsApiService.approve(id);
+        } else {
+            await SalesReturnsApiService.reject(id);
+        }
         await fetchReturns(pagination.value.current_page);
-    } catch (e: any) {
-        alert(e.response?.data?.message || 'No se pudo procesar la devolucion');
+    } catch (err: any) {
+        alert(
+            err.response?.data?.message || 'No se pudo procesar la devolución',
+        );
     } finally {
         processingId.value = null;
     }
 };
 
-const goToOrder = (orderId?: number) => {
-    if (!orderId) return;
-    router.visit(`/sales-orders/${orderId}`);
-};
-
-const nextPage = () => {
-    if (pagination.value.current_page < pagination.value.last_page) {
-        fetchReturns(pagination.value.current_page + 1);
-    }
-};
-
-const prevPage = () => {
-    if (pagination.value.current_page > 1) {
-        fetchReturns(pagination.value.current_page - 1);
-    }
+const clearFilters = (): void => {
+    filters.value = {
+        status: '',
+        refund_method: '',
+        search: '',
+        customer_id: '',
+        sales_order_id: '',
+        warehouse_id: '',
+        date_from: '',
+        date_to: '',
+    };
 };
 </script>
 
 <template>
     <Head title="Devoluciones" />
 
-    <div class="space-y-6">
-        <div class="flex items-center justify-between">
+    <div class="space-y-4">
+        <header class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h1
-                    class="flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white"
-                >
-                    <RotateCcw
-                        class="h-8 w-8 text-cyan-600 dark:text-cyan-400"
-                    />
-                    Devoluciones
-                </h1>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Listado global de devoluciones de ventas
+                <div class="flex items-center gap-2">
+                    <RotateCcw class="h-6 w-6 text-cyan-700" />
+                    <h1 class="text-2xl font-semibold text-gray-950">
+                        Devoluciones
+                    </h1>
+                </div>
+                <p class="mt-1 text-sm text-gray-500">
+                    Reembolsos, saldos a favor, inventario y facturas origen.
                 </p>
             </div>
+        </header>
 
-            <select
-                v-model="statusFilter"
-                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
-            >
-                <option value="all">Todos los estados</option>
-                <option value="pending">Pendiente</option>
-                <option value="approved">Aprobada</option>
-                <option value="rejected">Rechazada</option>
-            </select>
-        </div>
+        <section class="grid gap-3 md:grid-cols-5">
+            <div class="rounded-lg border bg-white p-3">
+                <p class="text-xs font-medium text-gray-500">Pendientes</p>
+                <p class="mt-1 text-2xl font-semibold text-amber-700">
+                    {{ metrics.pending }}
+                </p>
+                <p class="text-xs text-gray-500">
+                    {{ formatCurrency(metrics.pendingAmount) }}
+                </p>
+            </div>
+            <div class="rounded-lg border bg-white p-3">
+                <p class="text-xs font-medium text-gray-500">Aprobadas</p>
+                <p class="mt-1 text-2xl font-semibold text-emerald-700">
+                    {{ metrics.approved }}
+                </p>
+                <p class="text-xs text-gray-500">
+                    {{ formatCurrency(metrics.approvedAmount) }}
+                </p>
+            </div>
+            <div class="rounded-lg border bg-white p-3">
+                <p class="text-xs font-medium text-gray-500">Rechazadas</p>
+                <p class="mt-1 text-2xl font-semibold text-red-700">
+                    {{ metrics.rejected }}
+                </p>
+                <p class="text-xs text-gray-500">En la página actual</p>
+            </div>
+            <div class="rounded-lg border bg-white p-3">
+                <p class="text-xs font-medium text-gray-500">Resultados</p>
+                <p class="mt-1 text-2xl font-semibold text-gray-950">
+                    {{ pagination.total }}
+                </p>
+                <p class="text-xs text-gray-500">Con filtros activos</p>
+            </div>
+            <div class="rounded-lg border bg-white p-3">
+                <p class="text-xs font-medium text-gray-500">Página</p>
+                <p class="mt-1 text-2xl font-semibold text-gray-950">
+                    {{ pagination.current_page }}/{{ pagination.last_page }}
+                </p>
+                <p class="text-xs text-gray-500">
+                    {{ pagination.per_page }} por página
+                </p>
+            </div>
+        </section>
+
+        <section class="rounded-lg border bg-white p-3">
+            <div class="grid gap-2 md:grid-cols-8">
+                <div class="relative md:col-span-2">
+                    <Search
+                        class="absolute top-2.5 left-2.5 h-4 w-4 text-gray-400"
+                    />
+                    <input
+                        v-model="filters.search"
+                        type="search"
+                        placeholder="Buscar devolución, factura o cliente"
+                        class="w-full rounded-md border px-8 py-2 text-sm"
+                    />
+                </div>
+                <select
+                    v-model="filters.status"
+                    class="rounded-md border px-3 py-2 text-sm"
+                >
+                    <option value="">Todos los estados</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="approved">Aprobada</option>
+                    <option value="rejected">Rechazada</option>
+                </select>
+                <select
+                    v-model="filters.refund_method"
+                    class="rounded-md border px-3 py-2 text-sm"
+                >
+                    <option value="">Todos los métodos</option>
+                    <option value="cash">Efectivo</option>
+                    <option value="card">Tarjeta</option>
+                    <option value="transfer">Transferencia</option>
+                    <option value="balance">Saldo a favor</option>
+                </select>
+                <input
+                    v-model="filters.customer_id"
+                    type="number"
+                    min="1"
+                    placeholder="Cliente ID"
+                    class="rounded-md border px-3 py-2 text-sm"
+                />
+                <input
+                    v-model="filters.sales_order_id"
+                    type="number"
+                    min="1"
+                    placeholder="Factura ID"
+                    class="rounded-md border px-3 py-2 text-sm"
+                />
+                <input
+                    v-model="filters.date_from"
+                    type="date"
+                    class="rounded-md border px-3 py-2 text-sm"
+                />
+                <div class="flex gap-2">
+                    <input
+                        v-model="filters.date_to"
+                        type="date"
+                        class="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
+                    />
+                    <button
+                        type="button"
+                        class="rounded-md border px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                        @click="clearFilters"
+                    >
+                        Limpiar
+                    </button>
+                </div>
+            </div>
+        </section>
 
         <div
             v-if="error"
-            class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-300"
+            class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
         >
             {{ error }}
         </div>
 
-        <div
-            class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-border dark:bg-card"
-        >
-            <div v-if="loading" class="p-10 text-center text-gray-500">
+        <section class="overflow-hidden rounded-lg border bg-white">
+            <div v-if="loading" class="p-8 text-center text-sm text-gray-500">
                 Cargando devoluciones...
             </div>
-
             <div
                 v-else-if="returns.length === 0"
-                class="p-10 text-center text-gray-500"
+                class="p-8 text-center text-sm text-gray-500"
             >
                 No hay devoluciones para el filtro seleccionado.
             </div>
-
             <div v-else class="overflow-x-auto">
-                <table
-                    class="min-w-full divide-y divide-gray-200 dark:divide-border"
-                >
-                    <thead class="bg-gray-50 dark:bg-background">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
                         <tr>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-semibold tracking-wider text-gray-600 uppercase dark:text-gray-400"
-                            >
-                                Devolucion
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-semibold tracking-wider text-gray-600 uppercase dark:text-gray-400"
-                            >
-                                Orden
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-semibold tracking-wider text-gray-600 uppercase dark:text-gray-400"
-                            >
-                                Cliente
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-semibold tracking-wider text-gray-600 uppercase dark:text-gray-400"
-                            >
-                                Monto
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-semibold tracking-wider text-gray-600 uppercase dark:text-gray-400"
-                            >
-                                Estado
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-semibold tracking-wider text-gray-600 uppercase dark:text-gray-400"
-                            >
-                                Fecha
-                            </th>
-                            <th
-                                class="px-6 py-3 text-right text-xs font-semibold tracking-wider text-gray-600 uppercase dark:text-gray-400"
-                            >
-                                Acciones
-                            </th>
+                            <th class="w-10 px-3 py-2"></th>
+                            <th class="px-3 py-2 text-left">Devolución</th>
+                            <th class="px-3 py-2 text-left">Factura</th>
+                            <th class="px-3 py-2 text-left">Cliente</th>
+                            <th class="px-3 py-2 text-left">Método</th>
+                            <th class="px-3 py-2 text-right">Monto</th>
+                            <th class="px-3 py-2 text-left">Estado</th>
+                            <th class="px-3 py-2 text-left">Fecha</th>
+                            <th class="px-3 py-2 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody
-                        class="divide-y divide-gray-100 dark:divide-border/50"
-                    >
-                        <tr
-                            v-for="item in returns"
-                            :key="item.id"
-                            class="hover:bg-gray-50/70 dark:hover:bg-muted/30"
-                        >
-                            <td
-                                class="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white"
-                            >
-                                {{ item.return_number || `DEV-${item.id}` }}
-                            </td>
-                            <td
-                                class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
-                            >
-                                {{
-                                    item.sales_order?.order_number ||
-                                    `#${item.sales_order_id}`
-                                }}
-                            </td>
-                            <td
-                                class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
-                            >
-                                {{ item.customer?.name || 'Publico General' }}
-                            </td>
-                            <td
-                                class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
-                            >
-                                {{ formatCurrency(item.total_amount) }}
-                            </td>
-                            <td class="px-6 py-4 text-sm">
-                                <span
-                                    :class="[
-                                        'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
-                                        getStatusClasses(item.status),
-                                    ]"
+                    <tbody class="divide-y divide-gray-100">
+                        <template v-for="item in returns" :key="item.id">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-3 py-2">
+                                    <button
+                                        type="button"
+                                        class="rounded p-1 hover:bg-gray-100"
+                                        @click="
+                                            expandedId =
+                                                expandedId === item.id
+                                                    ? null
+                                                    : item.id
+                                        "
+                                    >
+                                        <ChevronDown
+                                            v-if="expandedId === item.id"
+                                            class="h-4 w-4"
+                                        />
+                                        <ChevronRight v-else class="h-4 w-4" />
+                                    </button>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <button
+                                        type="button"
+                                        class="font-semibold text-cyan-700 hover:underline"
+                                        @click="
+                                            router.visit(`/returns/${item.id}`)
+                                        "
+                                    >
+                                        {{
+                                            item.return_number ||
+                                            `DEV-${item.id}`
+                                        }}
+                                    </button>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <button
+                                        type="button"
+                                        class="text-gray-700 hover:text-cyan-700 hover:underline"
+                                        @click="
+                                            router.visit(
+                                                `/sales-orders/${item.sales_order_id}`,
+                                            )
+                                        "
+                                    >
+                                        {{
+                                            item.sales_order?.order_number ||
+                                            `#${item.sales_order_id}`
+                                        }}
+                                    </button>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <button
+                                        v-if="item.customer?.id"
+                                        type="button"
+                                        class="hover:text-cyan-700 hover:underline"
+                                        @click="
+                                            router.visit(
+                                                `/customers/${item.customer?.id}`,
+                                            )
+                                        "
+                                    >
+                                        {{ item.customer.name }}
+                                    </button>
+                                    <span v-else>Público general</span>
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{ methodLabel(item.refund_method) }}
+                                </td>
+                                <td
+                                    class="px-3 py-2 text-right font-semibold tabular-nums"
                                 >
-                                    {{ item.status }}
-                                </span>
-                            </td>
-                            <td
-                                class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400"
-                            >
-                                {{ formatDate(item.created_at) }}
-                            </td>
-                            <td class="px-6 py-4 text-right">
-                                <div class="inline-flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        class="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs hover:bg-gray-100 dark:border-border dark:hover:bg-muted"
-                                        @click="goToOrder(item.sales_order_id)"
+                                    {{ formatCurrency(item.total_amount) }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    <span
+                                        :class="[
+                                            'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1',
+                                            statusClasses(item.status),
+                                        ]"
                                     >
-                                        Ver orden
-                                    </button>
-
-                                    <button
-                                        v-if="item.status === 'pending'"
-                                        type="button"
-                                        class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs text-white hover:bg-emerald-700"
-                                        :disabled="processingId === item.id"
-                                        @click="
-                                            processReturn(item.id, 'approve')
-                                        "
+                                        {{ statusLabel(item.status) }}
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2 text-gray-500">
+                                    {{ formatDate(item.created_at) }}
+                                </td>
+                                <td class="px-3 py-2 text-right">
+                                    <div class="inline-flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            class="rounded-md border px-2 py-1 text-xs hover:bg-gray-50"
+                                            @click="
+                                                router.visit(
+                                                    `/returns/${item.id}`,
+                                                )
+                                            "
+                                        >
+                                            <ExternalLink class="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                            v-if="item.status === 'pending'"
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                                            :disabled="processingId === item.id"
+                                            @click="
+                                                processReturn(
+                                                    item.id,
+                                                    'approve',
+                                                )
+                                            "
+                                        >
+                                            <CheckCircle2 class="h-3.5 w-3.5" />
+                                            Aprobar
+                                        </button>
+                                        <button
+                                            v-if="item.status === 'pending'"
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                                            :disabled="processingId === item.id"
+                                            @click="
+                                                processReturn(item.id, 'reject')
+                                            "
+                                        >
+                                            <XCircle class="h-3.5 w-3.5" />
+                                            Rechazar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="expandedId === item.id">
+                                <td></td>
+                                <td colspan="8" class="bg-gray-50 px-3 py-3">
+                                    <div
+                                        class="grid gap-3 text-xs text-gray-600 md:grid-cols-4"
                                     >
-                                        <CheckCircle2 :size="13" />
-                                        Aprobar
-                                    </button>
-
-                                    <button
-                                        v-if="item.status === 'pending'"
-                                        type="button"
-                                        class="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1.5 text-xs text-white hover:bg-red-700"
-                                        :disabled="processingId === item.id"
-                                        @click="
-                                            processReturn(item.id, 'reject')
-                                        "
-                                    >
-                                        <XCircle :size="13" />
-                                        Rechazar
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
+                                        <div>
+                                            <span class="font-semibold"
+                                                >Sucursal:</span
+                                            >
+                                            {{
+                                                item.warehouse?.name ||
+                                                item.warehouse?.code ||
+                                                'N/A'
+                                            }}
+                                        </div>
+                                        <div>
+                                            <span class="font-semibold"
+                                                >Usuario:</span
+                                            >
+                                            {{
+                                                item.processed_by_name ||
+                                                item.user?.name ||
+                                                'Sistema'
+                                            }}
+                                        </div>
+                                        <div>
+                                            <span class="font-semibold"
+                                                >Motivo:</span
+                                            >
+                                            {{ item.reason || 'Sin motivo' }}
+                                        </div>
+                                        <div>
+                                            <span class="font-semibold"
+                                                >Items:</span
+                                            >
+                                            {{ item.items?.length ?? 0 }}
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
                     </tbody>
                 </table>
             </div>
 
             <div
-                v-if="!loading && pagination.last_page > 1"
-                class="flex items-center justify-between border-t border-gray-200 px-6 py-4 dark:border-border"
+                class="flex items-center justify-between border-t px-4 py-3 text-sm"
             >
-                <span class="text-sm text-gray-600 dark:text-gray-400">
-                    Pagina {{ pagination.current_page }} de
+                <span class="text-gray-500">
+                    Página {{ pagination.current_page }} de
                     {{ pagination.last_page }}
                 </span>
-                <div class="flex items-center gap-2">
+                <div class="flex gap-2">
                     <button
                         type="button"
-                        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-40 dark:border-border"
+                        class="rounded-md border px-3 py-1.5 disabled:opacity-40"
                         :disabled="pagination.current_page <= 1"
-                        @click="prevPage"
+                        @click="fetchReturns(pagination.current_page - 1)"
                     >
                         Anterior
                     </button>
                     <button
                         type="button"
-                        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-40 dark:border-border"
+                        class="rounded-md border px-3 py-1.5 disabled:opacity-40"
                         :disabled="
                             pagination.current_page >= pagination.last_page
                         "
-                        @click="nextPage"
+                        @click="fetchReturns(pagination.current_page + 1)"
                     >
                         Siguiente
                     </button>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 </template>

@@ -121,6 +121,7 @@ function referenceMeta(type?: string | null, id?: number | null) {
         purchase: `/purchase-orders/${id}`,
         sale: `/sales-orders/${id}`,
         sales_order: `/sales-orders/${id}`,
+        sales_return: `/returns/${id}`,
         transfer: `/inventory-transfers/${id}`,
     };
 

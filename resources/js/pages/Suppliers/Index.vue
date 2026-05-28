@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
@@ -8,12 +8,17 @@ import {
     Plus,
     Pencil,
     Trash2,
+    AlertTriangle,
     Building2,
     Package,
     Upload,
 } from 'lucide-vue-next';
 import Pagination from '@/components/Pagination.vue';
-import type { SupplierFilters } from '@/types/supplier';
+import { suppliersService } from '@/services/suppliers';
+import type {
+    SupplierCommercialDashboard,
+    SupplierFilters,
+} from '@/types/supplier';
 
 const {
     suppliers,
@@ -29,6 +34,14 @@ const filters = ref<SupplierFilters>({
     status: undefined,
     per_page: 15,
 });
+const commercialDashboard = ref<SupplierCommercialDashboard | null>(null);
+const commercialDashboardLoading = ref(false);
+const commercialDashboardError = ref<string | null>(null);
+const onlyLowStockWithoutSupplier = ref(true);
+
+const productsWithoutSupplier = computed(
+    () => commercialDashboard.value?.products_without_supplier ?? [],
+);
 
 const statusOptions = [
     { value: '', label: 'Todos' },
@@ -41,6 +54,25 @@ async function loadSuppliers(page: number = 1) {
     if (!cleanFilters.status) delete cleanFilters.status;
     if (!cleanFilters.search) delete cleanFilters.search;
     await fetchSuppliers(cleanFilters);
+}
+
+async function loadCommercialDashboard() {
+    commercialDashboardLoading.value = true;
+    commercialDashboardError.value = null;
+
+    try {
+        commercialDashboard.value =
+            await suppliersService.getCommercialDashboard({
+                only_low_stock: onlyLowStockWithoutSupplier.value,
+                per_page: 25,
+            });
+    } catch (e: any) {
+        commercialDashboardError.value =
+            e.response?.data?.message ||
+            'Error al cargar tablero comercial de proveedores';
+    } finally {
+        commercialDashboardLoading.value = false;
+    }
 }
 
 async function handlePageChange(page: number) {
@@ -58,7 +90,7 @@ async function handleDelete(id: number) {
 }
 
 onMounted(async () => {
-    await loadSuppliers();
+    await Promise.all([loadSuppliers(), loadCommercialDashboard()]);
 });
 </script>
 
@@ -67,7 +99,9 @@ onMounted(async () => {
     <AppLayout>
         <div class="space-y-6">
             <!-- Header -->
-            <div class="flex items-center justify-between">
+            <div
+                class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+            >
                 <div>
                     <h1
                         class="text-3xl font-bold text-gray-900 dark:text-white"
@@ -93,6 +127,187 @@ onMounted(async () => {
                     Importar
                 </Link>
             </div>
+
+            <div
+                v-if="commercialDashboard"
+                class="grid grid-cols-2 gap-3 lg:grid-cols-4"
+            >
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <p class="text-xs font-semibold text-gray-500 uppercase">
+                        Proveedores activos
+                    </p>
+                    <p
+                        class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                    >
+                        {{ commercialDashboard.summary.suppliers_count }}
+                    </p>
+                </div>
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <p class="text-xs font-semibold text-gray-500 uppercase">
+                        Vinculos producto
+                    </p>
+                    <p
+                        class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                    >
+                        {{
+                            commercialDashboard.summary.supplied_variants_count
+                        }}
+                    </p>
+                </div>
+                <div
+                    class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
+                >
+                    <p class="text-xs font-semibold text-amber-700 uppercase">
+                        Sin proveedor
+                    </p>
+                    <p class="mt-2 text-2xl font-bold text-amber-700">
+                        {{
+                            commercialDashboard.summary
+                                .products_without_supplier_count
+                        }}
+                    </p>
+                </div>
+                <div
+                    class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20"
+                >
+                    <p class="text-xs font-semibold text-red-700 uppercase">
+                        Bajo stock sin proveedor
+                    </p>
+                    <p class="mt-2 text-2xl font-bold text-red-700">
+                        {{
+                            commercialDashboard.summary
+                                .low_stock_without_supplier_count
+                        }}
+                    </p>
+                </div>
+            </div>
+
+            <div
+                v-if="commercialDashboardError"
+                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300"
+            >
+                {{ commercialDashboardError }}
+            </div>
+
+            <section
+                class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+            >
+                <div
+                    class="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between dark:border-border"
+                >
+                    <div>
+                        <h2
+                            class="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white"
+                        >
+                            <AlertTriangle :size="18" class="text-amber-500" />
+                            Productos sin proveedor
+                        </h2>
+                        <p class="text-xs text-gray-500">
+                            Variantes sin relacion comercial para abastecer.
+                        </p>
+                    </div>
+                    <label
+                        class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"
+                    >
+                        <input
+                            v-model="onlyLowStockWithoutSupplier"
+                            type="checkbox"
+                            class="rounded border-gray-300"
+                            @change="loadCommercialDashboard"
+                        />
+                        Solo bajo stock
+                    </label>
+                </div>
+                <div
+                    v-if="commercialDashboardLoading"
+                    class="p-6 text-sm text-gray-500"
+                >
+                    Cargando tablero comercial...
+                </div>
+                <div v-else class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead
+                            class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                        >
+                            <tr>
+                                <th class="px-3 py-2 text-left">Producto</th>
+                                <th class="px-3 py-2 text-left">Marca</th>
+                                <th class="px-3 py-2 text-left">Sucursal</th>
+                                <th class="px-3 py-2 text-right">Stock</th>
+                                <th class="px-3 py-2 text-right">Reorden</th>
+                                <th class="px-3 py-2 text-right">Accion</th>
+                            </tr>
+                        </thead>
+                        <tbody
+                            class="divide-y divide-gray-100 dark:divide-border"
+                        >
+                            <tr v-if="productsWithoutSupplier.length === 0">
+                                <td
+                                    colspan="6"
+                                    class="px-3 py-6 text-center text-gray-500"
+                                >
+                                    Sin productos pendientes bajo el filtro
+                                    actual.
+                                </td>
+                            </tr>
+                            <tr
+                                v-for="item in productsWithoutSupplier"
+                                :key="`${item.product_id}-${item.variant_id}-${item.warehouse?.id}`"
+                                class="hover:bg-gray-50 dark:hover:bg-muted/40"
+                            >
+                                <td class="px-3 py-2">
+                                    <Link
+                                        :href="`/products/${item.product_id}`"
+                                        class="font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                                    >
+                                        {{ item.product_name }}
+                                    </Link>
+                                    <p class="font-mono text-xs text-gray-500">
+                                        {{
+                                            item.variant_sku ||
+                                            item.product_sku ||
+                                            '-'
+                                        }}
+                                    </p>
+                                </td>
+                                <td class="px-3 py-2 text-gray-600">
+                                    {{ item.brand_name || '-' }}
+                                </td>
+                                <td class="px-3 py-2 text-gray-600">
+                                    {{ item.warehouse?.name || '-' }}
+                                </td>
+                                <td
+                                    class="px-3 py-2 text-right font-mono font-semibold"
+                                    :class="
+                                        item.needs_reorder
+                                            ? 'text-red-600'
+                                            : 'text-gray-700'
+                                    "
+                                >
+                                    {{ item.quantity_available }}
+                                </td>
+                                <td class="px-3 py-2 text-right font-mono">
+                                    {{ item.reorder_point }} /
+                                    {{ item.reorder_quantity }}
+                                </td>
+                                <td class="px-3 py-2 text-right">
+                                    <Link
+                                        :href="`/products/${item.product_id}`"
+                                        class="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200"
+                                    >
+                                        <Package :size="13" />
+                                        Ver producto
+                                    </Link>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
             <!-- Filters -->
             <div

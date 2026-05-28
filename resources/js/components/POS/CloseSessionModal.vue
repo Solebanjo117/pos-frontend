@@ -160,7 +160,13 @@ const cashRow = computed<ReconciliationRow>(
 );
 
 const paymentRows = computed<ReconciliationRow[]>(() =>
-    reconciliationRows.value.filter((row) => row.code !== 'cash'),
+    reconciliationRows.value.filter(
+        (row) => row.code !== 'cash' && !row.is_informational,
+    ),
+);
+
+const informationalRows = computed<ReconciliationRow[]>(() =>
+    reconciliationRows.value.filter((row) => row.is_informational),
 );
 
 const totalCashCounted = computed(() =>
@@ -190,10 +196,9 @@ const totalCounted = computed(() =>
 
 const totalExpected = computed(() =>
     money(
-        reconciliationRows.value.reduce(
-            (total, row) => total + Number(row.expected_total || 0),
-            0,
-        ),
+        reconciliationRows.value
+            .filter((row) => !row.is_informational)
+            .reduce((total, row) => total + Number(row.expected_total || 0), 0),
     ),
 );
 
@@ -557,6 +562,47 @@ watch(
                                         "
                                     />
                                 </div>
+                            </td>
+                        </tr>
+                        <tr
+                            v-for="row in informationalRows"
+                            :key="`info-${row.code}`"
+                            class="h-11 bg-slate-50"
+                        >
+                            <td class="border border-slate-300 px-2 py-2">
+                                <div class="font-bold text-slate-950">
+                                    {{ row.label }}
+                                </div>
+                                <div
+                                    class="mt-0.5 text-[10px] font-semibold text-slate-400 uppercase"
+                                >
+                                    {{ row.code }} - informativo
+                                </div>
+                            </td>
+                            <td
+                                class="border border-slate-300 px-2 py-2 text-right font-semibold"
+                            >
+                                {{ formatCurrency(row.start_adds) }}
+                            </td>
+                            <td
+                                class="border border-slate-300 px-2 py-2 text-right font-semibold"
+                            >
+                                {{ formatCurrency(row.payments) }}
+                            </td>
+                            <td
+                                class="border border-slate-300 px-2 py-2 text-right font-semibold"
+                            >
+                                {{ formatCurrency(row.withdrawals) }}
+                            </td>
+                            <td
+                                class="border border-slate-300 px-2 py-2 text-right font-bold text-slate-950"
+                            >
+                                {{ formatCurrency(row.expected_total) }}
+                            </td>
+                            <td
+                                class="border border-slate-300 px-2 py-2 text-xs font-semibold text-slate-500"
+                            >
+                                No se cuenta en cierre
                             </td>
                         </tr>
                     </tbody>

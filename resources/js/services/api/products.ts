@@ -5,6 +5,8 @@ import type {
     CreateProductRequest,
     UpdateProductRequest,
     ProductFilters,
+    ProductOperationalProfile,
+    ProductProfileFilters,
     VariantFifoHistory,
     PaginatedResponse,
     ApiResponse,
@@ -48,6 +50,15 @@ export const productsApi = {
         return response.data;
     },
 
+    async getProductProfile(
+        id: number,
+        filters: ProductProfileFilters,
+    ): Promise<ApiResponse<ProductOperationalProfile>> {
+        const response = await apiClient.get<
+            ApiResponse<ProductOperationalProfile>
+        >(`/products/${id}/profile`, { params: filters });
+        return response.data;
+    },
     /**
      * Create new product
      */

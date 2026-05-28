@@ -27,7 +27,9 @@ import {
     type AccountPaymentRecord,
     type CashMovementRecord,
     type OperationalExpenseRecord,
+    type PosSessionDocument,
     type PosSessionRecord,
+    type PosSessionTimelineEvent,
     type PurchasePaymentRecord,
     type SessionSalesOrder,
 } from '@/services/posSessions';
@@ -73,6 +75,7 @@ const filterWarehouseId = ref<number | undefined>(undefined);
 const filterUserId = ref<number | undefined>(undefined);
 const filterDateFrom = ref<string>('');
 const filterDateTo = ref<string>('');
+const filterDifference = ref<string>('');
 
 const selectedSession = ref<PosSessionRecord | null>(null);
 const selectedSalesOrders = ref<SessionSalesOrder[]>([]);
@@ -80,6 +83,8 @@ const selectedCashMovements = ref<CashMovementRecord[]>([]);
 const selectedPurchasePayments = ref<PurchasePaymentRecord[]>([]);
 const selectedAccountPayments = ref<AccountPaymentRecord[]>([]);
 const selectedOperationalExpenses = ref<OperationalExpenseRecord[]>([]);
+const selectedDocuments = ref<PosSessionDocument[]>([]);
+const selectedTimeline = ref<PosSessionTimelineEvent[]>([]);
 const showDetailModal = ref(false);
 const loadingDetail = ref(false);
 const showCloseSessionModal = ref(false);
@@ -174,19 +179,55 @@ const getExpectedTotal = (session: PosSessionRecord): number =>
             session.expected_amount,
     );
 
+const hasClosingDeclaration = (session: PosSessionRecord): boolean =>
+    session.closing_amount !== null && session.closing_amount !== undefined;
+
 const getDeclaredTotal = (session: PosSessionRecord): number =>
-    moneyValue(
-        getSummary(session)?.declared_total ??
-            getSummary(session)?.declared_cash ??
-            session.closing_amount,
-    );
+    hasClosingDeclaration(session)
+        ? moneyValue(
+              getSummary(session)?.declared_total ??
+                  getSummary(session)?.declared_cash ??
+                  session.closing_amount,
+          )
+        : getExpectedTotal(session);
 
 const getDifference = (session: PosSessionRecord): number =>
-    moneyValue(
-        getSummary(session)?.total_difference ??
-            getSummary(session)?.difference ??
-            getDeclaredTotal(session) - getExpectedTotal(session),
-    );
+    hasClosingDeclaration(session)
+        ? moneyValue(
+              getSummary(session)?.total_difference ??
+                  getSummary(session)?.difference ??
+                  getDeclaredTotal(session) - getExpectedTotal(session),
+          )
+        : 0;
+
+const filteredSessions = computed(() => {
+    if (!filterDifference.value) return sessions.value;
+
+    return sessions.value.filter((session) => {
+        const tone = getDifferenceTone(getDifference(session));
+
+        if (filterDifference.value === 'with_difference') {
+            return tone !== 'balanced';
+        }
+
+        return tone === filterDifference.value;
+    });
+});
+
+const getDeclaredDisplay = (session: PosSessionRecord): string =>
+    hasClosingDeclaration(session)
+        ? formatCurrency(getDeclaredTotal(session))
+        : 'Sin declarar';
+
+const getDifferenceDisplay = (session: PosSessionRecord): string =>
+    hasClosingDeclaration(session)
+        ? `${getDifference(session) > 0 ? '+' : ''}${formatCurrency(getDifference(session))}`
+        : 'Pendiente';
+
+const getDifferenceStatusLabel = (session: PosSessionRecord): string =>
+    hasClosingDeclaration(session)
+        ? getDifferenceLabel(getDifference(session))
+        : 'Sin cierre';
 
 const getDifferenceTone = (
     value: number,
@@ -240,24 +281,24 @@ const statusClass = (status: string): string => {
 };
 
 const pageStats = computed(() => {
-    const expected = sessions.value.reduce(
+    const expected = filteredSessions.value.reduce(
         (total, session) => total + getExpectedTotal(session),
         0,
     );
-    const declared = sessions.value.reduce(
+    const declared = filteredSessions.value.reduce(
         (total, session) => total + getDeclaredTotal(session),
         0,
     );
-    const difference = sessions.value.reduce(
+    const difference = filteredSessions.value.reduce(
         (total, session) => total + getDifference(session),
         0,
     );
-    const flagged = sessions.value.filter(
+    const flagged = filteredSessions.value.filter(
         (session) => getDifferenceTone(getDifference(session)) !== 'balanced',
     ).length;
 
     return {
-        count: sessions.value.length,
+        count: filteredSessions.value.length,
         expected,
         declared,
         difference,
@@ -357,6 +398,8 @@ const openDetailById = async (sessionId: number) => {
     selectedPurchasePayments.value = [];
     selectedAccountPayments.value = [];
     selectedOperationalExpenses.value = [];
+    selectedDocuments.value = [];
+    selectedTimeline.value = [];
 
     try {
         const response = await PosSessionsApiService.show(sessionId);
@@ -372,6 +415,8 @@ const openDetailById = async (sessionId: number) => {
             response.operational_expenses ||
             response.data.operational_expenses ||
             [];
+        selectedDocuments.value = response.documents || [];
+        selectedTimeline.value = response.timeline || [];
     } catch (err: any) {
         error.value =
             err.response?.data?.message ||
@@ -399,6 +444,8 @@ const closeDetail = () => {
     selectedPurchasePayments.value = [];
     selectedAccountPayments.value = [];
     selectedOperationalExpenses.value = [];
+    selectedDocuments.value = [];
+    selectedTimeline.value = [];
 };
 
 const handleCloseSession = async (
@@ -430,6 +477,7 @@ const clearFilters = () => {
     filterUserId.value = undefined;
     filterDateFrom.value = '';
     filterDateTo.value = '';
+    filterDifference.value = '';
     fetchSessions(1);
 };
 
@@ -839,6 +887,25 @@ onMounted(async () => {
                         </select>
                     </div>
 
+                    <div>
+                        <label
+                            class="mb-1.5 block text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
+                            >Diferencia</label
+                        >
+                        <select
+                            v-model="filterDifference"
+                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
+                        >
+                            <option value="">Todas</option>
+                            <option value="balanced">Cuadradas</option>
+                            <option value="with_difference">
+                                Con diferencia
+                            </option>
+                            <option value="missing">Faltante</option>
+                            <option value="surplus">Sobrante</option>
+                        </select>
+                    </div>
+
                     <div class="flex flex-wrap gap-2">
                         <button
                             type="button"
@@ -912,7 +979,7 @@ onMounted(async () => {
                             class="divide-y divide-slate-100 dark:divide-border/60"
                         >
                             <tr
-                                v-for="session in sessions"
+                                v-for="session in filteredSessions"
                                 :key="session.id"
                                 class="transition hover:bg-slate-50 dark:hover:bg-muted/40"
                             >
@@ -991,11 +1058,7 @@ onMounted(async () => {
                                 <td
                                     class="px-4 py-3 text-right font-semibold text-slate-950 tabular-nums dark:text-white"
                                 >
-                                    {{
-                                        formatCurrency(
-                                            getDeclaredTotal(session),
-                                        )
-                                    }}
+                                    {{ getDeclaredDisplay(session) }}
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     <div
@@ -1019,24 +1082,12 @@ onMounted(async () => {
                                             :size="13"
                                         />
                                         <Minus v-else :size="13" />
-                                        {{
-                                            getDifference(session) > 0
-                                                ? '+'
-                                                : ''
-                                        }}{{
-                                            formatCurrency(
-                                                getDifference(session),
-                                            )
-                                        }}
+                                        {{ getDifferenceDisplay(session) }}
                                     </div>
                                     <div
                                         class="mt-1 text-[11px] font-semibold text-slate-400"
                                     >
-                                        {{
-                                            getDifferenceLabel(
-                                                getDifference(session),
-                                            )
-                                        }}
+                                        {{ getDifferenceStatusLabel(session) }}
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-center">
@@ -1061,7 +1112,7 @@ onMounted(async () => {
                                     </button>
                                 </td>
                             </tr>
-                            <tr v-if="sessions.length === 0">
+                            <tr v-if="filteredSessions.length === 0">
                                 <td
                                     colspan="7"
                                     class="px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400"
@@ -1115,6 +1166,8 @@ onMounted(async () => {
             :purchase-payments="selectedPurchasePayments"
             :account-payments="selectedAccountPayments"
             :operational-expenses="selectedOperationalExpenses"
+            :documents="selectedDocuments"
+            :timeline="selectedTimeline"
             :loading="loadingDetail"
             @close="closeDetail"
         />

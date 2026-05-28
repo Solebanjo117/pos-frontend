@@ -2,6 +2,99 @@ import apiClient from './api/client';
 
 const BASE_PATH = '/pos-sessions';
 
+export interface PosSessionReconciliationRow {
+    code: string;
+    label: string;
+    start_adds: number;
+    payments: number;
+    withdrawals: number;
+    expected_total: number;
+    declared_total?: number;
+    difference?: number;
+    is_countable?: boolean;
+    is_informational?: boolean;
+}
+
+export interface PosSessionSummary {
+    opening_amount: number;
+    cash_sales: number;
+    card_sales?: number;
+    transfer_sales?: number;
+    credit_sales?: number;
+    electronic_sales?: number;
+    total_sales: number;
+    total_discounts?: number;
+    shipping_revenue: number;
+    cash_movements_in?: number;
+    cash_movements_out?: number;
+    expected_cash: number;
+    declared_cash: number;
+    difference: number;
+    expected_total?: number;
+    declared_total?: number;
+    total_difference?: number;
+    total_billed?: number;
+    electronic_breakdown?: Record<string, number>;
+    informational_breakdown?: Record<string, number>;
+    accounts_receivable_generated?: number;
+    store_credit_applied?: number;
+    informational_total?: number;
+    reconciliation_rows?: PosSessionReconciliationRow[];
+}
+
+export interface PosSessionDocument {
+    id: string;
+    type:
+        | 'sale'
+        | 'ar_receipt'
+        | 'ap_payment'
+        | 'operational_expense'
+        | 'cash_movement'
+        | string;
+    type_label: string;
+    document_id: number | string | null;
+    document_number: string | null;
+    amount: number;
+    method: string | null;
+    method_label: string | null;
+    direction: 'in' | 'out' | string;
+    occurred_at: string | null;
+    actor_id: number | null;
+    actor_name: string | null;
+    customer_id: number | null;
+    customer_name: string | null;
+    supplier_id: number | null;
+    supplier_name: string | null;
+    reference: string | null;
+    notes: string | null;
+    href: string | null;
+    is_cash_counted: boolean;
+    source: string;
+    applications?: Array<{
+        document_type: string;
+        document_id: number;
+        document_number: string | null;
+        amount: string | number;
+    }>;
+    [key: string]: any;
+}
+
+export interface PosSessionTimelineEvent {
+    id: string;
+    type: string;
+    label: string;
+    amount: number;
+    direction: 'in' | 'out' | string;
+    occurred_at: string | null;
+    href: string | null;
+    source: string;
+    document?: {
+        id: number | string | null;
+        number: string | null;
+        reference: string | null;
+    };
+}
+
 export interface PosSessionRecord {
     id: number;
     user_id: number;
@@ -12,41 +105,8 @@ export interface PosSessionRecord {
     closing_amount: string | null;
     expected_amount: string | null;
     closing_details: {
-        summary?: {
-            opening_amount: number;
-            cash_sales: number;
-            card_sales: number;
-            transfer_sales: number;
-            credit_sales: number;
-            electronic_sales?: number;
-            total_sales: number;
-            total_discounts?: number;
-            shipping_revenue: number;
-            cash_movements_in?: number;
-            cash_movements_out?: number;
-            expected_cash: number;
-            declared_cash: number;
-            difference: number;
-            expected_total?: number;
-            declared_total?: number;
-            total_difference?: number;
-            total_billed?: number;
-            electronic_breakdown?: Record<string, number>;
-            informational_breakdown?: Record<string, number>;
-            reconciliation_rows?: Array<{
-                code: string;
-                label: string;
-                start_adds: number;
-                payments: number;
-                withdrawals: number;
-                expected_total: number;
-                declared_total?: number;
-                difference?: number;
-                is_countable?: boolean;
-                is_informational?: boolean;
-            }>;
-        };
-        reconciliation_rows?: any[];
+        summary?: PosSessionSummary;
+        reconciliation_rows?: PosSessionReconciliationRow[];
         [key: string]: any;
     } | null;
     status: string;
@@ -57,6 +117,19 @@ export interface PosSessionRecord {
     purchase_payments?: PurchasePaymentRecord[];
     account_payments?: AccountPaymentRecord[];
     operational_expenses?: OperationalExpenseRecord[];
+}
+
+export interface PosSessionDetailResponse {
+    data: PosSessionRecord;
+    summary: PosSessionSummary;
+    reconciliation_rows: PosSessionReconciliationRow[];
+    documents: PosSessionDocument[];
+    timeline: PosSessionTimelineEvent[];
+    sales_orders: SessionSalesOrder[];
+    cash_movements: CashMovementRecord[];
+    purchase_payments: PurchasePaymentRecord[];
+    account_payments: AccountPaymentRecord[];
+    operational_expenses: OperationalExpenseRecord[];
 }
 
 export interface CashMovementRecord {
@@ -180,22 +253,10 @@ export const PosSessionsApiService = {
     /**
      * Get a single session with its sales orders
      */
-    async show(id: number): Promise<{
-        data: PosSessionRecord;
-        sales_orders: SessionSalesOrder[];
-        cash_movements: CashMovementRecord[];
-        purchase_payments: PurchasePaymentRecord[];
-        account_payments: AccountPaymentRecord[];
-        operational_expenses: OperationalExpenseRecord[];
-    }> {
-        const response = await apiClient.get<{
-            data: PosSessionRecord;
-            sales_orders: SessionSalesOrder[];
-            cash_movements: CashMovementRecord[];
-            purchase_payments: PurchasePaymentRecord[];
-            account_payments: AccountPaymentRecord[];
-            operational_expenses: OperationalExpenseRecord[];
-        }>(`${BASE_PATH}/${id}`);
+    async show(id: number): Promise<PosSessionDetailResponse> {
+        const response = await apiClient.get<PosSessionDetailResponse>(
+            `${BASE_PATH}/${id}`,
+        );
         return response.data;
     },
 };

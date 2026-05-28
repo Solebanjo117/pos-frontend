@@ -176,6 +176,7 @@ function referenceHref(movement: InventoryMovement): string | null {
         purchase_order: `/purchase-orders/${movement.reference_id}`,
         sale: `/sales-orders/${movement.reference_id}`,
         sales_order: `/sales-orders/${movement.reference_id}`,
+        sales_return: `/returns/${movement.reference_id}`,
         transfer: `/inventory-transfers/${movement.reference_id}`,
     };
 

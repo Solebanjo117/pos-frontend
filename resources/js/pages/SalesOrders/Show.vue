@@ -2,41 +2,60 @@
 import { computed, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { useSalesOrders } from '@/composables/useSalesOrders';
-import {
-    ArrowLeft,
-    Edit,
-    CheckCircle,
-    XCircle,
-    Package,
-    User,
-    Calendar,
-    DollarSign,
-    Printer,
-    RotateCcw,
-    Search,
-    Plus,
-    Minus,
-    ChevronDown,
-    ChevronUp,
-    X,
-    Calculator,
-    Edit2,
-    CircleDollarSign,
-    AlertTriangle,
-    ClipboardList,
-} from 'lucide-vue-next';
-import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
+import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useUsers } from '@/composables/useUsers';
 import apiClient from '@/services/api/client';
+import { salesOrdersService } from '@/services/sales-orders';
+import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { Product, ProductVariant } from '@/types/product';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
+import type {
+    SalesOrderOperationalDetail,
+    SalesOrderOperationalItem,
+} from '@/types/sales-order';
+import {
+    Activity,
+    AlertTriangle,
+    ArrowLeft,
+    Banknote,
+    Boxes,
+    CheckCircle,
+    DollarSign,
+    Edit,
+    ExternalLink,
+    FileText,
+    Package,
+    Plus,
+    Printer,
+    RotateCcw,
+    TrendingUp,
+    User,
+    XCircle,
+} from 'lucide-vue-next';
 
-const props = defineProps<{
-    id: number;
-}>();
+const props = defineProps<{ id: number }>();
+
+type TabKey =
+    | 'summary'
+    | 'items'
+    | 'payments'
+    | 'returns'
+    | 'inventory'
+    | 'profit'
+    | 'activity';
+
+const tabs: Array<{ key: TabKey; label: string; icon: any }> = [
+    { key: 'summary', label: 'Resumen', icon: FileText },
+    { key: 'items', label: 'Items', icon: Package },
+    { key: 'payments', label: 'Pagos/AR', icon: Banknote },
+    { key: 'returns', label: 'Devoluciones', icon: RotateCcw },
+    { key: 'inventory', label: 'Inventario', icon: Boxes },
+    { key: 'profit', label: 'Rentabilidad', icon: TrendingUp },
+    { key: 'activity', label: 'Actividad', icon: Activity },
+];
 
 const {
     currentSalesOrder,
@@ -49,15 +68,19 @@ const {
     updateOrderItem,
 } = useSalesOrders();
 
+const { users, fetchUsers } = useUsers();
+
+const operationalDetail = ref<SalesOrderOperationalDetail | null>(null);
+const operationalLoading = ref(false);
+const operationalError = ref<string | null>(null);
+const activeTab = ref<TabKey>('summary');
 const showPrintModal = ref(false);
 const showReturnModal = ref(false);
+const showAddItemModal = ref(false);
 const returnLoading = ref(false);
 const returnError = ref<string | null>(null);
-const orderReturns = ref<any[]>([]);
-const showAuditLogs = ref(false);
-const showAddItemModal = ref(false);
-const expandedItemId = ref<number | null>(null);
 const savingItemIds = ref<Set<number>>(new Set());
+
 const pickerProducts = ref<Product[]>([]);
 const pickerTotal = ref(0);
 const pickerCurrentPage = ref(1);
@@ -77,7 +100,14 @@ const pickerFilters = ref<{
     sort?: string;
 }>({ query: '' });
 
-const { users, fetchUsers } = useUsers();
+const order = computed(() => operationalDetail.value?.order ?? null);
+const items = computed(() => operationalDetail.value?.items ?? []);
+const payments = computed(() => operationalDetail.value?.payments ?? []);
+const returns = computed(() => operationalDetail.value?.returns ?? []);
+const movements = computed(
+    () => operationalDetail.value?.inventory_context.movements ?? [],
+);
+const audit = computed(() => operationalDetail.value?.audit ?? []);
 
 const paymentStatusLabels: Record<string, string> = {
     pending: 'Pendiente',
@@ -86,51 +116,135 @@ const paymentStatusLabels: Record<string, string> = {
     refunded: 'Reembolsado',
 };
 
-const getPaymentStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-        pending:
-            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-        partial:
-            'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-        paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-        refunded:
-            'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-    };
-
-    return (
-        colors[status] ||
-        'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-300'
-    );
+const statusLabels: Record<string, string> = {
+    draft: 'Borrador',
+    pending: 'Pendiente',
+    confirmed: 'Confirmada',
+    processing: 'En proceso',
+    completed: 'Completada',
+    cancelled: 'Cancelada',
 };
 
-const itemCount = computed(() => currentSalesOrder.value?.items?.length || 0);
-const auditLogCount = computed(
-    () => (currentSalesOrder.value as any)?.audit_logs?.length || 0,
-);
+const itemCount = computed(() => items.value.length);
 const returnsTotal = computed(() =>
-    orderReturns.value.reduce(
-        (sum, ret) => sum + Number(ret.total_amount || 0),
-        0,
-    ),
+    returns.value.reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
 );
-const selectedWarehouseId = computed(() => {
-    const catalogItem = currentSalesOrder.value?.items?.find(
-        (item: any) => !item.is_custom_line && item.warehouse_id,
-    );
+const paidTotal = computed(
+    () => operationalDetail.value?.ar_context.amount_paid ?? 0,
+);
+const amountDue = computed(
+    () => operationalDetail.value?.ar_context.amount_due ?? 0,
+);
+const customer = computed(() => order.value?.customer ?? null);
 
+const selectedWarehouseId = computed(() => {
+    const catalogItem = items.value.find(
+        (item) => !item.is_custom_line && item.warehouse_id,
+    );
     return Number(
-        catalogItem?.warehouse_id ??
-            (currentSalesOrder.value?.items?.[0] as any)?.warehouse_id ??
-            1,
+        catalogItem?.warehouse_id ?? items.value[0]?.warehouse_id ?? 1,
     );
 });
 
-const canEditPostSaleItem = (item: any): boolean =>
-    Boolean(item.added_after_sale);
+const canEditBaseOrder = computed(
+    () =>
+        currentSalesOrder.value?.status === 'draft' ||
+        currentSalesOrder.value?.status === 'pending',
+);
 
-const toggleItemEditor = (item: any): void => {
-    if (!canEditPostSaleItem(item)) return;
-    expandedItemId.value = expandedItemId.value === item.id ? null : item.id;
+const canActOnConfirmedOrder = computed(
+    () =>
+        currentSalesOrder.value?.status === 'confirmed' ||
+        currentSalesOrder.value?.status === 'processing' ||
+        currentSalesOrder.value?.status === 'completed',
+);
+
+const loadOperationalDetail = async (): Promise<void> => {
+    operationalLoading.value = true;
+    operationalError.value = null;
+    try {
+        operationalDetail.value = await salesOrdersService.getOperationalDetail(
+            props.id,
+        );
+    } catch (err: any) {
+        operationalError.value =
+            err.response?.data?.message ||
+            'No se pudo cargar la ficha operativa.';
+    } finally {
+        operationalLoading.value = false;
+    }
+};
+
+const refreshOrder = async (): Promise<void> => {
+    await Promise.all([fetchSalesOrderById(props.id), loadOperationalDetail()]);
+};
+
+const formatCurrency = (value?: number | string | null): string =>
+    Number(value ?? 0).toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+    });
+
+const formatDate = (value?: string | null): string => {
+    if (!value) return 'N/A';
+    return new Date(value).toLocaleDateString('es-PA');
+};
+
+const formatDateTime = (value?: string | null): string => {
+    if (!value) return 'N/A';
+    return new Date(value).toLocaleString('es-PA', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+    });
+};
+
+const statusClass = (status?: string): string => {
+    const classes: Record<string, string> = {
+        draft: 'bg-gray-100 text-gray-700 dark:bg-muted dark:text-gray-200',
+        pending:
+            'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
+        confirmed:
+            'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200',
+        processing:
+            'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200',
+        completed:
+            'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200',
+        cancelled:
+            'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200',
+    };
+    return classes[status || 'draft'] ?? classes.draft;
+};
+
+const paymentClass = (status?: string): string => {
+    const classes: Record<string, string> = {
+        pending:
+            'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
+        partial:
+            'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200',
+        paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200',
+        refunded:
+            'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-200',
+    };
+    return classes[status || 'pending'] ?? classes.pending;
+};
+
+const handleConfirm = async (): Promise<void> => {
+    if (!confirm('¿Confirmar esta orden? Esto descontará el inventario.'))
+        return;
+    await confirmSalesOrder(props.id);
+    await refreshOrder();
+};
+
+const handleComplete = async (): Promise<void> => {
+    if (!confirm('¿Marcar esta orden como completada?')) return;
+    await completeSalesOrder(props.id);
+    await refreshOrder();
+};
+
+const handleCancel = async (): Promise<void> => {
+    if (!confirm('¿Cancelar esta orden? El inventario será revertido.')) return;
+    await cancelSalesOrder(props.id);
+    await refreshOrder();
 };
 
 const setItemSaving = (itemId: number, saving: boolean): void => {
@@ -144,176 +258,70 @@ const setItemSaving = (itemId: number, saving: boolean): void => {
 };
 
 const updatePostSaleItem = async (
-    item: any,
+    item: SalesOrderOperationalItem,
     payload: Record<string, unknown>,
 ): Promise<void> => {
-    if (!canEditPostSaleItem(item) || savingItemIds.value.has(item.id)) return;
-
+    if (!item.added_after_sale || savingItemIds.value.has(item.id)) return;
     setItemSaving(item.id, true);
     try {
         await updateOrderItem(item.id, payload);
-    } catch (err) {
-        console.error('Error updating post-sale item:', err);
+        await refreshOrder();
     } finally {
         setItemSaving(item.id, false);
     }
 };
 
-const updatePostSaleQuantity = (item: any, quantity: number): void => {
-    updatePostSaleItem(item, {
-        quantity: Math.max(1, Math.floor(Number(quantity) || 1)),
-    });
-};
-
-const updatePostSaleNumber = (
-    item: any,
-    key: 'unit_price' | 'discount_percent' | 'tax_percent',
-    value: number,
-): void => {
-    const max = key === 'unit_price' ? Number.MAX_SAFE_INTEGER : 100;
-    updatePostSaleItem(item, {
-        [key]: Math.max(0, Math.min(max, Number(value) || 0)),
-    });
-};
-
-const togglePostSaleTax = (item: any): void => {
-    updatePostSaleItem(item, {
-        tax_percent: Number(item.tax_percent || 0) > 0 ? 0 : 7,
-    });
-};
-
-const scrollToSection = (sectionId: string) => {
-    document
-        .getElementById(sectionId)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
-
-const auditActionIcon = (action: string) => {
-    const icons: Record<string, any> = {
-        search: Search,
-        cart_add: Plus,
-        cart_remove: X,
-        qty_change: Calculator,
-        price_override: Edit2,
-        tax_override: CircleDollarSign,
-        checkout_success: CheckCircle,
-        checkout_error: AlertTriangle,
-    };
-    return icons[action] || ClipboardList;
-};
-
-const auditActionLabel = (action: string) => {
-    const labels: Record<string, string> = {
-        search: 'Búsqueda',
-        cart_add: 'Añadido',
-        cart_remove: 'Eliminado',
-        qty_change: 'Cant. cambiada',
-        price_override: 'Precio override',
-        tax_override: 'Impuesto override',
-        checkout_success: 'Checkout',
-        checkout_error: 'Error checkout',
-    };
-    return labels[action] || action;
-};
-
-const formatLogTime = (timestamp: string) => {
+const handleReturnSubmit = async (payload: {
+    reason: string;
+    refund_method: string;
+    refund_notes: string;
+    items: {
+        sales_order_item_id: number;
+        quantity: number;
+        user_id: number | null;
+    }[];
+}): Promise<void> => {
+    returnLoading.value = true;
+    returnError.value = null;
     try {
-        return new Date(timestamp).toLocaleTimeString('es-MX', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
-    } catch {
-        return timestamp;
-    }
-};
-
-const formatLogDetail = (log: any) => {
-    const m = log.metadata || {};
-    switch (log.action) {
-        case 'search':
-            return `"${m.query}"`;
-        case 'cart_add':
-            return `${m.name || `#${m.product_id}`} ×${m.quantity}`;
-        case 'cart_remove':
-            return `${m.name || `#${m.product_id}`}`;
-        case 'qty_change':
-            return `#${m.product_id}: ${m.old_qty} → ${m.new_qty}`;
-        case 'price_override':
-            return `$${m.old_price} → $${m.new_price}`;
-        case 'tax_override':
-            return `${m.old_tax}% → ${m.new_tax}%`;
-        case 'checkout_success':
-            return `Orden #${m.order_id} — $${m.total}`;
-        default:
-            return JSON.stringify(m);
-    }
-};
-
-const handleConfirm = async () => {
-    if (!confirm('¿Confirmar esta orden? Esto descontará el inventario.'))
-        return;
-    try {
-        await confirmSalesOrder(props.id);
-        await fetchSalesOrderById(props.id);
-    } catch (err) {
-        console.error('Error:', err);
-    }
-};
-
-const handleComplete = async () => {
-    if (!confirm('¿Marcar esta orden como completada?')) return;
-    try {
-        await completeSalesOrder(props.id);
-        await fetchSalesOrderById(props.id);
-    } catch (err) {
-        console.error('Error:', err);
-    }
-};
-
-const handleCancel = async () => {
-    if (!confirm('¿Cancelar esta orden? El inventario será revertido.')) return;
-    try {
-        await cancelSalesOrder(props.id);
-        await fetchSalesOrderById(props.id);
-    } catch (err) {
-        console.error('Error:', err);
-    }
-};
-
-const fetchReturns = async () => {
-    try {
-        const { data } = await apiClient.get(
-            `/sales-orders/${props.id}/returns`,
+        const response = await SalesReturnsApiService.createForOrder(
+            props.id,
+            payload,
         );
-        orderReturns.value = data;
-    } catch (e) {
-        console.error('Error fetching returns:', e);
+        const returnId = response.data?.id;
+        if (returnId) {
+            await SalesReturnsApiService.approve(returnId);
+        }
+        showReturnModal.value = false;
+        await refreshOrder();
+    } catch (err: any) {
+        const errData = err.response?.data;
+        returnError.value = Array.isArray(errData?.errors)
+            ? errData.errors.join('\n')
+            : errData?.message || 'Error al procesar la devolución';
+    } finally {
+        returnLoading.value = false;
     }
 };
 
-const fetchProductFilterOptions = async () => {
+const fetchProductFilterOptions = async (): Promise<void> => {
     try {
         const [categoriesResponse, brandsResponse] = await Promise.all([
             apiClient.get('/categories'),
             apiClient.get('/brands'),
         ]);
-
         productFilterCategories.value =
             categoriesResponse.data.data ?? categoriesResponse.data ?? [];
         productFilterBrands.value =
             brandsResponse.data.data ?? brandsResponse.data ?? [];
-    } catch (e) {
+    } catch {
         productFilterCategories.value = [];
         productFilterBrands.value = [];
     }
 };
 
-const fetchPickerProducts = async (append = false) => {
-    if (append && pickerCurrentPage.value >= pickerLastPage.value) {
-        return;
-    }
-
+const fetchPickerProducts = async (append = false): Promise<void> => {
+    if (append && pickerCurrentPage.value >= pickerLastPage.value) return;
     if (append) {
         pickerLoadingMore.value = true;
     } else {
@@ -338,7 +346,6 @@ const fetchPickerProducts = async (append = false) => {
                 with_variants: true,
             },
         });
-
         const rows = data.data || [];
         pickerProducts.value = append
             ? [...pickerProducts.value, ...rows]
@@ -352,13 +359,13 @@ const fetchPickerProducts = async (append = false) => {
     }
 };
 
-const openProductPicker = async () => {
+const openProductPicker = async (): Promise<void> => {
     showAddItemModal.value = true;
     pickerFilters.value = { query: productSearch.value };
     await fetchPickerProducts();
 };
 
-const handlePickerSearch = (filters: typeof pickerFilters.value) => {
+const handlePickerSearch = (filters: typeof pickerFilters.value): void => {
     pickerFilters.value = filters;
     productSearch.value = filters.query;
     fetchPickerProducts();
@@ -372,919 +379,1035 @@ const priceFor = (product: Product, variant: ProductVariant | null): number =>
             0,
     );
 
-const normalizeTaxPercent = (value: number): number =>
-    Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
-
 const taxRateFor = (product: Product, variant: ProductVariant | null): number =>
-    normalizeTaxPercent(
-        Number(
-            variant?.pricing?.sale_tax_rate ??
-                variant?.pricing?.tax_rate ??
-                product.pricing?.sale_tax_rate ??
-                product.pricing?.tax_rate ??
-                0,
+    Math.max(
+        0,
+        Math.min(
+            100,
+            Math.round(
+                Number(
+                    variant?.pricing?.sale_tax_rate ??
+                        variant?.pricing?.tax_rate ??
+                        product.pricing?.sale_tax_rate ??
+                        product.pricing?.tax_rate ??
+                        0,
+                ),
+            ),
         ),
     );
 
 const addVariantSelections = async (
     selections: ProductVariantSelection[],
 ): Promise<void> => {
-    if (!currentSalesOrder.value || selections.length === 0) {
-        return;
-    }
-
-    try {
-        for (const { product, variant, quantity } of selections) {
-            await apiClient.post(
-                `/sales-orders/${currentSalesOrder.value.id}/items`,
-                {
-                    product_id: product.id,
-                    variant_id: variant?.id ?? null,
-                    warehouse_id: selectedWarehouseId.value,
-                    quantity,
-                    unit_price: priceFor(product, variant),
-                    tax_percent: taxRateFor(product, variant),
-                    seller_id: (currentSalesOrder.value as any).user_id ?? null,
-                },
-            );
-        }
-
-        showAddItemModal.value = false;
-        productSearch.value = '';
-        pickerProducts.value = [];
-        await fetchSalesOrderById(props.id);
-    } catch (err) {
-        console.error('Error adding sales order items:', err);
-    }
-};
-
-const handleReturnSubmit = async (payload: {
-    reason: string;
-    refund_method: string;
-    refund_notes: string;
-    items: {
-        sales_order_item_id: number;
-        quantity: number;
-        user_id: number | null;
-    }[];
-}) => {
-    returnLoading.value = true;
-    returnError.value = null;
-    try {
-        const { data } = await apiClient.post(
-            `/sales-orders/${props.id}/returns`,
-            payload,
+    if (!currentSalesOrder.value || selections.length === 0) return;
+    for (const { product, variant, quantity } of selections) {
+        await apiClient.post(
+            `/sales-orders/${currentSalesOrder.value.id}/items`,
+            {
+                product_id: product.id,
+                variant_id: variant?.id ?? null,
+                warehouse_id: selectedWarehouseId.value,
+                quantity,
+                unit_price: priceFor(product, variant),
+                tax_percent: taxRateFor(product, variant),
+                seller_id: currentSalesOrder.value.user_id ?? null,
+            },
         );
-        const returnId = data.data?.id;
-        // Auto-approve the return
-        if (returnId) {
-            await apiClient.post(`/sales-returns/${returnId}/approve`);
-        }
-        showReturnModal.value = false;
-        await fetchSalesOrderById(props.id);
-        await fetchReturns();
-    } catch (err: any) {
-        const errData = err.response?.data;
-        if (Array.isArray(errData?.errors)) {
-            returnError.value = errData.errors.join('\n');
-        } else {
-            returnError.value =
-                errData?.message || 'Error al procesar la devolución';
-        }
-    } finally {
-        returnLoading.value = false;
     }
+    showAddItemModal.value = false;
+    productSearch.value = '';
+    pickerProducts.value = [];
+    await refreshOrder();
 };
 
-const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-        draft: 'bg-gray-100 text-gray-800 dark:bg-card dark:text-gray-300',
-        pending:
-            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-        confirmed:
-            'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-        processing:
-            'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-        completed:
-            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-        cancelled:
-            'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    };
-    return colors[status] || colors.draft;
-};
-
-onMounted(() => {
-    fetchSalesOrderById(props.id);
-    fetchReturns();
-    fetchUsers();
-    fetchProductFilterOptions();
+onMounted(async () => {
+    await Promise.all([
+        refreshOrder(),
+        fetchUsers(),
+        fetchProductFilterOptions(),
+    ]);
 });
 </script>
 
 <template>
-    <Head :title="`Orden ${currentSalesOrder?.order_number || ''}`" />
+    <Head :title="`Factura ${order?.order_number || ''}`" />
 
     <AppLayout>
-        <div v-if="loading" class="py-12 text-center">
-            <p class="text-gray-600 dark:text-gray-400">Cargando orden...</p>
+        <div
+            v-if="loading || operationalLoading"
+            class="p-8 text-sm text-gray-500"
+        >
+            Cargando ficha operativa...
         </div>
 
         <div
-            v-else-if="error"
-            class="rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+            v-else-if="error || operationalError"
+            class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
         >
-            {{ error }}
+            {{ error || operationalError }}
         </div>
 
-        <div v-else-if="currentSalesOrder" class="space-y-6">
-            <!-- Header -->
-            <div
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
+        <div v-else-if="order && operationalDetail" class="space-y-4">
+            <section
+                class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
             >
                 <div
-                    class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"
+                    class="flex flex-col gap-4 border-b border-gray-200 p-4 xl:flex-row xl:items-start xl:justify-between dark:border-border"
                 >
-                    <div class="flex items-center gap-4">
-                        <button
-                            @click="router.visit('/sales-orders')"
-                            class="mt-1 rounded-lg p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50"
-                            title="Volver"
-                        >
-                            <ArrowLeft :size="22" />
-                        </button>
-                        <div>
-                            <h1
-                                class="text-2xl font-semibold text-gray-900 dark:text-white"
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                class="rounded-md p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted"
+                                title="Volver"
+                                @click="router.visit('/sales-orders')"
                             >
-                                {{ currentSalesOrder.order_number }}
-                            </h1>
-                            <div class="mt-2 flex flex-wrap items-center gap-2">
-                                <span
-                                    :class="[
-                                        'rounded-full px-2 py-1 text-xs font-semibold',
-                                        getStatusColor(
-                                            currentSalesOrder.status,
-                                        ),
-                                    ]"
+                                <ArrowLeft :size="20" />
+                            </button>
+                            <div>
+                                <p
+                                    class="text-xs font-semibold text-gray-500 uppercase"
                                 >
-                                    {{ currentSalesOrder.status_label }}
-                                </span>
-                                <span
-                                    :class="[
-                                        'rounded-full px-2 py-1 text-xs font-semibold',
-                                        getPaymentStatusColor(
-                                            currentSalesOrder.payment_status,
-                                        ),
-                                    ]"
+                                    Orden de venta / factura
+                                </p>
+                                <h1
+                                    class="font-mono text-2xl font-bold text-gray-900 dark:text-white"
                                 >
-                                    {{
-                                        paymentStatusLabels[
-                                            currentSalesOrder.payment_status
-                                        ] || currentSalesOrder.payment_status
-                                    }}
-                                </span>
-                                <span
-                                    class="text-sm text-gray-600 dark:text-gray-400"
-                                >
-                                    {{
-                                        currentSalesOrder.customer_name ||
-                                        'Sin cliente'
-                                    }}
-                                </span>
-                                <span
-                                    class="text-sm text-gray-600 dark:text-gray-400"
-                                >
-                                    {{
-                                        new Date(
-                                            currentSalesOrder.date,
-                                        ).toLocaleDateString('es-MX')
-                                    }}
-                                </span>
-                                <span
-                                    class="text-sm text-gray-600 dark:text-gray-400"
-                                >
-                                    {{ itemCount }} Artículos
-                                </span>
+                                    {{ order.order_number }}
+                                </h1>
                             </div>
-                            <p
-                                class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white"
+                        </div>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                            <span
+                                class="rounded-full px-2 py-1 text-xs font-semibold"
+                                :class="statusClass(order.status)"
                             >
-                                {{ currentSalesOrder.formatted_total }}
-                            </p>
+                                {{ statusLabels[order.status] || order.status }}
+                            </span>
+                            <span
+                                class="rounded-full px-2 py-1 text-xs font-semibold"
+                                :class="paymentClass(order.payment_status)"
+                            >
+                                {{
+                                    paymentStatusLabels[order.payment_status] ||
+                                    order.payment_status
+                                }}
+                            </span>
+                            <button
+                                v-if="customer"
+                                type="button"
+                                class="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                                @click="
+                                    router.visit(`/customers/${customer.id}`)
+                                "
+                            >
+                                <User :size="14" />
+                                {{ customer.name }}
+                            </button>
+                            <span v-else class="text-sm text-gray-500">
+                                Sin cliente
+                            </span>
+                            <span class="text-sm text-gray-500">
+                                {{ formatDate(order.date) }}
+                            </span>
                         </div>
                     </div>
 
-                    <div
-                        class="flex flex-wrap items-center justify-start gap-2 xl:justify-end"
-                    >
+                    <div class="flex flex-wrap items-center gap-2">
                         <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
                             @click="showPrintModal = true"
-                            class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
                         >
                             <Printer :size="16" />
                             Imprimir
                         </button>
                         <button
-                            v-if="
-                                currentSalesOrder.status === 'draft' ||
-                                currentSalesOrder.status === 'pending'
-                            "
+                            v-if="canEditBaseOrder"
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
                             @click="
                                 router.visit(`/sales-orders/${props.id}/edit`)
                             "
-                            class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
                         >
                             <Edit :size="16" />
                             Editar
                         </button>
                         <button
-                            v-if="
-                                currentSalesOrder.status === 'draft' ||
-                                currentSalesOrder.status === 'pending'
-                            "
+                            v-if="canEditBaseOrder"
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                             @click="handleConfirm"
-                            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
                         >
                             <CheckCircle :size="16" />
                             Confirmar
                         </button>
                         <button
                             v-if="
-                                currentSalesOrder.status === 'confirmed' ||
-                                currentSalesOrder.status === 'processing'
+                                currentSalesOrder?.status === 'confirmed' ||
+                                currentSalesOrder?.status === 'processing'
                             "
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                             @click="handleComplete"
-                            class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
                         >
                             <CheckCircle :size="16" />
                             Completar
                         </button>
                         <button
-                            v-if="
-                                currentSalesOrder.status === 'confirmed' ||
-                                currentSalesOrder.status === 'completed'
-                            "
-                            @click="router.visit(`/returns/${props.id}`)"
-                            class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
+                            v-if="canActOnConfirmedOrder"
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
+                            @click="showReturnModal = true"
                         >
                             <RotateCcw :size="16" />
                             Devolver
                         </button>
                         <button
-                            v-if="
-                                currentSalesOrder.status === 'confirmed' ||
-                                currentSalesOrder.status === 'completed'
-                            "
+                            v-if="canActOnConfirmedOrder"
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
                             @click="openProductPicker"
-                            class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50"
                         >
                             <Plus :size="16" />
-                            Agregar Artículo
+                            Agregar item
                         </button>
                         <button
                             v-if="
-                                currentSalesOrder.status !== 'completed' &&
-                                currentSalesOrder.status !== 'cancelled'
+                                currentSalesOrder?.status !== 'completed' &&
+                                currentSalesOrder?.status !== 'cancelled'
                             "
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-300 dark:hover:bg-red-950/30"
                             @click="handleCancel"
-                            class="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
                         >
                             <XCircle :size="16" />
                             Cancelar
                         </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- Section Navigation -->
-            <div
-                class="sticky top-0 z-10 flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm dark:border-border dark:bg-card"
+                <div class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-6">
+                    <div class="rounded-md bg-gray-50 p-3 dark:bg-muted/40">
+                        <p class="text-xs text-gray-500">Total</p>
+                        <p
+                            class="mt-1 text-xl font-bold text-gray-900 dark:text-white"
+                        >
+                            {{ formatCurrency(order.total) }}
+                        </p>
+                    </div>
+                    <div class="rounded-md bg-gray-50 p-3 dark:bg-muted/40">
+                        <p class="text-xs text-gray-500">Cobrado real</p>
+                        <p class="mt-1 text-xl font-bold text-emerald-600">
+                            {{ formatCurrency(paidTotal) }}
+                        </p>
+                    </div>
+                    <div class="rounded-md bg-gray-50 p-3 dark:bg-muted/40">
+                        <p class="text-xs text-gray-500">Saldo</p>
+                        <p class="mt-1 text-xl font-bold text-amber-600">
+                            {{ formatCurrency(amountDue) }}
+                        </p>
+                    </div>
+                    <div class="rounded-md bg-gray-50 p-3 dark:bg-muted/40">
+                        <p class="text-xs text-gray-500">Devuelto</p>
+                        <p class="mt-1 text-xl font-bold text-red-600">
+                            {{ formatCurrency(returnsTotal) }}
+                        </p>
+                    </div>
+                    <div class="rounded-md bg-gray-50 p-3 dark:bg-muted/40">
+                        <p class="text-xs text-gray-500">Items</p>
+                        <p
+                            class="mt-1 text-xl font-bold text-gray-900 dark:text-white"
+                        >
+                            {{ itemCount }}
+                        </p>
+                    </div>
+                    <div class="rounded-md bg-gray-50 p-3 dark:bg-muted/40">
+                        <p class="text-xs text-gray-500">Margen bruto</p>
+                        <p
+                            class="mt-1 text-xl font-bold text-gray-900 dark:text-white"
+                        >
+                            {{
+                                operationalDetail.profit_summary
+                                    .gross_margin_percent ?? 0
+                            }}%
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <nav
+                class="sticky top-0 z-10 flex gap-1 overflow-x-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-border dark:bg-card"
             >
                 <button
+                    v-for="tab in tabs"
+                    :key="tab.key"
                     type="button"
-                    class="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50"
-                    @click="scrollToSection('order-summary')"
+                    class="inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold"
+                    :class="
+                        activeTab === tab.key
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted'
+                    "
+                    @click="activeTab = tab.key"
                 >
-                    Resumen
+                    <component :is="tab.icon" :size="15" />
+                    {{ tab.label }}
                 </button>
-                <button
-                    type="button"
-                    class="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50"
-                    @click="scrollToSection('order-items')"
-                >
-                    Artículos
-                </button>
-                <button
-                    type="button"
-                    class="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50"
-                    @click="scrollToSection('order-returns')"
-                >
-                    Devoluciones
-                    <span
-                        class="ml-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs dark:bg-muted"
-                        >{{ orderReturns.length }}</span
-                    >
-                </button>
-                <button
-                    type="button"
-                    class="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-muted/50"
-                    @click="scrollToSection('order-audit')"
-                >
-                    Auditoría
-                    <span
-                        class="ml-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs dark:bg-muted"
-                        >{{ auditLogCount }}</span
-                    >
-                </button>
-            </div>
+            </nav>
 
-            <!-- Order Info Cards -->
-            <div
-                id="order-summary"
-                class="grid scroll-mt-20 grid-cols-1 gap-3 md:grid-cols-5"
+            <section
+                v-if="activeTab === 'summary'"
+                class="grid gap-4 xl:grid-cols-[1.25fr_.75fr]"
             >
                 <div
-                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                 >
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30"
+                    <div
+                        class="border-b border-gray-200 px-4 py-3 dark:border-border"
+                    >
+                        <h2
+                            class="text-sm font-bold text-gray-900 dark:text-white"
                         >
-                            <User
-                                class="text-blue-600 dark:text-blue-400 dark:text-primary"
-                                :size="20"
-                            />
+                            Datos generales
+                        </h2>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                        <div>
+                            <p class="text-xs text-gray-500">Cliente</p>
+                            <p
+                                class="font-semibold text-gray-900 dark:text-white"
+                            >
+                                {{ customer?.name || 'Sin cliente' }}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                {{ customer?.code || 'Sin código' }}
+                            </p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                Cliente
-                            </p>
+                            <p class="text-xs text-gray-500">Vendedor</p>
                             <p
-                                class="font-medium text-gray-900 dark:text-white"
+                                class="font-semibold text-gray-900 dark:text-white"
+                            >
+                                {{ order.user?.name || 'Sistema' }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Caja</p>
+                            <button
+                                v-if="order.pos_session"
+                                type="button"
+                                class="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:underline"
+                                @click="router.visit('/pos-sessions')"
+                            >
+                                Sesión #{{ order.pos_session.id }}
+                                <ExternalLink :size="13" />
+                            </button>
+                            <p
+                                v-else
+                                class="font-semibold text-gray-900 dark:text-white"
+                            >
+                                Sin sesión
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Bodega</p>
+                            <p
+                                class="font-semibold text-gray-900 dark:text-white"
                             >
                                 {{
-                                    currentSalesOrder.customer_name ||
-                                    'Sin cliente'
+                                    order.pos_session?.warehouse_name ||
+                                    items[0]?.warehouse_name ||
+                                    'N/A'
+                                }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Carro</p>
+                            <p
+                                class="font-semibold text-gray-900 dark:text-white"
+                            >
+                                {{
+                                    order.customer_vehicle
+                                        ? [
+                                              order.customer_vehicle.make,
+                                              order.customer_vehicle.model,
+                                              order.customer_vehicle.year,
+                                          ]
+                                              .filter(Boolean)
+                                              .join(' ')
+                                        : 'Sin carro'
+                                }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Preparación</p>
+                            <p
+                                class="font-semibold text-gray-900 dark:text-white"
+                            >
+                                {{
+                                    order.prepared_at
+                                        ? `Preparada ${formatDateTime(order.prepared_at)}`
+                                        : order.sent_to_warehouse_at
+                                          ? 'Enviada a bodega'
+                                          : 'Sin envío a bodega'
                                 }}
                             </p>
                         </div>
                     </div>
-                </div>
-
-                <div
-                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                >
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30"
+                    <div
+                        v-if="order.notes || order.internal_notes"
+                        class="border-t border-gray-200 p-4 text-sm dark:border-border"
+                    >
+                        <p
+                            v-if="order.notes"
+                            class="text-gray-700 dark:text-gray-300"
                         >
-                            <Calendar
-                                class="text-purple-600 dark:text-purple-400"
-                                :size="20"
-                            />
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                Fecha
-                            </p>
-                            <p
-                                class="font-medium text-gray-900 dark:text-white"
-                            >
-                                {{
-                                    new Date(
-                                        currentSalesOrder.date,
-                                    ).toLocaleDateString('es-MX')
-                                }}
-                            </p>
-                        </div>
+                            {{ order.notes }}
+                        </p>
+                        <p
+                            v-if="order.internal_notes"
+                            class="mt-2 text-amber-700 dark:text-amber-200"
+                        >
+                            {{ order.internal_notes }}
+                        </p>
                     </div>
                 </div>
 
                 <div
-                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                 >
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30"
+                    <div
+                        class="border-b border-gray-200 px-4 py-3 dark:border-border"
+                    >
+                        <h2
+                            class="text-sm font-bold text-gray-900 dark:text-white"
                         >
-                            <DollarSign
-                                class="text-green-600 dark:text-green-400"
-                                :size="20"
-                            />
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                Total
-                            </p>
-                            <p
-                                class="font-medium text-gray-900 dark:text-white"
-                            >
-                                {{ currentSalesOrder.formatted_total }}
-                            </p>
-                        </div>
+                            Accesos
+                        </h2>
+                    </div>
+                    <div class="space-y-2 p-4">
+                        <button
+                            v-if="customer"
+                            type="button"
+                            class="flex w-full items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm font-semibold hover:bg-gray-50 dark:border-border dark:hover:bg-muted"
+                            @click="router.visit(`/customers/${customer.id}`)"
+                        >
+                            Ficha cliente
+                            <ExternalLink :size="14" />
+                        </button>
+                        <button
+                            v-if="customer"
+                            type="button"
+                            class="flex w-full items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm font-semibold hover:bg-gray-50 dark:border-border dark:hover:bg-muted"
+                            @click="
+                                router.visit(`/ar?customer_id=${customer.id}`)
+                            "
+                        >
+                            Cobros AR
+                            <ExternalLink :size="14" />
+                        </button>
+                        <button
+                            type="button"
+                            class="flex w-full items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm font-semibold hover:bg-gray-50 dark:border-border dark:hover:bg-muted"
+                            @click="activeTab = 'inventory'"
+                        >
+                            Trazabilidad inventario
+                            <ExternalLink :size="14" />
+                        </button>
                     </div>
                 </div>
+            </section>
 
-                <div
-                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                >
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="rounded-lg bg-yellow-100 p-2 dark:bg-yellow-900/30"
-                        >
-                            <Package
-                                class="text-yellow-600 dark:text-yellow-400"
-                                :size="20"
-                            />
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                Estado
-                            </p>
-                            <span
-                                :class="[
-                                    'rounded-full px-2 py-1 text-xs font-semibold',
-                                    getStatusColor(currentSalesOrder.status),
-                                ]"
-                            >
-                                {{ currentSalesOrder.status_label }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                >
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30"
-                        >
-                            <CircleDollarSign
-                                class="text-indigo-600 dark:text-indigo-400"
-                                :size="20"
-                            />
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                Pago
-                            </p>
-                            <span
-                                :class="[
-                                    'rounded-full px-2 py-1 text-xs font-semibold',
-                                    getPaymentStatusColor(
-                                        currentSalesOrder.payment_status,
-                                    ),
-                                ]"
-                            >
-                                {{
-                                    paymentStatusLabels[
-                                        currentSalesOrder.payment_status
-                                    ] || currentSalesOrder.payment_status
-                                }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Items Table -->
-            <div
-                id="order-items"
-                class="scroll-mt-20 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+            <section
+                v-if="activeTab === 'items'"
+                class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
             >
-                <div
-                    class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-border"
-                >
-                    <h2
-                        class="text-lg font-semibold text-gray-900 dark:text-white"
-                    >
-                        Artículos
-                    </h2>
-                    <span class="text-sm text-gray-500 dark:text-gray-400"
-                        >{{ itemCount }} Líneas</span
-                    >
-                </div>
-
                 <div class="overflow-x-auto">
-                    <table
-                        class="min-w-full divide-y divide-gray-200 dark:divide-border"
-                    >
-                        <thead class="bg-gray-50 dark:bg-background">
+                    <table class="min-w-full text-sm">
+                        <thead
+                            class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                        >
                             <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Producto
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Almacén
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Vendedor
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Cantidad
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Precio Unit.
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Desc.
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    ITBM
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Total
-                                </th>
+                                <th class="px-3 py-2 text-left">Item</th>
+                                <th class="px-3 py-2 text-left">Bodega</th>
+                                <th class="px-3 py-2 text-right">Cant.</th>
+                                <th class="px-3 py-2 text-right">Precio</th>
+                                <th class="px-3 py-2 text-right">ITBM</th>
+                                <th class="px-3 py-2 text-right">Total</th>
+                                <th class="px-3 py-2 text-right">Costo</th>
+                                <th class="px-3 py-2 text-right">Utilidad</th>
                             </tr>
                         </thead>
                         <tbody
-                            class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
+                            class="divide-y divide-gray-100 dark:divide-border"
                         >
-                            <tr
-                                v-for="item in currentSalesOrder.items"
-                                :key="item.id"
-                            >
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <button
-                                            v-if="
-                                                !(item as any).is_custom_line &&
-                                                item.product_id
-                                            "
-                                            type="button"
-                                            class="text-left text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline dark:text-indigo-400 dark:hover:text-indigo-300"
-                                            @click="
-                                                router.visit(
-                                                    `/products/${item.product_id}`,
-                                                )
-                                            "
-                                        >
-                                            {{
-                                                item.product_name || 'Producto'
-                                            }}
-                                        </button>
-                                        <div
-                                            v-else
-                                            class="text-sm font-medium text-gray-900 dark:text-white"
-                                        >
-                                            {{
-                                                (item as any)
-                                                    .custom_description ||
-                                                item.product_name
-                                            }}
-                                        </div>
-                                        <span
-                                            v-if="(item as any).is_custom_line"
-                                            class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                                        >
-                                            Miscelaneo
-                                        </span>
-                                    </div>
-                                    <div
-                                        class="text-xs text-gray-500 dark:text-gray-400"
+                            <tr v-for="item in items" :key="item.id">
+                                <td class="px-3 py-3">
+                                    <button
+                                        v-if="
+                                            !item.is_custom_line &&
+                                            item.product_id
+                                        "
+                                        type="button"
+                                        class="text-left font-semibold text-indigo-600 hover:underline"
+                                        @click="
+                                            router.visit(
+                                                `/products/${item.product_id}`,
+                                            )
+                                        "
+                                    >
+                                        {{ item.product_name }}
+                                    </button>
+                                    <p
+                                        v-else
+                                        class="font-semibold text-gray-900 dark:text-white"
                                     >
                                         {{
-                                            item.product_sku ||
-                                            ((item as any).is_custom_line
-                                                ? 'MISC'
-                                                : '')
+                                            item.custom_description ||
+                                            item.product_name
                                         }}
-                                    </div>
-                                    <div
-                                        v-if="item.notes"
-                                        class="mt-1 rounded border border-gray-100 bg-gray-50 p-1.5 text-xs text-gray-500 italic dark:border-border dark:bg-muted dark:text-gray-400"
-                                    >
+                                    </p>
+                                    <p class="font-mono text-xs text-gray-500">
+                                        {{
+                                            item.variant_sku ||
+                                            item.product_sku ||
+                                            (item.is_custom_line ? 'MISC' : '')
+                                        }}
+                                    </p>
+                                    <div class="mt-1 flex flex-wrap gap-1">
                                         <span
-                                            class="font-medium text-gray-700 not-italic dark:text-gray-300"
-                                            >Nota:</span
+                                            v-if="item.brand_name"
+                                            class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600"
                                         >
-                                        {{ item.notes }}
+                                            {{ item.brand_name }}
+                                        </span>
+                                        <span
+                                            v-if="item.added_after_sale"
+                                            class="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700"
+                                        >
+                                            Post-venta
+                                        </span>
+                                        <span
+                                            v-if="item.is_custom_line"
+                                            class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600"
+                                        >
+                                            Misceláneo
+                                        </span>
                                     </div>
                                 </td>
                                 <td
-                                    class="px-4 py-3 text-sm text-gray-900 dark:text-white"
+                                    class="px-3 py-3 text-gray-700 dark:text-gray-300"
                                 >
-                                    {{
-                                        (item as any).is_custom_line
-                                            ? 'N/A'
-                                            : item.warehouse_name
-                                    }}
-                                </td>
-                                <td
-                                    class="px-4 py-3 text-sm text-gray-900 dark:text-white"
-                                >
-                                    <span
+                                    {{ item.warehouse_name || 'N/A' }}
+                                    <p
                                         v-if="item.seller_name"
-                                        class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                        class="text-xs text-gray-500"
                                     >
                                         {{ item.seller_name }}
-                                    </span>
-                                    <span v-else class="text-xs text-gray-400"
-                                        >—</span
-                                    >
+                                    </p>
                                 </td>
-                                <td
-                                    class="px-4 py-3 text-right text-sm text-gray-900 dark:text-white"
-                                >
-                                    {{ item.quantity }}
-                                </td>
-                                <td
-                                    class="px-4 py-3 text-right text-sm text-gray-900 dark:text-white"
-                                >
-                                    ${{ item.unit_price }}
-                                </td>
-                                <td
-                                    class="px-4 py-3 text-right text-sm text-gray-900 dark:text-white"
-                                >
-                                    <span
-                                        v-if="
-                                            Number(item.discount_amount || 0) >
-                                            0
+                                <td class="px-3 py-3 text-right">
+                                    <input
+                                        v-if="item.added_after_sale"
+                                        :value="item.quantity"
+                                        type="number"
+                                        min="1"
+                                        class="w-20 rounded-md border border-gray-300 px-2 py-1 text-right text-sm dark:border-border dark:bg-muted"
+                                        :disabled="savingItemIds.has(item.id)"
+                                        @change="
+                                            updatePostSaleItem(item, {
+                                                quantity: Math.max(
+                                                    1,
+                                                    Number(
+                                                        (
+                                                            $event.target as HTMLInputElement
+                                                        ).value,
+                                                    ) || 1,
+                                                ),
+                                            })
                                         "
-                                        >-${{ item.discount_amount }}</span
+                                    />
+                                    <span v-else>{{ item.quantity }}</span>
+                                </td>
+                                <td class="px-3 py-3 text-right">
+                                    <input
+                                        v-if="item.added_after_sale"
+                                        :value="item.unit_price"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        class="w-24 rounded-md border border-gray-300 px-2 py-1 text-right text-sm dark:border-border dark:bg-muted"
+                                        :disabled="savingItemIds.has(item.id)"
+                                        @change="
+                                            updatePostSaleItem(item, {
+                                                unit_price:
+                                                    Number(
+                                                        (
+                                                            $event.target as HTMLInputElement
+                                                        ).value,
+                                                    ) || 0,
+                                            })
+                                        "
+                                    />
+                                    <span v-else>{{
+                                        formatCurrency(item.unit_price)
+                                    }}</span>
+                                </td>
+                                <td class="px-3 py-3 text-right">
+                                    {{ formatCurrency(item.tax_amount) }}
+                                </td>
+                                <td class="px-3 py-3 text-right font-semibold">
+                                    {{ formatCurrency(item.total) }}
+                                </td>
+                                <td class="px-3 py-3 text-right">
+                                    {{ formatCurrency(item.total_cost) }}
+                                </td>
+                                <td
+                                    class="px-3 py-3 text-right font-semibold"
+                                    :class="
+                                        item.gross_profit >= 0
+                                            ? 'text-emerald-600'
+                                            : 'text-red-600'
+                                    "
+                                >
+                                    {{ formatCurrency(item.gross_profit) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section
+                v-if="activeTab === 'payments'"
+                class="grid gap-4 xl:grid-cols-[1fr_22rem]"
+            >
+                <div
+                    class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                >
+                    <table class="min-w-full text-sm">
+                        <thead
+                            class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                        >
+                            <tr>
+                                <th class="px-3 py-2 text-left">Método</th>
+                                <th class="px-3 py-2 text-left">Fecha</th>
+                                <th class="px-3 py-2 text-left">Usuario</th>
+                                <th class="px-3 py-2 text-left">Notas</th>
+                                <th class="px-3 py-2 text-right">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody
+                            class="divide-y divide-gray-100 dark:divide-border"
+                        >
+                            <tr v-if="payments.length === 0">
+                                <td
+                                    colspan="5"
+                                    class="px-3 py-8 text-center text-gray-500"
+                                >
+                                    Sin pagos registrados.
+                                </td>
+                            </tr>
+                            <tr v-for="payment in payments" :key="payment.id">
+                                <td class="px-3 py-2 font-semibold">
+                                    {{ payment.method_label }}
+                                    <span
+                                        v-if="payment.is_refund"
+                                        class="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-[11px] text-red-700"
                                     >
-                                    <span v-else class="text-gray-400">-</span>
+                                        Reembolso
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{ formatDateTime(payment.paid_at) }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{ payment.creator_name || 'Sistema' }}
+                                </td>
+                                <td class="max-w-sm px-3 py-2 text-gray-600">
+                                    {{ payment.notes || '-' }}
                                 </td>
                                 <td
-                                    class="px-4 py-3 text-right text-sm text-gray-900 dark:text-white"
+                                    class="px-3 py-2 text-right font-mono font-semibold"
+                                    :class="
+                                        payment.amount < 0
+                                            ? 'text-red-600'
+                                            : 'text-emerald-600'
+                                    "
                                 >
-                                    ${{ item.tax_amount }}
-                                </td>
-                                <td
-                                    class="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white"
-                                >
-                                    {{ item.formatted_total }}
+                                    {{ formatCurrency(payment.amount) }}
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Totals -->
-                <div
-                    class="border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-border dark:bg-background"
+                <aside
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                 >
-                    <div class="ml-auto max-w-md space-y-2">
-                        <div class="flex justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400"
-                                >Subtotal:</span
-                            >
-                            <span
-                                class="font-medium text-gray-900 dark:text-white"
-                                >${{ currentSalesOrder.subtotal }}</span
-                            >
-                        </div>
-                        <div class="flex justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400"
-                                >Impuestos:</span
-                            >
-                            <span
-                                class="font-medium text-gray-900 dark:text-white"
-                                >${{ currentSalesOrder.tax_amount }}</span
-                            >
-                        </div>
-                        <div
-                            v-if="currentSalesOrder.discount_amount > 0"
-                            class="flex justify-between text-sm"
-                        >
-                            <span class="text-gray-600 dark:text-gray-400"
-                                >Descuento:</span
-                            >
-                            <span
-                                class="font-medium text-red-600 dark:text-red-400"
-                                >-${{ currentSalesOrder.discount_amount }}</span
-                            >
-                        </div>
-                        <div
-                            v-if="currentSalesOrder.shipping_cost > 0"
-                            class="flex justify-between text-sm"
-                        >
-                            <span class="text-gray-600 dark:text-gray-400"
-                                >Envío:</span
-                            >
-                            <span
-                                class="font-medium text-gray-900 dark:text-white"
-                                >${{ currentSalesOrder.shipping_cost }}</span
-                            >
-                        </div>
-                        <div
-                            class="flex justify-between border-t border-gray-200 pt-2 text-lg font-bold dark:border-border"
-                        >
-                            <span class="text-gray-900 dark:text-white"
-                                >Total:</span
-                            >
-                            <span class="text-gray-900 dark:text-white">{{
-                                currentSalesOrder.formatted_total
+                    <h2 class="text-sm font-bold text-gray-900 dark:text-white">
+                        Estado AR
+                    </h2>
+                    <div class="mt-3 space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Total</span>
+                            <span class="font-mono">{{
+                                formatCurrency(order.total)
                             }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Cobrado real</span>
+                            <span class="font-mono text-emerald-600">
+                                {{ formatCurrency(paidTotal) }}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Devuelto</span>
+                            <span class="font-mono text-red-600">
+                                {{ formatCurrency(returnsTotal) }}
+                            </span>
+                        </div>
+                        <div
+                            class="flex justify-between border-t pt-2 dark:border-border"
+                        >
+                            <span class="font-semibold">Saldo</span>
+                            <span class="font-mono font-bold text-amber-600">
+                                {{ formatCurrency(amountDue) }}
+                            </span>
+                        </div>
+                    </div>
+                    <button
+                        v-if="customer"
+                        type="button"
+                        class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                        @click="router.visit(`/ar?customer_id=${customer.id}`)"
+                    >
+                        <DollarSign :size="15" />
+                        Ir a cobros
+                    </button>
+                </aside>
+            </section>
+
+            <section
+                v-if="activeTab === 'returns'"
+                class="space-y-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+            >
+                <div
+                    v-if="returns.length === 0"
+                    class="py-8 text-center text-sm text-gray-500"
+                >
+                    Esta factura no tiene devoluciones.
+                </div>
+                <div
+                    v-for="ret in returns"
+                    :key="ret.id"
+                    class="rounded-md border border-gray-200 p-3 dark:border-border"
+                >
+                    <div
+                        class="flex flex-wrap items-start justify-between gap-3"
+                    >
+                        <div>
+                            <p
+                                class="font-mono font-bold text-gray-900 dark:text-white"
+                            >
+                                <button
+                                    type="button"
+                                    class="text-cyan-700 hover:underline"
+                                    @click="router.visit(`/returns/${ret.id}`)"
+                                >
+                                    {{ ret.return_number }}
+                                </button>
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                {{ ret.processed_by_name || 'Sistema' }} ·
+                                {{ formatDateTime(ret.created_at) }}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-mono font-bold text-red-600">
+                                {{ formatCurrency(ret.total_amount) }}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                {{ ret.refund_method || 'N/A' }}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        class="mt-3 inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs hover:bg-gray-50 dark:border-border dark:hover:bg-muted/40"
+                        @click="router.visit(`/returns/${ret.id}`)"
+                    >
+                        <ExternalLink :size="13" />
+                        Ver ficha completa
+                    </button>
+                    <p v-if="ret.reason" class="mt-2 text-sm text-gray-600">
+                        {{ ret.reason }}
+                    </p>
+                    <div class="mt-3 overflow-x-auto">
+                        <table class="min-w-full text-xs">
+                            <tbody>
+                                <tr v-for="item in ret.items" :key="item.id">
+                                    <td class="py-1 pr-3">
+                                        {{ item.product_name || 'Producto' }}
+                                    </td>
+                                    <td class="py-1 text-right">
+                                        x{{ item.quantity }}
+                                    </td>
+                                    <td class="py-1 pl-3 text-right font-mono">
+                                        {{ formatCurrency(item.subtotal) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                v-if="activeTab === 'inventory'"
+                class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+            >
+                <table class="min-w-full text-sm">
+                    <thead
+                        class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                    >
+                        <tr>
+                            <th class="px-3 py-2 text-left">Movimiento</th>
+                            <th class="px-3 py-2 text-left">Item</th>
+                            <th class="px-3 py-2 text-left">Bodega</th>
+                            <th class="px-3 py-2 text-right">Cantidad</th>
+                            <th class="px-3 py-2 text-left">Lotes</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-border">
+                        <tr v-if="movements.length === 0">
+                            <td
+                                colspan="5"
+                                class="px-3 py-8 text-center text-gray-500"
+                            >
+                                Sin movimientos relacionados.
+                            </td>
+                        </tr>
+                        <tr v-for="movement in movements" :key="movement.id">
+                            <td class="px-3 py-3">
+                                <button
+                                    type="button"
+                                    class="font-mono font-semibold text-indigo-600 hover:underline"
+                                    @click="
+                                        router.visit(
+                                            `/inventory-movements/${movement.id}`,
+                                        )
+                                    "
+                                >
+                                    #{{ movement.id }}
+                                </button>
+                                <p class="text-xs text-gray-500">
+                                    {{ movement.reference_type }} ·
+                                    {{ formatDateTime(movement.created_at) }}
+                                </p>
+                            </td>
+                            <td class="px-3 py-3">
+                                {{ movement.product_name || 'Producto' }}
+                                <p class="font-mono text-xs text-gray-500">
+                                    {{
+                                        movement.variant_sku ||
+                                        movement.product_sku ||
+                                        ''
+                                    }}
+                                </p>
+                            </td>
+                            <td class="px-3 py-3">
+                                {{ movement.warehouse_name || 'N/A' }}
+                            </td>
+                            <td class="px-3 py-3 text-right font-mono">
+                                {{ movement.quantity }}
+                            </td>
+                            <td class="px-3 py-3">
+                                <div
+                                    v-if="movement.lot_allocations.length"
+                                    class="space-y-1"
+                                >
+                                    <p
+                                        v-for="allocation in movement.lot_allocations"
+                                        :key="allocation.id"
+                                        class="text-xs text-gray-600"
+                                    >
+                                        {{
+                                            allocation.batch_number ||
+                                            `Lote #${allocation.inventory_lot_id}`
+                                        }}
+                                        · x{{ allocation.quantity }} ·
+                                        {{
+                                            formatCurrency(
+                                                allocation.total_cost,
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                                <span v-else class="text-xs text-gray-400">
+                                    Sin lotes
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section
+                v-if="activeTab === 'profit'"
+                class="grid gap-4 lg:grid-cols-4"
+            >
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <p class="text-xs text-gray-500">Subtotal base</p>
+                    <p class="mt-1 text-xl font-bold">
+                        {{
+                            formatCurrency(
+                                operationalDetail.profit_summary.subtotal,
+                            )
+                        }}
+                    </p>
+                </div>
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <p class="text-xs text-gray-500">Costo vendido</p>
+                    <p class="mt-1 text-xl font-bold">
+                        {{
+                            formatCurrency(
+                                operationalDetail.profit_summary.total_cost,
+                            )
+                        }}
+                    </p>
+                </div>
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <p class="text-xs text-gray-500">Utilidad bruta</p>
+                    <p class="mt-1 text-xl font-bold text-emerald-600">
+                        {{
+                            formatCurrency(
+                                operationalDetail.profit_summary.gross_profit,
+                            )
+                        }}
+                    </p>
+                </div>
+                <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <p class="text-xs text-gray-500">Margen</p>
+                    <p class="mt-1 text-xl font-bold">
+                        {{
+                            operationalDetail.profit_summary
+                                .gross_margin_percent ?? 0
+                        }}%
+                    </p>
+                </div>
+                <div
+                    v-if="operationalDetail.profit_summary.has_missing_costs"
+                    class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 lg:col-span-4"
+                >
+                    <AlertTriangle class="mr-1 inline h-4 w-4" />
+                    Hay líneas sin costo histórico disponible.
+                </div>
+            </section>
+
+            <section
+                v-if="activeTab === 'activity'"
+                class="grid gap-4 xl:grid-cols-2"
+            >
+                <div
+                    class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                >
+                    <div
+                        class="border-b border-gray-200 px-4 py-3 dark:border-border"
+                    >
+                        <h2 class="text-sm font-bold">Auditoría POS</h2>
+                    </div>
+                    <div class="divide-y divide-gray-100 dark:divide-border">
+                        <div
+                            v-if="audit.length === 0"
+                            class="p-6 text-sm text-gray-500"
+                        >
+                            Sin eventos de auditoría.
+                        </div>
+                        <div
+                            v-for="(row, idx) in audit"
+                            :key="idx"
+                            class="p-3 text-sm"
+                        >
+                            <p class="font-semibold">{{ row.action }}</p>
+                            <p class="font-mono text-xs text-gray-500">
+                                {{ row.timestamp || 'Sin fecha' }}
+                            </p>
+                            <pre
+                                v-if="row.metadata"
+                                class="mt-1 overflow-x-auto rounded bg-gray-50 p-2 text-xs dark:bg-muted"
+                                >{{ row.metadata }}</pre
+                            >
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Notes -->
-            <div
-                v-if="currentSalesOrder.notes"
-                class="rounded-lg border border-gray-200 bg-white p-6 dark:border-border dark:bg-card"
-            >
-                <h3
-                    class="mb-2 text-lg font-semibold text-gray-900 dark:text-white"
+                <div
+                    class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                 >
-                    Notas
-                </h3>
-                <p class="text-gray-700 dark:text-gray-300">
-                    {{ currentSalesOrder.notes }}
-                </p>
-            </div>
-            <!-- Returns History -->
-            <div
-                id="order-returns"
-                class="scroll-mt-20 rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-            >
-                <div class="mb-3 flex items-center justify-between">
-                    <h3
-                        class="text-lg font-semibold text-gray-900 dark:text-white"
-                    >
-                        Devoluciones
-                    </h3>
-                    <span
-                        class="text-sm font-medium text-red-600 dark:text-red-400"
-                        >-${{ returnsTotal.toFixed(2) }}</span
-                    >
-                </div>
-                <div v-if="orderReturns.length > 0" class="space-y-3">
                     <div
-                        v-for="ret in orderReturns"
-                        :key="ret.id"
-                        class="rounded-lg border border-gray-200 p-4 dark:border-border"
+                        class="border-b border-gray-200 px-4 py-3 dark:border-border"
                     >
-                        <div class="mb-2 flex items-center justify-between">
-                            <div>
-                                <span
-                                    class="font-semibold text-gray-900 dark:text-white"
-                                    >{{ ret.return_number }}</span
-                                >
-                                <span
-                                    class="ml-2 rounded-full px-2 py-0.5 text-xs font-medium"
-                                    :class="
-                                        ret.status === 'approved'
-                                            ? 'bg-green-100 text-green-800'
-                                            : ret.status === 'rejected'
-                                              ? 'bg-red-100 text-red-800'
-                                              : 'bg-yellow-100 text-yellow-800'
-                                    "
-                                >
-                                    {{
-                                        ret.status === 'approved'
-                                            ? 'Aprobada'
-                                            : ret.status === 'rejected'
-                                              ? 'Rechazada'
-                                              : 'Pendiente'
-                                    }}
-                                </span>
-                            </div>
-                            <span class="text-sm font-bold text-red-600"
-                                >${{
-                                    Number(ret.total_amount).toFixed(2)
-                                }}</span
-                            >
+                        <h2 class="text-sm font-bold">Movimientos contables</h2>
+                    </div>
+                    <div class="divide-y divide-gray-100 dark:divide-border">
+                        <div
+                            v-if="
+                                operationalDetail.ar_context
+                                    .customer_transactions.length === 0 &&
+                                operationalDetail.ar_context.ledger_entries
+                                    .length === 0
+                            "
+                            class="p-6 text-sm text-gray-500"
+                        >
+                            Sin movimientos AR relacionados.
                         </div>
-                        <p v-if="ret.reason" class="mb-2 text-xs text-gray-500">
-                            Motivo: {{ ret.reason }}
-                        </p>
-                        <div class="space-y-1 text-xs text-gray-400">
-                            <p v-for="item in ret.items" :key="item.id">
-                                • {{ item.product?.name || 'Producto' }} ×
-                                {{ item.quantity }} = ${{
-                                    Number(item.subtotal).toFixed(2)
+                        <div
+                            v-for="row in operationalDetail.ar_context
+                                .customer_transactions"
+                            :key="`tx-${row.id}`"
+                            class="p-3 text-sm"
+                        >
+                            <p class="font-semibold">{{ row.type_label }}</p>
+                            <p class="text-gray-600">{{ row.description }}</p>
+                            <p class="font-mono text-xs text-gray-500">
+                                {{ formatDateTime(row.transaction_date) }} ·
+                                {{ formatCurrency(row.amount) }}
+                            </p>
+                        </div>
+                        <div
+                            v-for="row in operationalDetail.ar_context
+                                .ledger_entries"
+                            :key="`ledger-${row.id}`"
+                            class="p-3 text-sm"
+                        >
+                            <p class="font-semibold">{{ row.movement_type }}</p>
+                            <p class="text-gray-600">
+                                {{
+                                    row.document_number ||
+                                    row.batch_number ||
+                                    row.reference_number
                                 }}
+                            </p>
+                            <p class="font-mono text-xs text-gray-500">
+                                D {{ formatCurrency(row.debit) }} · C
+                                {{ formatCurrency(row.credit) }}
                             </p>
                         </div>
                     </div>
                 </div>
-                <p v-else class="text-sm text-gray-500 dark:text-gray-400">
-                    Esta venta no tiene devoluciones registradas.
-                </p>
-            </div>
-
-            <!-- Audit Logs Timeline -->
-            <div
-                v-if="currentSalesOrder"
-                id="order-audit"
-                class="scroll-mt-20 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-            >
-                <button
-                    @click="showAuditLogs = !showAuditLogs"
-                    class="dark:hover:bg-muted/50/50 flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50"
-                >
-                    <h3
-                        class="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
-                    >
-                        <ClipboardList class="h-5 w-5 text-gray-500" />
-                        Auditoría de Caja
-                        <span
-                            class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-500 dark:bg-muted"
-                        >
-                            {{
-                                (currentSalesOrder as any).audit_logs?.length ||
-                                0
-                            }}
-                            eventos
-                        </span>
-                    </h3>
-                    <svg
-                        class="h-5 w-5 text-gray-400 transition-transform"
-                        :class="{ 'rotate-180': showAuditLogs }"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M19 9l-7 7-7-7"
-                        />
-                    </svg>
-                </button>
-                <div
-                    v-if="showAuditLogs"
-                    class="border-t border-gray-100 px-6 pb-5 dark:border-border"
-                >
-                    <div
-                        v-if="(currentSalesOrder as any).audit_logs?.length"
-                        class="relative mt-4 pl-6"
-                    >
-                        <!-- Vertical line -->
-                        <div
-                            class="absolute top-1 bottom-1 left-2 w-0.5 bg-gray-200 dark:bg-gray-600"
-                        ></div>
-                        <div
-                            v-for="(log, idx) in (currentSalesOrder as any)
-                                .audit_logs"
-                            :key="idx"
-                            class="relative flex items-start gap-3 pb-3 last:pb-0"
-                        >
-                            <!-- Dot -->
-                            <div
-                                class="absolute top-1 -left-[16px] z-10 h-3 w-3 rounded-full border-2 border-white dark:border-border"
-                                :class="
-                                    log.action === 'checkout_success'
-                                        ? 'bg-green-500'
-                                        : log.action === 'checkout_error'
-                                          ? 'bg-red-500'
-                                          : 'bg-indigo-400'
-                                "
-                            ></div>
-                            <!-- Content -->
-                            <div class="flex flex-1 items-center gap-2 text-sm">
-                                <span
-                                    class="w-16 shrink-0 font-mono text-xs text-gray-400"
-                                    >{{ formatLogTime(log.timestamp) }}</span
-                                >
-                                <component
-                                    :is="auditActionIcon(log.action)"
-                                    class="mt-0.5 h-4 w-4 shrink-0 text-gray-500"
-                                />
-                                <span
-                                    class="font-medium text-gray-700 dark:text-gray-300"
-                                    >{{ auditActionLabel(log.action) }}:</span
-                                >
-                                <span
-                                    class="truncate text-gray-500 dark:text-gray-400"
-                                    >{{ formatLogDetail(log) }}</span
-                                >
-                            </div>
-                        </div>
-                    </div>
-                    <div
-                        v-else
-                        class="py-6 text-center text-sm text-gray-500 dark:text-gray-400"
-                    >
-                        No hay registros de auditoría disponibles para esta
-                        venta.
-                    </div>
-                </div>
-            </div>
+            </section>
         </div>
 
-        <!-- Print Ticket Modal -->
         <PrintTicketModal
             v-if="currentSalesOrder"
             :show="showPrintModal"
@@ -1293,7 +1416,6 @@ onMounted(() => {
             @close="showPrintModal = false"
         />
 
-        <!-- Return Modal -->
         <CreateReturnModal
             v-if="currentSalesOrder"
             :show="showReturnModal"
@@ -1301,23 +1423,22 @@ onMounted(() => {
             :order-number="currentSalesOrder.order_number"
             :has-customer="!!currentSalesOrder.customer_id"
             :users="users"
-            :current-user-id="(currentSalesOrder as any).user_id"
+            :current-user-id="currentSalesOrder.user_id"
             :items="
-                (currentSalesOrder.items || [])
-                    .filter((i: any) => !i.is_custom_line)
-                    .map((i: any) => ({
-                        id: i.id,
-                        product_id: i.product_id,
-                        variant_id: i.variant_id,
-                        product_name:
-                            i.product_name || i.product?.name || 'Producto',
-                        product_sku: i.product_sku || i.product?.sku_base || '',
-                        quantity: i.quantity,
-                        unit_price: Number(i.unit_price),
-                        discount_percent: Number(i.discount_percent || 0),
-                        tax_percent: Number(i.tax_percent || 0),
-                        total: Number(i.total),
-                        seller_name: i.seller_name || '',
+                items
+                    .filter((item) => !item.is_custom_line && item.product_id)
+                    .map((item) => ({
+                        id: item.id,
+                        product_id: item.product_id as number,
+                        variant_id: item.variant_id ?? undefined,
+                        product_name: item.product_name || 'Producto',
+                        product_sku: item.product_sku || '',
+                        quantity: item.quantity,
+                        unit_price: item.unit_price,
+                        discount_percent: item.discount_percent,
+                        tax_percent: item.tax_percent,
+                        total: item.total,
+                        seller_name: item.seller_name || '',
                     }))
             "
             :loading="returnLoading"
@@ -1329,7 +1450,6 @@ onMounted(() => {
             "
         />
 
-        <!-- Add Item Modal -->
         <ProductVariantPickerModal
             v-if="currentSalesOrder"
             :show="showAddItemModal"

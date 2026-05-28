@@ -2,8 +2,9 @@
 import { ref, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
-import apiClient from '@/services/api/client';
 import { usePOS } from '@/composables/usePOS';
+import { SalesQuotesApiService } from '@/services/sales-quotes';
+import type { SalesQuote } from '@/types/sales-quote';
 import {
     FileText,
     Plus,
@@ -23,25 +24,12 @@ import {
 
 defineOptions({ layout: AppLayout });
 
-interface SalesQuote {
-    id: number;
-    quote_number: string;
-    customer: { id: number; name: string } | null;
-    user: { id: number; name: string } | null;
-    date: string;
-    valid_until: string | null;
-    status: string;
-    status_label: string;
-    formatted_total: string;
-    total: number;
-    items: any[];
-    converted_order_id: number | null;
-}
-
 const quotes = ref<SalesQuote[]>([]);
 const loading = ref(true);
 const search = ref('');
 const statusFilter = ref('');
+const dateFrom = ref('');
+const dateTo = ref('');
 const currentPage = ref(1);
 const lastPage = ref(1);
 const total = ref(0);
@@ -104,9 +92,10 @@ const fetchQuotes = async (page = 1) => {
         const params: Record<string, any> = { page, per_page: 20 };
         if (search.value) params.search = search.value;
         if (statusFilter.value) params.status = statusFilter.value;
+        if (dateFrom.value) params.date_from = dateFrom.value;
+        if (dateTo.value) params.date_to = dateTo.value;
 
-        const res = await apiClient.get('/sales-quotes', { params });
-        const data = res.data;
+        const data = await SalesQuotesApiService.list(params);
 
         quotes.value = data.data ?? [];
         currentPage.value = data.current_page ?? 1;
@@ -125,7 +114,7 @@ const handleDelete = async (id: number) => {
     )
         return;
     try {
-        await apiClient.delete(`/sales-quotes/${id}`);
+        await SalesQuotesApiService.delete(id);
         await fetchQuotes(currentPage.value);
     } catch (e: any) {
         alert(e.response?.data?.message || 'Error al eliminar');
@@ -138,8 +127,7 @@ const openingPOS = ref<number | null>(null);
 const openQuoteInPOS = async (id: number) => {
     openingPOS.value = id;
     try {
-        const res = await apiClient.get(`/sales-quotes/${id}`);
-        const q = res.data;
+        const q = await SalesQuotesApiService.show(id);
         loadQuoteAsSession({
             id: q.id,
             quote_number: q.quote_number,
@@ -181,7 +169,7 @@ const handleTransition = async (
     };
     if (!confirm(`¿Deseas ${labels[action]} esta cotización?`)) return;
     try {
-        await apiClient.post(`/sales-quotes/${id}/${action}`);
+        await SalesQuotesApiService.transition(id, action);
         await fetchQuotes(currentPage.value);
     } catch (e: any) {
         alert(e.response?.data?.message || 'Error al cambiar el estado');
@@ -196,11 +184,11 @@ const handleConvert = async (id: number) => {
     )
         return;
     try {
-        const res = await apiClient.post(`/sales-quotes/${id}/convert`, {
+        const res = await SalesQuotesApiService.convert(id, {
             payment_method: 'cash',
             payment_status: 'pending',
         });
-        alert(res.data.message || 'Cotización convertida exitosamente');
+        alert(res.message || 'Cotización convertida exitosamente');
         await fetchQuotes(currentPage.value);
     } catch (e: any) {
         alert(e.response?.data?.message || 'Error al convertir');
@@ -265,7 +253,7 @@ onMounted(() => fetchQuotes());
                 </p>
             </div>
             <Link
-                href="/quotes/create"
+                href="/sales-quotes/create"
                 class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white shadow-sm transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
             >
                 <Plus :size="20" />
@@ -313,6 +301,28 @@ onMounted(() => fetchQuotes());
                             {{ opt.label }}
                         </option>
                     </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-gray-500"
+                        >Desde</label
+                    >
+                    <input
+                        v-model="dateFrom"
+                        type="date"
+                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                        @change="fetchQuotes(1)"
+                    />
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-gray-500"
+                        >Hasta</label
+                    >
+                    <input
+                        v-model="dateTo"
+                        type="date"
+                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                        @change="fetchQuotes(1)"
+                    />
                 </div>
                 <div
                     class="ml-auto self-end pb-2 text-sm text-gray-500 dark:text-gray-400"

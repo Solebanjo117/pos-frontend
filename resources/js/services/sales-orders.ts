@@ -8,6 +8,7 @@ import type {
     AddOrderItemData,
     UpdateOrderItemData,
     SalesOrderItem,
+    SalesOrderOperationalDetail,
 } from '@/types/sales-order';
 
 export interface StockWarning {
@@ -44,6 +45,18 @@ export const salesOrdersService = {
     async getById(id: number): Promise<SalesOrder> {
         const { data } = await apiClient.get(`${BASE_URL}/${id}`);
         return data;
+    },
+
+    /**
+     * Get complete operational detail for a sales order/invoice.
+     */
+    async getOperationalDetail(
+        id: number,
+    ): Promise<SalesOrderOperationalDetail> {
+        const { data } = await apiClient.get(
+            `${BASE_URL}/${id}/operational-detail`,
+        );
+        return data.data;
     },
 
     /**

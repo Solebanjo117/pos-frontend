@@ -909,32 +909,42 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 <!-- ========== SIDEBAR + TABLE LAYOUT ========== -->
                 <div v-else class="flex min-h-0 flex-col gap-4 lg:flex-row">
                     <!-- Sidebar Filters -->
-                    <div v-if="showSidebarFilters" class="shrink-0">
-                        <ProductFiltersComponent
-                            :model-value="sidebarFilterValues"
-                            @update:model-value="handleSidebarFilterChange"
-                            :categories="categories"
-                            :brands="brands"
-                            :collapsible="true"
-                            @close="showSidebarFilters = false"
-                        />
-                    </div>
-                    <button
-                        v-else
-                        type="button"
-                        class="hidden h-10 shrink-0 items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 text-sm font-medium text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50 md:flex dark:border-indigo-800 dark:bg-card dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-                        @click="showSidebarFilters = true"
-                        title="Mostrar filtros"
+                    <Transition
+                        enter-active-class="transition-all duration-200 ease-out"
+                        enter-from-class="-translate-x-2 opacity-0"
+                        enter-to-class="translate-x-0 opacity-100"
+                        leave-active-class="transition-all duration-150 ease-in"
+                        leave-from-class="translate-x-0 opacity-100"
+                        leave-to-class="-translate-x-2 opacity-0"
+                        mode="out-in"
                     >
-                        <Filter class="h-4 w-4" />
-                        Filtros
-                        <span
-                            v-if="sidebarActiveFilterCount > 0"
-                            class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-100 px-1 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+                        <div v-if="showSidebarFilters" class="shrink-0">
+                            <ProductFiltersComponent
+                                :model-value="sidebarFilterValues"
+                                @update:model-value="handleSidebarFilterChange"
+                                :categories="categories"
+                                :brands="brands"
+                                :collapsible="true"
+                                @close="showSidebarFilters = false"
+                            />
+                        </div>
+                        <button
+                            v-else
+                            type="button"
+                            class="relative hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-white text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50 md:flex dark:border-indigo-800 dark:bg-card dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                            @click="showSidebarFilters = true"
+                            aria-label="Mostrar filtros"
+                            title="Mostrar filtros"
                         >
-                            {{ sidebarActiveFilterCount }}
-                        </span>
-                    </button>
+                            <Filter class="h-4 w-4" />
+                            <span
+                                v-if="sidebarActiveFilterCount > 0"
+                                class="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-100 px-1 text-[10px] font-bold text-indigo-700 ring-2 ring-white dark:bg-indigo-900/40 dark:text-indigo-300 dark:ring-card"
+                            >
+                                {{ sidebarActiveFilterCount }}
+                            </span>
+                        </button>
+                    </Transition>
 
                     <!-- Products Table -->
                     <div

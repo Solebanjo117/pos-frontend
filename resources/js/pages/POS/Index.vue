@@ -57,6 +57,7 @@ import AddCustomLineModal from '@/components/POS/AddCustomLineModal.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import { SalesOrderPaymentApiService } from '@/services/payments';
+import { SalesReturnsApiService } from '@/services/sales-returns';
 import { router } from '@inertiajs/vue3';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
 
@@ -660,8 +661,8 @@ async function confirmReturn() {
         }));
 
         // Create the return
-        const returnRes = await apiClient.post(
-            `/sales-orders/${props.orderId}/returns`,
+        const returnRes = await SalesReturnsApiService.createForOrder(
+            props.orderId,
             {
                 refund_method: 'balance', // Always use balance for store credit
                 reason: 'Devolución desde POS',
@@ -669,10 +670,10 @@ async function confirmReturn() {
             },
         );
 
-        const returnId = returnRes.data.data?.id;
+        const returnId = returnRes.data?.id;
         if (returnId) {
             // Approve immediately
-            await apiClient.post(`/sales-returns/${returnId}/approve`);
+            await SalesReturnsApiService.approve(returnId);
         }
 
         // Redirect to the original order

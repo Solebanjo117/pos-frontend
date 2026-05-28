@@ -3,11 +3,13 @@ import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowLeft,
+    Banknote,
     Building2,
     ChevronDown,
     ChevronRight,
     Clock,
     CreditCard,
+    FileText,
     Mail,
     MapPin,
     Package,
@@ -24,9 +26,13 @@ import ProductVariantPickerModal from '@/components/Products/ProductVariantPicke
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
 import apiClient from '@/services/api/client';
+import { suppliersService } from '@/services/suppliers';
 import type { Product } from '@/types/product';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
-import type { SupplierProduct } from '@/types/supplier';
+import type {
+    SupplierProduct,
+    SupplierPurchaseHistory,
+} from '@/types/supplier';
 
 interface PaginationState {
     current_page: number;
@@ -64,6 +70,16 @@ interface SupplierProductLink {
 }
 
 const props = defineProps<{ supplierId: number }>();
+
+const tabs = [
+    { key: 'summary', label: 'Resumen' },
+    { key: 'orders', label: 'Ordenes' },
+    { key: 'items', label: 'Items comprados' },
+    { key: 'payments', label: 'Pagos/AP' },
+    { key: 'products', label: 'Productos abastecidos' },
+] as const;
+
+type TabKey = (typeof tabs)[number]['key'];
 
 const {
     supplier,
@@ -114,6 +130,17 @@ const expandedProductIds = ref<Set<number>>(new Set());
 const editForms = ref<Record<number, EditForm>>({});
 const savingVariantIds = ref<Set<number>>(new Set());
 const selectedSupplierProductLinks = ref<SupplierProductLink[]>([]);
+const activeTab = ref<TabKey>('summary');
+const purchaseHistory = ref<SupplierPurchaseHistory | null>(null);
+const purchaseHistoryLoading = ref(false);
+const purchaseHistoryError = ref<string | null>(null);
+const purchaseHistoryFilters = ref({
+    search: '',
+    status: '',
+    payment_status: '',
+    page: 1,
+    per_page: 10,
+});
 
 const brandsNotYetLinked = computed(() => {
     const linkedIds = new Set(supplierBrands.value.map((b) => b.id));
@@ -180,6 +207,72 @@ const groupedSupplierProducts = computed(() => {
     return Array.from(groups.values());
 });
 
+const purchaseOrders = computed(() => purchaseHistory.value?.data ?? []);
+const purchaseSummary = computed(
+    () =>
+        purchaseHistory.value?.summary ?? {
+            orders_count: 0,
+            items_count: 0,
+            total_ordered: 0,
+            total_paid: 0,
+            total_due: 0,
+            total_received_units: 0,
+            total_ordered_units: 0,
+        },
+);
+const purchasedItems = computed(() =>
+    purchaseOrders.value.flatMap((order) =>
+        order.items.map((item) => ({ ...item, order })),
+    ),
+);
+const purchasePayments = computed(() =>
+    purchaseOrders.value.flatMap((order) =>
+        order.payments.map((payment) => ({ ...payment, order })),
+    ),
+);
+const hasAccountsPayableOrders = computed(() =>
+    purchaseOrders.value.some((order) => order.is_accounts_payable),
+);
+
+const formatCurrency = (value: unknown): string =>
+    new Intl.NumberFormat('es-PA', {
+        style: 'currency',
+        currency: 'USD',
+    }).format(Number(value) || 0);
+
+const formatDate = (value?: string | null): string => {
+    if (!value) return '-';
+
+    return new Date(value).toLocaleDateString('es-PA');
+};
+
+const formatDays = (value?: number | null): string =>
+    value === null || value === undefined ? '-' : `${value} d`;
+
+const formatCostDelta = (value?: number | null): string => {
+    if (value === null || value === undefined) return '-';
+
+    const sign = value > 0 ? '+' : '';
+
+    return `${sign}${formatCurrency(value)}`;
+};
+
+const formatPercent = (value?: number | null): string => {
+    if (value === null || value === undefined) return '-';
+
+    const sign = value > 0 ? '+' : '';
+
+    return `${sign}${Number(value).toFixed(1)}%`;
+};
+
+const costDeltaClass = (value?: number | null): string => {
+    if (value === null || value === undefined || value === 0) {
+        return 'text-gray-500';
+    }
+
+    return value > 0 ? 'text-red-600' : 'text-emerald-600';
+};
+
 onMounted(async () => {
     await fetchSupplierById(props.supplierId);
     selectedSupplierProductLinks.value = buildSupplierProductLinks(
@@ -189,9 +282,60 @@ onMounted(async () => {
         fetchSupplierBrands(props.supplierId).catch(() => {}),
         fetchAvailableBrands().catch(() => {}),
         fetchProductFilterOptions(),
+        fetchPurchaseHistory(),
     ]);
     fetchSupplierProducts();
 });
+
+const fetchPurchaseHistory = async (
+    page = purchaseHistoryFilters.value.page,
+) => {
+    purchaseHistoryLoading.value = true;
+    purchaseHistoryError.value = null;
+
+    try {
+        purchaseHistory.value = await suppliersService.getPurchaseHistory(
+            props.supplierId,
+            {
+                search: purchaseHistoryFilters.value.search || undefined,
+                status: purchaseHistoryFilters.value.status || undefined,
+                payment_status:
+                    purchaseHistoryFilters.value.payment_status || undefined,
+                page,
+                per_page: purchaseHistoryFilters.value.per_page,
+            },
+        );
+        purchaseHistoryFilters.value.page =
+            purchaseHistory.value.meta.current_page;
+    } catch (error: any) {
+        purchaseHistoryError.value =
+            error?.response?.data?.message ||
+            'Error al cargar el historial de compras.';
+    } finally {
+        purchaseHistoryLoading.value = false;
+    }
+};
+
+const searchPurchaseHistory = () => {
+    fetchPurchaseHistory(1);
+};
+
+const paymentStatusLabel = (status: string): string =>
+    ({
+        pending: 'Pendiente',
+        partial: 'Parcial',
+        paid: 'Pagado',
+    })[status] ?? status;
+
+const paymentStatusClass = (status: string): string =>
+    ({
+        pending:
+            'bg-red-50 text-red-700 ring-red-200 dark:bg-red-950/30 dark:text-red-300 dark:ring-red-900/50',
+        partial:
+            'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/50',
+        paid: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50',
+    })[status] ??
+    'bg-gray-50 text-gray-700 ring-gray-200 dark:bg-muted dark:text-gray-300 dark:ring-border';
 
 const syncEditForms = (): void => {
     const next = { ...editForms.value };
@@ -526,7 +670,107 @@ const removeVariant = async (variantId?: number | null) => {
             </div>
 
             <template v-else-if="supplier">
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+                    <div
+                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    >
+                        <p
+                            class="text-xs font-semibold text-gray-500 uppercase"
+                        >
+                            Saldo AP
+                        </p>
+                        <p class="mt-2 text-2xl font-bold text-red-600">
+                            {{ formatCurrency(purchaseSummary.total_due) }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    >
+                        <p
+                            class="text-xs font-semibold text-gray-500 uppercase"
+                        >
+                            Comprado
+                        </p>
+                        <p
+                            class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                        >
+                            {{ formatCurrency(purchaseSummary.total_ordered) }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    >
+                        <p
+                            class="text-xs font-semibold text-gray-500 uppercase"
+                        >
+                            Pagado
+                        </p>
+                        <p class="mt-2 text-2xl font-bold text-emerald-600">
+                            {{ formatCurrency(purchaseSummary.total_paid) }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    >
+                        <p
+                            class="text-xs font-semibold text-gray-500 uppercase"
+                        >
+                            Ordenes
+                        </p>
+                        <p
+                            class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                        >
+                            {{ purchaseSummary.orders_count }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    >
+                        <p
+                            class="text-xs font-semibold text-gray-500 uppercase"
+                        >
+                            Abastece
+                        </p>
+                        <p
+                            class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                        >
+                            {{ supplierProductsPagination.total }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="overflow-x-auto border-b border-gray-200 dark:border-border"
+                >
+                    <nav class="flex min-w-max gap-1">
+                        <button
+                            v-for="tab in tabs"
+                            :key="tab.key"
+                            type="button"
+                            class="border-b-2 px-3 py-2 text-sm font-semibold"
+                            :class="
+                                activeTab === tab.key
+                                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-300'
+                                    : 'border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                            "
+                            @click="activeTab = tab.key"
+                        >
+                            {{ tab.label }}
+                        </button>
+                    </nav>
+                </div>
+
+                <div
+                    v-if="purchaseHistoryError"
+                    class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300"
+                >
+                    {{ purchaseHistoryError }}
+                </div>
+
+                <div
+                    v-if="activeTab === 'summary'"
+                    class="grid grid-cols-1 gap-6 md:grid-cols-2"
+                >
                     <div
                         class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-border dark:bg-card"
                     >
@@ -677,7 +921,403 @@ const removeVariant = async (variantId?: number | null) => {
                     </div>
                 </div>
 
+                <section
+                    v-if="activeTab === 'orders'"
+                    class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                >
+                    <div
+                        class="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between dark:border-border"
+                    >
+                        <div>
+                            <h2
+                                class="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white"
+                            >
+                                <FileText :size="18" class="text-emerald-500" />
+                                Ordenes de compra
+                            </h2>
+                            <p class="text-xs text-gray-500">
+                                Historial filtrado por proveedor en encabezado o
+                                items de OC diaria.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input
+                                v-model="purchaseHistoryFilters.search"
+                                type="text"
+                                placeholder="Buscar OC, factura, producto..."
+                                class="h-9 w-64 rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                @keyup.enter="searchPurchaseHistory"
+                            />
+                            <select
+                                v-model="purchaseHistoryFilters.payment_status"
+                                class="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-border dark:bg-muted dark:text-white"
+                                @change="searchPurchaseHistory"
+                            >
+                                <option value="">Pago: todos</option>
+                                <option value="pending">Pendiente</option>
+                                <option value="partial">Parcial</option>
+                                <option value="paid">Pagado</option>
+                            </select>
+                            <button
+                                type="button"
+                                class="inline-flex h-9 items-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                                @click="searchPurchaseHistory"
+                            >
+                                <Search :size="15" />
+                                Buscar
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        v-if="purchaseHistoryLoading"
+                        class="p-8 text-sm text-gray-500"
+                    >
+                        Cargando historial...
+                    </div>
+                    <div v-else class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead
+                                class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                            >
+                                <tr>
+                                    <th class="px-3 py-2 text-left">OC</th>
+                                    <th class="px-3 py-2 text-left">Fecha</th>
+                                    <th class="px-3 py-2 text-left">
+                                        Sucursal
+                                    </th>
+                                    <th class="px-3 py-2 text-right">Items</th>
+                                    <th class="px-3 py-2 text-right">
+                                        Total prov.
+                                    </th>
+                                    <th class="px-3 py-2 text-right">Pagado</th>
+                                    <th class="px-3 py-2 text-right">
+                                        Saldo AP
+                                    </th>
+                                    <th class="px-3 py-2 text-center">Pago</th>
+                                </tr>
+                            </thead>
+                            <tbody
+                                class="divide-y divide-gray-100 dark:divide-border"
+                            >
+                                <tr v-if="purchaseOrders.length === 0">
+                                    <td
+                                        colspan="8"
+                                        class="px-3 py-8 text-center text-gray-500"
+                                    >
+                                        Sin ordenes para este proveedor.
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-for="order in purchaseOrders"
+                                    :key="order.id"
+                                    class="hover:bg-gray-50 dark:hover:bg-muted/40"
+                                >
+                                    <td class="px-3 py-2">
+                                        <Link
+                                            :href="`/purchase-orders/${order.id}`"
+                                            class="font-mono font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                                        >
+                                            {{ order.po_number }}
+                                        </Link>
+                                        <p
+                                            v-if="order.supplier_invoice_number"
+                                            class="text-xs text-gray-500"
+                                        >
+                                            Factura
+                                            {{ order.supplier_invoice_number }}
+                                        </p>
+                                    </td>
+                                    <td class="px-3 py-2 text-gray-600">
+                                        {{ formatDate(order.order_date) }}
+                                    </td>
+                                    <td class="px-3 py-2 text-gray-600">
+                                        {{ order.warehouse?.name || '-' }}
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-mono">
+                                        {{ order.items.length }}
+                                    </td>
+                                    <td
+                                        class="px-3 py-2 text-right font-mono font-semibold"
+                                    >
+                                        {{
+                                            formatCurrency(
+                                                order.supplier_items_total,
+                                            )
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-3 py-2 text-right font-mono text-emerald-600"
+                                    >
+                                        {{
+                                            order.is_accounts_payable
+                                                ? formatCurrency(
+                                                      order.amount_paid,
+                                                  )
+                                                : '-'
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-3 py-2 text-right font-mono font-bold text-red-600"
+                                    >
+                                        {{
+                                            order.is_accounts_payable
+                                                ? formatCurrency(
+                                                      order.amount_due,
+                                                  )
+                                                : '-'
+                                        }}
+                                    </td>
+                                    <td class="px-3 py-2 text-center">
+                                        <span
+                                            class="inline-flex rounded-full px-2 py-1 text-xs font-bold ring-1"
+                                            :class="
+                                                paymentStatusClass(
+                                                    order.payment_status,
+                                                )
+                                            "
+                                        >
+                                            {{
+                                                order.is_accounts_payable
+                                                    ? paymentStatusLabel(
+                                                          order.payment_status,
+                                                      )
+                                                    : 'OC diaria'
+                                            }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section
+                    v-if="activeTab === 'items'"
+                    class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                >
+                    <div
+                        class="border-b border-gray-200 px-4 py-3 dark:border-border"
+                    >
+                        <h2
+                            class="text-sm font-bold text-gray-900 dark:text-white"
+                        >
+                            Items comprados
+                        </h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead
+                                class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                            >
+                                <tr>
+                                    <th class="px-3 py-2 text-left">
+                                        Producto
+                                    </th>
+                                    <th class="px-3 py-2 text-left">OC</th>
+                                    <th class="px-3 py-2 text-left">Marca</th>
+                                    <th class="px-3 py-2 text-right">
+                                        Ordenado
+                                    </th>
+                                    <th class="px-3 py-2 text-right">
+                                        Recibido
+                                    </th>
+                                    <th class="px-3 py-2 text-right">Costo</th>
+                                    <th class="px-3 py-2 text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody
+                                class="divide-y divide-gray-100 dark:divide-border"
+                            >
+                                <tr v-if="purchasedItems.length === 0">
+                                    <td
+                                        colspan="7"
+                                        class="px-3 py-8 text-center text-gray-500"
+                                    >
+                                        Sin items comprados.
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-for="item in purchasedItems"
+                                    :key="`${item.order.id}-${item.id}`"
+                                >
+                                    <td class="px-3 py-2">
+                                        <Link
+                                            v-if="item.product_id"
+                                            :href="`/products/${item.product_id}`"
+                                            class="font-semibold text-indigo-600 hover:underline"
+                                        >
+                                            {{
+                                                item.product_name || 'Producto'
+                                            }}
+                                        </Link>
+                                        <span
+                                            v-else
+                                            class="font-semibold text-gray-900"
+                                        >
+                                            {{
+                                                item.product_name || 'Producto'
+                                            }}
+                                        </span>
+                                        <p
+                                            class="font-mono text-xs text-gray-500"
+                                        >
+                                            {{
+                                                item.variant_sku ||
+                                                item.product_sku ||
+                                                '-'
+                                            }}
+                                        </p>
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <Link
+                                            :href="`/purchase-orders/${item.order.id}`"
+                                            class="font-mono text-indigo-600 hover:underline"
+                                        >
+                                            {{ item.order.po_number }}
+                                        </Link>
+                                    </td>
+                                    <td class="px-3 py-2 text-gray-600">
+                                        {{ item.brand_name || '-' }}
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-mono">
+                                        {{ item.quantity_ordered }}
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-mono">
+                                        {{ item.quantity_received }}
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-mono">
+                                        {{ formatCurrency(item.unit_cost) }}
+                                    </td>
+                                    <td
+                                        class="px-3 py-2 text-right font-mono font-semibold"
+                                    >
+                                        {{ formatCurrency(item.total) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section
+                    v-if="activeTab === 'payments'"
+                    class="grid gap-4 lg:grid-cols-[1fr_20rem]"
+                >
+                    <div
+                        class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-border"
+                        >
+                            <div>
+                                <h2
+                                    class="text-sm font-bold text-gray-900 dark:text-white"
+                                >
+                                    Pagos y saldo AP
+                                </h2>
+                                <p class="text-xs text-gray-500">
+                                    La gestion de pagos se mantiene en Cuentas
+                                    por Pagar.
+                                </p>
+                            </div>
+                            <Link
+                                v-if="hasAccountsPayableOrders"
+                                :href="`/accounts-payable?supplier_id=${supplier.id}`"
+                                class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                            >
+                                <Banknote :size="15" />
+                                Ver en Cuentas por Pagar
+                            </Link>
+                            <span
+                                v-else
+                                class="rounded-md border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-500 dark:border-border"
+                            >
+                                Sin documentos AP directos
+                            </span>
+                        </div>
+                        <div
+                            class="divide-y divide-gray-100 dark:divide-border"
+                        >
+                            <div
+                                v-if="purchasePayments.length === 0"
+                                class="p-8 text-center text-sm text-gray-500"
+                            >
+                                Sin pagos registrados en el historial cargado.
+                            </div>
+                            <div
+                                v-for="payment in purchasePayments"
+                                :key="payment.id"
+                                class="grid gap-2 p-3 text-sm md:grid-cols-[1fr_9rem_8rem]"
+                            >
+                                <div class="min-w-0">
+                                    <Link
+                                        :href="`/purchase-orders/${payment.order.id}`"
+                                        class="font-mono font-semibold text-indigo-600 hover:underline"
+                                    >
+                                        {{ payment.order.po_number }}
+                                    </Link>
+                                    <p class="truncate text-xs text-gray-500">
+                                        {{
+                                            payment.reference_number ||
+                                            payment.notes ||
+                                            payment.method_label
+                                        }}
+                                    </p>
+                                </div>
+                                <div class="text-gray-600">
+                                    {{ formatDate(payment.paid_at) }}
+                                </div>
+                                <div
+                                    class="text-right font-mono font-bold text-emerald-600"
+                                >
+                                    {{ formatCurrency(payment.amount) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <aside
+                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    >
+                        <p
+                            class="text-xs font-semibold text-gray-500 uppercase"
+                        >
+                            Resumen AP
+                        </p>
+                        <dl class="mt-3 space-y-3 text-sm">
+                            <div class="flex justify-between gap-3">
+                                <dt class="text-gray-500">Saldo abierto</dt>
+                                <dd class="font-mono font-bold text-red-600">
+                                    {{
+                                        formatCurrency(
+                                            purchaseSummary.total_due,
+                                        )
+                                    }}
+                                </dd>
+                            </div>
+                            <div class="flex justify-between gap-3">
+                                <dt class="text-gray-500">Pagado</dt>
+                                <dd
+                                    class="font-mono font-semibold text-emerald-600"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            purchaseSummary.total_paid,
+                                        )
+                                    }}
+                                </dd>
+                            </div>
+                            <div class="flex justify-between gap-3">
+                                <dt class="text-gray-500">Documentos</dt>
+                                <dd class="font-mono font-semibold">
+                                    {{ purchaseSummary.orders_count }}
+                                </dd>
+                            </div>
+                        </dl>
+                    </aside>
+                </section>
+
                 <div
+                    v-if="activeTab === 'products'"
                     class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
                 >
                     <div
@@ -829,7 +1469,16 @@ const removeVariant = async (variantId?: number | null) => {
                                                 Stock
                                             </th>
                                             <th class="py-2 text-right">
-                                                Costo
+                                                Pactado
+                                            </th>
+                                            <th class="py-2 text-right">
+                                                Ult. costo
+                                            </th>
+                                            <th class="py-2 text-right">
+                                                Variacion
+                                            </th>
+                                            <th class="py-2 text-right">
+                                                Compras
                                             </th>
                                             <th class="py-2 text-right">MOQ</th>
                                             <th class="py-2 text-right">
@@ -837,6 +1486,9 @@ const removeVariant = async (variantId?: number | null) => {
                                             </th>
                                             <th class="py-2 text-center">
                                                 Preferido
+                                            </th>
+                                            <th class="py-2 text-right">
+                                                Pendiente
                                             </th>
                                             <th class="py-2 text-right">
                                                 Acciones
@@ -899,6 +1551,84 @@ const removeVariant = async (variantId?: number | null) => {
                                                     }}
                                                 </span>
                                             </td>
+                                            <td
+                                                class="py-3 pr-4 text-right font-mono"
+                                            >
+                                                <span
+                                                    class="block font-semibold text-gray-900 dark:text-gray-100"
+                                                >
+                                                    {{
+                                                        row.last_unit_cost ===
+                                                            null ||
+                                                        row.last_unit_cost ===
+                                                            undefined
+                                                            ? '-'
+                                                            : formatCurrency(
+                                                                  row.last_unit_cost,
+                                                              )
+                                                    }}
+                                                </span>
+                                                <span
+                                                    v-if="
+                                                        row.last_landed_unit_cost !==
+                                                            null &&
+                                                        row.last_landed_unit_cost !==
+                                                            undefined
+                                                    "
+                                                    class="block text-xs text-gray-500"
+                                                >
+                                                    total
+                                                    {{
+                                                        formatCurrency(
+                                                            row.last_landed_unit_cost,
+                                                        )
+                                                    }}
+                                                </span>
+                                            </td>
+                                            <td
+                                                class="py-3 pr-4 text-right font-mono"
+                                                :class="
+                                                    costDeltaClass(
+                                                        row.cost_delta,
+                                                    )
+                                                "
+                                            >
+                                                <span class="block font-bold">
+                                                    {{
+                                                        formatCostDelta(
+                                                            row.cost_delta,
+                                                        )
+                                                    }}
+                                                </span>
+                                                <span class="block text-xs">
+                                                    {{
+                                                        formatPercent(
+                                                            row.cost_delta_percent,
+                                                        )
+                                                    }}
+                                                </span>
+                                            </td>
+                                            <td
+                                                class="py-3 pr-4 text-right text-gray-600"
+                                            >
+                                                <span
+                                                    class="font-mono font-semibold"
+                                                >
+                                                    {{
+                                                        row.purchase_count ?? 0
+                                                    }}
+                                                </span>
+                                                <span
+                                                    class="block text-xs text-gray-500"
+                                                >
+                                                    cada
+                                                    {{
+                                                        formatDays(
+                                                            row.average_days_between_purchases,
+                                                        )
+                                                    }}
+                                                </span>
+                                            </td>
                                             <td class="py-3 pr-4 text-right">
                                                 <input
                                                     v-if="row.variant_id"
@@ -942,6 +1672,16 @@ const removeVariant = async (variantId?: number | null) => {
                                                         '-'
                                                     }}
                                                 </span>
+                                                <span
+                                                    class="block text-xs text-gray-500"
+                                                >
+                                                    real
+                                                    {{
+                                                        formatDays(
+                                                            row.average_actual_lead_time_days,
+                                                        )
+                                                    }}
+                                                </span>
                                             </td>
                                             <td class="py-3 pr-4 text-center">
                                                 <input
@@ -965,6 +1705,24 @@ const removeVariant = async (variantId?: number | null) => {
                                                     class="text-sm text-gray-400"
                                                     >-</span
                                                 >
+                                            </td>
+                                            <td
+                                                class="py-3 pr-4 text-right text-gray-600"
+                                            >
+                                                <span
+                                                    class="font-mono font-semibold"
+                                                >
+                                                    {{
+                                                        row.pending_orders_count ??
+                                                        0
+                                                    }}
+                                                </span>
+                                                <span
+                                                    class="block text-xs text-gray-500"
+                                                >
+                                                    {{ row.pending_units ?? 0 }}
+                                                    und.
+                                                </span>
                                             </td>
                                             <td
                                                 class="space-x-1 py-3 text-right whitespace-nowrap"

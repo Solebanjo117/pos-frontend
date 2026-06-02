@@ -9,6 +9,8 @@ import type {
     CategorySales,
     TopCashier,
     RecentActivity,
+    DashboardFinancial,
+    DashboardFilters,
 } from '@/types/dashboard';
 
 export function useDashboard() {
@@ -32,12 +34,13 @@ export function useDashboard() {
     const salesByCategory = ref<CategorySales[]>([]);
     const topCashiers = ref<TopCashier[]>([]);
     const recentActivity = ref<RecentActivity[]>([]);
+    const financial = ref<DashboardFinancial | null>(null);
 
     /**
      * Fetch all dashboard data
      */
     const fetchDashboardData = async (
-        warehouseId?: number | null,
+        warehouseIdOrFilters?: number | null | DashboardFilters,
         period: string = '7d',
     ) => {
         loading.value = true;
@@ -45,7 +48,7 @@ export function useDashboard() {
 
         try {
             const data = await DashboardApiService.getDashboardData(
-                warehouseId,
+                warehouseIdOrFilters,
                 period,
             );
             stats.value = data.stats;
@@ -67,6 +70,7 @@ export function useDashboard() {
             if (data.recent_activity) {
                 recentActivity.value = data.recent_activity;
             }
+            financial.value = data.financial ?? null;
         } catch (err: any) {
             error.value =
                 err.response?.data?.message ||
@@ -154,6 +158,7 @@ export function useDashboard() {
         salesByCategory,
         topCashiers,
         recentActivity,
+        financial,
 
         // Methods
         fetchDashboardData,

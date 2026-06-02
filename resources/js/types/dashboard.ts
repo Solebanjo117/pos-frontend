@@ -8,6 +8,85 @@ export interface DashboardStats {
     total_inventory_value: number;
 }
 
+export interface DashboardPeriod {
+    key: string;
+    date_from: string;
+    date_to: string;
+    previous_date_from: string;
+    previous_date_to: string;
+}
+
+export interface DashboardKpiComparison {
+    previous_value: number | null;
+    formatted_previous_value: string;
+    delta_percentage: number | null;
+}
+
+export interface DashboardFinancialKpi {
+    key: string;
+    label: string;
+    value: number;
+    formatted_value: string;
+    route: string;
+    tone: string;
+    comparison: DashboardKpiComparison | null;
+}
+
+export interface DashboardPaymentMethod {
+    method: string;
+    label: string;
+    amount: number;
+    percentage: number;
+}
+
+export interface DashboardTopClient {
+    customer_id: number;
+    name: string;
+    total_revenue: number;
+    pending_amount: number;
+    orders_count: number;
+    route: string;
+}
+
+export interface DashboardLatestTransaction {
+    id: number;
+    type: string;
+    label: string;
+    customer_id: number | null;
+    customer_name?: string | null;
+    reference: string | null;
+    amount: number;
+    method: string;
+    occurred_at: string | null;
+    route: string | null;
+}
+
+export interface DashboardAlert {
+    type: string;
+    severity: 'info' | 'attention' | 'warning' | string;
+    label: string;
+    value: number;
+    route: string;
+}
+
+export interface DashboardFinancial {
+    period: DashboardPeriod;
+    kpis: DashboardFinancialKpi[];
+    payment_methods: DashboardPaymentMethod[];
+    top_clients: DashboardTopClient[];
+    latest_transactions: DashboardLatestTransaction[];
+    alerts: DashboardAlert[];
+    report_links: Record<string, string>;
+}
+
+export interface DashboardFilters {
+    warehouse_id?: number | null;
+    period?: string;
+    date_from?: string;
+    date_to?: string;
+    compare?: boolean;
+}
+
 export interface TopProduct {
     name: string;
     sales: number;
@@ -90,4 +169,5 @@ export interface DashboardData {
     sales_by_category?: CategorySales[];
     top_cashiers?: TopCashier[];
     recent_activity?: RecentActivity[];
+    financial?: DashboardFinancial;
 }

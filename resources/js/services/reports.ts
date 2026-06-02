@@ -8,6 +8,8 @@ import type {
     IncomeStatementReport,
     FinancialPositionReport,
     CustomerReferenceReport,
+    SalesByClientFilters,
+    SalesByClientReport,
 } from '@/types/report';
 
 export const ReportsApiService = {
@@ -116,6 +118,29 @@ export const ReportsApiService = {
         const response = await apiClient.get('/reports/customer-references', {
             params: filters,
         });
+        return response.data;
+    },
+
+    async getSalesByClient(
+        filters: SalesByClientFilters,
+    ): Promise<SalesByClientReport> {
+        const response = await apiClient.get('/reports/sales-by-client', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async exportSalesByClient(
+        format: 'pdf' | 'excel',
+        filters: SalesByClientFilters,
+    ): Promise<Blob> {
+        const response = await apiClient.get(
+            `/reports/sales-by-client/export/${format}`,
+            {
+                params: filters,
+                responseType: 'blob',
+            },
+        );
         return response.data;
     },
 

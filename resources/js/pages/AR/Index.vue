@@ -1,21 +1,31 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { AccountsReceivableApiService } from '@/services/payments';
-import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import {
     AlertCircle,
     Banknote,
     Clock,
+    CreditCard,
     ExternalLink,
-    FileText,
     ReceiptText,
     Search,
+    Shield,
     TrendingUp,
     Users,
 } from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
+import FinanceAgingBars from '@/components/Finance/FinanceAgingBars.vue';
+import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
+import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
+import { AccountsReceivableApiService } from '@/services/payments';
+import type { BreadcrumbItem } from '@/types';
+
+interface AgingBucket {
+    label: string;
+    amount: number;
+    count: number;
+}
 
 interface Debtor {
     id: number;
@@ -24,7 +34,14 @@ interface Debtor {
     email?: string | null;
     phone?: string | null;
     current_balance: number;
+    credit_limit?: number;
+    available_credit?: number;
     open_documents_count?: number;
+    total_billed?: number;
+    total_paid?: number;
+    last_payment_days?: number | null;
+    status?: 'Corriente' | 'Por Vencer' | 'Vencido';
+    aging_buckets?: Record<string, AgingBucket>;
 }
 
 interface StatementDocument {
@@ -32,6 +49,9 @@ interface StatementDocument {
     document_type?: string;
     document_number: string;
     date?: string | null;
+    due_date?: string | null;
+    days_overdue?: number;
+    status_label?: string;
     total: number;
     amount_paid: number;
     amount_due: number;
@@ -46,8 +66,26 @@ interface StatementDocument {
 
 interface Statement {
     account: Debtor;
+    summary?: {
+        total_open_balance: number;
+        total_billed: number;
+        total_paid: number;
+        open_documents_count: number;
+        aging_buckets: Record<string, AgingBucket>;
+    };
     documents: StatementDocument[];
     entries: Array<Record<string, any>>;
+}
+
+interface ReceivablesSummary {
+    total_receivable: number;
+    active_customers: number;
+    open_documents_count: number;
+    credits_granted: number;
+    collections_received: number;
+    aging_buckets: Record<string, AgingBucket>;
+    over_90_amount: number;
+    over_90_count: number;
 }
 
 interface Payment {
@@ -72,6 +110,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const debtors = ref<Debtor[]>([]);
+const summary = ref<ReceivablesSummary | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const searchQuery = ref('');
@@ -80,7 +119,6 @@ const reportFilters = ref<ReportFilters>({});
 const selectedCustomer = ref<Debtor | null>(null);
 const statement = ref<Statement | null>(null);
 const loadingDetails = ref(false);
-
 const showPaymentModal = ref(false);
 const paymentLoading = ref(false);
 const paymentError = ref<string | null>(null);
@@ -93,23 +131,6 @@ const entries = computed<Array<Record<string, any>>>(
     () => statement.value?.entries ?? [],
 );
 const recentMovements = computed(() => entries.value.slice(0, 8));
-const totalReceivable = computed(() =>
-    debtors.value.reduce(
-        (sum, customer) => sum + Number(customer.current_balance || 0),
-        0,
-    ),
-);
-const customersWithBalance = computed(() =>
-    debtors.value.filter(
-        (customer) => Number(customer.current_balance || 0) > 0,
-    ),
-);
-const openDocumentsCount = computed(() =>
-    debtors.value.reduce(
-        (sum, customer) => sum + Number(customer.open_documents_count || 0),
-        0,
-    ),
-);
 const selectedBalance = computed(() =>
     Number(
         statement.value?.account?.current_balance ??
@@ -117,11 +138,11 @@ const selectedBalance = computed(() =>
             0,
     ),
 );
-const selectedDocumentsTotal = computed(() =>
-    documents.value.reduce(
-        (sum, document) => sum + Number(document.amount_due || 0),
-        0,
-    ),
+const selectedPaymentCustomer = computed(() => selectedCustomer.value as any);
+const selectedAging = computed(
+    () =>
+        statement.value?.summary?.aging_buckets ??
+        selectedCustomer.value?.aging_buckets,
 );
 const manualApplicationTotal = computed(() =>
     money(
@@ -167,7 +188,7 @@ const formatDate = (date?: string | null): string => {
         return '-';
     }
 
-    return new Date(date).toLocaleDateString('es-PA');
+    return new Date(`${date}T00:00:00`).toLocaleDateString('es-PA');
 };
 
 const documentPaymentMethods = (document: StatementDocument): string => {
@@ -183,10 +204,16 @@ const documentPaymentMethods = (document: StatementDocument): string => {
         .join(' / ');
 };
 
-const extractDebtors = (response: any): Debtor[] => {
-    const data = response?.data ?? response;
+const statusClass = (status?: string): string => {
+    if (status === 'Vencido') {
+        return 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/30';
+    }
 
-    return Array.isArray(data) ? data : [];
+    if (status === 'Por Vencer' || status === 'Por vencer') {
+        return 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30';
+    }
+
+    return 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/30';
 };
 
 const readReportFilters = (): ReportFilters => {
@@ -200,6 +227,12 @@ const readReportFilters = (): ReportFilters => {
     };
 };
 
+const extractDebtors = (response: any): Debtor[] => {
+    const data = response?.data ?? response;
+
+    return Array.isArray(data) ? data : [];
+};
+
 const fetchDebtors = async (): Promise<void> => {
     loading.value = true;
     error.value = null;
@@ -211,6 +244,7 @@ const fetchDebtors = async (): Promise<void> => {
             ...reportFilters.value,
         });
         debtors.value = extractDebtors(response);
+        summary.value = response?.summary ?? null;
     } catch (e: any) {
         error.value =
             e.response?.data?.message || 'Error al cargar clientes con deuda.';
@@ -294,6 +328,11 @@ const setApplicationAmount = (documentId: number, value: string): void => {
         ...manualApplications.value,
         [documentId]: parsed > 0 ? parsed : 0,
     };
+};
+
+const onApplicationInput = (documentId: number, event: Event): void => {
+    const target = event.target as HTMLInputElement | null;
+    setApplicationAmount(documentId, target?.value ?? '0');
 };
 
 const buildApplications = ():
@@ -414,7 +453,7 @@ const onSearch = (): void => {
         clearTimeout(searchTimeout);
     }
 
-    searchTimeout = setTimeout(() => fetchDebtors(), 300);
+    searchTimeout = setTimeout(() => void fetchDebtors(), 300);
 };
 
 onMounted(async () => {
@@ -434,145 +473,110 @@ onMounted(async () => {
     <Head title="Cuentas por Cobrar" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div
-            class="min-h-[calc(100vh-4.25rem)] bg-gray-50/60 p-4 dark:bg-background"
-        >
-            <div class="mx-auto max-w-7xl space-y-4">
-                <div
-                    class="flex flex-col gap-3 border-b border-gray-200 pb-4 lg:flex-row lg:items-center lg:justify-between dark:border-border"
-                >
-                    <div>
-                        <p
-                            class="text-xs font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400"
-                        >
-                            Crédito cliente
-                        </p>
-                        <h1
-                            class="mt-1 flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white"
-                        >
-                            <TrendingUp :size="24" class="text-emerald-500" />
-                            Cuentas por cobrar
-                        </h1>
-                        <p
-                            class="mt-1 text-sm text-gray-500 dark:text-gray-400"
-                        >
-                            Clientes con ventas pendientes o parcialmente
-                            cobradas.
-                        </p>
-                    </div>
+        <div class="space-y-5 p-4">
+            <FinanceReportShell
+                eyebrow="Credito cliente"
+                title="Cuentas por Cobrar"
+                subtitle="Saldos, aging, documentos abiertos y registro de cobros."
+                :icon="CreditCard"
+            >
+                <template #actions>
                     <Link
                         href="/customers"
-                        class="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-gray-200 dark:hover:bg-muted"
+                        class="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
                     >
                         <ExternalLink :size="16" />
                         Ver clientes
                     </Link>
-                </div>
+                </template>
 
                 <div
                     v-if="activeReportFilters"
-                    class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100"
+                    class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
                 >
                     Vista filtrada desde reportes:
                     <span class="font-semibold">{{ reportFilterSummary }}</span>
                 </div>
+            </FinanceReportShell>
 
-                <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <div
-                        class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
-                    >
-                        <p
-                            class="text-xs font-semibold text-amber-700 uppercase dark:text-amber-300"
-                        >
-                            Total por cobrar
-                        </p>
-                        <p
-                            class="mt-2 text-2xl font-bold text-amber-900 dark:text-amber-100"
-                        >
-                            {{ formatCurrency(totalReceivable) }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                    >
-                        <p
-                            class="text-xs font-semibold text-gray-500 uppercase"
-                        >
-                            Clientes
-                        </p>
-                        <p
-                            class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
-                        >
-                            {{ customersWithBalance.length }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                    >
-                        <p
-                            class="text-xs font-semibold text-gray-500 uppercase"
-                        >
-                            Docs. abiertos
-                        </p>
-                        <p
-                            class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
-                        >
-                            {{ openDocumentsCount }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                    >
-                        <p
-                            class="text-xs font-semibold text-gray-500 uppercase"
-                        >
-                            Seleccionado
-                        </p>
-                        <p
-                            class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
-                        >
-                            {{ formatCurrency(selectedBalance) }}
-                        </p>
-                    </div>
-                </div>
+            <div class="grid gap-3 md:grid-cols-5">
+                <FinanceKpiCard
+                    label="Total por Cobrar"
+                    :value="formatCurrency(summary?.total_receivable ?? 0)"
+                    :detail="`${summary?.active_customers ?? 0} clientes activos`"
+                    accent="indigo"
+                    :icon="CreditCard"
+                />
+                <FinanceKpiCard
+                    label="Creditos Otorgados"
+                    :value="formatCurrency(summary?.credits_granted ?? 0)"
+                    detail="Ventas a credito del periodo"
+                    accent="sky"
+                    :icon="TrendingUp"
+                />
+                <FinanceKpiCard
+                    label="Cobros del Periodo"
+                    :value="formatCurrency(summary?.collections_received ?? 0)"
+                    detail="Pagos reales registrados"
+                    accent="emerald"
+                    :icon="Banknote"
+                />
+                <FinanceKpiCard
+                    label="Vencidos +90"
+                    :value="formatCurrency(summary?.over_90_amount ?? 0)"
+                    :detail="`${summary?.over_90_count ?? 0} documentos`"
+                    accent="rose"
+                    :icon="Clock"
+                />
+                <FinanceKpiCard
+                    label="Docs. Abiertos"
+                    :value="String(summary?.open_documents_count ?? 0)"
+                    detail="Facturas pendientes"
+                    accent="slate"
+                    :icon="ReceiptText"
+                />
+            </div>
 
-                <div
-                    v-if="error"
-                    class="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
-                >
-                    <AlertCircle :size="18" />
-                    {{ error }}
-                </div>
+            <div
+                v-if="error"
+                class="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+            >
+                <AlertCircle :size="18" />
+                {{ error }}
+            </div>
 
-                <div class="grid gap-4 xl:grid-cols-[25rem_1fr]">
+            <div class="grid gap-5 xl:grid-cols-[minmax(340px,420px)_1fr]">
+                <aside class="space-y-4">
                     <section
-                        class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
                     >
                         <div
-                            class="space-y-3 border-b border-gray-200 px-4 py-3 dark:border-border"
+                            class="space-y-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800"
                         >
                             <div class="flex items-center justify-between">
                                 <div>
                                     <h2
-                                        class="text-sm font-bold text-gray-900 dark:text-white"
+                                        class="text-sm font-semibold text-slate-900 dark:text-slate-100"
                                     >
-                                        Clientes con saldo
+                                        Saldos por cliente
                                     </h2>
-                                    <p class="text-xs text-gray-500">
+                                    <p
+                                        class="text-xs text-slate-500 dark:text-slate-400"
+                                    >
                                         Ordenado por saldo pendiente
                                     </p>
                                 </div>
-                                <Users :size="18" class="text-gray-400" />
+                                <Users :size="18" class="text-slate-400" />
                             </div>
                             <div class="relative">
                                 <Search
-                                    class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400"
+                                    class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400"
                                 />
                                 <input
                                     v-model="searchQuery"
                                     type="text"
                                     placeholder="Buscar cliente..."
-                                    class="w-full rounded-md border border-gray-300 bg-gray-50 py-2 pr-3 pl-9 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                    class="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-9 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                                     @input="onSearch"
                                 />
                             </div>
@@ -580,32 +584,32 @@ onMounted(async () => {
 
                         <div
                             v-if="loading"
-                            class="p-6 text-center text-sm text-gray-500"
+                            class="p-6 text-center text-sm text-slate-500"
                         >
                             Cargando clientes...
                         </div>
                         <div
                             v-else-if="debtors.length === 0"
-                            class="p-8 text-center text-sm text-gray-500"
+                            class="p-8 text-center text-sm text-slate-500"
                         >
                             <ReceiptText
-                                class="mx-auto mb-2 text-gray-300"
+                                class="mx-auto mb-2 text-slate-300"
                                 :size="36"
                             />
                             No hay cuentas por cobrar pendientes.
                         </div>
                         <div
                             v-else
-                            class="max-h-[34rem] divide-y divide-gray-100 overflow-y-auto dark:divide-border"
+                            class="max-h-[42rem] divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800"
                         >
                             <button
                                 v-for="customer in debtors"
                                 :key="customer.id"
                                 type="button"
                                 :class="[
-                                    'w-full px-4 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-muted/50',
+                                    'w-full px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900/60',
                                     selectedCustomer?.id === customer.id
-                                        ? 'bg-amber-50/80 dark:bg-amber-950/20'
+                                        ? 'bg-indigo-50 dark:bg-indigo-500/10'
                                         : '',
                                 ]"
                                 @click="loadStatement(customer)"
@@ -614,31 +618,67 @@ onMounted(async () => {
                                     class="flex items-start justify-between gap-3"
                                 >
                                     <div class="min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <p
+                                                class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100"
+                                            >
+                                                {{ customer.name }}
+                                            </p>
+                                            <span
+                                                class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1"
+                                                :class="
+                                                    statusClass(customer.status)
+                                                "
+                                            >
+                                                {{
+                                                    customer.status ??
+                                                    'Corriente'
+                                                }}
+                                            </span>
+                                        </div>
                                         <p
-                                            class="truncate text-sm font-semibold text-gray-900 dark:text-white"
-                                        >
-                                            {{ customer.name }}
-                                        </p>
-                                        <p
-                                            class="truncate text-xs text-gray-500"
+                                            class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400"
                                         >
                                             {{
                                                 customer.email ||
                                                 customer.phone ||
+                                                customer.code ||
                                                 'Sin contacto'
                                             }}
                                         </p>
-                                        <p class="mt-1 text-xs text-gray-500">
-                                            {{
-                                                customer.open_documents_count ||
-                                                0
-                                            }}
-                                            docs. abiertos
-                                        </p>
+                                        <div
+                                            class="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-500 dark:text-slate-400"
+                                        >
+                                            <span
+                                                >Fact.
+                                                {{
+                                                    formatCurrency(
+                                                        customer.total_billed ??
+                                                            0,
+                                                    )
+                                                }}</span
+                                            >
+                                            <span
+                                                >Cob.
+                                                {{
+                                                    formatCurrency(
+                                                        customer.total_paid ??
+                                                            0,
+                                                    )
+                                                }}</span
+                                            >
+                                            <span
+                                                >{{
+                                                    customer.open_documents_count ??
+                                                    0
+                                                }}
+                                                docs</span
+                                            >
+                                        </div>
                                     </div>
                                     <div class="text-right">
                                         <p
-                                            class="font-mono text-sm font-bold text-amber-600 dark:text-amber-300"
+                                            class="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-300"
                                         >
                                             {{
                                                 formatCurrency(
@@ -646,218 +686,240 @@ onMounted(async () => {
                                                 )
                                             }}
                                         </p>
-                                        <Link
-                                            :href="`/customers/${customer.id}`"
-                                            class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
-                                            @click.stop
+                                        <p
+                                            class="mt-1 text-[11px] text-slate-500"
                                         >
-                                            Ver cliente
-                                            <ExternalLink :size="12" />
-                                        </Link>
+                                            Lim.
+                                            {{
+                                                formatCurrency(
+                                                    customer.credit_limit ?? 0,
+                                                )
+                                            }}
+                                        </p>
                                     </div>
                                 </div>
                             </button>
                         </div>
                     </section>
 
+                    <FinanceAgingBars
+                        :buckets="summary?.aging_buckets"
+                        :currency-formatter="formatCurrency"
+                    />
+                </aside>
+
+                <main class="space-y-4">
                     <section
-                        class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        v-if="!selectedCustomer"
+                        class="rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm dark:border-slate-700 dark:bg-slate-950"
                     >
-                        <div
-                            class="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 md:flex-row md:items-center md:justify-between dark:border-border"
+                        <Shield class="mx-auto text-slate-300" :size="44" />
+                        <h2
+                            class="mt-3 text-lg font-semibold text-slate-900 dark:text-slate-100"
                         >
-                            <div>
-                                <h2
-                                    class="text-sm font-bold text-gray-900 dark:text-white"
-                                >
-                                    {{
-                                        selectedCustomer
-                                            ? selectedCustomer.name
-                                            : 'Selecciona un cliente'
-                                    }}
-                                </h2>
-                                <p class="text-xs text-gray-500">
-                                    Documentos abiertos, saldo y movimientos
-                                    recientes.
-                                </p>
-                            </div>
+                            Selecciona un cliente
+                        </h2>
+                        <p
+                            class="mt-1 text-sm text-slate-500 dark:text-slate-400"
+                        >
+                            El estado de cuenta, documentos y cobros apareceran
+                            aqui.
+                        </p>
+                    </section>
+
+                    <template v-else>
+                        <section
+                            class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+                        >
                             <div
-                                v-if="selectedCustomer"
-                                class="flex items-center gap-2"
+                                class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
                             >
-                                <Link
-                                    :href="`/customers/${selectedCustomer.id}`"
-                                    class="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:text-indigo-200"
-                                >
-                                    <ExternalLink :size="15" />
-                                    Ficha cliente
-                                </Link>
-                                <Link
-                                    :href="`/sales-orders?customer_id=${selectedCustomer.id}`"
-                                    class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
-                                >
-                                    <FileText :size="15" />
-                                    Ver ventas
-                                </Link>
-                                <button
-                                    type="button"
-                                    :disabled="selectedBalance <= 0"
-                                    class="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-                                    @click="openPayment"
-                                >
-                                    <Banknote :size="15" />
-                                    Registrar cobro
-                                </button>
-                            </div>
-                        </div>
-
-                        <div
-                            v-if="!selectedCustomer"
-                            class="p-10 text-center text-sm text-gray-500"
-                        >
-                            Selecciona un cliente para ver documentos
-                            pendientes.
-                        </div>
-                        <div
-                            v-else-if="loadingDetails"
-                            class="p-6 text-sm text-gray-500"
-                        >
-                            Cargando estado de cuenta...
-                        </div>
-                        <div
-                            v-else
-                            class="grid gap-4 p-4 xl:grid-cols-[1fr_18rem]"
-                        >
-                            <div class="space-y-3">
-                                <div class="grid grid-cols-3 gap-2">
-                                    <div
-                                        class="rounded-md bg-gray-50 p-3 dark:bg-muted/40"
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        <p class="text-xs text-gray-500">
-                                            Documentos
-                                        </p>
-                                        <p
-                                            class="mt-1 text-lg font-bold text-gray-900 dark:text-white"
-                                        >
-                                            {{ documents.length }}
-                                        </p>
-                                    </div>
-                                    <div
-                                        class="rounded-md bg-gray-50 p-3 dark:bg-muted/40"
+                                        Estado de cuenta
+                                    </p>
+                                    <h2
+                                        class="mt-1 text-xl font-semibold text-slate-950 dark:text-slate-50"
                                     >
-                                        <p class="text-xs text-gray-500">
-                                            Saldo docs.
-                                        </p>
-                                        <p
-                                            class="mt-1 text-lg font-bold text-amber-600 dark:text-amber-300"
-                                        >
-                                            {{
-                                                formatCurrency(
-                                                    selectedDocumentsTotal,
-                                                )
-                                            }}
-                                        </p>
-                                    </div>
-                                    <div
-                                        class="rounded-md bg-gray-50 p-3 dark:bg-muted/40"
+                                        {{ selectedCustomer.name }}
+                                    </h2>
+                                    <p
+                                        class="mt-1 text-sm text-slate-500 dark:text-slate-400"
                                     >
-                                        <p class="text-xs text-gray-500">
-                                            Movimientos
-                                        </p>
-                                        <p
-                                            class="mt-1 text-lg font-bold text-gray-900 dark:text-white"
-                                        >
-                                            {{ recentMovements.length }}
-                                        </p>
-                                    </div>
+                                        {{
+                                            selectedCustomer.email ||
+                                            selectedCustomer.phone ||
+                                            selectedCustomer.code ||
+                                            'Sin contacto'
+                                        }}
+                                    </p>
                                 </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <Link
+                                        :href="`/customers/${selectedCustomer.id}`"
+                                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+                                    >
+                                        <ExternalLink :size="16" />
+                                        Perfil
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        :disabled="selectedBalance <= 0"
+                                        class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+                                        @click="openPayment"
+                                    >
+                                        <Banknote :size="16" />
+                                        Registrar cobro
+                                    </button>
+                                </div>
+                            </div>
 
+                            <div class="mt-4 grid gap-3 md:grid-cols-4">
+                                <FinanceKpiCard
+                                    label="Saldo pendiente"
+                                    :value="formatCurrency(selectedBalance)"
+                                    :detail="`${documents.length} documentos`"
+                                    accent="indigo"
+                                    :icon="CreditCard"
+                                />
+                                <FinanceKpiCard
+                                    label="Facturado"
+                                    :value="
+                                        formatCurrency(
+                                            statement?.summary?.total_billed ??
+                                                selectedCustomer.total_billed ??
+                                                0,
+                                        )
+                                    "
+                                    detail="Documentos abiertos"
+                                    accent="sky"
+                                    :icon="ReceiptText"
+                                />
+                                <FinanceKpiCard
+                                    label="Cobrado"
+                                    :value="
+                                        formatCurrency(
+                                            statement?.summary?.total_paid ??
+                                                selectedCustomer.total_paid ??
+                                                0,
+                                        )
+                                    "
+                                    detail="Aplicado a documentos"
+                                    accent="emerald"
+                                    :icon="Banknote"
+                                />
+                                <FinanceKpiCard
+                                    label="Credito disponible"
+                                    :value="
+                                        formatCurrency(
+                                            selectedCustomer.available_credit ??
+                                                0,
+                                        )
+                                    "
+                                    :detail="`Limite ${formatCurrency(selectedCustomer.credit_limit ?? 0)}`"
+                                    accent="amber"
+                                    :icon="Shield"
+                                />
+                            </div>
+                        </section>
+
+                        <div class="grid gap-4 xl:grid-cols-[1fr_320px]">
+                            <section
+                                class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+                            >
                                 <div
-                                    class="overflow-hidden rounded-md border border-gray-200 dark:border-border"
+                                    class="border-b border-slate-200 px-4 py-3 dark:border-slate-800"
                                 >
-                                    <table class="min-w-full text-sm">
+                                    <h3
+                                        class="text-sm font-semibold text-slate-900 dark:text-slate-100"
+                                    >
+                                        Documentos abiertos
+                                    </h3>
+                                </div>
+                                <div
+                                    v-if="loadingDetails"
+                                    class="p-8 text-center text-sm text-slate-500"
+                                >
+                                    Cargando estado de cuenta...
+                                </div>
+                                <div v-else class="overflow-x-auto">
+                                    <table
+                                        class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800"
+                                    >
                                         <thead
-                                            class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
+                                            class="bg-slate-50 dark:bg-slate-900"
                                         >
                                             <tr>
-                                                <th class="px-3 py-2 text-left">
-                                                    Venta
-                                                </th>
-                                                <th class="px-3 py-2 text-left">
-                                                    Fecha
-                                                </th>
-                                                <th class="px-3 py-2 text-left">
-                                                    Metodo
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                                >
+                                                    Factura
                                                 </th>
                                                 <th
-                                                    class="px-3 py-2 text-right"
+                                                    class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                                >
+                                                    Fecha
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                                >
+                                                    Vence
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
                                                 >
                                                     Total
                                                 </th>
                                                 <th
-                                                    class="px-3 py-2 text-right"
+                                                    class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
                                                 >
-                                                    Cobrado
+                                                    Pagado
                                                 </th>
                                                 <th
-                                                    class="px-3 py-2 text-right"
+                                                    class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
                                                 >
-                                                    Saldo
+                                                    Pendiente
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                                >
+                                                    Estado
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                                >
+                                                    Aplicar
                                                 </th>
                                             </tr>
                                         </thead>
                                         <tbody
-                                            class="divide-y divide-gray-100 dark:divide-border"
+                                            class="divide-y divide-slate-100 dark:divide-slate-800"
                                         >
-                                            <tr v-if="documents.length === 0">
-                                                <td
-                                                    colspan="6"
-                                                    class="px-3 py-8 text-center text-gray-500"
-                                                >
-                                                    No hay documentos pendientes
-                                                    para este cliente.
-                                                </td>
-                                            </tr>
                                             <tr
                                                 v-for="document in documents"
                                                 :key="document.id"
-                                                class="hover:bg-gray-50 dark:hover:bg-muted/40"
+                                                class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
                                             >
-                                                <td class="px-3 py-2">
-                                                    <Link
-                                                        v-if="
-                                                            document.document_type ===
-                                                                'sales_order' ||
-                                                            !document.document_type
-                                                        "
-                                                        :href="`/sales-orders/${document.id}`"
-                                                        class="font-mono font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
-                                                    >
-                                                        {{
-                                                            document.document_number
-                                                        }}
-                                                    </Link>
-                                                    <span
-                                                        v-else
-                                                        class="font-mono font-semibold text-gray-900 dark:text-white"
-                                                    >
-                                                        {{
-                                                            document.document_number
-                                                        }}
-                                                    </span>
+                                                <td
+                                                    class="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100"
+                                                >
+                                                    {{
+                                                        document.document_number
+                                                    }}
                                                     <p
-                                                        class="mt-0.5 text-xs text-gray-500"
+                                                        class="mt-1 text-[11px] font-normal text-slate-500"
                                                     >
                                                         {{
-                                                            document.payment_status ===
-                                                            'partial'
-                                                                ? 'Cobro parcial'
-                                                                : 'Pendiente'
+                                                            documentPaymentMethods(
+                                                                document,
+                                                            )
                                                         }}
                                                     </p>
                                                 </td>
                                                 <td
-                                                    class="px-3 py-2 text-gray-600 dark:text-gray-300"
+                                                    class="px-4 py-3 text-slate-600 dark:text-slate-300"
                                                 >
                                                     {{
                                                         formatDate(
@@ -866,18 +928,16 @@ onMounted(async () => {
                                                     }}
                                                 </td>
                                                 <td
-                                                    class="max-w-[14rem] px-3 py-2 text-gray-600 dark:text-gray-300"
+                                                    class="px-4 py-3 text-slate-600 dark:text-slate-300"
                                                 >
-                                                    <span class="line-clamp-2">
-                                                        {{
-                                                            documentPaymentMethods(
-                                                                document,
-                                                            )
-                                                        }}
-                                                    </span>
+                                                    {{
+                                                        formatDate(
+                                                            document.due_date,
+                                                        )
+                                                    }}
                                                 </td>
                                                 <td
-                                                    class="px-3 py-2 text-right font-mono"
+                                                    class="px-4 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300"
                                                 >
                                                     {{
                                                         formatCurrency(
@@ -886,7 +946,7 @@ onMounted(async () => {
                                                     }}
                                                 </td>
                                                 <td
-                                                    class="px-3 py-2 text-right font-mono text-green-600"
+                                                    class="px-4 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300"
                                                 >
                                                     {{
                                                         formatCurrency(
@@ -895,7 +955,7 @@ onMounted(async () => {
                                                     }}
                                                 </td>
                                                 <td
-                                                    class="px-3 py-2 text-right font-mono font-bold text-amber-600"
+                                                    class="px-4 py-3 text-right font-semibold text-slate-900 tabular-nums dark:text-slate-100"
                                                 >
                                                     {{
                                                         formatCurrency(
@@ -903,152 +963,161 @@ onMounted(async () => {
                                                         )
                                                     }}
                                                 </td>
+                                                <td class="px-4 py-3">
+                                                    <span
+                                                        class="rounded-full px-2 py-1 text-xs font-semibold ring-1"
+                                                        :class="
+                                                            statusClass(
+                                                                document.status_label,
+                                                            )
+                                                        "
+                                                    >
+                                                        {{
+                                                            document.status_label ??
+                                                            'Corriente'
+                                                        }}
+                                                    </span>
+                                                </td>
+                                                <td
+                                                    class="px-4 py-3 text-right"
+                                                >
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        :max="
+                                                            document.amount_due
+                                                        "
+                                                        step="0.01"
+                                                        class="h-9 w-28 rounded-md border border-slate-200 bg-white px-2 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                                        :placeholder="
+                                                            formatCurrency(
+                                                                document.amount_due,
+                                                            )
+                                                        "
+                                                        @input="
+                                                            onApplicationInput(
+                                                                document.id,
+                                                                $event,
+                                                            )
+                                                        "
+                                                    />
+                                                </td>
+                                            </tr>
+                                            <tr v-if="documents.length === 0">
+                                                <td
+                                                    colspan="8"
+                                                    class="px-4 py-10 text-center text-slate-500"
+                                                >
+                                                    Sin documentos abiertos.
+                                                </td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
+                            </section>
 
-                            <aside
-                                class="rounded-md border border-gray-200 dark:border-border"
-                            >
-                                <div
-                                    class="border-b border-gray-200 px-3 py-2 dark:border-border"
-                                >
-                                    <h3
-                                        class="text-xs font-bold text-gray-500 uppercase"
-                                    >
-                                        Últimos movimientos
-                                    </h3>
-                                </div>
-                                <div
-                                    v-if="recentMovements.length === 0"
-                                    class="p-4 text-sm text-gray-500"
-                                >
-                                    Sin movimientos registrados.
-                                </div>
-                                <div
-                                    v-else
-                                    class="divide-y divide-gray-100 dark:divide-border"
+                            <aside class="space-y-4">
+                                <FinanceAgingBars
+                                    :buckets="selectedAging"
+                                    :currency-formatter="formatCurrency"
+                                />
+                                <section
+                                    class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
                                 >
                                     <div
-                                        v-for="entry in recentMovements"
-                                        :key="entry.id"
-                                        class="px-3 py-2"
+                                        class="border-b border-slate-200 px-4 py-3 dark:border-slate-800"
+                                    >
+                                        <h3
+                                            class="text-sm font-semibold text-slate-900 dark:text-slate-100"
+                                        >
+                                            Movimientos recientes
+                                        </h3>
+                                    </div>
+                                    <div
+                                        class="divide-y divide-slate-100 dark:divide-slate-800"
                                     >
                                         <div
-                                            class="flex items-center justify-between gap-2"
+                                            v-for="movement in recentMovements"
+                                            :key="movement.id"
+                                            class="px-4 py-3"
                                         >
-                                            <p
-                                                class="truncate text-sm font-semibold text-gray-900 dark:text-white"
+                                            <div
+                                                class="flex items-start justify-between gap-3"
                                             >
-                                                {{
-                                                    entry.batch_number ||
-                                                    entry.reference_number ||
-                                                    entry.document_number ||
-                                                    'Movimiento'
-                                                }}
-                                            </p>
-                                            <p
-                                                class="font-mono text-sm font-bold text-green-600"
-                                            >
-                                                {{
-                                                    formatCurrency(
-                                                        entry.credit ||
-                                                            entry.debit ||
-                                                            0,
-                                                    )
-                                                }}
-                                            </p>
+                                                <div class="min-w-0">
+                                                    <p
+                                                        class="truncate text-sm font-medium text-slate-900 dark:text-slate-100"
+                                                    >
+                                                        {{
+                                                            movement.batch_number ||
+                                                            movement.document_number ||
+                                                            movement.movement_type
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        class="mt-0.5 text-xs text-slate-500 dark:text-slate-400"
+                                                    >
+                                                        {{
+                                                            formatDate(
+                                                                String(
+                                                                    movement.occurred_at ||
+                                                                        '',
+                                                                ).slice(0, 10),
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
+                                                <p
+                                                    class="text-right text-sm font-semibold text-slate-900 tabular-nums dark:text-slate-100"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            Number(
+                                                                movement.credit ||
+                                                                    0,
+                                                            ) ||
+                                                                Number(
+                                                                    movement.debit ||
+                                                                        0,
+                                                                ),
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <p
-                                            class="mt-1 flex items-center gap-1 text-xs text-gray-500"
+                                        <div
+                                            v-if="recentMovements.length === 0"
+                                            class="px-4 py-8 text-center text-sm text-slate-500"
                                         >
-                                            <Clock :size="12" />
-                                            {{ formatDate(entry.occurred_at) }}
-                                        </p>
+                                            Sin movimientos registrados.
+                                        </div>
                                     </div>
-                                </div>
+                                </section>
                             </aside>
                         </div>
-                    </section>
-                </div>
+                    </template>
+                </main>
             </div>
         </div>
 
         <OperationalPaymentPanel
-            mode="sale"
             :show="showPaymentModal"
             :amount-to-charge="selectedBalance"
-            :subtotal="selectedBalance"
-            title="Registrar cobro cliente"
+            mode="sale"
+            :customer="selectedPaymentCustomer"
+            title="Registrar cobro de cuenta"
             primary-action-label="Registrar cobro"
             cancel-label="Cancelar"
-            allow-partial
-            :allowed-method-codes="['cash', 'card', 'transfer', 'other']"
-            show-reference-number
-            show-notes
-            reference-number-label="Número de recibo"
-            notes-label="Notas"
+            :show-reference-number="true"
+            :show-notes="true"
+            reference-number-label="Referencia"
+            notes-label="Notas del cobro"
             :loading="paymentLoading"
             :error="paymentError"
+            :allow-partial="true"
+            :allowed-method-codes="['cash', 'card', 'transfer', 'other']"
             @finish="handlePaymentFinish"
             @cancel="closePayment"
-        >
-            <template #details>
-                <div
-                    v-if="documents.length > 0"
-                    class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                >
-                    <div
-                        class="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-border"
-                    >
-                        <span class="text-xs font-bold text-gray-500 uppercase">
-                            Aplicación manual opcional
-                        </span>
-                        <span class="text-xs text-gray-500">
-                            {{ formatCurrency(manualApplicationTotal) }}
-                            aplicado
-                        </span>
-                    </div>
-                    <div
-                        class="max-h-48 divide-y divide-gray-100 overflow-y-auto dark:divide-border"
-                    >
-                        <div
-                            v-for="document in documents"
-                            :key="`application-${document.id}`"
-                            class="grid grid-cols-[1fr_8rem] items-center gap-3 px-3 py-2"
-                        >
-                            <div class="min-w-0">
-                                <p
-                                    class="truncate text-sm font-medium text-gray-900 dark:text-white"
-                                >
-                                    {{ document.document_number }}
-                                </p>
-                                <p class="text-xs text-gray-500">
-                                    Pendiente:
-                                    {{ formatCurrency(document.amount_due) }}
-                                </p>
-                            </div>
-                            <input
-                                type="number"
-                                min="0"
-                                :max="document.amount_due"
-                                step="0.01"
-                                class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-right text-sm dark:border-border dark:bg-muted dark:text-white"
-                                :value="manualApplications[document.id] || ''"
-                                @input="
-                                    setApplicationAmount(
-                                        document.id,
-                                        ($event.target as HTMLInputElement)
-                                            .value,
-                                    )
-                                "
-                            />
-                        </div>
-                    </div>
-                </div>
-            </template>
-        </OperationalPaymentPanel>
+        />
     </AppLayout>
 </template>

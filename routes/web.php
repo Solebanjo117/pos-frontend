@@ -139,6 +139,10 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
     Route::get('/customer-references', function () {
         return Inertia::render('Reports/CustomerReferences');
     })->name('customer-references');
+
+    Route::get('/sales-by-client', function () {
+        return Inertia::render('Reports/SalesByClient');
+    })->name('sales-by-client');
     
     Route::get('/z-report', function () {
         return Inertia::render('Reports/ZReport');
@@ -161,7 +165,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('customers.create');
 
     Route::get('/customers/{id}', function ($id) {
-        return Inertia::render('Customers/Show', ['customerId' => $id]);
+        return Inertia::render('Customers/Show', ['customerId' => (int) $id]);
     })->name('customers.show');
 
     Route::get('/customers/{id}/edit', function ($id) {
@@ -253,6 +257,15 @@ Route::middleware(['auth'])->prefix('work-orders')->name('work-orders.')->group(
     Route::get('/', function () {
         return Inertia::render('WorkOrders/Index');
     })->name('index');
+    Route::get('/create', function () {
+        return Inertia::render('WorkOrders/Form');
+    })->name('create');
+    Route::get('/{id}', function ($id) {
+        return Inertia::render('WorkOrders/Show', ['workOrderId' => (int) $id]);
+    })->name('show');
+    Route::get('/{id}/edit', function ($id) {
+        return Inertia::render('WorkOrders/Form', ['workOrderId' => (int) $id]);
+    })->name('edit');
 });
 
 require __DIR__.'/settings.php';

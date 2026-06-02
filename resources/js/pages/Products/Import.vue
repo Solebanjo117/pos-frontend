@@ -5,10 +5,11 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import UniversalImporter from '@/components/Import/UniversalImporter.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
-import type { ImporterConfig } from '@/services/import';
+import { importService, type ImporterConfig } from '@/services/import';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
@@ -28,6 +29,7 @@ const importConfig: ImporterConfig = {
         'Descarga la plantilla, sube tu archivo Excel, edita los datos y enriquece cada producto con atributos y variantes.',
     templateFilename: 'plantilla_productos.xlsx',
     fullFileImport: true,
+    groupedProductPreview: true,
     columns: [
         { key: 'nombre', label: 'Nombre', type: 'text', required: true },
         { key: 'sku', label: 'SKU / Codigo', type: 'text' },
@@ -216,6 +218,8 @@ const saveAttributes = () => {
         row.__attributes = currentAttributes.value.filter((attribute) =>
             attribute.name.trim(),
         );
+    if (editingRowIdx.value !== null)
+        importerRef.value?.markPersistedRowDirty?.(editingRowIdx.value);
     attributesModal.value = false;
     toast.success('Atributos guardados');
 };
@@ -227,7 +231,11 @@ const openVariantsModal = (rowIdx: number) => {
 
 const onDraftVariantsChanged = (variants: any[]) => {
     const row = getEditingRow();
-    if (row) row.__variants = variants;
+    if (row) {
+        row.__variants = variants;
+        if (editingRowIdx.value !== null)
+            importerRef.value?.markPersistedRowDirty?.(editingRowIdx.value);
+    }
 };
 
 const handleCreate = (columnKey: string) => {
@@ -244,50 +252,27 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
     creatingVehicleCandidates.value[key] = true;
 
     try {
-        let makeId = candidate.make_id ?? null;
-        if (!makeId && candidate.make) {
-            const { data } = await apiClient.post('/vehicle-makes', {
-                name: candidate.make,
-            });
-            makeId = (data.data ?? data).id;
+        const response = await importService.createVehicleCandidatesBatch(
+            'products',
+            [candidate],
+        );
+        const item = response.data.candidates[0];
+
+        if (!item || item.status === 'error') {
+            throw new Error(item?.message || 'No se pudo crear el vehiculo.');
         }
 
-        let modelId = candidate.model_id ?? null;
-        if (!modelId && candidate.model && makeId) {
-            const currentYear = new Date().getFullYear();
-            const { data } = await apiClient.post('/vehicle-models', {
-                make_id: makeId,
-                name: candidate.model,
-                year_from: currentYear,
-                year_to: currentYear,
-            });
-            modelId = (data.data ?? data).id;
+        if (importerRef.value?.refreshAfterReferenceBatch) {
+            toast.success('Vehiculo creado. Actualizando mesa de importacion.');
+            await importerRef.value.refreshAfterReferenceBatch();
+        } else {
+            toast.success('Vehiculo creado. Actualizando previsualizacion.');
+            await importerRef.value?.refreshPreview?.();
         }
-
-        if (candidate.chassis) {
-            await apiClient.post('/vehicle-chassis', {
-                code: candidate.chassis,
-                name: candidate.chassis,
-                model_id: modelId,
-                model_ids: modelId ? [modelId] : [],
-            });
-        }
-
-        if (candidate.engine) {
-            await apiClient.post('/vehicle-engines', {
-                make_id: makeId,
-                model_id: modelId,
-                model_ids: modelId ? [modelId] : [],
-                engine_code: candidate.engine,
-                fuel_type: 'Gasoline',
-            });
-        }
-
-        toast.success('Vehiculo creado. Actualizando previsualizacion.');
-        await importerRef.value?.refreshPreview?.();
     } catch (error: any) {
         toast.error(
             error.response?.data?.message ||
+                error.message ||
                 'No se pudo crear el vehiculo detectado.',
         );
     } finally {
@@ -322,8 +307,9 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
                             Vehiculos detectados sin catalogo completo
                         </h2>
                         <p class="text-amber-800 dark:text-amber-200">
-                            Crea los chasis o motores faltantes y el preview se
-                            actualiza para validar esas filas.
+                            Puedes crear los chasis o motores faltantes para
+                            completar el catalogo. El producto tambien puede
+                            importarse sin compatibilidad vehicular.
                         </p>
                     </div>
                 </div>
@@ -381,6 +367,10 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
             <DialogContent class="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Nueva Categoria</DialogTitle>
+                    <DialogDescription>
+                        Crea una categoria faltante para resolver referencias
+                        del importador.
+                    </DialogDescription>
                 </DialogHeader>
                 <form @submit.prevent="submitCategory" class="space-y-4 py-2">
                     <div class="space-y-2">
@@ -445,6 +435,7 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
                                 </label>
                                 <button
                                     type="button"
+                                    :aria-label="`Quitar atributo por defecto ${index + 1}`"
                                     @click="removeDefaultAttr(index)"
                                     class="text-red-400 hover:text-red-600"
                                 >
@@ -496,6 +487,9 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
                             editingRowIdx !== null ? editingRowIdx + 1 : ''
                         }}</DialogTitle
                     >
+                    <DialogDescription>
+                        Edita los atributos tecnicos de la fila seleccionada.
+                    </DialogDescription>
                 </DialogHeader>
                 <div class="space-y-3 py-2">
                     <div
@@ -521,6 +515,7 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
                         </div>
                         <button
                             type="button"
+                            :aria-label="`Quitar atributo ${index + 1}`"
                             @click="removeAttr(index)"
                             class="text-red-400 hover:text-red-600"
                         >
@@ -568,6 +563,9 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
                             editingRowIdx !== null ? editingRowIdx + 1 : ''
                         }}</DialogTitle
                     >
+                    <DialogDescription>
+                        Revisa y ajusta las variantes detectadas para esta fila.
+                    </DialogDescription>
                 </DialogHeader>
                 <div class="space-y-4 py-2">
                     <div
@@ -643,6 +641,9 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
                         </p>
                         <div class="mt-3 overflow-x-auto">
                             <table class="min-w-full text-left text-xs">
+                                <caption class="sr-only">
+                                    Variantes detectadas para la fila
+                                </caption>
                                 <thead
                                     class="border-b border-emerald-200 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
                                 >

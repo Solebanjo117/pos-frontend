@@ -1,42 +1,13 @@
 import { ref } from 'vue';
-import apiClient from '@/services/api/client';
+import {
+    WorkOrdersApiService,
+    type WorkOrder,
+    type WorkOrderFilters,
+    type WorkOrderStatus,
+    type WorkOrderSummary,
+} from '@/services/workOrders';
 
-export interface WorkOrderItem {
-    id: number;
-    product_id: number;
-    variant_id: number | null;
-    warehouse_id: number;
-    quantity: number;
-    unit_price: string;
-    notes: string | null;
-}
-
-export interface WorkOrder {
-    id: number;
-    folio: string;
-    customer_id: number | null;
-    warehouse_id: number;
-    created_by: number;
-    assigned_to: number | null;
-    status: 'pending' | 'in_progress' | 'done' | 'delivered' | 'cancelled';
-    vehicle_description: string | null;
-    notes: string | null;
-    labour_cost: string;
-    estimated_delivery_at: string | null;
-    created_at: string;
-    updated_at: string;
-    customer?: { id: number; name: string } | null;
-    warehouse?: { id: number; name: string } | null;
-    items?: WorkOrderItem[];
-}
-
-export interface WorkOrderFilters {
-    status?: string;
-    warehouse_id?: number;
-    search?: string;
-    per_page?: number;
-    page?: number;
-}
+export type { WorkOrder, WorkOrderFilters, WorkOrderSummary };
 
 export function useWorkOrders() {
     const workOrders = ref<WorkOrder[]>([]);
@@ -45,33 +16,36 @@ export function useWorkOrders() {
     const total = ref(0);
     const currentPage = ref(1);
     const lastPage = ref(1);
+    const summary = ref<WorkOrderSummary | null>(null);
 
     const fetchWorkOrders = async (filters: WorkOrderFilters = {}) => {
         loading.value = true;
         error.value = null;
+
         try {
-            const { data } = await apiClient.get('/work-orders', {
-                params: filters,
-            });
-            workOrders.value = data.data ?? data;
-            total.value = data.total ?? workOrders.value.length;
-            currentPage.value = data.current_page ?? 1;
-            lastPage.value = data.last_page ?? 1;
+            const response = await WorkOrdersApiService.getWorkOrders(filters);
+            workOrders.value = response.data ?? [];
+            total.value =
+                response.total ??
+                response.meta?.total ??
+                workOrders.value.length;
+            currentPage.value =
+                response.current_page ?? response.meta?.current_page ?? 1;
+            lastPage.value =
+                response.last_page ?? response.meta?.last_page ?? 1;
+            summary.value = response.summary ?? null;
         } catch (err: any) {
             error.value =
                 err.response?.data?.message ??
-                'Error al cargar órdenes de trabajo';
+                'Error al cargar ordenes de trabajo';
             console.error('Error fetching work orders:', err);
         } finally {
             loading.value = false;
         }
     };
 
-    const transitionStatus = async (id: number, status: string) => {
-        const { data } = await apiClient.post(`/work-orders/${id}/transition`, {
-            status,
-        });
-        return data;
+    const transitionStatus = async (id: number, status: WorkOrderStatus) => {
+        return WorkOrdersApiService.transitionWorkOrder(id, status);
     };
 
     return {
@@ -81,6 +55,7 @@ export function useWorkOrders() {
         total,
         currentPage,
         lastPage,
+        summary,
         fetchWorkOrders,
         transitionStatus,
     };

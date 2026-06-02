@@ -288,7 +288,7 @@ onMounted(async () => {
                     </div>
                 </div>
                 <div
-                    v-if="stats.without_supplier > 0"
+                    v-if="(stats?.without_supplier ?? 0) > 0"
                     class="rounded-lg border border-amber-200 bg-white p-4 dark:border-amber-800 dark:bg-card"
                 >
                     <div class="flex items-center gap-3">
@@ -304,7 +304,7 @@ onMounted(async () => {
                             <p
                                 class="text-2xl font-bold text-amber-600 dark:text-amber-400"
                             >
-                                {{ stats.without_supplier }}
+                                {{ stats?.without_supplier ?? 0 }}
                             </p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
                                 Sin Proveedor
@@ -316,7 +316,7 @@ onMounted(async () => {
 
             <!-- Warning: products without supplier -->
             <div
-                v-if="stats?.without_supplier > 0"
+                v-if="(stats?.without_supplier ?? 0) > 0"
                 class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
             >
                 <AlertTriangle
@@ -326,7 +326,10 @@ onMounted(async () => {
                 <div>
                     <p class="text-sm text-amber-700 dark:text-amber-400">
                         <strong
-                            >{{ stats.without_supplier }} producto(s)</strong
+                            >{{
+                                stats?.without_supplier ?? 0
+                            }}
+                            producto(s)</strong
                         >
                         con bajo stock no tienen proveedor asignado.
                     </p>

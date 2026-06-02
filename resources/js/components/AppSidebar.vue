@@ -347,6 +347,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                 href: '/ar',
                 icon: Banknote,
             },
+            {
+                title: 'Ordenes de Trabajo',
+                href: '/work-orders',
+                icon: Wrench,
+            },
         ],
     });
 
@@ -371,6 +376,10 @@ const mainNavItems = computed<NavItem[]>(() => {
                 {
                     title: 'Clientes y referencias',
                     href: '/reports/customer-references',
+                },
+                {
+                    title: 'Ventas por Cliente',
+                    href: '/reports/sales-by-client',
                 },
                 {
                     title: 'Cierre de Caja (Z-Report)',

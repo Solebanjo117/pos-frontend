@@ -1,64 +1,41 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import {
     AlertCircle,
-    Box,
+    Banknote,
+    BarChart3,
     Calendar,
-    ChevronDown,
-    ChevronRight,
     CreditCard,
     DollarSign,
-    ReceiptText,
+    Download,
+    FileText,
+    Printer,
     RefreshCw,
-    Tag,
+    Scale,
     TrendingDown,
     TrendingUp,
-    Warehouse as WarehouseIcon,
+    Wallet,
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
+import FinanceAccountingPanel from '@/components/Finance/FinanceAccountingPanel.vue';
+import FinanceAgingBars from '@/components/Finance/FinanceAgingBars.vue';
+import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
+import FinanceMethodBars from '@/components/Finance/FinanceMethodBars.vue';
+import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { InventoryApiService } from '@/services/inventory';
-import { type BreadcrumbItem } from '@/types';
-import {
-    type AgingBuckets,
-    type CreditDocument,
-    type CreditMovement,
-    type FinancialReport,
-} from '@/types/report';
+import type { BreadcrumbItem } from '@/types';
+import type { StatementSection } from '@/types/report';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
-type FinancialReportTab =
-    | 'income_statement'
-    | 'financial_position'
-    | 'credits'
-    | 'comparison';
+type ReportTab = 'income' | 'position' | 'credits';
 type IncomeBasis = 'cash' | 'accrual_operational';
 type PositionMode = 'current_snapshot' | 'as_of';
-type SummaryKey = keyof FinancialReport['summary'];
-type StatementView = 'net_profit' | 'income' | 'expenses' | 'categories';
-type StatementTone = 'income' | 'expense' | 'profit' | 'balance' | 'neutral';
-type OperationalExpenseCategory =
-    FinancialReport['operational_expenses']['by_category'][number];
-type FinancialTimelineRow = FinancialReport['timeline'][number];
-type VisibleTimelineRow = FinancialTimelineRow & {
-    value: number;
-    label: string;
-};
-
-interface StatementRow {
-    key: string;
-    label: string;
-    amount: number;
-    detail?: string;
-    tone: StatementTone;
-    path?: string;
-    children?: StatementRow[];
-}
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -78,51 +55,33 @@ const {
     fetchBrandProfitability,
     fetchCategoryProfitability,
 } = useReports();
-
-const financialReport = incomeStatementReport;
-
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 
 const warehouses = ref<any[]>([]);
 const activePreset = ref<DatePreset>('month');
-const activeReportTab = ref<FinancialReportTab>('income_statement');
-const activeView = ref<StatementView>('net_profit');
+const activeTab = ref<ReportTab>('income');
 const incomeBasis = ref<IncomeBasis>('cash');
 const positionMode = ref<PositionMode>('current_snapshot');
-const expandedRows = ref<Set<string>>(
-    new Set(['income', 'expenses', 'operational-expenses']),
-);
 
 const today = new Date();
 const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-
 const filters = ref({
     date_from: firstDayOfMonth.toISOString().split('T')[0],
     date_to: today.toISOString().split('T')[0],
     warehouse_id: null as number | null,
 });
 
-const statementViews: Array<{ key: StatementView; label: string }> = [
-    { key: 'net_profit', label: 'Utilidad neta' },
-    { key: 'income', label: 'Ingresos' },
-    { key: 'expenses', label: 'Gastos' },
-    { key: 'categories', label: 'Categorias' },
+const tabs: Array<{ key: ReportTab; label: string; icon: any }> = [
+    { key: 'income', label: 'Estado de Resultados', icon: FileText },
+    { key: 'position', label: 'Balance General', icon: Scale },
+    { key: 'credits', label: 'Creditos', icon: CreditCard },
 ];
-
-const reportTabs: Array<{ key: FinancialReportTab; label: string }> = [
-    { key: 'income_statement', label: 'Resultados' },
-    { key: 'financial_position', label: 'Situacion financiera' },
-    { key: 'credits', label: 'Creditos' },
-    { key: 'comparison', label: 'Comparativo' },
+const datePresets: Array<{ key: DatePreset; label: string }> = [
+    { key: 'today', label: 'Hoy' },
+    { key: 'week', label: 'Semana' },
+    { key: 'month', label: 'Mes' },
+    { key: 'custom', label: 'Manual' },
 ];
-
-const loadWarehouses = async () => {
-    try {
-        warehouses.value = await InventoryApiService.getWarehouses();
-    } catch (e) {
-        console.error('Failed to load warehouses', e);
-    }
-};
 
 const warehouseOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Todas' },
@@ -144,49 +103,78 @@ const selectedWarehouseLabel = computed(() => {
     );
 });
 
-const setPreset = (preset: DatePreset) => {
-    activePreset.value = preset;
-    const now = new Date();
+const incomeSummary = computed(() => incomeStatementReport.value?.summary);
+const positionSummary = computed(() => financialPositionReport.value?.summary);
+const creditBalances = computed(
+    () =>
+        incomeStatementReport.value?.credit_balances ??
+        financialPositionReport.value?.credit_balances,
+);
 
-    switch (preset) {
-        case 'today':
-            filters.value.date_from = now.toISOString().split('T')[0];
-            filters.value.date_to = now.toISOString().split('T')[0];
-            break;
-        case 'week': {
-            const monday = new Date(now);
-            monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-            filters.value.date_from = monday.toISOString().split('T')[0];
-            filters.value.date_to = now.toISOString().split('T')[0];
-            break;
-        }
-        case 'month': {
-            const first = new Date(now.getFullYear(), now.getMonth(), 1);
-            filters.value.date_from = first.toISOString().split('T')[0];
-            filters.value.date_to = now.toISOString().split('T')[0];
-            break;
-        }
-        case 'custom':
-            break;
-    }
+const incomeSections = computed<StatementSection[]>(
+    () => incomeStatementReport.value?.sections ?? [],
+);
+const positionSections = computed<StatementSection[]>(
+    () => financialPositionReport.value?.sections ?? [],
+);
 
-    applyFilters();
+const brandRows = computed(() =>
+    (brandProfitabilityReport.value ?? []).slice(0, 5).map((row: any) => ({
+        label: row.brand_name ?? row.name ?? 'Sin marca',
+        amount: Number(row.revenue ?? row.total_revenue ?? 0),
+        detail: `Margen ${formatPercent(Number(row.margin_percentage ?? row.margin ?? 0))}`,
+    })),
+);
+
+const categoryRows = computed(() =>
+    (categoryProfitabilityReport.value ?? []).slice(0, 5).map((row: any) => ({
+        label: row.category_name ?? row.name ?? 'Sin categoria',
+        amount: Number(row.revenue ?? row.total_revenue ?? 0),
+        detail: `Margen ${formatPercent(Number(row.margin_percentage ?? row.margin ?? 0))}`,
+    })),
+);
+
+const paymentRows = computed(() => [
+    {
+        label: 'Cuentas por cobrar',
+        amount: Number(
+            creditBalances.value?.accounts_receivable?.total_open_balance ?? 0,
+        ),
+        detail: `${creditBalances.value?.accounts_receivable?.open_documents_count ?? 0} documentos abiertos`,
+    },
+    {
+        label: 'Cuentas por pagar',
+        amount: Number(
+            creditBalances.value?.accounts_payable?.total_open_balance ?? 0,
+        ),
+        detail: `${creditBalances.value?.accounts_payable?.open_documents_count ?? 0} documentos abiertos`,
+    },
+]);
+
+const timelineRows = computed(() => {
+    const timeline = incomeStatementReport.value?.timeline ?? [];
+    const max = Math.max(
+        ...timeline.map((row: any) =>
+            Math.max(Number(row.revenue || 0), Number(row.cogs || 0)),
+        ),
+        1,
+    );
+
+    return timeline.slice(-8).map((row: any) => ({
+        date: row.date,
+        revenue: Number(row.revenue || 0),
+        cogs: Number(row.cogs || 0),
+        profit: Number(row.profit ?? row.gross_profit ?? 0),
+        revenuePct: (Number(row.revenue || 0) / max) * 100,
+        cogsPct: (Number(row.cogs || 0) / max) * 100,
+    }));
+});
+
+const loadWarehouses = async (): Promise<void> => {
+    warehouses.value = await InventoryApiService.getWarehouses();
 };
 
-onMounted(async () => {
-    await Promise.all([initWarehouse(), loadWarehouses()]);
-    filters.value.warehouse_id = currentWarehouseId.value;
-    await applyFilters();
-});
-
-watch(currentWarehouseId, (val) => {
-    if (val && val !== filters.value.warehouse_id) {
-        filters.value.warehouse_id = val;
-        applyFilters();
-    }
-});
-
-const applyFilters = async () => {
+const loadReports = async (): Promise<void> => {
     if (!filters.value.date_from || !filters.value.date_to) {
         return;
     }
@@ -207,1982 +195,555 @@ const applyFilters = async () => {
     ]);
 };
 
-const onWarehouseChange = () => {
-    applyFilters();
+const setPreset = (preset: DatePreset): void => {
+    activePreset.value = preset;
+    const now = new Date();
+
+    if (preset === 'today') {
+        filters.value.date_from = now.toISOString().split('T')[0];
+        filters.value.date_to = now.toISOString().split('T')[0];
+    }
+
+    if (preset === 'week') {
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+        filters.value.date_from = monday.toISOString().split('T')[0];
+        filters.value.date_to = now.toISOString().split('T')[0];
+    }
+
+    if (preset === 'month') {
+        const first = new Date(now.getFullYear(), now.getMonth(), 1);
+        filters.value.date_from = first.toISOString().split('T')[0];
+        filters.value.date_to = now.toISOString().split('T')[0];
+    }
+
+    void loadReports();
 };
 
-const onReportModeChange = () => {
-    applyFilters();
-};
-
-const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('en-US', {
+const formatCurrency = (value: number): string =>
+    new Intl.NumberFormat('es-PA', {
         style: 'currency',
         currency: 'USD',
-    }).format(value || 0);
+    }).format(Number(value) || 0);
 
-const formatPercent = (value: number) => `${(value || 0).toFixed(2)}%`;
+const formatPercent = (value: number): string =>
+    `${(Number(value) || 0).toFixed(2)}%`;
 
-const formatShortDate = (date: string) =>
+const formatShortDate = (date: string): string =>
     new Intl.DateTimeFormat('es-PA', {
-        month: 'short',
         day: '2-digit',
+        month: 'short',
     }).format(new Date(`${date}T00:00:00`));
 
-const summary = computed(() => financialReport.value?.summary);
-const financialPositionSummary = computed(
-    () => financialPositionReport.value?.summary,
-);
-
-const operationalExpenseCategories = computed<OperationalExpenseCategory[]>(
-    () => financialReport.value?.operational_expenses?.by_category || [],
-);
-
-const creditBalances = computed(
-    () =>
-        financialReport.value?.credit_balances ?? {
-            accounts_receivable: {
-                total_open_balance: 0,
-                open_documents_count: 0,
-                accounts_count: 0,
-                aging_buckets: null,
-                documents: [],
-                recent_movements: [],
-            },
-            accounts_payable: {
-                total_open_balance: 0,
-                open_documents_count: 0,
-                accounts_count: 0,
-                aging_buckets: null,
-                documents: [],
-                recent_movements: [],
-            },
-        },
-);
-
-const incomeComparison = computed(() => financialReport.value?.comparison);
-const reportBreakdowns = computed(
-    () =>
-        financialReport.value?.breakdowns ?? {
-            by_brand: [],
-            by_category: [],
-            by_warehouse: [],
-        },
-);
-
-const agingBucketLabels: Record<keyof AgingBuckets, string> = {
-    current: 'Actual',
-    '1_30': '1-30 dias',
-    '31_60': '31-60 dias',
-    '61_90': '61-90 dias',
-    '90_plus': '90+ dias',
-};
-
-const agingRows = computed(() => {
-    const receivable =
-        creditBalances.value.accounts_receivable.aging_buckets ?? {};
-    const payable = creditBalances.value.accounts_payable.aging_buckets ?? {};
-
-    return (Object.keys(agingBucketLabels) as Array<keyof AgingBuckets>).map(
-        (key) => ({
-            key,
-            label: agingBucketLabels[key],
-            receivableAmount: receivable[key]?.amount ?? 0,
-            receivableCount: receivable[key]?.count ?? 0,
-            payableAmount: payable[key]?.amount ?? 0,
-            payableCount: payable[key]?.count ?? 0,
-        }),
-    );
-});
-
-const creditDocuments = computed<CreditDocument[]>(() => [
-    ...(creditBalances.value.accounts_receivable.documents ?? []),
-    ...(creditBalances.value.accounts_payable.documents ?? []),
-]);
-
-const creditMovements = computed<CreditMovement[]>(() => [
-    ...(creditBalances.value.accounts_receivable.recent_movements ?? []),
-    ...(creditBalances.value.accounts_payable.recent_movements ?? []),
-]);
-
-const comparisonMetricLabels: Array<[SummaryKey, string]> = [
-    ['total_revenue', 'Ingresos'],
-    ['total_cogs', 'Costo de ventas'],
-    ['total_operational_expenses', 'Gastos operativos'],
-    ['gross_profit', 'Utilidad bruta'],
-    ['net_profit', 'Utilidad neta'],
-    ['margin_percentage', 'Margen'],
-];
-
-const comparisonRows = computed(() => {
-    const variance = incomeComparison.value?.variance ?? {};
-
-    return comparisonMetricLabels.map(([key, label]) => ({
-        key,
-        label,
-        current: summary.value?.[key] ?? 0,
-        previous: incomeComparison.value?.previous?.summary?.[key] ?? 0,
-        amount: variance[key]?.amount ?? 0,
-        percentage: variance[key]?.percentage,
-    }));
-});
-
-const reportQuery = computed(() => {
-    const query: Record<string, string | number> = {
-        date_from: filters.value.date_from,
-        date_to: filters.value.date_to,
-    };
-
-    if (filters.value.warehouse_id) {
-        query.warehouse_id = filters.value.warehouse_id;
+const sectionTone = (
+    section: StatementSection,
+): 'asset' | 'liability' | 'profit' | 'expense' | 'neutral' => {
+    if (section.rows.some((row) => row.type === 'asset')) {
+        return 'asset';
     }
 
-    return query;
-});
-
-const goToDetail = (
-    path: string,
-    extra: Record<string, string | number> = {},
-) => {
-    router.visit(path, {
-        data: {
-            ...reportQuery.value,
-            ...extra,
-        },
-    });
-};
-
-const goToCreditDocument = (document: CreditDocument) => {
-    const path =
-        document.document_type === 'sales_order'
-            ? '/accounts-receivable'
-            : '/accounts-payable';
-
-    goToDetail(path, {
-        document_id: document.id,
-        ...(document.account_id ? { account_id: document.account_id } : {}),
-        ...(document.warehouse_id
-            ? { warehouse_id: document.warehouse_id }
-            : {}),
-    });
-};
-
-const toggleRow = (key: string) => {
-    const next = new Set(expandedRows.value);
-
-    if (next.has(key)) {
-        next.delete(key);
-    } else {
-        next.add(key);
+    if (section.rows.some((row) => row.type === 'liability')) {
+        return 'liability';
     }
 
-    expandedRows.value = next;
-};
-
-const rowToneClass = (tone: StatementTone) => {
-    const classes: Record<StatementTone, string> = {
-        income: 'text-blue-700 dark:text-blue-300',
-        expense: 'text-rose-700 dark:text-rose-300',
-        profit: 'text-emerald-700 dark:text-emerald-300',
-        balance: 'text-cyan-700 dark:text-cyan-300',
-        neutral: 'text-gray-700 dark:text-gray-200',
-    };
-
-    return classes[tone];
-};
-
-const amountToneClass = (row: StatementRow) => {
-    if (row.tone === 'profit') {
-        return row.amount >= 0
-            ? 'text-emerald-700 dark:text-emerald-300'
-            : 'text-rose-700 dark:text-rose-300';
-    }
-
-    return rowToneClass(row.tone);
-};
-
-const topMetrics = computed(() => {
-    if (!summary.value) {
-        return [];
-    }
-
-    return [
-        {
-            label: 'Ingresos cobrados',
-            value: summary.value.total_revenue,
-            detail: `${summary.value.orders_count} ordenes`,
-            icon: DollarSign,
-            tone: 'blue',
-            path: '/sales-orders',
-        },
-        {
-            label: 'Utilidad bruta',
-            value: summary.value.gross_profit,
-            detail: `Margen neto ${formatPercent(summary.value.margin_percentage)}`,
-            icon: TrendingUp,
-            tone: summary.value.gross_profit >= 0 ? 'emerald' : 'rose',
-        },
-        {
-            label: 'Gastos operativos',
-            value: summary.value.total_operational_expenses,
-            detail: `${operationalExpenseCategories.value.length} categorias`,
-            icon: ReceiptText,
-            tone: 'amber',
-            path: '/operational-expenses',
-        },
-        {
-            label: 'Utilidad neta',
-            value: summary.value.net_profit,
-            detail: 'Despues de costos y gastos',
-            icon: summary.value.net_profit >= 0 ? TrendingUp : TrendingDown,
-            tone: summary.value.net_profit >= 0 ? 'emerald' : 'rose',
-        },
-    ];
-});
-
-const incomeRows = computed<StatementRow[]>(() => {
-    if (!summary.value) {
-        return [];
-    }
-
-    return [
-        {
-            key: 'income',
-            label: 'Ingresos',
-            amount: summary.value.total_revenue - summary.value.total_refunds,
-            detail: 'Ventas cobradas menos devoluciones aprobadas',
-            tone: 'income',
-            children: [
-                {
-                    key: 'income-sales',
-                    label: 'Ventas cobradas',
-                    amount: summary.value.total_revenue,
-                    detail: `${summary.value.orders_count} ordenes`,
-                    tone: 'income',
-                    path: '/sales-orders',
-                },
-                {
-                    key: 'income-refunds',
-                    label: 'Devoluciones aprobadas',
-                    amount: -summary.value.total_refunds,
-                    detail: 'Contra-ingreso del periodo',
-                    tone: 'expense',
-                },
-                {
-                    key: 'income-tax',
-                    label: 'ITBM cobrado',
-                    amount: summary.value.total_tax,
-                    detail: 'Dato informativo, no altera utilidad neta',
-                    tone: 'neutral',
-                },
-                {
-                    key: 'income-discounts',
-                    label: 'Descuentos aplicados',
-                    amount: -summary.value.total_discounts,
-                    detail: 'Dato informativo del periodo',
-                    tone: 'neutral',
-                },
-            ],
-        },
-    ];
-});
-
-const expenseRows = computed<StatementRow[]>(() => {
-    if (!summary.value) {
-        return [];
-    }
-
-    return [
-        {
-            key: 'expenses',
-            label: 'Gastos',
-            amount:
-                summary.value.total_cogs +
-                summary.value.total_operational_expenses,
-            detail: 'Costo de mercancia mas gastos operativos',
-            tone: 'expense',
-            children: [
-                {
-                    key: 'expenses-cogs',
-                    label: 'Costo de mercancia',
-                    amount: summary.value.total_cogs,
-                    detail: 'COGS registrado en lineas vendidas',
-                    tone: 'expense',
-                    path: '/reports/movement-history',
-                },
-                {
-                    key: 'operational-expenses',
-                    label: 'Gastos operativos',
-                    amount: summary.value.total_operational_expenses,
-                    detail: `${operationalExpenseCategories.value.length} categorias`,
-                    tone: 'expense',
-                    path: '/operational-expenses',
-                    children: operationalExpenseCategories.value.map(
-                        (category) => ({
-                            key: `expense-category-${category.category}`,
-                            label: category.label,
-                            amount: category.amount,
-                            detail: `${category.count} registros`,
-                            tone: 'expense',
-                            path: '/operational-expenses',
-                        }),
-                    ),
-                },
-            ],
-        },
-    ];
-});
-
-const resultRows = computed<StatementRow[]>(() => {
-    if (!summary.value) {
-        return [];
-    }
-
-    return [
-        {
-            key: 'gross-profit',
-            label: 'Utilidad bruta',
-            amount: summary.value.gross_profit,
-            detail: 'Ingresos cobrados menos costo y devoluciones',
-            tone: 'profit',
-        },
-        {
-            key: 'net-profit',
-            label: 'Utilidad neta',
-            amount: summary.value.net_profit,
-            detail: 'Resultado despues de gastos operativos',
-            tone: 'profit',
-        },
-    ];
-});
-
-const openBalanceRows = computed<StatementRow[]>(() => [
-    {
-        key: 'ar-open-balance',
-        label: 'Credito cliente',
-        amount: creditBalances.value.accounts_receivable.total_open_balance,
-        detail: `${creditBalances.value.accounts_receivable.open_documents_count} docs - ${creditBalances.value.accounts_receivable.accounts_count} clientes`,
-        tone: 'balance',
-        path: '/accounts-receivable',
-    },
-    {
-        key: 'ap-open-balance',
-        label: 'Credito compra',
-        amount: creditBalances.value.accounts_payable.total_open_balance,
-        detail: `${creditBalances.value.accounts_payable.open_documents_count} docs - ${creditBalances.value.accounts_payable.accounts_count} proveedores`,
-        tone: 'balance',
-        path: '/accounts-payable',
-    },
-]);
-
-const financialPositionMetrics = computed(() => {
-    if (!financialPositionSummary.value) {
-        return [];
-    }
-
-    return [
-        {
-            label: 'Activos',
-            value: financialPositionSummary.value.total_assets,
-            detail: 'Caja, credito cliente e inventario',
-            icon: DollarSign,
-            tone: 'blue',
-        },
-        {
-            label: 'Pasivos',
-            value: financialPositionSummary.value.total_liabilities,
-            detail: 'Credito proveedor abierto',
-            icon: ReceiptText,
-            tone: 'amber',
-        },
-        {
-            label: 'Patrimonio operativo',
-            value: financialPositionSummary.value.operational_equity,
-            detail: 'Activos menos pasivos',
-            icon:
-                financialPositionSummary.value.operational_equity >= 0
-                    ? TrendingUp
-                    : TrendingDown,
-            tone:
-                financialPositionSummary.value.operational_equity >= 0
-                    ? 'emerald'
-                    : 'rose',
-        },
-    ];
-});
-
-const financialPositionSections = computed(
-    () => financialPositionReport.value?.sections ?? [],
-);
-
-const financialPositionRowPath = (key: string) => {
-    const paths: Record<string, string> = {
-        'accounts-receivable': '/accounts-receivable',
-        'accounts-payable': '/accounts-payable',
-        inventory: '/reports/stock-levels',
-    };
-
-    return paths[key] ?? null;
-};
-
-const goToFinancialPositionRow = (key: string) => {
-    const path = financialPositionRowPath(key);
-
-    if (path) {
-        goToDetail(path);
-    }
-};
-
-const financialPositionTone = (type: string): StatementTone => {
-    if (type === 'liability') {
+    if (section.rows.some((row) => row.type === 'expense')) {
         return 'expense';
     }
 
-    if (type === 'equity') {
+    if (section.rows.some((row) => row.type === 'profit')) {
         return 'profit';
-    }
-
-    if (type === 'asset') {
-        return 'balance';
     }
 
     return 'neutral';
 };
 
-const timelineRows = computed<FinancialTimelineRow[]>(() => {
-    const rows = (
-        (financialReport.value?.timeline ?? []) as FinancialTimelineRow[]
-    ).slice();
-
-    return rows.sort((a: FinancialTimelineRow, b: FinancialTimelineRow) =>
-        a.date.localeCompare(b.date),
-    );
+onMounted(async () => {
+    await Promise.all([initWarehouse(), loadWarehouses()]);
+    filters.value.warehouse_id = currentWarehouseId.value;
+    await loadReports();
 });
 
-const visibleTimelineRows = computed<VisibleTimelineRow[]>(() => {
-    if (activeView.value === 'income') {
-        return timelineRows.value.map((day) => ({
-            ...day,
-            value: day.revenue,
-            label: 'Ingresos',
-        }));
+watch(currentWarehouseId, (value) => {
+    if (value && value !== filters.value.warehouse_id) {
+        filters.value.warehouse_id = value;
+        void loadReports();
     }
-
-    if (activeView.value === 'expenses') {
-        return timelineRows.value.map((day) => ({
-            ...day,
-            value: day.cogs + day.operational_expenses,
-            label: 'Gastos',
-        }));
-    }
-
-    return timelineRows.value.map((day) => ({
-        ...day,
-        value: day.profit,
-        label: 'Utilidad neta',
-    }));
 });
-
-const maxTimelineValue = computed(() => {
-    const values = visibleTimelineRows.value.map((day) => Math.abs(day.value));
-
-    return Math.max(...values, 1);
-});
-
-const statementColumns = computed(() => {
-    if (activeView.value === 'income') {
-        return {
-            leftTitle: 'Ingresos',
-            leftRows: incomeRows.value,
-            rightTitle: 'Resultado',
-            rightRows: resultRows.value,
-        };
-    }
-
-    if (activeView.value === 'expenses') {
-        return {
-            leftTitle: 'Gastos',
-            leftRows: expenseRows.value,
-            rightTitle: 'Resultado',
-            rightRows: resultRows.value,
-        };
-    }
-
-    if (activeView.value === 'categories') {
-        return {
-            leftTitle: 'Gastos por categoria',
-            leftRows: expenseRows.value[0]?.children?.[1]?.children || [],
-            rightTitle: 'Rentabilidad',
-            rightRows: resultRows.value,
-        };
-    }
-
-    return {
-        leftTitle: 'Ingresos',
-        leftRows: incomeRows.value,
-        rightTitle: 'Gastos',
-        rightRows: expenseRows.value,
-    };
-});
-
-const topBrands = computed(() =>
-    (brandProfitabilityReport.value || []).slice(0, 5),
-);
-const topCategories = computed(() =>
-    (categoryProfitabilityReport.value || []).slice(0, 5),
-);
 </script>
 
 <template>
-    <Head title="Reporte Financiero" />
+    <Head title="Finanzas y Rentabilidad" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-4 p-4">
-            <div
-                class="flex flex-col gap-3 border-b border-gray-200 pb-4 lg:flex-row lg:items-center lg:justify-between dark:border-border"
+        <div class="space-y-5 p-4">
+            <FinanceReportShell
+                eyebrow="Reportes"
+                title="Finanzas y Rentabilidad"
+                :subtitle="`${filters.date_from} - ${filters.date_to} · ${selectedWarehouseLabel}`"
+                :icon="BarChart3"
             >
-                <div>
-                    <h1
-                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
+                <template #actions>
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+                        @click="loadReports"
                     >
-                        <DollarSign :size="26" class="text-emerald-600" />
-                        Estado de resultados
-                    </h1>
+                        <RefreshCw
+                            :size="16"
+                            :class="{ 'animate-spin': loading }"
+                        />
+                        Actualizar
+                    </button>
+                    <button
+                        disabled
+                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-400 dark:border-slate-800 dark:text-slate-600"
+                    >
+                        <Download :size="16" />
+                        Excel
+                    </button>
+                    <button
+                        disabled
+                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-400 dark:border-slate-800 dark:text-slate-600"
+                    >
+                        <Printer :size="16" />
+                        Imprimir
+                    </button>
+                </template>
+
+                <div class="space-y-5">
                     <div
-                        class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+                        class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-5 dark:border-slate-800 dark:bg-slate-900/60"
                     >
-                        <span class="inline-flex items-center gap-1">
-                            <Calendar :size="14" />
-                            {{ filters.date_from }} - {{ filters.date_to }}
-                        </span>
-                        <span class="text-gray-300 dark:text-gray-600">/</span>
-                        <span class="inline-flex items-center gap-1">
-                            <WarehouseIcon :size="14" />
-                            {{ selectedWarehouseLabel }}
-                        </span>
-                    </div>
-                </div>
-
-                <div
-                    class="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-2 xl:flex-row xl:items-end dark:border-border dark:bg-card"
-                >
-                    <div>
-                        <label
-                            class="mb-1 block text-[11px] font-semibold text-gray-500 uppercase dark:text-gray-400"
-                        >
-                            Periodo
-                        </label>
-                        <div class="flex flex-wrap gap-1">
-                            <button
-                                v-for="preset in [
-                                    { key: 'today', label: 'Hoy' },
-                                    { key: 'week', label: 'Semana' },
-                                    { key: 'month', label: 'Mes' },
-                                    { key: 'custom', label: 'Manual' },
-                                ]"
-                                :key="preset.key"
-                                type="button"
-                                class="rounded-md px-3 py-2 text-sm font-medium transition"
-                                :class="
-                                    activePreset === preset.key
-                                        ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-muted dark:text-gray-300'
-                                "
-                                @click="setPreset(preset.key as DatePreset)"
+                        <div class="md:col-span-2">
+                            <label
+                                class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
                             >
-                                {{ preset.label }}
-                            </button>
+                                Periodo
+                            </label>
+                            <div
+                                class="grid grid-cols-4 overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"
+                            >
+                                <button
+                                    v-for="preset in datePresets"
+                                    :key="preset.key"
+                                    class="px-3 py-2 text-xs font-medium transition"
+                                    :class="
+                                        activePreset === preset.key
+                                            ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                                            : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
+                                    "
+                                    @click="setPreset(preset.key)"
+                                >
+                                    {{ preset.label }}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="flex gap-2">
                         <div>
                             <label
-                                class="mb-1 block text-[11px] font-semibold text-gray-500 uppercase dark:text-gray-400"
+                                class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
                             >
+                                <Calendar :size="12" class="mr-1 inline" />
                                 Desde
                             </label>
                             <input
                                 v-model="filters.date_from"
                                 type="date"
-                                class="h-10 w-36 rounded-md border border-gray-300 px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                @change="activePreset = 'custom'"
+                                class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                @change="loadReports"
                             />
                         </div>
                         <div>
                             <label
-                                class="mb-1 block text-[11px] font-semibold text-gray-500 uppercase dark:text-gray-400"
+                                class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
                             >
+                                <Calendar :size="12" class="mr-1 inline" />
                                 Hasta
                             </label>
                             <input
                                 v-model="filters.date_to"
                                 type="date"
-                                class="h-10 w-36 rounded-md border border-gray-300 px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                @change="activePreset = 'custom'"
+                                class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                @change="loadReports"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Sucursal
+                            </label>
+                            <SearchableSelect
+                                v-model="filters.warehouse_id"
+                                :options="warehouseOptions"
+                                placeholder="Todas"
+                                @update:model-value="loadReports"
                             />
                         </div>
                     </div>
 
-                    <div>
-                        <label
-                            class="mb-1 block text-[11px] font-semibold text-gray-500 uppercase dark:text-gray-400"
+                    <div
+                        v-if="error"
+                        class="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+                    >
+                        <AlertCircle :size="18" />
+                        {{ error }}
+                    </div>
+
+                    <nav class="flex flex-wrap gap-2">
+                        <button
+                            v-for="tab in tabs"
+                            :key="tab.key"
+                            class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition"
+                            :class="
+                                activeTab === tab.key
+                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                    : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900'
+                            "
+                            @click="activeTab = tab.key"
                         >
-                            Sucursal
-                        </label>
-                        <SearchableSelect
-                            v-model="filters.warehouse_id"
-                            :options="warehouseOptions"
-                            placeholder="Todas"
-                            class="w-44"
-                            @update:model-value="onWarehouseChange"
+                            <component :is="tab.icon" :size="16" />
+                            {{ tab.label }}
+                        </button>
+                    </nav>
+                </div>
+            </FinanceReportShell>
+
+            <section v-if="activeTab === 'income'" class="space-y-5">
+                <div class="grid gap-3 md:grid-cols-4">
+                    <FinanceKpiCard
+                        label="Ventas Brutas"
+                        :value="
+                            formatCurrency(incomeSummary?.total_revenue ?? 0)
+                        "
+                        detail="Ingresos del periodo"
+                        accent="emerald"
+                        :icon="TrendingUp"
+                    />
+                    <FinanceKpiCard
+                        label="Costo de Ventas"
+                        :value="formatCurrency(incomeSummary?.total_cogs ?? 0)"
+                        detail="COGS operativo"
+                        accent="amber"
+                        :icon="TrendingDown"
+                    />
+                    <FinanceKpiCard
+                        label="Utilidad Neta"
+                        :value="formatCurrency(incomeSummary?.net_profit ?? 0)"
+                        :detail="`Margen ${formatPercent(incomeSummary?.margin_percentage ?? 0)}`"
+                        accent="indigo"
+                        :icon="DollarSign"
+                    />
+                    <FinanceKpiCard
+                        label="Gastos Operativos"
+                        :value="
+                            formatCurrency(
+                                incomeSummary?.total_operational_expenses ?? 0,
+                            )
+                        "
+                        :detail="`${incomeSummary?.orders_count ?? 0} ordenes`"
+                        accent="rose"
+                        :icon="Wallet"
+                    />
+                </div>
+
+                <div
+                    class="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]"
+                >
+                    <div class="space-y-4">
+                        <FinanceAccountingPanel
+                            v-for="section in incomeSections"
+                            :key="section.key"
+                            :title="section.label"
+                            :total="section.amount"
+                            :rows="section.rows"
+                            :tone="sectionTone(section)"
+                            :icon="FileText"
+                            :currency-formatter="formatCurrency"
                         />
                     </div>
 
-                    <div>
-                        <label
-                            class="mb-1 block text-[11px] font-semibold text-gray-500 uppercase dark:text-gray-400"
-                        >
-                            Base
-                        </label>
-                        <select
-                            v-model="incomeBasis"
-                            class="h-10 rounded-md border border-gray-300 px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            @change="onReportModeChange"
-                        >
-                            <option value="cash">Caja</option>
-                            <option value="accrual_operational">
-                                Devengo operativo
-                            </option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label
-                            class="mb-1 block text-[11px] font-semibold text-gray-500 uppercase dark:text-gray-400"
-                        >
-                            Corte
-                        </label>
-                        <select
-                            v-model="positionMode"
-                            class="h-10 rounded-md border border-gray-300 px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            @change="onReportModeChange"
-                        >
-                            <option value="current_snapshot">
-                                Foto actual
-                            </option>
-                            <option value="as_of">Historico al corte</option>
-                        </select>
-                    </div>
-
-                    <button
-                        v-if="activePreset === 'custom'"
-                        type="button"
-                        class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700"
-                        @click="applyFilters"
-                    >
-                        <RefreshCw :size="15" />
-                        Aplicar
-                    </button>
-                </div>
-            </div>
-
-            <div
-                v-if="error"
-                class="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-900/40 dark:text-red-200"
-            >
-                <AlertCircle :size="20" />
-                {{ error }}
-            </div>
-
-            <div
-                class="inline-flex w-full overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-1 md:w-auto dark:border-border dark:bg-muted"
-            >
-                <button
-                    v-for="tab in reportTabs"
-                    :key="tab.key"
-                    type="button"
-                    class="rounded-md px-4 py-2 text-sm font-semibold whitespace-nowrap transition"
-                    :class="
-                        activeReportTab === tab.key
-                            ? 'bg-white text-gray-900 shadow-sm dark:bg-background dark:text-white'
-                            : 'text-gray-600 hover:text-gray-900 dark:text-gray-300'
-                    "
-                    @click="activeReportTab = tab.key"
-                >
-                    {{ tab.label }}
-                </button>
-            </div>
-
-            <div v-if="loading" class="flex items-center justify-center py-16">
-                <div
-                    class="flex items-center gap-3 text-gray-500 dark:text-gray-400"
-                >
-                    <RefreshCw :size="20" class="animate-spin" />
-                    Cargando datos financieros...
-                </div>
-            </div>
-
-            <template v-else-if="financialReport?.summary">
-                <template v-if="activeReportTab === 'income_statement'">
-                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <button
-                            v-for="metric in topMetrics"
-                            :key="metric.label"
-                            type="button"
-                            class="rounded-lg border border-gray-200 bg-white p-4 text-left transition dark:border-border dark:bg-card"
-                            :class="
-                                metric.path
-                                    ? 'hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/20'
-                                    : ''
-                            "
-                            @click="
-                                metric.path ? goToDetail(metric.path) : null
-                            "
-                        >
-                            <div
-                                class="flex items-center justify-between gap-3"
-                            >
-                                <div>
-                                    <p
-                                        class="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400"
-                                    >
-                                        {{ metric.label }}
-                                    </p>
-                                    <p
-                                        class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white"
-                                    >
-                                        {{ formatCurrency(metric.value) }}
-                                    </p>
-                                </div>
-                                <component
-                                    :is="metric.icon"
-                                    :size="22"
-                                    :class="{
-                                        'text-blue-600': metric.tone === 'blue',
-                                        'text-emerald-600':
-                                            metric.tone === 'emerald',
-                                        'text-rose-600': metric.tone === 'rose',
-                                        'text-amber-600':
-                                            metric.tone === 'amber',
-                                    }"
-                                />
-                            </div>
-                            <p
-                                class="mt-2 text-xs text-gray-500 dark:text-gray-400"
-                            >
-                                {{ metric.detail }}
-                            </p>
-                        </button>
-                    </div>
-
-                    <div
-                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                    >
+                    <aside class="space-y-4">
                         <div
-                            class="flex flex-col gap-3 border-b border-gray-200 p-4 lg:flex-row lg:items-center lg:justify-between dark:border-border"
+                            class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
                         >
-                            <div>
-                                <h2
-                                    class="text-sm font-semibold text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Tendencia del periodo
-                                </h2>
-                                <p
-                                    class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                                >
-                                    {{
-                                        activeView === 'income'
-                                            ? 'Ingresos cobrados'
-                                            : activeView === 'expenses'
-                                              ? 'Costos y gastos'
-                                              : 'Utilidad neta diaria'
-                                    }}
-                                </p>
-                            </div>
-
-                            <div
-                                class="inline-flex w-full overflow-x-auto rounded-md border border-gray-200 bg-gray-50 p-1 lg:w-auto dark:border-border dark:bg-muted"
+                            <h3
+                                class="text-sm font-semibold text-slate-900 dark:text-slate-100"
                             >
-                                <button
-                                    v-for="view in statementViews"
-                                    :key="view.key"
-                                    type="button"
-                                    class="rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap transition"
-                                    :class="
-                                        activeView === view.key
-                                            ? 'bg-white text-gray-900 shadow-sm dark:bg-background dark:text-white'
-                                            : 'text-gray-600 hover:text-gray-900 dark:text-gray-300'
-                                    "
-                                    @click="activeView = view.key"
-                                >
-                                    {{ view.label }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div
-                            class="flex h-56 items-end gap-1 overflow-x-auto px-4 pt-6 pb-4"
-                        >
-                            <div
-                                v-for="day in visibleTimelineRows"
-                                :key="day.date"
-                                class="flex min-w-10 flex-1 flex-col items-center justify-end gap-2"
-                                :title="`${formatShortDate(day.date)} · ${day.label}: ${formatCurrency(day.value)}`"
-                            >
+                                Tendencia del periodo
+                            </h3>
+                            <div class="mt-4 space-y-3">
                                 <div
-                                    class="flex h-40 w-full items-end justify-center border-b border-gray-200 dark:border-border"
+                                    v-for="row in timelineRows"
+                                    :key="row.date"
+                                    class="grid grid-cols-[72px_1fr] items-center gap-3"
                                 >
-                                    <div
-                                        class="w-full max-w-8 rounded-t"
-                                        :class="
-                                            day.value >= 0
-                                                ? activeView === 'income'
-                                                    ? 'bg-blue-500'
-                                                    : 'bg-emerald-500'
-                                                : 'bg-rose-500'
-                                        "
-                                        :style="{
-                                            height: `${Math.max(
-                                                8,
-                                                (Math.abs(day.value) /
-                                                    maxTimelineValue) *
-                                                    150,
-                                            )}px`,
-                                        }"
-                                    ></div>
-                                </div>
-                                <span
-                                    class="text-[11px] text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ formatShortDate(day.date) }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                        <section
-                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-border dark:bg-muted"
-                            >
-                                <h2
-                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                                >
-                                    {{ statementColumns.leftTitle }}
-                                </h2>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full min-w-[520px] text-sm">
-                                    <tbody>
-                                        <template
-                                            v-for="row in statementColumns.leftRows"
-                                            :key="row.key"
+                                    <span
+                                        class="text-xs text-slate-500 dark:text-slate-400"
+                                    >
+                                        {{ formatShortDate(row.date) }}
+                                    </span>
+                                    <div class="space-y-1">
+                                        <div
+                                            class="h-2 rounded-full bg-slate-100 dark:bg-slate-800"
                                         >
-                                            <tr
-                                                class="border-b border-gray-100 dark:border-border/60"
-                                            >
-                                                <td class="px-4 py-2">
-                                                    <button
-                                                        v-if="
-                                                            row.children?.length
-                                                        "
-                                                        type="button"
-                                                        class="mr-1 inline-flex align-middle text-gray-500"
-                                                        @click="
-                                                            toggleRow(row.key)
-                                                        "
-                                                    >
-                                                        <ChevronDown
-                                                            v-if="
-                                                                expandedRows.has(
-                                                                    row.key,
-                                                                )
-                                                            "
-                                                            :size="15"
-                                                        />
-                                                        <ChevronRight
-                                                            v-else
-                                                            :size="15"
-                                                        />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        class="font-medium"
-                                                        :class="[
-                                                            rowToneClass(
-                                                                row.tone,
-                                                            ),
-                                                            row.path
-                                                                ? 'hover:underline'
-                                                                : '',
-                                                        ]"
-                                                        @click="
-                                                            row.path
-                                                                ? goToDetail(
-                                                                      row.path,
-                                                                  )
-                                                                : null
-                                                        "
-                                                    >
-                                                        {{ row.label }}
-                                                    </button>
-                                                    <p
-                                                        v-if="row.detail"
-                                                        class="mt-0.5 pl-6 text-xs text-gray-500 dark:text-gray-400"
-                                                    >
-                                                        {{ row.detail }}
-                                                    </p>
-                                                </td>
-                                                <td
-                                                    class="px-4 py-2 text-right font-mono font-semibold"
-                                                    :class="
-                                                        amountToneClass(row)
-                                                    "
-                                                >
-                                                    {{
-                                                        formatCurrency(
-                                                            row.amount,
-                                                        )
-                                                    }}
-                                                </td>
-                                            </tr>
-
-                                            <template
-                                                v-if="
-                                                    row.children?.length &&
-                                                    expandedRows.has(row.key)
-                                                "
-                                            >
-                                                <template
-                                                    v-for="child in row.children"
-                                                    :key="child.key"
-                                                >
-                                                    <tr
-                                                        class="border-b border-gray-100 bg-gray-50/60 dark:border-border/60 dark:bg-muted/40"
-                                                    >
-                                                        <td
-                                                            class="px-4 py-2 pl-10"
-                                                        >
-                                                            <button
-                                                                v-if="
-                                                                    child
-                                                                        .children
-                                                                        ?.length
-                                                                "
-                                                                type="button"
-                                                                class="mr-1 inline-flex align-middle text-gray-500"
-                                                                @click="
-                                                                    toggleRow(
-                                                                        child.key,
-                                                                    )
-                                                                "
-                                                            >
-                                                                <ChevronDown
-                                                                    v-if="
-                                                                        expandedRows.has(
-                                                                            child.key,
-                                                                        )
-                                                                    "
-                                                                    :size="14"
-                                                                />
-                                                                <ChevronRight
-                                                                    v-else
-                                                                    :size="14"
-                                                                />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                class="font-medium"
-                                                                :class="[
-                                                                    rowToneClass(
-                                                                        child.tone,
-                                                                    ),
-                                                                    child.path
-                                                                        ? 'hover:underline'
-                                                                        : '',
-                                                                ]"
-                                                                @click="
-                                                                    child.path
-                                                                        ? goToDetail(
-                                                                              child.path,
-                                                                          )
-                                                                        : null
-                                                                "
-                                                            >
-                                                                {{
-                                                                    child.label
-                                                                }}
-                                                            </button>
-                                                            <p
-                                                                v-if="
-                                                                    child.detail
-                                                                "
-                                                                class="mt-0.5 pl-5 text-xs text-gray-500 dark:text-gray-400"
-                                                            >
-                                                                {{
-                                                                    child.detail
-                                                                }}
-                                                            </p>
-                                                        </td>
-                                                        <td
-                                                            class="px-4 py-2 text-right font-mono font-semibold"
-                                                            :class="
-                                                                amountToneClass(
-                                                                    child,
-                                                                )
-                                                            "
-                                                        >
-                                                            {{
-                                                                formatCurrency(
-                                                                    child.amount,
-                                                                )
-                                                            }}
-                                                        </td>
-                                                    </tr>
-
-                                                    <tr
-                                                        v-for="grandchild in child.children ||
-                                                        []"
-                                                        v-show="
-                                                            expandedRows.has(
-                                                                child.key,
-                                                            )
-                                                        "
-                                                        :key="grandchild.key"
-                                                        class="border-b border-gray-100 dark:border-border/60"
-                                                    >
-                                                        <td
-                                                            class="px-4 py-2 pl-16"
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                class="font-medium"
-                                                                :class="[
-                                                                    rowToneClass(
-                                                                        grandchild.tone,
-                                                                    ),
-                                                                    grandchild.path
-                                                                        ? 'hover:underline'
-                                                                        : '',
-                                                                ]"
-                                                                @click="
-                                                                    grandchild.path
-                                                                        ? goToDetail(
-                                                                              grandchild.path,
-                                                                          )
-                                                                        : null
-                                                                "
-                                                            >
-                                                                {{
-                                                                    grandchild.label
-                                                                }}
-                                                            </button>
-                                                            <p
-                                                                v-if="
-                                                                    grandchild.detail
-                                                                "
-                                                                class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
-                                                            >
-                                                                {{
-                                                                    grandchild.detail
-                                                                }}
-                                                            </p>
-                                                        </td>
-                                                        <td
-                                                            class="px-4 py-2 text-right font-mono font-semibold"
-                                                            :class="
-                                                                amountToneClass(
-                                                                    grandchild,
-                                                                )
-                                                            "
-                                                        >
-                                                            {{
-                                                                formatCurrency(
-                                                                    grandchild.amount,
-                                                                )
-                                                            }}
-                                                        </td>
-                                                    </tr>
-                                                </template>
-                                            </template>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-
-                        <section
-                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-border dark:bg-muted"
-                            >
-                                <h2
-                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                                >
-                                    {{ statementColumns.rightTitle }}
-                                </h2>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full min-w-[420px] text-sm">
-                                    <tbody>
-                                        <tr
-                                            v-for="row in statementColumns.rightRows"
-                                            :key="row.key"
-                                            class="border-b border-gray-100 dark:border-border/60"
+                                            <div
+                                                class="h-2 rounded-full bg-emerald-500"
+                                                :style="{
+                                                    width: `${row.revenuePct}%`,
+                                                }"
+                                            />
+                                        </div>
+                                        <div
+                                            class="h-2 rounded-full bg-slate-100 dark:bg-slate-800"
                                         >
-                                            <td class="px-4 py-3">
-                                                <div
-                                                    class="font-medium"
-                                                    :class="
-                                                        rowToneClass(row.tone)
-                                                    "
-                                                >
-                                                    {{ row.label }}
-                                                </div>
-                                                <p
-                                                    v-if="row.detail"
-                                                    class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
-                                                >
-                                                    {{ row.detail }}
-                                                </p>
-                                            </td>
-                                            <td
-                                                class="px-4 py-3 text-right font-mono text-base font-semibold"
-                                                :class="amountToneClass(row)"
-                                            >
-                                                {{ formatCurrency(row.amount) }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-                    </div>
-
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="flex flex-col gap-1 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-border"
-                        >
-                            <div>
-                                <h2
-                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                                >
-                                    Saldos abiertos
-                                </h2>
-                                <p
-                                    class="text-xs text-gray-500 dark:text-gray-400"
-                                >
-                                    Informativo y separado del estado de
-                                    resultados
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-3 p-4 md:grid-cols-2">
-                            <button
-                                v-for="row in openBalanceRows"
-                                :key="row.key"
-                                type="button"
-                                class="rounded-lg border border-gray-200 p-4 text-left transition hover:border-cyan-300 hover:bg-cyan-50/40 dark:border-border dark:hover:border-cyan-700 dark:hover:bg-cyan-950/20"
-                                @click="row.path ? goToDetail(row.path) : null"
-                            >
-                                <div
-                                    class="flex items-center justify-between gap-3"
-                                >
-                                    <div>
-                                        <p
-                                            class="text-sm font-semibold text-gray-900 dark:text-white"
-                                        >
-                                            {{ row.label }}
-                                        </p>
-                                        <p
-                                            class="mt-1 text-xs text-gray-500 dark:text-gray-400"
-                                        >
-                                            {{ row.detail }}
-                                        </p>
+                                            <div
+                                                class="h-2 rounded-full bg-amber-500"
+                                                :style="{
+                                                    width: `${row.cogsPct}%`,
+                                                }"
+                                            />
+                                        </div>
                                     </div>
-                                    <CreditCard
-                                        v-if="row.key === 'ar-open-balance'"
-                                        :size="22"
-                                        class="text-cyan-600"
-                                    />
-                                    <ReceiptText
-                                        v-else
-                                        :size="22"
-                                        class="text-violet-600"
-                                    />
                                 </div>
-                                <p
-                                    class="mt-3 text-right font-mono text-2xl font-semibold"
-                                    :class="rowToneClass(row.tone)"
-                                >
-                                    {{ formatCurrency(row.amount) }}
-                                </p>
-                            </button>
+                            </div>
                         </div>
-                    </section>
+                        <FinanceMethodBars
+                            :rows="brandRows"
+                            :currency-formatter="formatCurrency"
+                        />
+                        <FinanceMethodBars
+                            :rows="categoryRows"
+                            :currency-formatter="formatCurrency"
+                        />
+                    </aside>
+                </div>
+            </section>
 
-                    <section class="grid gap-4 xl:grid-cols-2">
-                        <div
-                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="flex items-center gap-2 border-b border-gray-200 px-4 py-3 dark:border-border"
-                            >
-                                <Tag :size="18" class="text-indigo-600" />
-                                <h2
-                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                                >
-                                    Top marcas por rentabilidad
-                                </h2>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full min-w-[420px] text-sm">
-                                    <thead>
-                                        <tr
-                                            class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
-                                        >
-                                            <th class="px-4 py-2 text-left">
-                                                Marca
-                                            </th>
-                                            <th class="px-4 py-2 text-right">
-                                                Ganancia
-                                            </th>
-                                            <th class="px-4 py-2 text-right">
-                                                Margen
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr
-                                            v-for="brand in topBrands"
-                                            :key="
-                                                brand.brand_id ||
-                                                brand.brand_name
-                                            "
-                                            class="border-b border-gray-100 dark:border-border/60"
-                                        >
-                                            <td class="px-4 py-2 font-medium">
-                                                {{ brand.brand_name }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
-                                            >
-                                                {{
-                                                    formatCurrency(brand.profit)
-                                                }}
-                                            </td>
-                                            <td class="px-4 py-2 text-right">
-                                                {{
-                                                    formatPercent(brand.margin)
-                                                }}
-                                            </td>
-                                        </tr>
-                                        <tr v-if="!topBrands.length">
-                                            <td
-                                                colspan="3"
-                                                class="px-4 py-8 text-center text-gray-500"
-                                            >
-                                                Sin datos de marcas para este
-                                                periodo
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+            <section v-if="activeTab === 'position'" class="space-y-5">
+                <div class="grid gap-3 md:grid-cols-4">
+                    <FinanceKpiCard
+                        label="Activos"
+                        :value="
+                            formatCurrency(positionSummary?.total_assets ?? 0)
+                        "
+                        detail="Caja, bancos, CxC e inventario"
+                        accent="sky"
+                        :icon="TrendingUp"
+                    />
+                    <FinanceKpiCard
+                        label="Pasivos"
+                        :value="
+                            formatCurrency(
+                                positionSummary?.total_liabilities ?? 0,
+                            )
+                        "
+                        detail="Cuentas por pagar y obligaciones"
+                        accent="amber"
+                        :icon="Banknote"
+                    />
+                    <FinanceKpiCard
+                        label="Patrimonio"
+                        :value="
+                            formatCurrency(
+                                positionSummary?.operational_equity ?? 0,
+                            )
+                        "
+                        detail="Balance operativo"
+                        accent="emerald"
+                        :icon="Scale"
+                    />
+                    <FinanceKpiCard
+                        label="Endeudamiento"
+                        :value="
+                            formatPercent(
+                                ((positionSummary?.total_liabilities ?? 0) /
+                                    Math.max(
+                                        positionSummary?.total_assets ?? 0,
+                                        1,
+                                    )) *
+                                    100,
+                            )
+                        "
+                        detail="Pasivo / Activo"
+                        accent="indigo"
+                        :icon="BarChart3"
+                    />
+                </div>
 
-                        <div
-                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="flex items-center gap-2 border-b border-gray-200 px-4 py-3 dark:border-border"
-                            >
-                                <Box :size="18" class="text-amber-600" />
-                                <h2
-                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                                >
-                                    Top categorias por rentabilidad
-                                </h2>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full min-w-[420px] text-sm">
-                                    <thead>
-                                        <tr
-                                            class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
-                                        >
-                                            <th class="px-4 py-2 text-left">
-                                                Categoria
-                                            </th>
-                                            <th class="px-4 py-2 text-right">
-                                                Ganancia
-                                            </th>
-                                            <th class="px-4 py-2 text-right">
-                                                Margen
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr
-                                            v-for="category in topCategories"
-                                            :key="
-                                                category.category_id ||
-                                                category.category_name
-                                            "
-                                            class="border-b border-gray-100 dark:border-border/60"
-                                        >
-                                            <td class="px-4 py-2 font-medium">
-                                                {{ category.category_name }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
-                                            >
-                                                {{
-                                                    formatCurrency(
-                                                        category.profit,
-                                                    )
-                                                }}
-                                            </td>
-                                            <td class="px-4 py-2 text-right">
-                                                {{
-                                                    formatPercent(
-                                                        category.margin,
-                                                    )
-                                                }}
-                                            </td>
-                                        </tr>
-                                        <tr v-if="!topCategories.length">
-                                            <td
-                                                colspan="3"
-                                                class="px-4 py-8 text-center text-gray-500"
-                                            >
-                                                Sin datos de categorias para
-                                                este periodo
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </section>
-                </template>
-
-                <template v-else-if="activeReportTab === 'financial_position'">
-                    <div class="grid gap-3 md:grid-cols-3">
-                        <div
-                            v-for="metric in financialPositionMetrics"
-                            :key="metric.label"
-                            class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="flex items-center justify-between gap-3"
-                            >
-                                <div>
-                                    <p
-                                        class="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400"
-                                    >
-                                        {{ metric.label }}
-                                    </p>
-                                    <p
-                                        class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white"
-                                    >
-                                        {{ formatCurrency(metric.value) }}
-                                    </p>
-                                </div>
-                                <component
-                                    :is="metric.icon"
-                                    :size="22"
-                                    :class="{
-                                        'text-blue-600': metric.tone === 'blue',
-                                        'text-emerald-600':
-                                            metric.tone === 'emerald',
-                                        'text-rose-600': metric.tone === 'rose',
-                                        'text-amber-600':
-                                            metric.tone === 'amber',
-                                    }"
-                                />
-                            </div>
-                            <p
-                                class="mt-2 text-xs text-gray-500 dark:text-gray-400"
-                            >
-                                {{ metric.detail }}
-                            </p>
-                        </div>
+                <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <FinanceAccountingPanel
+                            v-for="section in positionSections"
+                            :key="section.key"
+                            :title="section.label"
+                            :total="section.amount"
+                            :rows="section.rows"
+                            :tone="sectionTone(section)"
+                            :icon="Scale"
+                            :currency-formatter="formatCurrency"
+                        />
                     </div>
+                    <aside class="space-y-4">
+                        <FinanceAgingBars
+                            :buckets="
+                                financialPositionReport?.aging
+                                    ?.accounts_receivable
+                            "
+                            :currency-formatter="formatCurrency"
+                        />
+                        <FinanceAgingBars
+                            :buckets="
+                                financialPositionReport?.aging?.accounts_payable
+                            "
+                            :currency-formatter="formatCurrency"
+                        />
+                    </aside>
+                </div>
+            </section>
 
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+            <section
+                v-if="activeTab === 'credits'"
+                class="grid gap-5 xl:grid-cols-[360px_1fr]"
+            >
+                <aside class="space-y-4">
+                    <FinanceKpiCard
+                        label="Cuentas por Cobrar"
+                        :value="
+                            formatCurrency(
+                                creditBalances?.accounts_receivable
+                                    ?.total_open_balance ?? 0,
+                            )
+                        "
+                        :detail="`${creditBalances?.accounts_receivable?.accounts_count ?? 0} clientes`"
+                        accent="indigo"
+                        :icon="CreditCard"
+                    />
+                    <FinanceKpiCard
+                        label="Cuentas por Pagar"
+                        :value="
+                            formatCurrency(
+                                creditBalances?.accounts_payable
+                                    ?.total_open_balance ?? 0,
+                            )
+                        "
+                        :detail="`${creditBalances?.accounts_payable?.accounts_count ?? 0} proveedores`"
+                        accent="amber"
+                        :icon="Banknote"
+                    />
+                    <FinanceMethodBars
+                        :rows="paymentRows"
+                        :currency-formatter="formatCurrency"
+                    />
+                    <Link
+                        href="/ar"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
                     >
-                        <div
-                            class="flex flex-col gap-1 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-border"
+                        Ver cuentas por cobrar
+                    </Link>
+                </aside>
+
+                <div
+                    class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+                >
+                    <div
+                        class="border-b border-slate-200 px-4 py-3 dark:border-slate-800"
+                    >
+                        <h3
+                            class="text-sm font-semibold text-slate-900 dark:text-slate-100"
                         >
-                            <div>
-                                <h2
-                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                            Documentos abiertos de clientes
+                        </h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table
+                            class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800"
+                        >
+                            <thead class="bg-slate-50 dark:bg-slate-900">
+                                <tr>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                    >
+                                        Documento
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                    >
+                                        Cliente
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                    >
+                                        Total
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                    >
+                                        Pendiente
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                    >
+                                        Dias
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody
+                                class="divide-y divide-slate-100 dark:divide-slate-800"
+                            >
+                                <tr
+                                    v-for="document in creditBalances
+                                        ?.accounts_receivable?.documents ?? []"
+                                    :key="`${document.document_type}-${document.id}`"
+                                    class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
                                 >
-                                    Situacion financiera operativa
-                                </h2>
-                                <p
-                                    class="text-xs text-gray-500 dark:text-gray-400"
+                                    <td
+                                        class="px-4 py-3 font-medium text-slate-900 dark:text-slate-100"
+                                    >
+                                        {{ document.document_number }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-slate-600 dark:text-slate-300"
+                                    >
+                                        {{
+                                            document.account_name ??
+                                            'Sin cliente'
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                    >
+                                        {{ formatCurrency(document.total) }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right font-semibold text-slate-900 tabular-nums dark:text-slate-100"
+                                    >
+                                        {{
+                                            formatCurrency(document.amount_due)
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right text-slate-500 tabular-nums"
+                                    >
+                                        {{ document.days_overdue }}
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-if="
+                                        !creditBalances?.accounts_receivable
+                                            ?.documents?.length
+                                    "
                                 >
-                                    Foto actual; no reconstruye saldos
-                                    historicos al corte
-                                    {{ financialPositionReport?.as_of }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[680px] text-sm">
-                                <tbody
-                                    v-for="section in financialPositionSections"
-                                    :key="section.key"
-                                >
-                                    <tr
-                                        class="border-b border-gray-200 bg-gray-50 dark:border-border dark:bg-muted"
+                                    <td
+                                        colspan="5"
+                                        class="px-4 py-10 text-center text-slate-500"
                                     >
-                                        <td
-                                            class="px-4 py-3 text-sm font-semibold text-gray-700 uppercase dark:text-gray-200"
-                                        >
-                                            {{ section.label }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-3 text-right font-mono text-base font-semibold text-gray-900 dark:text-white"
-                                        >
-                                            {{ formatCurrency(section.amount) }}
-                                        </td>
-                                    </tr>
-                                    <tr
-                                        v-for="row in section.rows"
-                                        :key="row.key"
-                                        class="border-b border-gray-100 dark:border-border/60"
-                                    >
-                                        <td class="px-4 py-3 pl-8">
-                                            <button
-                                                type="button"
-                                                class="font-medium"
-                                                :class="[
-                                                    rowToneClass(
-                                                        financialPositionTone(
-                                                            row.type,
-                                                        ),
-                                                    ),
-                                                    financialPositionRowPath(
-                                                        row.key,
-                                                    )
-                                                        ? 'hover:underline'
-                                                        : '',
-                                                ]"
-                                                @click="
-                                                    goToFinancialPositionRow(
-                                                        row.key,
-                                                    )
-                                                "
-                                            >
-                                                {{ row.label }}
-                                            </button>
-                                            <p
-                                                v-if="row.detail"
-                                                class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
-                                            >
-                                                {{ row.detail }}
-                                            </p>
-                                        </td>
-                                        <td
-                                            class="px-4 py-3 text-right font-mono font-semibold"
-                                            :class="
-                                                rowToneClass(
-                                                    financialPositionTone(
-                                                        row.type,
-                                                    ),
-                                                )
-                                            "
-                                        >
-                                            {{ formatCurrency(row.amount) }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                </template>
-
-                <template v-else-if="activeReportTab === 'credits'">
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="border-b border-gray-200 px-4 py-3 dark:border-border"
-                        >
-                            <h2
-                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                            >
-                                Antiguedad de saldos
-                            </h2>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[720px] text-sm">
-                                <thead>
-                                    <tr
-                                        class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
-                                    >
-                                        <th class="px-4 py-2 text-left">
-                                            Rango
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            CxC
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Docs CxC
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            CxP
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Docs CxP
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="row in agingRows"
-                                        :key="row.key"
-                                        class="border-b border-gray-100 dark:border-border/60"
-                                    >
-                                        <td class="px-4 py-2 font-medium">
-                                            {{ row.label }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono text-cyan-700 dark:text-cyan-300"
-                                        >
-                                            {{
-                                                formatCurrency(
-                                                    row.receivableAmount,
-                                                )
-                                            }}
-                                        </td>
-                                        <td class="px-4 py-2 text-right">
-                                            {{ row.receivableCount }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono text-rose-700 dark:text-rose-300"
-                                        >
-                                            {{
-                                                formatCurrency(
-                                                    row.payableAmount,
-                                                )
-                                            }}
-                                        </td>
-                                        <td class="px-4 py-2 text-right">
-                                            {{ row.payableCount }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="border-b border-gray-200 px-4 py-3 dark:border-border"
-                        >
-                            <h2
-                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                            >
-                                Documentos abiertos
-                            </h2>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[900px] text-sm">
-                                <thead>
-                                    <tr
-                                        class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
-                                    >
-                                        <th class="px-4 py-2 text-left">
-                                            Documento
-                                        </th>
-                                        <th class="px-4 py-2 text-left">
-                                            Tipo
-                                        </th>
-                                        <th class="px-4 py-2 text-left">
-                                            Cuenta
-                                        </th>
-                                        <th class="px-4 py-2 text-left">
-                                            Fecha
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Total
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Pagado
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Saldo
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Dias
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Accion
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="document in creditDocuments"
-                                        :key="`${document.document_type}-${document.id}`"
-                                        class="border-b border-gray-100 dark:border-border/60"
-                                    >
-                                        <td class="px-4 py-2 font-medium">
-                                            {{ document.document_number }}
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            <span
-                                                class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                                                :class="
-                                                    document.document_type ===
-                                                    'sales_order'
-                                                        ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300'
-                                                        : 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'
-                                                "
-                                            >
-                                                {{
-                                                    document.document_type ===
-                                                    'sales_order'
-                                                        ? 'CxC'
-                                                        : 'CxP'
-                                                }}
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            {{ document.account_name || 'N/A' }}
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            {{ document.date }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono"
-                                        >
-                                            {{ formatCurrency(document.total) }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono"
-                                        >
-                                            {{
-                                                formatCurrency(
-                                                    document.amount_paid,
-                                                )
-                                            }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono font-semibold"
-                                        >
-                                            {{
-                                                formatCurrency(
-                                                    document.amount_due,
-                                                )
-                                            }}
-                                        </td>
-                                        <td class="px-4 py-2 text-right">
-                                            {{ document.days_overdue }}
-                                        </td>
-                                        <td class="px-4 py-2 text-right">
-                                            <button
-                                                type="button"
-                                                class="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
-                                                @click="
-                                                    goToCreditDocument(document)
-                                                "
-                                            >
-                                                Ver
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <tr v-if="!creditDocuments.length">
-                                        <td
-                                            colspan="9"
-                                            class="px-4 py-8 text-center text-gray-500"
-                                        >
-                                            Sin documentos abiertos para los
-                                            filtros seleccionados
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="border-b border-gray-200 px-4 py-3 dark:border-border"
-                        >
-                            <h2
-                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                            >
-                                Movimientos recientes
-                            </h2>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[760px] text-sm">
-                                <thead>
-                                    <tr
-                                        class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
-                                    >
-                                        <th class="px-4 py-2 text-left">
-                                            Lote
-                                        </th>
-                                        <th class="px-4 py-2 text-left">
-                                            Tipo
-                                        </th>
-                                        <th class="px-4 py-2 text-left">
-                                            Metodo
-                                        </th>
-                                        <th class="px-4 py-2 text-left">
-                                            Fecha
-                                        </th>
-                                        <th class="px-4 py-2 text-left">
-                                            Referencia
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Monto
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="movement in creditMovements"
-                                        :key="`${movement.account_type}-${movement.id}`"
-                                        class="border-b border-gray-100 dark:border-border/60"
-                                    >
-                                        <td class="px-4 py-2 font-medium">
-                                            {{ movement.batch_number }}
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            {{
-                                                movement.account_type ===
-                                                'customer'
-                                                    ? 'Abono cliente'
-                                                    : 'Pago proveedor'
-                                            }}
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            {{ movement.method }}
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            {{
-                                                movement.paid_at
-                                                    ? formatShortDate(
-                                                          movement.paid_at.slice(
-                                                              0,
-                                                              10,
-                                                          ),
-                                                      )
-                                                    : 'N/A'
-                                            }}
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            {{
-                                                movement.reference_number ||
-                                                'Sin referencia'
-                                            }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono font-semibold"
-                                            :class="
-                                                movement.account_type ===
-                                                'customer'
-                                                    ? 'text-cyan-700 dark:text-cyan-300'
-                                                    : 'text-rose-700 dark:text-rose-300'
-                                            "
-                                        >
-                                            {{
-                                                formatCurrency(movement.amount)
-                                            }}
-                                        </td>
-                                    </tr>
-                                    <tr v-if="!creditMovements.length">
-                                        <td
-                                            colspan="6"
-                                            class="px-4 py-8 text-center text-gray-500"
-                                        >
-                                            Sin movimientos recientes para los
-                                            filtros seleccionados
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                </template>
-
-                <template v-else>
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="border-b border-gray-200 px-4 py-3 dark:border-border"
-                        >
-                            <h2
-                                class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                            >
-                                Comparativo contra periodo anterior
-                            </h2>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[760px] text-sm">
-                                <thead>
-                                    <tr
-                                        class="border-b border-gray-100 text-xs text-gray-500 uppercase dark:border-border/60"
-                                    >
-                                        <th class="px-4 py-2 text-left">
-                                            Metrica
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Actual
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Anterior
-                                        </th>
-                                        <th class="px-4 py-2 text-right">
-                                            Variacion
-                                        </th>
-                                        <th class="px-4 py-2 text-right">%</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="row in comparisonRows"
-                                        :key="row.key"
-                                        class="border-b border-gray-100 dark:border-border/60"
-                                    >
-                                        <td class="px-4 py-2 font-medium">
-                                            {{ row.label }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono"
-                                        >
-                                            {{
-                                                row.key === 'margin_percentage'
-                                                    ? formatPercent(row.current)
-                                                    : formatCurrency(
-                                                          row.current,
-                                                      )
-                                            }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono"
-                                        >
-                                            {{
-                                                row.key === 'margin_percentage'
-                                                    ? formatPercent(
-                                                          row.previous,
-                                                      )
-                                                    : formatCurrency(
-                                                          row.previous,
-                                                      )
-                                            }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-right font-mono font-semibold"
-                                            :class="
-                                                row.amount >= 0
-                                                    ? 'text-emerald-700 dark:text-emerald-300'
-                                                    : 'text-rose-700 dark:text-rose-300'
-                                            "
-                                        >
-                                            {{
-                                                row.key === 'margin_percentage'
-                                                    ? formatPercent(row.amount)
-                                                    : formatCurrency(row.amount)
-                                            }}
-                                        </td>
-                                        <td class="px-4 py-2 text-right">
-                                            {{
-                                                row.percentage === null
-                                                    ? 'N/A'
-                                                    : formatPercent(
-                                                          row.percentage,
-                                                      )
-                                            }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    <section class="grid gap-4 xl:grid-cols-3">
-                        <div
-                            v-for="group in [
-                                {
-                                    title: 'Marcas',
-                                    rows: reportBreakdowns.by_brand,
-                                    label: 'brand_name',
-                                },
-                                {
-                                    title: 'Categorias',
-                                    rows: reportBreakdowns.by_category,
-                                    label: 'category_name',
-                                },
-                                {
-                                    title: 'Sucursales',
-                                    rows: reportBreakdowns.by_warehouse,
-                                    label: 'name',
-                                },
-                            ]"
-                            :key="group.title"
-                            class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="border-b border-gray-200 px-4 py-3 dark:border-border"
-                            >
-                                <h3
-                                    class="text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
-                                >
-                                    {{ group.title }}
-                                </h3>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full min-w-[320px] text-sm">
-                                    <tbody>
-                                        <tr
-                                            v-for="row in group.rows.slice(
-                                                0,
-                                                6,
-                                            )"
-                                            :key="row.id || row[group.label]"
-                                            class="border-b border-gray-100 dark:border-border/60"
-                                        >
-                                            <td class="px-4 py-2 font-medium">
-                                                {{ row[group.label] }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-2 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300"
-                                            >
-                                                {{
-                                                    formatCurrency(
-                                                        row.profit ?? 0,
-                                                    )
-                                                }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </section>
-                </template>
-            </template>
+                                        Sin documentos abiertos.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </div>
     </AppLayout>
 </template>

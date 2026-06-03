@@ -18,6 +18,7 @@ export interface Category {
     name: string;
     slug: string;
     parent_id?: number | null;
+    parent_ids?: number[];
     description?: string;
     icon?: string;
     image_url?: string | null;
@@ -34,6 +35,7 @@ export interface Category {
     updated_at: string;
     // Loaded relationships
     parent?: Category;
+    parents?: Category[];
     children?: Category[];
     products?: Product[];
 }
@@ -52,6 +54,7 @@ export interface CategoryFilters {
 export interface CreateCategoryData {
     name: string;
     parent_id?: number | null;
+    parent_ids?: number[];
     description?: string;
     icon?: string;
     image_url?: string | null;

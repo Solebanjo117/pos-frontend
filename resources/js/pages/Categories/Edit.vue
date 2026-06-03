@@ -4,16 +4,16 @@ import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useStoreSettings } from '@/composables/useStoreSettings';
-import { ArrowLeft, Save } from 'lucide-vue-next';
+import { ArrowLeft, Plus, Save, X } from 'lucide-vue-next';
 import type {
     UpdateCategoryData,
     Category,
     CategoryDefaultAttribute,
 } from '@/types/category';
+import CategoryImagesSection from '@/components/Categories/CategoryImagesSection.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
-import CategoryImagesSection from '@/components/Categories/CategoryImagesSection.vue';
 
 interface Props {
     id: string;
@@ -32,6 +32,7 @@ const {
 const { fetchSettings, defaultTaxRate, resolveTaxRate } = useStoreSettings();
 
 const parentCategories = ref<Category[]>([]);
+const selectedParentCategoryId = ref<number | null>(null);
 
 type CategoryAttributeDraft = {
     name: string;
@@ -42,11 +43,13 @@ type CategoryAttributeDraft = {
 
 type CategoryForm = Omit<UpdateCategoryData, 'default_attributes'> & {
     default_attributes: CategoryAttributeDraft[];
+    parent_ids: number[];
 };
 
 const form = ref<CategoryForm>({
     name: '',
     parent_id: null,
+    parent_ids: [],
     description: '',
     default_attributes: [],
     icon: '',
@@ -70,6 +73,44 @@ function addAttribute() {
 
 function removeAttribute(index: number) {
     form.value.default_attributes.splice(index, 1);
+}
+
+function toCategoryId(value: number | string | null): number | null {
+    if (value === null || value === '') {
+        return null;
+    }
+
+    const categoryId = Number(value);
+
+    return Number.isFinite(categoryId) ? categoryId : null;
+}
+
+function formatCategoryLabel(category: Category): string {
+    return category.parent
+        ? `${category.parent.name} > ${category.name}`
+        : category.name;
+}
+
+function addParentCategory() {
+    if (
+        selectedParentCategoryId.value === null ||
+        form.value.parent_ids.includes(selectedParentCategoryId.value)
+    ) {
+        return;
+    }
+
+    form.value.parent_ids.push(selectedParentCategoryId.value);
+    selectedParentCategoryId.value = null;
+}
+
+function removeParentCategory(categoryId: number) {
+    form.value.parent_ids = form.value.parent_ids.filter(
+        (parentId) => parentId !== categoryId,
+    );
+
+    if (selectedParentCategoryId.value === categoryId) {
+        selectedParentCategoryId.value = null;
+    }
 }
 
 function parseSelectOptions(optionsText: string): string[] {
@@ -139,6 +180,9 @@ onMounted(async () => {
         form.value = {
             name: category.value.name,
             parent_id: category.value.parent_id ?? null,
+            parent_ids:
+                category.value.parent_ids ??
+                (category.value.parent_id ? [category.value.parent_id] : []),
             description: category.value.description || '',
             default_attributes: (category.value.default_attributes ?? []).map(
                 mapToDraftAttribute,
@@ -161,6 +205,7 @@ async function handleSubmit() {
         normalizeItbmPercent();
         const categoryPayload = {
             ...form.value,
+            parent_id: form.value.parent_ids[0] ?? null,
             default_attributes: toPayloadDefaultAttributes(),
         };
         delete categoryPayload.image_url;
@@ -185,15 +230,22 @@ const availableParents = computed(() =>
     parentCategories.value.filter((c) => c.id !== Number(props.id)),
 );
 
-const parentCategoryOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Ninguna (categoría raíz)' },
-    ...availableParents.value.map((category) => ({
-        value: category.id,
-        label: category.parent
-            ? `${category.parent.name} → ${category.name}`
-            : category.name,
-    })),
-]);
+const parentCategoryOptions = computed<SelectOption[]>(() =>
+    availableParents.value
+        .filter((category) => !form.value.parent_ids.includes(category.id))
+        .map((category) => ({
+            value: category.id,
+            label: formatCategoryLabel(category),
+        })),
+);
+
+const selectedParentCategories = computed(() =>
+    form.value.parent_ids
+        .map((parentId) =>
+            availableParents.value.find((category) => category.id === parentId),
+        )
+        .filter((category): category is Category => Boolean(category)),
+);
 </script>
 
 <template>
@@ -267,23 +319,66 @@ const parentCategoryOptions = computed<SelectOption[]>(() => [
                     />
                 </div>
 
-                <!-- Parent Category -->
+                <!-- Parent Categories -->
                 <div>
                     <label
                         class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                        Categoría Padre
+                        Categorías padre
                     </label>
-                    <SearchableSelect
-                        :model-value="form.parent_id ?? null"
-                        @update:model-value="
-                            (value) => (form.parent_id = value as number | null)
-                        "
-                        :options="parentCategoryOptions"
-                        placeholder="Ninguna (categoría raíz)"
-                    />
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                        <SearchableSelect
+                            :options="parentCategoryOptions"
+                            :model-value="selectedParentCategoryId"
+                            @update:model-value="
+                                (value) =>
+                                    (selectedParentCategoryId =
+                                        toCategoryId(value))
+                            "
+                            placeholder="Buscar categoría padre"
+                            search-placeholder="Buscar categoría padre"
+                            empty-results-text="Sin categorías disponibles"
+                            :loading="loading"
+                            :clearable="true"
+                        />
+                        <button
+                            type="button"
+                            @click="addParentCategory"
+                            :disabled="!selectedParentCategoryId"
+                            class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        >
+                            <Plus class="h-4 w-4" />
+                            Agregar
+                        </button>
+                    </div>
+                    <div
+                        v-if="selectedParentCategories.length > 0"
+                        class="mt-2 flex flex-wrap gap-2"
+                    >
+                        <span
+                            v-for="category in selectedParentCategories"
+                            :key="category.id"
+                            class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
+                        >
+                            {{ formatCategoryLabel(category) }}
+                            <button
+                                type="button"
+                                @click="removeParentCategory(category.id)"
+                                class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
+                                :aria-label="`Quitar ${category.name}`"
+                            >
+                                <X class="h-3 w-3" />
+                            </button>
+                        </span>
+                    </div>
+                    <p
+                        v-else
+                        class="mt-2 text-xs text-gray-500 dark:text-gray-400"
+                    >
+                        Sin categorías padre seleccionadas
+                    </p>
                     <p class="mt-1 text-xs text-gray-500">
-                        Selecciona una categoría padre si esta es una
+                        Agrega una o más categorías padre si esta es una
                         subcategoría
                     </p>
                 </div>

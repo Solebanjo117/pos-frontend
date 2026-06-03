@@ -13,6 +13,7 @@ import {
     ChevronDown,
     ChevronLeft,
     Upload,
+    Settings2,
 } from 'lucide-vue-next';
 import type { Category } from '@/types/category';
 
@@ -21,6 +22,9 @@ const { loading, error, fetchCategoriesWithParent, deleteCategory } =
 
 const searchQuery = ref('');
 const expandedCategories = ref<Set<number>>(new Set());
+const DEFAULT_PATH_SEPARATOR = ' / ';
+const PATH_SEPARATOR_STORAGE_KEY = 'hermex.categories.pathSeparator';
+const pathSeparator = ref(DEFAULT_PATH_SEPARATOR);
 
 // Pagination State
 const currentPage = ref(1);
@@ -41,6 +45,7 @@ interface UICategory extends Category {
     _hasChildren: boolean;
     _isExpanded: boolean;
     _path: string;
+    _treeKey: string;
 }
 
 const categoryMap = computed(() => {
@@ -51,10 +56,25 @@ const categoryMap = computed(() => {
     return map;
 });
 
-function buildCategoryPath(category: Category): string {
+function categoryParentIds(category: Category): number[] {
+    if (Array.isArray(category.parent_ids) && category.parent_ids.length > 0) {
+        return category.parent_ids;
+    }
+
+    return category.parent_id ? [category.parent_id] : [];
+}
+
+function visualPathSeparator(): string {
+    return pathSeparator.value === '' ? DEFAULT_PATH_SEPARATOR : pathSeparator.value;
+}
+
+function buildCategoryPath(
+    category: Category,
+    activeParentId: number | null = null,
+): string {
     const path = [category.name];
     const visited = new Set<number>([category.id]);
-    let parentId = category.parent_id ?? null;
+    let parentId = activeParentId ?? categoryParentIds(category)[0] ?? null;
 
     while (parentId) {
         if (visited.has(parentId)) break;
@@ -66,7 +86,17 @@ function buildCategoryPath(category: Category): string {
         parentId = parent.parent_id ?? null;
     }
 
-    return path.join(' / ');
+    return path.join(visualPathSeparator());
+}
+
+function buildCategoryPaths(category: Category): string[] {
+    const parentIds = categoryParentIds(category);
+
+    if (parentIds.length === 0) {
+        return [buildCategoryPath(category)];
+    }
+
+    return parentIds.map((parentId) => buildCategoryPath(category, parentId));
 }
 
 // Compute filtered categories (flattened for search but still preserving parent-child context if possible)
@@ -82,7 +112,9 @@ const processedCategories = computed(() => {
                 c.name.toLowerCase().includes(query) ||
                 c.description?.toLowerCase().includes(query) ||
                 c.parent?.name.toLowerCase().includes(query) ||
-                buildCategoryPath(c).toLowerCase().includes(query) ||
+                buildCategoryPaths(c).some((path) =>
+                    path.toLowerCase().includes(query),
+                ) ||
                 (c.default_attributes || []).some((attr) =>
                     attr.name.toLowerCase().includes(query),
                 ),
@@ -97,7 +129,8 @@ const processedCategories = computed(() => {
                         _indent: 0,
                         _hasChildren: false,
                         _isExpanded: false,
-                        _path: buildCategoryPath(c),
+                        _path: buildCategoryPaths(c).join(' | '),
+                        _treeKey: `search-${c.id}`,
                     }) as UICategory,
             ),
             totalPages: 1, // Search doesn't paginate for now, or paginates flat
@@ -110,9 +143,9 @@ const processedCategories = computed(() => {
     // Group children by parent
     const childrenByParent = list.reduce(
         (acc, cat) => {
-            if (cat.parent_id) {
-                if (!acc[cat.parent_id]) acc[cat.parent_id] = [];
-                acc[cat.parent_id].push(cat);
+            for (const parentId of categoryParentIds(cat)) {
+                if (!acc[parentId]) acc[parentId] = [];
+                acc[parentId].push(cat);
             }
             return acc;
         },
@@ -121,7 +154,7 @@ const processedCategories = computed(() => {
 
     // Pagination: Only slice the TOP LEVEL items
     let topLevel = list
-        .filter((c) => !c.parent_id)
+        .filter((c) => categoryParentIds(c).length === 0)
         .sort((a, b) => (a.priority || 0) - (b.priority || 0));
     const totalPages = Math.ceil(topLevel.length / itemsPerPage.value);
 
@@ -130,7 +163,12 @@ const processedCategories = computed(() => {
     topLevel = topLevel.slice(startIdx, startIdx + itemsPerPage.value);
 
     // Recursive function to build the tree list
-    function addNode(cat: Category, depth: number) {
+    function addNode(
+        cat: Category,
+        depth: number,
+        activeParentId: number | null = null,
+        branchKey = `${cat.id}`,
+    ) {
         const children = (childrenByParent[cat.id] || []).sort(
             (a, b) => (a.priority || 0) - (b.priority || 0),
         );
@@ -143,12 +181,15 @@ const processedCategories = computed(() => {
             _isSearchMatched: false,
             _hasChildren: hasChildren,
             _isExpanded: isExpanded,
-            _path: buildCategoryPath(cat),
+            _path: buildCategoryPath(cat, activeParentId),
+            _treeKey: branchKey,
         } as UICategory);
 
         // Only append children to the list if this node is expanded attached
         if (hasChildren && isExpanded) {
-            children.forEach((child) => addNode(child, depth + 1));
+            children.forEach((child) =>
+                addNode(child, depth + 1, cat.id, `${branchKey}-${child.id}`),
+            );
         }
     }
 
@@ -184,6 +225,10 @@ function toggleExpand(id: number) {
     }
 }
 
+function resetPathSeparator() {
+    pathSeparator.value = DEFAULT_PATH_SEPARATOR;
+}
+
 async function handleDelete(id: number) {
     if (
         !confirm(
@@ -200,7 +245,14 @@ async function handleDelete(id: number) {
 }
 
 onMounted(async () => {
+    pathSeparator.value =
+        localStorage.getItem(PATH_SEPARATOR_STORAGE_KEY) ??
+        DEFAULT_PATH_SEPARATOR;
     await loadCategories();
+});
+
+watch(pathSeparator, (value) => {
+    localStorage.setItem(PATH_SEPARATOR_STORAGE_KEY, value);
 });
 </script>
 
@@ -209,7 +261,7 @@ onMounted(async () => {
     <AppLayout>
         <div class="space-y-6">
             <!-- Header -->
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1
                         class="text-3xl font-bold text-gray-900 dark:text-white"
@@ -240,7 +292,7 @@ onMounted(async () => {
             <div
                 class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
             >
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_20rem]">
                     <div>
                         <label
                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -257,6 +309,30 @@ onMounted(async () => {
                                 placeholder="Nombre de categoría..."
                                 class="w-full rounded-lg border border-gray-300 bg-white py-2 pr-4 pl-10 text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-border dark:bg-muted dark:text-white"
                             />
+                        </div>
+                    </div>
+                    <div>
+                        <label
+                            class="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
+                            <Settings2 :size="16" />
+                            Separador visual del path
+                        </label>
+                        <div class="flex gap-2">
+                            <input
+                                v-model="pathSeparator"
+                                type="text"
+                                maxlength="12"
+                                placeholder=" / "
+                                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-border dark:bg-muted dark:text-white"
+                            />
+                            <button
+                                type="button"
+                                @click="resetPathSeparator"
+                                class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                            >
+                                Reset
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -348,7 +424,7 @@ onMounted(async () => {
                             </tr>
                             <tr
                                 v-for="cat in filteredCategories"
-                                :key="cat.id"
+                                :key="cat._treeKey"
                                 class="transition duration-150 hover:bg-indigo-50/50 dark:hover:bg-muted/50"
                                 :class="{
                                     'bg-gray-50/30 dark:bg-muted/10':

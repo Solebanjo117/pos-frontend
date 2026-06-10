@@ -132,6 +132,10 @@ type ImportSearchableOption = {
     label: string;
     value: string | number;
 };
+type WorkerAwareRun = Partial<ImportResult> & {
+    status?: string;
+    phase?: string | null;
+};
 
 const searchableOptions = ref<Record<string, ImportSearchableOption[]>>({});
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -139,6 +143,7 @@ const importerRootRef = ref<HTMLElement | null>(null);
 const normalTableScrollRef = ref<HTMLDivElement | null>(null);
 const groupedTableScrollRef = ref<HTMLDivElement | null>(null);
 const MAX_IMPORT_FILE_BYTES = 100 * 1024 * 1024;
+const IMPORT_CHUNK_CONCURRENCY = 3;
 const bulkEditMode = ref(false);
 const bulkValues = ref<Record<string, any>>({});
 const importStartedAt = ref<Date | null>(null);
@@ -472,8 +477,10 @@ const importConfirmationSummary = computed(() => {
     if (importConfirmMode.value === 'file') {
         const excludedCount = Math.max(
             0,
-            Number(validationRowsServerMeta.value?.total ?? editedRows.value.length) -
-                validCount.value,
+            Number(
+                validationRowsServerMeta.value?.total ??
+                    editedRows.value.length,
+            ) - validCount.value,
         );
 
         return {
@@ -1155,7 +1162,7 @@ const activeImportContext = computed(() => {
             (result.value as any).original_filename ||
             `Importacion #${activeImportRunId.value}`,
         type: runTypeLabel(run),
-        status: statusLabel(run.status ?? result.value.status ?? ''),
+        status: statusLabel(run.status ?? result.value.status ?? '', run),
     };
 });
 const reusableAsyncPreviewRunId = computed(() => {
@@ -3400,6 +3407,49 @@ const mergeImportRun = (run: any) => {
     importRuns.value = [run, ...importRuns.value];
 };
 
+const chunkConcurrencyForRun = (run: ImportResult | null): number => {
+    if (
+        run?.run_type === 'import' &&
+        run?.summary?.use_persisted_rows_snapshot === true
+    ) {
+        return IMPORT_CHUNK_CONCURRENCY;
+    }
+
+    return 1;
+};
+
+const processImportRunChunks = async (
+    importRunId: number,
+    concurrency: number,
+): Promise<ImportResult> => {
+    const responses = await Promise.allSettled(
+        Array.from({ length: concurrency }, () =>
+            importService.processRunChunk(props.config.entity, importRunId),
+        ),
+    );
+    const completedRuns = responses
+        .filter(
+            (response): response is PromiseFulfilledResult<ImportRun> =>
+                response.status === 'fulfilled',
+        )
+        .map((response) => response.value.data ?? response.value);
+
+    if (completedRuns.length > 0) {
+        return completedRuns.reduce((latest, current) =>
+            (current.processed_rows ?? 0) >= (latest.processed_rows ?? 0)
+                ? current
+                : latest,
+        );
+    }
+
+    const firstRejected = responses.find(
+        (response): response is PromiseRejectedResult =>
+            response.status === 'rejected',
+    );
+
+    throw firstRejected?.reason ?? new Error('No se pudo procesar el lote.');
+};
+
 const refreshImportRun = async () => {
     if (!activeImportRunId.value) return;
     const importRunId = activeImportRunId.value;
@@ -3415,31 +3465,38 @@ const refreshImportRun = async () => {
         second: '2-digit',
     }).format(new Date());
     let status = result.value?.status;
-    if (status === 'pending') {
+    if (status === 'pending' || status === 'running') {
         pendingPollCount.value += 1;
 
-        if (pendingPollCount.value >= 6 && !processNowAttempted.value) {
-            processNowAttempted.value = true;
-
-            try {
-                const processResponse = await importService.processRunNow(
-                    props.config.entity,
-                    importRunId,
-                );
-                result.value = processResponse.data ?? processResponse;
-                await loadImportRuns(false);
-                status = result.value?.status;
-            } catch (e: any) {
-                error.value =
-                    e.response?.data?.message ||
-                    'El proceso sigue en cola. Puedes mantener esta pantalla abierta; se seguira consultando el avance.';
+        try {
+            result.value = await processImportRunChunks(
+                importRunId,
+                chunkConcurrencyForRun(result.value),
+            );
+            mergeImportRun(result.value);
+            status = result.value?.status;
+            error.value = null;
+        } catch (e: any) {
+            const processErrorData = e.response?.data?.data as
+                | Partial<ImportResult>
+                | undefined;
+            if (processErrorData && typeof processErrorData === 'object') {
+                result.value = {
+                    ...(result.value ?? activeHistoryRun.value ?? {}),
+                    ...processErrorData,
+                    id: importRunId,
+                    status,
+                };
+                mergeImportRun(result.value);
             }
-        } else if (pendingPollCount.value >= 6) {
+
             error.value =
-                'El proceso sigue en cola. Puedes mantener esta pantalla abierta; se seguira consultando el avance.';
+                processErrorData?.message ||
+                e.response?.data?.message ||
+                'No se pudo procesar el siguiente lote de la importacion.';
         }
 
-        if (status === 'pending') {
+        if (status === 'pending' || status === 'running') {
             return;
         }
     }
@@ -3489,20 +3546,17 @@ const refreshImportRun = async () => {
     }
 };
 
-const {
-    pendingPollCount,
-    processNowAttempted,
-    startImportStatusPolling,
-    stopImportStatusPolling,
-} = useImportPolling({
-    activeImportRunId,
-    refreshImportRun,
-    onPollingError: (message) => {
-        error.value = message;
-        fullImportRunning.value = false;
-        validationRunning.value = false;
-    },
-});
+const { pendingPollCount, startImportStatusPolling, stopImportStatusPolling } =
+    useImportPolling({
+        activeImportRunId,
+        refreshImportRun,
+        onPollingError: (message) => {
+            error.value = message;
+            fullImportRunning.value = false;
+            validationRunning.value = false;
+        },
+        intervalMs: 250,
+    });
 
 onUnmounted(() => {
     stopImportStatusPolling();
@@ -3519,7 +3573,28 @@ const runTypeLabel = (run: any): string => {
     return 'Importacion';
 };
 
-const statusLabel = (status: string): string => {
+const runWaitingForWorker = (
+    run: WorkerAwareRun | null | undefined,
+): boolean => {
+    return run?.waiting_for_worker === true || run?.worker_required === true;
+};
+
+const runWorkerMessage = (
+    run: WorkerAwareRun | null | undefined,
+): string | null => {
+    if (!runWaitingForWorker(run)) return null;
+
+    return (
+        run?.worker_message ||
+        'El proceso requiere una accion manual antes de continuar.'
+    );
+};
+
+const statusLabel = (status: string, run?: WorkerAwareRun): string => {
+    if (runWaitingForWorker({ ...(run ?? {}), status })) {
+        return 'Requiere accion';
+    }
+
     const labels: Record<string, string> = {
         pending: 'En cola',
         running: 'Procesando',
@@ -3532,7 +3607,11 @@ const statusLabel = (status: string): string => {
     return labels[status] ?? status;
 };
 
-const statusClass = (status: string): string => {
+const statusClass = (status: string, run?: WorkerAwareRun): string => {
+    if (runWaitingForWorker({ ...(run ?? {}), status })) {
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
+    }
+
     if (status === 'completed') {
         return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
     }
@@ -4721,9 +4800,9 @@ const formatFileSize = (bytes: number) => {
                             <td class="px-4 py-4">
                                 <span
                                     class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                                    :class="statusClass(run.status)"
+                                    :class="statusClass(run.status, run)"
                                 >
-                                    {{ statusLabel(run.status) }}
+                                    {{ statusLabel(run.status, run) }}
                                 </span>
                             </td>
                             <td class="px-4 py-4">
@@ -4763,6 +4842,12 @@ const formatFileSize = (bytes: number) => {
                                             - {{ run.conflict_count }}
                                             conflictos
                                         </span>
+                                    </p>
+                                    <p
+                                        v-if="runWorkerMessage(run)"
+                                        class="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+                                    >
+                                        {{ runWorkerMessage(run) }}
                                     </p>
                                 </div>
                             </td>
@@ -7075,6 +7160,12 @@ const formatFileSize = (bytes: number) => {
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {{ formatProgressRefresh() }}
+                    </p>
+                    <p
+                        v-if="runWorkerMessage(result)"
+                        class="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+                    >
+                        {{ runWorkerMessage(result) }}
                     </p>
                 </div>
                 <div

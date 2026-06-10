@@ -332,6 +332,18 @@ export const importService = {
         return response.data;
     },
 
+    async processRunChunk(
+        entity: string,
+        importRunId: number,
+    ): Promise<ImportRun> {
+        const response = await apiClient.post(
+            `/${entity}/import/runs/${importRunId}/process-chunk`,
+            {},
+            { timeout: 120000 },
+        );
+        return response.data;
+    },
+
     async deleteRun(entity: string, importRunId: number): Promise<void> {
         await apiClient.delete(`/${entity}/import/runs/${importRunId}`);
     },

@@ -78,6 +78,7 @@ export interface ImportSummary {
     suggestions?: { categories?: Suggestion[]; brands?: Suggestion[] };
     preview_limited?: boolean;
     preview_async?: boolean;
+    use_persisted_rows_snapshot?: boolean;
     sheets?: ImportSheet[];
     selected_sheet?: { index: number; name?: string };
     recommended_sheet?: ImportSheet | null;
@@ -186,6 +187,7 @@ export interface ImportRun {
     data?: Record<string, unknown>;
     id: number;
     status: ImportRunStatus;
+    phase?: string | null;
     run_type?: string;
     mode?: string;
     original_filename?: string;
@@ -205,6 +207,23 @@ export interface ImportRun {
     can_delete?: boolean;
     preview_async?: boolean;
     async?: boolean;
+    waiting_for_worker?: boolean;
+    worker_required?: boolean;
+    worker_message?: string;
+    worker_command?: string;
+    blocking_reason?: string;
+    queue?: string;
+    queue_connection?: string;
+    queue_driver?: string;
+    chunk_processing?: boolean;
+    process_chunk_url?: string;
+    chunk?: {
+        processed_rows: number;
+        has_more: boolean;
+    };
+    started_at?: string | null;
+    finished_at?: string | null;
+    heartbeat_at?: string | null;
     summary?: ImportSummary;
     mapping?: Record<string, string>;
     sheet_index?: number | null;
@@ -281,9 +300,13 @@ export interface ImportRunRowsResponse {
 
 export interface ImportResult {
     data?: any;
+    id?: number;
     status?: string;
+    message?: string;
+    phase?: string | null;
     run_type?: string;
     mode?: string;
+    original_filename?: string;
     total_rows?: number;
     processed_rows?: number;
     success_count?: number;
@@ -303,6 +326,23 @@ export interface ImportResult {
     mapping?: Record<string, string>;
     sheet_index?: number | null;
     sheet_name?: string | null;
+    waiting_for_worker?: boolean;
+    worker_required?: boolean;
+    worker_message?: string;
+    blocking_reason?: string;
+    worker_command?: string;
+    queue?: string;
+    queue_connection?: string;
+    queue_driver?: string;
+    chunk_processing?: boolean;
+    process_chunk_url?: string;
+    chunk?: {
+        processed_rows: number;
+        has_more: boolean;
+    };
+    started_at?: string | null;
+    finished_at?: string | null;
+    heartbeat_at?: string | null;
     rows?: ImportRow[];
 }
 

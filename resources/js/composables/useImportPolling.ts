@@ -18,11 +18,16 @@ export function useImportPolling({
     intervalMs = 1500,
 }: UseImportPollingOptions) {
     const pendingPollCount = ref(0);
-    const processNowAttempted = ref(false);
     const pollingDelaysMs =
         intervalMs === DEFAULT_POLLING_DELAYS_MS[0]
             ? DEFAULT_POLLING_DELAYS_MS
-            : ([intervalMs, 3000, 5000, 10000, 15000] as const);
+            : ([
+                  intervalMs,
+                  intervalMs,
+                  intervalMs,
+                  intervalMs,
+                  intervalMs,
+              ] as const);
 
     let importStatusTimer: ReturnType<typeof setTimeout> | null = null;
     let importStatusRefreshInFlight = false;
@@ -79,7 +84,6 @@ export function useImportPolling({
     const startImportStatusPolling = (): void => {
         stopImportStatusPolling();
         pendingPollCount.value = 0;
-        processNowAttempted.value = false;
         consecutivePollCount = 0;
         scheduleNextImportStatusRefresh();
         void refreshImportRun().catch(() => undefined);
@@ -89,7 +93,6 @@ export function useImportPolling({
 
     return {
         pendingPollCount,
-        processNowAttempted,
         startImportStatusPolling,
         stopImportStatusPolling,
     };

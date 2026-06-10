@@ -17,6 +17,61 @@ const getCSRFToken = (): string | null => {
     return meta ? meta.getAttribute('content') : null;
 };
 
+const getResponseMessage = (payload: unknown, fallback: string): string => {
+    if (typeof payload === 'string') {
+        return payload;
+    }
+
+    if (!payload || typeof payload !== 'object') {
+        return fallback;
+    }
+
+    const response = payload as {
+        message?: unknown;
+        data?: { message?: unknown };
+    };
+
+    if (typeof response.message === 'string' && response.message.trim() !== '') {
+        return response.message;
+    }
+
+    if (
+        typeof response.data?.message === 'string' &&
+        response.data.message.trim() !== ''
+    ) {
+        return response.data.message;
+    }
+
+    return fallback;
+};
+
+const getBlockingReason = (payload: unknown): string | null => {
+    if (!payload || typeof payload !== 'object') {
+        return null;
+    }
+
+    const response = payload as {
+        blocking_reason?: unknown;
+        data?: { blocking_reason?: unknown };
+    };
+
+    if (
+        typeof response.blocking_reason === 'string' &&
+        response.blocking_reason.trim() !== ''
+    ) {
+        return response.blocking_reason;
+    }
+
+    if (
+        typeof response.data?.blocking_reason === 'string' &&
+        response.data.blocking_reason.trim() !== ''
+    ) {
+        return response.data.blocking_reason;
+    }
+
+    return null;
+};
+
 // Request interceptor
 apiClient.interceptors.request.use(
     (config) => {
@@ -38,6 +93,16 @@ apiClient.interceptors.response.use(
     (error: AxiosError) => {
         if (error.response) {
             const status = error.response.status;
+            const responseData = error.response.data;
+            const responseMessage = getResponseMessage(
+                responseData,
+                status === 500
+                    ? 'Error del servidor. Intenta de nuevo.'
+                    : 'La solicitud no pudo completarse.',
+            );
+            const blockingReason = getBlockingReason(responseData);
+
+            error.message = responseMessage;
 
             switch (status) {
                 case 401:
@@ -71,16 +136,30 @@ apiClient.interceptors.response.use(
                     );
                     break;
 
+                case 422:
+                    if (blockingReason) {
+                        console.warn('[API] 422 Blocking response', {
+                            message: responseMessage,
+                            blocking_reason: blockingReason,
+                            data: responseData,
+                        });
+                        break;
+                    }
+
+                    console.warn('[API] 422 Unprocessable Entity', responseData);
+                    break;
+
                 case 500:
-                    console.error(
-                        '[API] 500 Server Error',
-                        error.response.data,
-                    );
+                    console.error('[API] 500 Server Error', {
+                        message: responseMessage,
+                        data: responseData,
+                    });
                     window.dispatchEvent(
                         new CustomEvent('api:server-error', {
                             detail: {
-                                message:
-                                    'Error del servidor. Intenta de nuevo.',
+                                message: responseMessage,
+                                data: responseData,
+                                blocking_reason: blockingReason,
                             },
                         }),
                     );

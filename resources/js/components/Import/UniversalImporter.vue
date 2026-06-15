@@ -56,6 +56,9 @@ const searchableOptions = ref<Record<string, any[]>>({});
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const MAX_IMPORT_FILE_BYTES = 100 * 1024 * 1024;
 
+const getImportErrorMessage = (error: any, fallback: string): string =>
+    error?.response?.data?.message || error?.message || fallback;
+
 const emit = defineEmits<{
     (e: 'create', columnKey: string, rowIndex: number): void;
     (
@@ -297,12 +300,12 @@ const previewImport = async (
         await loadSearchableOptions();
         resolveSearchableValues();
     } catch (e: any) {
-        error.value =
-            e.response?.data?.message ||
-            (e.code === 'ECONNABORTED'
+        error.value = getImportErrorMessage(
+            e,
+            e.code === 'ECONNABORTED'
                 ? 'La previsualizacion tardo demasiado. Se debe procesar en cola para evitar el timeout.'
-                : null) ||
-            'No se pudo generar la previsualización.';
+                : 'No se pudo generar la previsualización.',
+        );
         previewRows.value = [];
         editedRows.value = [];
         previewSummary.value = null;
@@ -666,9 +669,10 @@ const importFullFile = async () => {
             fullImportRunning.value = false;
         }
     } catch (e: any) {
-        error.value =
-            e.response?.data?.message ||
-            'No se pudo iniciar la importacion completa.';
+        error.value = getImportErrorMessage(
+            e,
+            'No se pudo iniciar la importacion completa.',
+        );
         fullImportRunning.value = false;
     }
 };
@@ -861,14 +865,17 @@ const startImportStatusPolling = () => {
         if (importStatusRefreshInFlight) return;
 
         importStatusRefreshInFlight = true;
-        refreshImportRun().catch(() => {
-            error.value = 'No se pudo actualizar el avance de la importacion.';
-            fullImportRunning.value = false;
-            validationRunning.value = false;
-            stopImportStatusPolling();
-        }).finally(() => {
-            importStatusRefreshInFlight = false;
-        });
+        refreshImportRun()
+            .catch(() => {
+                error.value =
+                    'No se pudo actualizar el avance de la importacion.';
+                fullImportRunning.value = false;
+                validationRunning.value = false;
+                stopImportStatusPolling();
+            })
+            .finally(() => {
+                importStatusRefreshInFlight = false;
+            });
     }, 2500);
 };
 

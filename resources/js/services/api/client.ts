@@ -17,6 +17,30 @@ const getCSRFToken = (): string | null => {
     return meta ? meta.getAttribute('content') : null;
 };
 
+const IMPORT_UPLOAD_TOO_LARGE_MESSAGE =
+    'El servidor rechazó el archivo porque supera el límite de carga.';
+
+const getImportUploadTooLargeMessage = (error: AxiosError): string | null => {
+    if (error.response?.status === 413) {
+        return IMPORT_UPLOAD_TOO_LARGE_MESSAGE;
+    }
+
+    const config = error.config;
+    if (!config?.url || !config.url.includes('/products/import/')) {
+        return null;
+    }
+
+    if (!(config.data instanceof FormData)) {
+        return null;
+    }
+
+    const file = config.data.get('file');
+    if (!(file instanceof Blob)) {
+        return null;
+    }
+
+    return IMPORT_UPLOAD_TOO_LARGE_MESSAGE;
+};
 // Request interceptor
 apiClient.interceptors.request.use(
     (config) => {
@@ -104,12 +128,23 @@ apiClient.interceptors.response.use(
             );
         } else if (error.request) {
             // Network error — no response received
-            console.error('[API] No response from server');
-            window.dispatchEvent(
-                new CustomEvent('api:network-error', {
-                    detail: { message: 'Sin conexión con el servidor.' },
-                }),
-            );
+            const uploadTooLargeMessage = getImportUploadTooLargeMessage(error);
+            if (uploadTooLargeMessage) {
+                error.message = uploadTooLargeMessage;
+                console.error('[API] Upload rejected by server size limits');
+                window.dispatchEvent(
+                    new CustomEvent('api:network-error', {
+                        detail: { message: uploadTooLargeMessage },
+                    }),
+                );
+            } else {
+                console.error('[API] No response from server');
+                window.dispatchEvent(
+                    new CustomEvent('api:network-error', {
+                        detail: { message: 'Sin conexión con el servidor.' },
+                    }),
+                );
+            }
         } else {
             console.error('[API] Request error:', error.message);
         }

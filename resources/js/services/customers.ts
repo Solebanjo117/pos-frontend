@@ -4,6 +4,7 @@ import type {
     CustomerFilters,
     CustomerFormData,
     CustomerBalanceSummary,
+    CustomerProfileSummary,
     CustomerTransaction,
     CustomerVehicle,
     CustomerVehicleFormData,
@@ -45,6 +46,7 @@ export const CustomersApiService = {
         return await apiClient.get<{
             customer: Customer;
             balance_summary: CustomerBalanceSummary;
+            profile_summary: CustomerProfileSummary;
         }>(`/customers/${id}`);
     },
 

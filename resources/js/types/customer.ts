@@ -95,6 +95,49 @@ export interface CustomerBalanceSummary {
     is_over_limit: boolean;
 }
 
+export interface CustomerProfileTopItem {
+    product_id: number | null;
+    variant_id: number | null;
+    name: string | null;
+    sku: string | null;
+    brand_name: string | null;
+    quantity: number;
+    total: number;
+}
+
+export interface CustomerProfileRecentPayment {
+    id: number;
+    order_id: number;
+    order_number: string;
+    method: string;
+    method_label: string;
+    amount: number;
+    paid_at: string | null;
+}
+
+export interface CustomerProfileMechanic {
+    customer_id: number;
+    name: string;
+    code: string | null;
+    orders_count: number;
+    last_order_date: string | null;
+}
+
+export interface CustomerProfileSummary {
+    total_purchased: number;
+    invoices_count: number;
+    average_ticket: number;
+    last_purchase_date: string | null;
+    total_paid: number;
+    pending_amount: number;
+    credit_used_percent: number;
+    credit_status: 'current' | 'pending' | 'over_limit';
+    credit_status_label: string;
+    top_items: CustomerProfileTopItem[];
+    recent_payments: CustomerProfileRecentPayment[];
+    mechanic: CustomerProfileMechanic | null;
+}
+
 export interface CustomerOrderPaymentSummary {
     method: string;
     method_label: string;

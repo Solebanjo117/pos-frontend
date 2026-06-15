@@ -379,3 +379,122 @@ export interface CustomerReferenceReport {
     };
     data: CustomerReferenceReportRow[];
 }
+
+export interface SalesByClientFilters {
+    date_from: string;
+    date_to: string;
+    warehouse_id: number | null;
+    customer_id: number | null;
+    referred_by_customer_id: number | null;
+    search?: string;
+    status?: string | null;
+    payment_status?: string | null;
+    sort_by?:
+        | 'customer_name'
+        | 'orders_count'
+        | 'total_revenue'
+        | 'total_paid'
+        | 'pending_amount'
+        | 'last_payment_date'
+        | 'status';
+    sort_direction?: 'asc' | 'desc';
+    page?: number;
+    per_page?: number;
+}
+
+export interface SalesByClientInvoice {
+    id: number;
+    order_number: string;
+    date: string | null;
+    status: string;
+    payment_status: string;
+    total: number;
+    amount_paid: number;
+    pending_amount: number;
+    method?: string | null;
+    method_label?: string | null;
+    href: string;
+}
+
+export interface SalesByClientPurchasedItem {
+    product_id?: number | null;
+    variant_id?: number | null;
+    name: string | null;
+    sku?: string | null;
+    brand_name?: string | null;
+    quantity: number;
+    total: number;
+}
+
+export interface SalesByClientVehicle {
+    id: number;
+    name: string;
+    vin?: string | null;
+    status: string;
+}
+
+export interface SalesByClientRow {
+    customer_id: number;
+    customer_code?: string | null;
+    customer_name: string;
+    customer_email?: string | null;
+    customer_phone?: string | null;
+    initials: string;
+    referred_by_customer_id?: number | null;
+    referred_by_customer_name?: string | null;
+    orders_count: number;
+    total_revenue: number;
+    total_paid: number;
+    pending_amount: number;
+    last_payment_amount: number;
+    last_payment_date?: string | null;
+    dominant_payment_method?: string | null;
+    dominant_payment_method_label: string;
+    status: 'aldia' | 'pendiente' | 'vencido';
+    status_label: string;
+    details: {
+        invoices: SalesByClientInvoice[];
+        items: SalesByClientPurchasedItem[];
+        vehicles: SalesByClientVehicle[];
+    };
+}
+
+export interface SalesByClientReferrer {
+    customer_id?: number | null;
+    customer_name: string;
+    initials: string;
+    clients_count: number;
+    orders_count: number;
+    total_revenue: number;
+    commission: number;
+    growth: number;
+}
+
+export interface SalesByClientTopClient {
+    customer_id: number;
+    customer_name: string;
+    total_revenue: number;
+    orders_count: number;
+    growth: number;
+}
+
+export interface SalesByClientReport {
+    summary: {
+        total_revenue: number;
+        orders_count: number;
+        average_ticket: number;
+        active_customers: number;
+        total_paid: number;
+        pending_amount: number;
+        overdue_amount: number;
+    };
+    data: SalesByClientRow[];
+    by_referrer: SalesByClientReferrer[];
+    top_clients: SalesByClientTopClient[];
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+}

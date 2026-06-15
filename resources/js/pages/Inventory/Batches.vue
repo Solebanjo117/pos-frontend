@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';

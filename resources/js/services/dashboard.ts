@@ -2,6 +2,7 @@ import apiClient from './api/client';
 import type {
     DashboardStats,
     DashboardData,
+    DashboardFilters,
     TopProduct,
     LowStockProduct,
     InventorySummary,
@@ -19,12 +20,33 @@ export const DashboardApiService = {
      * Get all dashboard data in one request
      */
     async getDashboardData(
-        warehouseId?: number | null,
+        warehouseIdOrFilters?: number | null | DashboardFilters,
         period: string = '7d',
     ): Promise<DashboardData> {
         const params = new URLSearchParams();
-        if (warehouseId) params.append('warehouse_id', warehouseId.toString());
-        if (period) params.append('period', period);
+        const filters =
+            typeof warehouseIdOrFilters === 'object'
+                ? warehouseIdOrFilters
+                : {
+                      warehouse_id: warehouseIdOrFilters,
+                      period,
+                  };
+
+        if (filters?.warehouse_id) {
+            params.append('warehouse_id', filters.warehouse_id.toString());
+        }
+        if (filters?.period) {
+            params.append('period', filters.period);
+        }
+        if (filters?.date_from) {
+            params.append('date_from', filters.date_from);
+        }
+        if (filters?.date_to) {
+            params.append('date_to', filters.date_to);
+        }
+        if (filters?.compare) {
+            params.append('compare', 'true');
+        }
 
         const response = await apiClient.get<{ data: DashboardData }>(
             `${BASE_PATH}?${params.toString()}`,

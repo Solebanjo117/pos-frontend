@@ -70,6 +70,26 @@ export const importService = {
         return response.data;
     },
 
+    async metadata(
+        entity: string,
+        file: File,
+        options: ImportSheetSelection = {},
+    ): Promise<ImportResult> {
+        const formData = new FormData();
+        formData.append('file', file);
+        appendImportOptions(formData, options);
+        const response = await apiClient.post(
+            `/${entity}/import/metadata`,
+            formData,
+            {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 120000,
+                onUploadProgress: options.onUploadProgress,
+            },
+        );
+        return response.data;
+    },
+
     async execute(
         entity: string,
         rows: any[],
@@ -247,9 +267,22 @@ export const importService = {
     async revalidateRunRows(
         entity: string,
         importRunId: number,
-    ): Promise<{ data: { full_revalidation_status: string } }> {
+        payload: {
+            scope?: 'full' | 'references';
+            brands?: string[];
+            categories?: string[];
+        } = {},
+    ): Promise<{
+        data: {
+            full_revalidation_status: string;
+            scope?: string;
+            affected_rows_count?: number;
+            fallback_full_revalidation?: boolean;
+        };
+    }> {
         const response = await apiClient.post(
             `/${entity}/import/runs/${importRunId}/revalidate`,
+            payload,
         );
         return response.data;
     },
@@ -328,6 +361,21 @@ export const importService = {
             `/${entity}/import/runs/${importRunId}/process-now`,
             {},
             { timeout: 120000 },
+        );
+        return response.data;
+    },
+
+    async processRunChunk(
+        entity: string,
+        importRunId: number,
+    ): Promise<ImportRun> {
+        const response = await apiClient.post(
+            `/${entity}/import/runs/${importRunId}/process-chunk`,
+            {},
+            {
+                timeout: 120000,
+                suppressExpectedTerminalChunkConflictLog: true,
+            },
         );
         return response.data;
     },

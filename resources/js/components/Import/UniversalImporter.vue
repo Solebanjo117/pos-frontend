@@ -103,6 +103,7 @@ const fullValidationReportActive = ref(false);
 const result = ref<ImportResult | null>(null);
 const error = ref<string | null>(null);
 const previewLoading = ref(false);
+const metadataLoading = ref(false);
 const uploadProgress = ref<number | null>(null);
 const importRunning = ref(false);
 const fullImportRunning = ref(false);
@@ -132,6 +133,10 @@ type ImportSearchableOption = {
     label: string;
     value: string | number;
 };
+type WorkerAwareRun = Partial<ImportResult> & {
+    status?: string;
+    phase?: string | null;
+};
 
 const searchableOptions = ref<Record<string, ImportSearchableOption[]>>({});
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -139,6 +144,8 @@ const importerRootRef = ref<HTMLElement | null>(null);
 const normalTableScrollRef = ref<HTMLDivElement | null>(null);
 const groupedTableScrollRef = ref<HTMLDivElement | null>(null);
 const MAX_IMPORT_FILE_BYTES = 100 * 1024 * 1024;
+const IMPORT_CHUNK_CONCURRENCY = 3;
+const TERMINAL_IMPORT_STATUSES = ['completed', 'failed', 'cancelled'];
 const bulkEditMode = ref(false);
 const bulkValues = ref<Record<string, any>>({});
 const importStartedAt = ref<Date | null>(null);
@@ -209,12 +216,18 @@ const mappingPreviewStale = ref(false);
 const mappingReplacementRunId = ref<number | null>(null);
 const operationalMappingApplying = ref(false);
 let latestPreviewRequestId = 0;
+let latestMetadataRequestId = 0;
 let latestServerRowsRequestId = 0;
 let syncingServerPreviewPage = false;
 const autoRevalidatedImportRunIds = new Set<number>();
 
 type RowsRevalidationOptions = {
     automatic?: boolean;
+};
+
+type ReferenceRevalidationPayload = {
+    brands?: string[];
+    categories?: string[];
 };
 
 watch(leaveConfirmOpen, (open) => {
@@ -472,8 +485,10 @@ const importConfirmationSummary = computed(() => {
     if (importConfirmMode.value === 'file') {
         const excludedCount = Math.max(
             0,
-            Number(validationRowsServerMeta.value?.total ?? editedRows.value.length) -
-                validCount.value,
+            Number(
+                validationRowsServerMeta.value?.total ??
+                    editedRows.value.length,
+            ) - validCount.value,
         );
 
         return {
@@ -1155,7 +1170,7 @@ const activeImportContext = computed(() => {
             (result.value as any).original_filename ||
             `Importacion #${activeImportRunId.value}`,
         type: runTypeLabel(run),
-        status: statusLabel(run.status ?? result.value.status ?? ''),
+        status: statusLabel(run.status ?? result.value.status ?? '', run),
     };
 });
 const reusableAsyncPreviewRunId = computed(() => {
@@ -1246,7 +1261,9 @@ const shouldShowMappingTransparency = computed(
     () =>
         props.config.fullFileImport &&
         advancedImportControlsVisible.value &&
-        (previewLoading.value || hasMappingPanelContent.value),
+        (metadataLoading.value ||
+            previewLoading.value ||
+            hasMappingPanelContent.value),
 );
 const mappingContextLabel = computed(() => {
     if (mappingSource.value === 'history') {
@@ -1998,10 +2015,12 @@ const setSelectedFile = (selectedFile: File) => {
 
     file.value = selectedFile;
     previewSource.value = 'file';
+    void loadImportMetadata();
 };
 
 const resetPreview = () => {
     latestPreviewRequestId++;
+    latestMetadataRequestId++;
 
     previewRows.value = [];
     editedRows.value = [];
@@ -2014,6 +2033,7 @@ const resetPreview = () => {
     fullValidationReportActive.value = false;
     result.value = null;
     error.value = null;
+    metadataLoading.value = false;
     validationRunning.value = false;
     fullImportRunning.value = false;
     importRunning.value = false;
@@ -2065,6 +2085,72 @@ const downloadTemplate = async () => {
     }
 };
 
+const applyMetadataPayload = (
+    payload: any,
+    rows: any[] = [],
+    fallbackSheetIndex: number | null = selectedSheetIndex.value,
+): void => {
+    const metadata = previewMetadataFromPayload(payload, rows);
+
+    importSheets.value = metadata.sheets;
+    detectedColumns.value = metadata.detectedColumns;
+    requiredFields.value = metadata.requiredFields;
+    applySuggestedMappingIfPristine(metadata.suggestedMapping);
+    selectedSheetIndex.value =
+        metadata.selectedSheet?.index ?? fallbackSheetIndex ?? null;
+    ensureDetectedColumns(rows);
+};
+
+const loadImportMetadata = async (
+    sheetIndex: number | null = selectedSheetIndex.value,
+): Promise<void> => {
+    if (!file.value || !props.config.fullFileImport) {
+        return;
+    }
+
+    const requestId = ++latestMetadataRequestId;
+    metadataLoading.value = true;
+    error.value = null;
+
+    try {
+        const response = await importService.metadata(
+            props.config.entity,
+            file.value,
+            {
+                ...(sheetIndex !== null ? { sheet_index: sheetIndex } : {}),
+                mapping: currentRequestMapping(),
+                mode: importMode.value,
+                profile_id: selectedProfileId.value,
+            },
+        );
+        const metadataPayload = response.data ?? response;
+
+        if (requestId !== latestMetadataRequestId) {
+            return;
+        }
+
+        applyMetadataPayload(metadataPayload, [], sheetIndex);
+        previewSource.value = 'file';
+        mappingPreviewStale.value = false;
+    } catch (e: any) {
+        if (requestId !== latestMetadataRequestId) {
+            return;
+        }
+
+        error.value =
+            e.response?.data?.message ||
+            'No se pudieron leer las columnas del archivo.';
+        importSheets.value = [];
+        selectedSheetIndex.value = null;
+        detectedColumns.value = [];
+        requiredFields.value = [];
+    } finally {
+        if (requestId === latestMetadataRequestId) {
+            metadataLoading.value = false;
+        }
+    }
+};
+
 type PreviewImportOptions = {
     restartImportRunId?: number | null;
 };
@@ -2075,6 +2161,7 @@ const previewImport = async (
 ) => {
     if (!file.value) return;
     const requestId = ++latestPreviewRequestId;
+    latestMetadataRequestId++;
     error.value = null;
     result.value = null;
     fullValidationReportActive.value = false;
@@ -2082,6 +2169,7 @@ const previewImport = async (
     persistedRowsAvailable.value = false;
     dirtyPersistedRowIds.value = new Set();
     previewLoading.value = true;
+    metadataLoading.value = false;
     uploadProgress.value = 0;
     try {
         const requestOptions = {
@@ -2429,6 +2517,16 @@ const handleSheetChange = async (event: Event) => {
     const value = Number((event.target as HTMLSelectElement).value);
     selectedSheetIndex.value = Number.isNaN(value) ? null : value;
     resetMapping();
+
+    if (
+        props.config.fullFileImport &&
+        !hasPreview.value &&
+        activeImportRunId.value === null
+    ) {
+        await loadImportMetadata(selectedSheetIndex.value);
+        return;
+    }
+
     await previewImport(selectedSheetIndex.value);
 };
 
@@ -2460,14 +2558,13 @@ const loadSearchableOptions = async (options: { force?: boolean } = {}) => {
 };
 
 const refreshAfterReferenceMutation = async (
-    persistedRowsMessage: string,
+    references: ReferenceRevalidationPayload = {},
 ): Promise<boolean> => {
     await loadSearchableOptions({ force: true });
     resolveSearchableValues();
 
     if (validatedImportRunId.value && persistedRowsAvailable.value) {
-        toast.success(persistedRowsMessage);
-        return requestFullRowsRevalidation();
+        return requestReferenceRowsRevalidation(references);
     }
 
     await previewImport(selectedSheetIndex.value);
@@ -2485,9 +2582,10 @@ const createMissingBrand = async (brandName: string, refreshPreview = true) => {
             status: 'active',
         });
         if (refreshPreview) {
-            await refreshAfterReferenceMutation(
-                'Marca creada. Revalidando filas persistidas antes de importar.',
-            );
+            await refreshAfterReferenceMutation({
+                brands: [brandName],
+                categories: [],
+            });
         }
     } catch (e: any) {
         error.value =
@@ -2512,9 +2610,10 @@ const createMissingCategoryAndRefresh = async (categoryName: string) => {
 
     try {
         await createMissingCategory(categoryName);
-        await refreshAfterReferenceMutation(
-            'Categoria creada. Revalidando filas persistidas antes de importar.',
-        );
+        await refreshAfterReferenceMutation({
+            brands: [],
+            categories: [categoryName],
+        });
     } catch (e: any) {
         error.value =
             e.response?.data?.message ||
@@ -2546,9 +2645,10 @@ const executeCreateAllMissingReferences = async () => {
         );
         const summary = response.data.summary;
 
-        await refreshAfterReferenceMutation(
-            'Referencias creadas. Revalidando filas persistidas antes de importar.',
-        );
+        await refreshAfterReferenceMutation({
+            categories: previewSummary.value?.missing_categories ?? [],
+            brands: missingBrandReferences.value,
+        });
 
         if (summary.error_count > 0) {
             toast.warning(
@@ -2595,9 +2695,7 @@ const executeCreateMissingVehicleCandidates = async () => {
         );
         const summary = response.data.summary;
 
-        await refreshAfterReferenceMutation(
-            'Vehiculos creados. Revalidando filas persistidas antes de importar.',
-        );
+        await refreshAfterReferenceMutation();
 
         if (summary.error_count > 0) {
             toast.warning(
@@ -2691,10 +2789,7 @@ defineExpose({
     },
     refreshPreview: () => previewImport(selectedSheetIndex.value),
     revalidatePersistedRows: requestFullRowsRevalidation,
-    refreshAfterReferenceBatch: () =>
-        refreshAfterReferenceMutation(
-            'Referencias creadas. Revalidando filas persistidas antes de importar.',
-        ),
+    refreshAfterReferenceBatch: () => refreshAfterReferenceMutation(),
     markPersistedRowDirty,
     editedRows,
     previewSummary,
@@ -3116,6 +3211,61 @@ const discardPersistedRowChanges = async () => {
     });
 };
 
+async function requestReferenceRowsRevalidation(
+    references: ReferenceRevalidationPayload,
+): Promise<boolean> {
+    if (
+        !activeImportRunId.value ||
+        revalidatingRows.value ||
+        persistedRowsRevalidationActive.value
+    )
+        return false;
+
+    revalidatingRows.value = true;
+    error.value = null;
+
+    try {
+        const response = await importService.revalidateRunRows(
+            props.config.entity,
+            activeImportRunId.value,
+            {
+                scope: 'references',
+                brands: references.brands ?? [],
+                categories: references.categories ?? [],
+            },
+        );
+
+        validationRowsServerMeta.value = validationRowsServerMeta.value
+            ? {
+                  ...validationRowsServerMeta.value,
+                  full_revalidation_status:
+                      response.data.full_revalidation_status,
+              }
+            : validationRowsServerMeta.value;
+
+        if (response.data.fallback_full_revalidation === true) {
+            toast.success('Revalidando filas afectadas.');
+            startImportStatusPolling();
+            return true;
+        }
+
+        if (activeImportRunId.value) {
+            await loadValidatedRunRows(activeImportRunId.value);
+            await refreshImportRun();
+        }
+
+        toast.success('Revalidando filas afectadas.');
+        return true;
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message ||
+            'No se pudo revalidar las filas afectadas.';
+        return false;
+    } finally {
+        revalidatingRows.value = false;
+    }
+}
+
 async function requestFullRowsRevalidation(
     options: RowsRevalidationOptions = {},
 ): Promise<boolean> {
@@ -3144,7 +3294,7 @@ async function requestFullRowsRevalidation(
                 'Revalidando errores guardados con las referencias actuales.',
             );
         } else {
-            toast.success('Revalidacion completa en cola.');
+            toast.success('Revalidación completa en cola.');
         }
         startImportStatusPolling();
         return true;
@@ -3400,6 +3550,112 @@ const mergeImportRun = (run: any) => {
     importRuns.value = [run, ...importRuns.value];
 };
 
+const chunkConcurrencyForRun = (run: ImportResult | null): number => {
+    if (run?.run_type === 'validation') {
+        if (
+            run.summary?.parallel_validation === true &&
+            run.summary?.use_persisted_rows_snapshot === true &&
+            run.summary?.staging_status === 'completed'
+        ) {
+            return IMPORT_CHUNK_CONCURRENCY;
+        }
+
+        return 1;
+    }
+
+    if (
+        run?.run_type === 'import' &&
+        run?.summary?.use_persisted_rows_snapshot === true
+    ) {
+        return IMPORT_CHUNK_CONCURRENCY;
+    }
+
+    return 1;
+};
+
+const isTerminalImportStatus = (status: string | null | undefined): boolean =>
+    TERMINAL_IMPORT_STATUSES.includes(status ?? '');
+
+const isTerminalChunkConflict = (error: any): boolean =>
+    error?.response?.status === 409 &&
+    typeof error.response?.data?.message === 'string' &&
+    error.response.data.message.includes('ya finalizo');
+
+const isActiveChunkStatus = (status: string | null | undefined): boolean =>
+    status === 'pending' || status === 'running';
+
+const latestProgressRun = (runs: ImportResult[]): ImportResult =>
+    runs.reduce((latest, current) =>
+        (current.processed_rows ?? 0) >= (latest.processed_rows ?? 0)
+            ? current
+            : latest,
+    );
+
+const processImportRunChunks = async (
+    importRunId: number,
+    concurrency: number,
+): Promise<ImportResult> => {
+    const responses = await Promise.allSettled(
+        Array.from({ length: concurrency }, () =>
+            importService.processRunChunk(props.config.entity, importRunId),
+        ),
+    );
+    const completedRuns = responses
+        .filter(
+            (response): response is PromiseFulfilledResult<ImportRun> =>
+                response.status === 'fulfilled',
+        )
+        .map(
+            (response) =>
+                (response.value.data ?? response.value) as ImportResult,
+        );
+    const terminalConflict = responses.find(
+        (response): response is PromiseRejectedResult =>
+            response.status === 'rejected' &&
+            isTerminalChunkConflict(response.reason),
+    );
+
+    if (completedRuns.length > 0) {
+        const terminalRuns = completedRuns.filter(
+            (run) =>
+                isTerminalImportStatus(run.status) ||
+                run.chunk?.has_more === false,
+        );
+
+        if (terminalRuns.length > 0) {
+            return latestProgressRun(terminalRuns);
+        }
+    }
+
+    if (terminalConflict) {
+        const latestResponse = await importService.getRun(
+            props.config.entity,
+            importRunId,
+        );
+        const latestRun = (latestResponse.data ??
+            latestResponse) as ImportResult;
+
+        if (
+            isTerminalImportStatus(latestRun.status) ||
+            latestRun.chunk?.has_more === false ||
+            !isActiveChunkStatus(latestRun.status)
+        ) {
+            return latestRun;
+        }
+    }
+
+    if (completedRuns.length > 0) {
+        return latestProgressRun(completedRuns);
+    }
+
+    const firstRejected = responses.find(
+        (response): response is PromiseRejectedResult =>
+            response.status === 'rejected',
+    );
+
+    throw firstRejected?.reason ?? new Error('No se pudo procesar el lote.');
+};
+
 const refreshImportRun = async () => {
     if (!activeImportRunId.value) return;
     const importRunId = activeImportRunId.value;
@@ -3415,38 +3671,56 @@ const refreshImportRun = async () => {
         second: '2-digit',
     }).format(new Date());
     let status = result.value?.status;
-    if (status === 'pending') {
+    if (status === 'pending' || status === 'running') {
         pendingPollCount.value += 1;
 
-        if (pendingPollCount.value >= 6 && !processNowAttempted.value) {
-            processNowAttempted.value = true;
-
-            try {
-                const processResponse = await importService.processRunNow(
+        try {
+            result.value = await processImportRunChunks(
+                importRunId,
+                chunkConcurrencyForRun(result.value),
+            );
+            mergeImportRun(result.value);
+            status = result.value?.status;
+            error.value = null;
+        } catch (e: any) {
+            if (isTerminalChunkConflict(e)) {
+                const terminalResponse = await importService.getRun(
                     props.config.entity,
                     importRunId,
                 );
-                result.value = processResponse.data ?? processResponse;
-                await loadImportRuns(false);
+                result.value = terminalResponse.data ?? terminalResponse;
+                mergeImportRun(result.value);
                 status = result.value?.status;
-            } catch (e: any) {
+                error.value = null;
+            } else {
+                const processErrorData = e.response?.data?.data as
+                    | Partial<ImportResult>
+                    | undefined;
+                if (processErrorData && typeof processErrorData === 'object') {
+                    result.value = {
+                        ...(result.value ?? activeHistoryRun.value ?? {}),
+                        ...processErrorData,
+                        id: importRunId,
+                        status,
+                    };
+                    mergeImportRun(result.value);
+                }
+
                 error.value =
+                    processErrorData?.message ||
                     e.response?.data?.message ||
-                    'El proceso sigue en cola. Puedes mantener esta pantalla abierta; se seguira consultando el avance.';
+                    'No se pudo procesar el siguiente lote de la importacion.';
             }
-        } else if (pendingPollCount.value >= 6) {
-            error.value =
-                'El proceso sigue en cola. Puedes mantener esta pantalla abierta; se seguira consultando el avance.';
         }
 
-        if (status === 'pending') {
+        if (status === 'pending' || status === 'running') {
             return;
         }
     }
 
     if (
         mappingReplacementRunId.value === importRunId &&
-        ['completed', 'failed', 'cancelled'].includes(status ?? '')
+        isTerminalImportStatus(status)
     ) {
         await restartPreviewWithCurrentMapping(importRunId);
         return;
@@ -3465,11 +3739,7 @@ const refreshImportRun = async () => {
         return;
     }
 
-    if (
-        status === 'completed' ||
-        status === 'failed' ||
-        status === 'cancelled'
-    ) {
+    if (isTerminalImportStatus(status)) {
         fullImportRunning.value = false;
         validationRunning.value = false;
         if (result.value?.run_type === 'validation') {
@@ -3489,20 +3759,16 @@ const refreshImportRun = async () => {
     }
 };
 
-const {
-    pendingPollCount,
-    processNowAttempted,
-    startImportStatusPolling,
-    stopImportStatusPolling,
-} = useImportPolling({
-    activeImportRunId,
-    refreshImportRun,
-    onPollingError: (message) => {
-        error.value = message;
-        fullImportRunning.value = false;
-        validationRunning.value = false;
-    },
-});
+const { pendingPollCount, startImportStatusPolling, stopImportStatusPolling } =
+    useImportPolling({
+        activeImportRunId,
+        refreshImportRun,
+        onPollingError: (message) => {
+            error.value = message;
+            fullImportRunning.value = false;
+            validationRunning.value = false;
+        },
+    });
 
 onUnmounted(() => {
     stopImportStatusPolling();
@@ -3519,7 +3785,28 @@ const runTypeLabel = (run: any): string => {
     return 'Importacion';
 };
 
-const statusLabel = (status: string): string => {
+const runWaitingForWorker = (
+    run: WorkerAwareRun | null | undefined,
+): boolean => {
+    return run?.waiting_for_worker === true || run?.worker_required === true;
+};
+
+const runWorkerMessage = (
+    run: WorkerAwareRun | null | undefined,
+): string | null => {
+    if (!runWaitingForWorker(run)) return null;
+
+    return (
+        run?.worker_message ||
+        'El proceso requiere una accion manual antes de continuar.'
+    );
+};
+
+const statusLabel = (status: string, run?: WorkerAwareRun): string => {
+    if (runWaitingForWorker({ ...(run ?? {}), status })) {
+        return 'Requiere accion';
+    }
+
     const labels: Record<string, string> = {
         pending: 'En cola',
         running: 'Procesando',
@@ -3532,7 +3819,11 @@ const statusLabel = (status: string): string => {
     return labels[status] ?? status;
 };
 
-const statusClass = (status: string): string => {
+const statusClass = (status: string, run?: WorkerAwareRun): string => {
+    if (runWaitingForWorker({ ...(run ?? {}), status })) {
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
+    }
+
     if (status === 'completed') {
         return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
     }
@@ -4043,13 +4334,17 @@ const formatFileSize = (bytes: number) => {
 
                 <button
                     type="button"
-                    :disabled="!hasFile || previewLoading"
+                    :disabled="!hasFile || metadataLoading || previewLoading"
                     @click="() => previewImport()"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
                 >
                     <Eye class="h-4 w-4" />
                     {{
-                        previewLoading ? 'Previsualizando...' : 'Previsualizar'
+                        metadataLoading
+                            ? 'Leyendo columnas...'
+                            : previewLoading
+                              ? 'Previsualizando...'
+                              : 'Previsualizar'
                     }}
                 </button>
 
@@ -4207,7 +4502,11 @@ const formatFileSize = (bytes: number) => {
                         <select
                             id="import-sheet-select"
                             :value="selectedSheetIndex ?? ''"
-                            :disabled="previewLoading || fullImportRunning"
+                            :disabled="
+                                metadataLoading ||
+                                previewLoading ||
+                                fullImportRunning
+                            "
                             class="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none disabled:opacity-60 dark:border-amber-700 dark:bg-background dark:text-white"
                             @change="handleSheetChange"
                         >
@@ -4440,6 +4739,7 @@ const formatFileSize = (bytes: number) => {
                                     :value="sourceColumnForTarget(field.key)"
                                     class="rounded border border-gray-300 bg-white px-2 py-1 dark:border-border dark:bg-card dark:text-white"
                                     :disabled="
+                                        metadataLoading ||
                                         previewLoading ||
                                         mappingReplacementRunId !== null ||
                                         operationalMappingApplying ||
@@ -4488,6 +4788,7 @@ const formatFileSize = (bytes: number) => {
                                     type="button"
                                     class="inline-flex items-center justify-center rounded-md bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
                                     :disabled="
+                                        metadataLoading ||
                                         previewLoading ||
                                         mappingReplacementRunId !== null
                                     "
@@ -4721,9 +5022,9 @@ const formatFileSize = (bytes: number) => {
                             <td class="px-4 py-4">
                                 <span
                                     class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                                    :class="statusClass(run.status)"
+                                    :class="statusClass(run.status, run)"
                                 >
-                                    {{ statusLabel(run.status) }}
+                                    {{ statusLabel(run.status, run) }}
                                 </span>
                             </td>
                             <td class="px-4 py-4">
@@ -4763,6 +5064,12 @@ const formatFileSize = (bytes: number) => {
                                             - {{ run.conflict_count }}
                                             conflictos
                                         </span>
+                                    </p>
+                                    <p
+                                        v-if="runWorkerMessage(run)"
+                                        class="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+                                    >
+                                        {{ runWorkerMessage(run) }}
                                     </p>
                                 </div>
                             </td>
@@ -7075,6 +7382,12 @@ const formatFileSize = (bytes: number) => {
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {{ formatProgressRefresh() }}
+                    </p>
+                    <p
+                        v-if="runWorkerMessage(result)"
+                        class="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+                    >
+                        {{ runWorkerMessage(result) }}
                     </p>
                 </div>
                 <div

@@ -2265,8 +2265,7 @@ const previewImport = async (
             e.response?.data?.message ||
             (e.code === 'ECONNABORTED'
                 ? 'La previsualizacion tardo demasiado. Se debe procesar en cola para evitar el timeout.'
-                : 'No se pudo generar la previsualización.',
-        );
+                : 'No se pudo generar la previsualización.');
         previewRows.value = [];
         editedRows.value = [];
         previewSummary.value = null;

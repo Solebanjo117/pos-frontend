@@ -78,7 +78,12 @@ export interface ImportSummary {
     suggestions?: { categories?: Suggestion[]; brands?: Suggestion[] };
     preview_limited?: boolean;
     preview_async?: boolean;
+    parallel_validation?: boolean;
     use_persisted_rows_snapshot?: boolean;
+    staging_status?: string;
+    staged_rows_count?: number;
+    validation_rows_count?: number;
+    validation_rows_limited?: boolean;
     sheets?: ImportSheet[];
     selected_sheet?: { index: number; name?: string };
     recommended_sheet?: ImportSheet | null;

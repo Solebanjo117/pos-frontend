@@ -1,6 +1,12 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios';
 import { router } from '@inertiajs/vue3';
 
+declare module 'axios' {
+    export interface AxiosRequestConfig {
+        suppressExpectedTerminalChunkConflictLog?: boolean;
+    }
+}
+
 const apiClient: AxiosInstance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
     headers: {
@@ -31,7 +37,10 @@ const getResponseMessage = (payload: unknown, fallback: string): string => {
         data?: { message?: unknown };
     };
 
-    if (typeof response.message === 'string' && response.message.trim() !== '') {
+    if (
+        typeof response.message === 'string' &&
+        response.message.trim() !== ''
+    ) {
         return response.message;
     }
 
@@ -72,6 +81,20 @@ const getBlockingReason = (payload: unknown): string | null => {
     return null;
 };
 
+const isExpectedTerminalChunkConflict = (
+    error: AxiosError,
+    responseMessage: string,
+): boolean => {
+    const url = error.config?.url ?? '';
+
+    return (
+        error.config?.suppressExpectedTerminalChunkConflictLog === true &&
+        error.response?.status === 409 &&
+        /\/import\/runs\/\d+\/process-chunk$/.test(url) &&
+        responseMessage.includes('ya finalizo')
+    );
+};
+
 // Request interceptor
 apiClient.interceptors.request.use(
     (config) => {
@@ -103,6 +126,10 @@ apiClient.interceptors.response.use(
             const blockingReason = getBlockingReason(responseData);
 
             error.message = responseMessage;
+
+            if (isExpectedTerminalChunkConflict(error, responseMessage)) {
+                return Promise.reject(error);
+            }
 
             switch (status) {
                 case 401:
@@ -146,7 +173,10 @@ apiClient.interceptors.response.use(
                         break;
                     }
 
-                    console.warn('[API] 422 Unprocessable Entity', responseData);
+                    console.warn(
+                        '[API] 422 Unprocessable Entity',
+                        responseData,
+                    );
                     break;
 
                 case 500:

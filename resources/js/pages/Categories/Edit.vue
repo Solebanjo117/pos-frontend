@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { ArrowLeft, Plus, Save, X } from 'lucide-vue-next';
+import { ref, onMounted, computed } from 'vue';
+import CategoryImagesSection from '@/components/Categories/CategoryImagesSection.vue';
+import SearchableSelect, {
+    type SelectOption,
+} from '@/components/ui/SearchableSelect.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useStoreSettings } from '@/composables/useStoreSettings';
-import { ArrowLeft, Plus, Save, X } from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type {
     UpdateCategoryData,
     Category,
     CategoryDefaultAttribute,
 } from '@/types/category';
-import CategoryImagesSection from '@/components/Categories/CategoryImagesSection.vue';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
 
 interface Props {
     id: string;

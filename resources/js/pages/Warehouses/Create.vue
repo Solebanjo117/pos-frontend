@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { useWarehouses } from '@/composables/useWarehouses';
 import type { CreateWarehouseRequest } from '@/types/warehouse';
 
 const breadcrumbs: BreadcrumbItem[] = [

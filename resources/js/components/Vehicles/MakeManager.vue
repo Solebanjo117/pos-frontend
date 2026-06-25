@@ -1,9 +1,7 @@
 <script setup lang="ts">
+import { Pencil, Trash2, Plus, Search } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
-import {
-    useVehicleMakes,
-    type VehicleMake,
-} from '@/composables/useVehicleMakes';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -11,10 +9,12 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Pencil, Trash2, Plus, Search } from 'lucide-vue-next';
+import {
+    useVehicleMakes,
+    type VehicleMake,
+} from '@/composables/useVehicleMakes';
 
 const {
     makes,

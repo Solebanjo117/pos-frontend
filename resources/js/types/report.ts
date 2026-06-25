@@ -498,3 +498,107 @@ export interface SalesByClientReport {
         total: number;
     };
 }
+
+export interface DailyFinancialRow {
+    date: string;
+    cash: number;
+    inventory: number;
+    purchase: number;
+    expenses: number;
+    sales: number;
+    cogs: number;
+    profit: number;
+    credit_payable: number;
+    credit_receivable: number;
+    cogs_credit: number;
+    investment: number;
+    opening_cash?: number;
+    opening_inventory?: number;
+    opening_accounts_receivable?: number;
+    opening_accounts_payable?: number;
+    cash_sales?: number;
+    credit_sales?: number;
+    cash_purchases?: number;
+    credit_purchases?: number;
+    customer_payments?: number;
+    supplier_payments?: number;
+    cogs_cash_sales?: number;
+    cogs_credit_sales?: number;
+    investment_in?: number;
+    investment_out?: number;
+    cash_adjustments?: number;
+    inventory_adjustments?: number;
+    closing_cash?: number;
+    closing_inventory?: number;
+    accounts_receivable?: number;
+    accounts_payable?: number;
+    gross_profit?: number;
+    net_profit?: number;
+    net_investment?: number;
+    is_locked?: boolean;
+    computed_at?: string | null;
+}
+
+export interface DailyFinancialSummary {
+    rows: DailyFinancialRow[];
+    totals: Record<string, number>;
+    period: {
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+    };
+}
+
+export interface BalanceSheetReport {
+    assets: {
+        cash: number;
+        cash_initial: number;
+        inventory: number;
+        inventory_initial: number;
+    };
+    liabilities: {
+        accounts_payable: number;
+        accounts_receivable: number;
+    };
+    totals: {
+        total_assets: number;
+        total_liabilities: number;
+        balance: number;
+    };
+    as_of: string;
+    warehouse_id?: number | null;
+}
+
+export interface ExpenseBreakdownItem {
+    label: string;
+    amount: number;
+}
+
+export interface ExpenseBreakdown {
+    items: ExpenseBreakdownItem[];
+    other: ExpenseBreakdownItem;
+    total: number;
+}
+
+export interface FinancialAdjustment {
+    id: number;
+    type: 'cash' | 'inventory';
+    type_label: string;
+    amount: number;
+    reason: string;
+    adjustment_date: string;
+    notes?: string | null;
+    warehouse_id?: number | null;
+}
+
+export interface CapitalMovement {
+    id: number;
+    movement_type: 'in' | 'out';
+    movement_type_label: string;
+    amount: number;
+    movement_date: string;
+    reason: string;
+    notes?: string | null;
+    warehouse_id?: number | null;
+    user_id?: number | null;
+}

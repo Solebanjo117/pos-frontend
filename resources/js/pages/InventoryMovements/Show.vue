@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowLeft,
@@ -13,9 +12,10 @@ import {
     User,
     Warehouse,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import { type InventoryMovement } from '@/types/inventory-movement';
 
 const props = defineProps<{

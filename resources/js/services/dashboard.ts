@@ -1,4 +1,3 @@
-import apiClient from './api/client';
 import type {
     DashboardStats,
     DashboardData,
@@ -9,6 +8,7 @@ import type {
     ReorderAlert,
     SalesChartData,
 } from '@/types/dashboard';
+import apiClient from './api/client';
 
 const BASE_PATH = '/dashboard';
 

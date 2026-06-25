@@ -1,31 +1,31 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
+import { Archive, Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next';
+import { ref, onMounted, watch, computed } from 'vue';
+import AlternativeManager from '@/components/Products/AlternativeManager.vue';
+import AttributeManager from '@/components/Products/AttributeManager.vue';
+import OemReferenceManager from '@/components/Products/OemReferenceManager.vue';
+import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
+import VariantManager from '@/components/Products/VariantManager.vue';
+import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
+import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useToast } from '@/composables/useToast';
-import type { UpdateProductRequest } from '@/types/product';
-import type { Category } from '@/types/category';
+import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { productsApi } from '@/services/api/products';
-import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes';
-import SearchableSelect from '@/components/ui/SearchableSelect.vue';
-import VariantManager from '@/components/Products/VariantManager.vue';
-import OemReferenceManager from '@/components/Products/OemReferenceManager.vue';
-import AlternativeManager from '@/components/Products/AlternativeManager.vue';
-import AttributeManager from '@/components/Products/AttributeManager.vue';
-import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
-import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
-import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
+import { type BreadcrumbItem } from '@/types';
+import type { Category } from '@/types/category';
+import type { UpdateProductRequest } from '@/types/product';
 import {
     normalizeAlternativesPayload,
     normalizeOemReferencesPayload,
     normalizeProductAttributesPayload,
     normalizeVehicleCompatibilityPayload,
 } from '@/utils/productPayload';
-import { Archive, Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next';
 
 const props = defineProps<{
     productId: number;

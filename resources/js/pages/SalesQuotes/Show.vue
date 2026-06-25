@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     AlertCircle,
@@ -20,9 +19,10 @@ import {
     User,
     XCircle,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import { usePOS } from '@/composables/usePOS';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
 import type {
     SalesQuoteOperationalDetail,

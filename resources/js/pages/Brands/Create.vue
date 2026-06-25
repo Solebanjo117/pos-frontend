@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { ArrowLeft, Save } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
 import { useBrands } from '@/composables/useBrands';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
-import { ArrowLeft, Save } from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { CreateBrandData } from '@/types/brand';
 import type { Supplier } from '@/types/supplier';
 

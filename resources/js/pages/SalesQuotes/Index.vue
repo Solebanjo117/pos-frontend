@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { usePOS } from '@/composables/usePOS';
-import { SalesQuotesApiService } from '@/services/sales-quotes';
-import type { SalesQuote } from '@/types/sales-quote';
 import {
     FileText,
     Plus,
@@ -21,6 +16,13 @@ import {
     EyeOff,
     ShoppingCart,
 } from 'lucide-vue-next';
+import { Banknote } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
+import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
+import { usePOS } from '@/composables/usePOS';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { SalesQuotesApiService } from '@/services/sales-quotes';
+import type { SalesQuote } from '@/types/sales-quote';
 
 defineOptions({ layout: AppLayout });
 
@@ -68,8 +70,6 @@ const getStatusColor = (status: string) => {
     };
     return colors[status] || colors.draft;
 };
-
-import { Banknote } from 'lucide-vue-next';
 
 const getStatusIcon = (status: string) => {
     const icons: Record<string, any> = {
@@ -194,8 +194,6 @@ const handleConvert = async (id: number) => {
         alert(e.response?.data?.message || 'Error al convertir');
     }
 };
-
-import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 
 const openPdf = (
     id: number,

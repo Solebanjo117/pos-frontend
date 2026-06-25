@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { ArrowRight, ClipboardCheck, Factory } from 'lucide-vue-next';
+import { onMounted, onUnmounted } from 'vue';
 import {
     usePurchaseOrderQueue,
     type PendingReceiptOrder,
 } from '@/composables/usePurchaseOrderQueue';
-import { ArrowRight, ClipboardCheck, Factory } from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
 
 defineOptions({ layout: AppLayout });
 

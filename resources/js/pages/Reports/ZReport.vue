@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import {
     AlertCircle,
@@ -18,7 +17,7 @@ import {
     UserRound,
     Wallet,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import FinanceAccountingPanel from '@/components/Finance/FinanceAccountingPanel.vue';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceMethodBars from '@/components/Finance/FinanceMethodBars.vue';
@@ -30,6 +29,7 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 
 interface CashDrawer {

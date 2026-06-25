@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import { BookOpen, Clock3, Send, Tag } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import PageShell from '@/components/PageShell.vue';
 import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/AppLayout.vue';
 import {
     changelogApi,
     type ChangelogDraft,

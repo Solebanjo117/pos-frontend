@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { CheckCircle, Clock, Package, Truck, User } from 'lucide-vue-next';
+import { onMounted, onUnmounted, ref } from 'vue';
 import {
     useDeliveryQueue,
     type DeliveryOrder,
 } from '@/composables/useDeliveryQueue';
-import { CheckCircle, Clock, Package, Truck, User } from 'lucide-vue-next';
+import AppLayout from '@/layouts/AppLayout.vue';
 
 defineOptions({ layout: AppLayout });
 

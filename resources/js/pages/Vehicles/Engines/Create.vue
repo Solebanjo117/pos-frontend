@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { useAuth } from '@/composables/useAuth';
 import {
     useVehicleEngines,
     VEHICLE_ENGINE_FUEL_TYPE_OPTIONS,
@@ -11,7 +12,6 @@ import {
     normalizeVehicleEngineCode,
     normalizeVehicleEngineFuelType,
 } from '@/composables/useVehicleEngines';
-import { useAuth } from '@/composables/useAuth';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';

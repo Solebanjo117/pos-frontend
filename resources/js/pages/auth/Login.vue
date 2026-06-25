@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { onMounted } from 'vue';
 
 // Redirect to the welcome page which now contains the login form
 onMounted(() => {

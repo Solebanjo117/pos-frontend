@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\FrontendApiProxyController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -8,6 +9,7 @@ Route::get('/', function () {
     if (Auth::check()) {
         return redirect('/pos');
     }
+
     return Inertia::render('Welcome', [
         'canRegister' => false,
     ]);
@@ -83,10 +85,10 @@ Route::middleware(['auth'])->prefix('warehouses')->name('warehouses.')->group(fu
         return Inertia::render('Warehouses/Create');
     })->name('create');
     Route::get('/{id}', function ($id) {
-        return Inertia::render('Warehouses/Show', ['warehouseId' => (int)$id]);
+        return Inertia::render('Warehouses/Show', ['warehouseId' => (int) $id]);
     })->name('show');
     Route::get('/{id}/edit', function ($id) {
-        return Inertia::render('Warehouses/Edit', ['warehouseId' => (int)$id]);
+        return Inertia::render('Warehouses/Edit', ['warehouseId' => (int) $id]);
     })->name('edit');
 });
 
@@ -127,7 +129,7 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
     Route::get('/stock-levels', function () {
         return Inertia::render('Reports/StockLevels');
     })->name('stock-levels');
-    
+
     Route::get('/movement-history', function () {
         return Inertia::render('Reports/MovementHistory');
     })->name('movement-history');
@@ -143,7 +145,7 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
     Route::get('/sales-by-client', function () {
         return Inertia::render('Reports/SalesByClient');
     })->name('sales-by-client');
-    
+
     Route::get('/z-report', function () {
         return Inertia::render('Reports/ZReport');
     })->name('z-report');
@@ -195,11 +197,11 @@ Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->grou
     })->name('create');
 
     Route::get('/{id}', function ($id) {
-        return Inertia::render('SalesOrders/Show', ['id' => (int)$id]);
+        return Inertia::render('SalesOrders/Show', ['id' => (int) $id]);
     })->name('show');
 
     Route::get('/{id}/edit', function ($id) {
-        return Inertia::render('SalesOrders/Edit', ['id' => (int)$id]);
+        return Inertia::render('SalesOrders/Edit', ['id' => (int) $id]);
     })->name('edit');
 });
 
@@ -213,10 +215,9 @@ Route::middleware(['auth'])->get('/returns/{id}', function ($id) {
 })->whereNumber('id')->name('returns.show');
 
 // Returns (POS in return mode)
-Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/orders/{orderId}', fn($orderId) =>
-    Inertia::render('SalesOrders/ReturnEditor', [
-        'orderId' => (int) $orderId
-    ])
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/orders/{orderId}', fn ($orderId) => Inertia::render('SalesOrders/ReturnEditor', [
+    'orderId' => (int) $orderId,
+])
 )->name('returns.create');
 
 // Vehicle Management Routes
@@ -224,7 +225,7 @@ Route::middleware(['auth'])->prefix('vehicles')->name('vehicles.')->group(functi
     Route::get('/', function () {
         return Inertia::render('Vehicles/Index');
     })->name('index');
-    
+
     // Engines (R21)
     Route::get('/engines', function () {
         return Inertia::render('Vehicles/Engines/Index');
@@ -333,6 +334,16 @@ Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
     })->name('operational-expenses.index')->middleware('role:admin,manager');
 });
 
+Route::get('/api/v1/store-settings', FrontendApiProxyController::class)
+    ->defaults('path', 'store-settings');
+Route::get('/api/v1/pricing-formula/presets', FrontendApiProxyController::class)
+    ->defaults('path', 'pricing-formula/presets');
+Route::post('/api/v1/pricing-formula/preview', FrontendApiProxyController::class)
+    ->defaults('path', 'pricing-formula/preview');
+
+Route::middleware(['auth'])
+    ->any('/api/v1/{path}', FrontendApiProxyController::class)
+    ->where('path', '.*');
 
 // ==================== BRANDS ====================
 Route::middleware(['auth', 'role:admin,manager'])->prefix('brands')->name('brands.')->group(function () {
@@ -378,19 +389,22 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
         $users = \App\Models\User::select('id', 'name', 'username', 'email', 'role', 'is_active')
             ->with('warehouses:id,name')
             ->get();
+
         return Inertia::render('Users/Index', ['users' => $users]);
     })->name('index');
 
     Route::get('/create', function () {
         $warehouses = \App\Models\Warehouse::where('status', 'active')->select('id', 'name')->orderBy('name')->get();
+
         return Inertia::render('Users/Form', ['warehouses' => $warehouses]);
     })->name('create');
 
     Route::get('/{id}/edit', function ($id) {
         $user = \App\Models\User::with('warehouses:id')->findOrFail($id);
         $warehouses = \App\Models\Warehouse::where('status', 'active')->select('id', 'name')->orderBy('name')->get();
+
         return Inertia::render('Users/Form', [
-            'userId'   => (int) $id,
+            'userId' => (int) $id,
             'userData' => array_merge(
                 $user->only('id', 'name', 'username', 'email', 'role', 'is_active'),
                 ['warehouse_ids' => $user->warehouses->pluck('id')->toArray()]
@@ -402,13 +416,13 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
     // CRUD API endpoints
     Route::post('/', function (\Illuminate\Http\Request $request) {
         $validated = $request->validate([
-            'name'                  => 'required|string|max:255',
-            'username'              => 'required|string|max:50|unique:users,username',
-            'email'                 => 'required|email|unique:users,email',
-            'password'              => 'required|string|min:8|confirmed',
-            'role'                  => 'required|in:admin,manager,buyer,seller,cashier,assistant',
-            'warehouse_ids'         => 'nullable|array',
-            'warehouse_ids.*'       => 'exists:warehouses,id',
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:50|unique:users,username',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'role' => 'required|in:admin,manager,buyer,seller,cashier,assistant',
+            'warehouse_ids' => 'nullable|array',
+            'warehouse_ids.*' => 'exists:warehouses,id',
         ]);
         unset($validated['warehouse_ids']);
         $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
@@ -418,7 +432,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
             $user->warehouses()->sync($request->input('warehouse_ids', []));
             // Set first warehouse as current
             $firstWh = $request->input('warehouse_ids')[0] ?? null;
-            if ($firstWh) $user->update(['current_warehouse_id' => $firstWh]);
+            if ($firstWh) {
+                $user->update(['current_warehouse_id' => $firstWh]);
+            }
         }
 
         return response()->json(['message' => 'Usuario creado', 'data' => $user->load('warehouses:id,name')], 201);
@@ -427,17 +443,17 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
     Route::put('/{id}', function (\Illuminate\Http\Request $request, $id) {
         $user = \App\Models\User::findOrFail($id);
         $validated = $request->validate([
-            'name'             => 'sometimes|string|max:255',
-            'username'         => 'sometimes|string|max:50|unique:users,username,' . $id,
-            'email'            => 'sometimes|email|unique:users,email,' . $id,
-            'password'         => 'nullable|string|min:8|confirmed',
-            'role'             => 'sometimes|in:admin,manager,buyer,seller,cashier,assistant',
-            'is_active'        => 'sometimes|boolean',
-            'warehouse_ids'    => 'nullable|array',
-            'warehouse_ids.*'  => 'exists:warehouses,id',
+            'name' => 'sometimes|string|max:255',
+            'username' => 'sometimes|string|max:50|unique:users,username,'.$id,
+            'email' => 'sometimes|email|unique:users,email,'.$id,
+            'password' => 'nullable|string|min:8|confirmed',
+            'role' => 'sometimes|in:admin,manager,buyer,seller,cashier,assistant',
+            'is_active' => 'sometimes|boolean',
+            'warehouse_ids' => 'nullable|array',
+            'warehouse_ids.*' => 'exists:warehouses,id',
         ]);
         unset($validated['warehouse_ids']);
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
         } else {
             unset($validated['password']);
@@ -457,6 +473,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
             return response()->json(['message' => 'No puedes desactivar al único administrador.'], 422);
         }
         $user->update(['is_active' => false]);
+
         return response()->json(['message' => 'Usuario desactivado']);
     })->name('destroy');
 });
@@ -490,13 +507,11 @@ Route::middleware(['auth'])->group(function () {
     })->name('sales-quotes.edit');
 
     // Quote Editor (POS in quote-only mode)
-    Route::get('/quotes/create', fn() =>
-        Inertia::render('SalesQuotes/Editor')
+    Route::get('/quotes/create', fn () => Inertia::render('SalesQuotes/Editor')
     )->name('quotes.create')->middleware('role:admin,manager,seller');
 
-    Route::get('/quotes/{id}/edit', fn($id) =>
-        Inertia::render('SalesQuotes/Editor', [
-            'quoteId' => (int) $id
-        ])
+    Route::get('/quotes/{id}/edit', fn ($id) => Inertia::render('SalesQuotes/Editor', [
+        'quoteId' => (int) $id,
+    ])
     )->name('quotes.edit')->middleware('role:admin,manager,seller');
 });

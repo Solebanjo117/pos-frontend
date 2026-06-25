@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { User, IdCard, CheckCircle2, Plus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
-import { formatCurrency } from '@/utils/formatters';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import { formatCurrency } from '@/utils/formatters';
 
 const props = defineProps<{
     subtotal: number;
@@ -130,10 +130,10 @@ watch(
                     Vendedor
                 </label>
                 <SearchableSelect
-                  v-model="internalSellerId"
-                  :options="sellerOptions"
-                  :disabled="props.canEditSeller === false"
-                  placeholder="Seleccionar Vendedor"
+                    v-model="internalSellerId"
+                    :options="sellerOptions"
+                    :disabled="props.canEditSeller === false"
+                    placeholder="Seleccionar Vendedor"
                     @update:modelValue="(val) => emit('update:sellerId', val)"
                     :class="
                         selectedSeller

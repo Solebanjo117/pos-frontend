@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     CalendarDays,
@@ -15,8 +14,9 @@ import {
     Wrench,
     XCircle,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import { useWorkOrders } from '@/composables/useWorkOrders';
+import AppLayout from '@/layouts/AppLayout.vue';
 import {
     WorkOrdersApiService,
     type WorkOrder,

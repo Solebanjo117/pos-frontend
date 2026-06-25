@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
+import {
+    BarElement,
+    CategoryScale,
+    Chart as ChartJS,
+    Legend,
+    LinearScale,
+    Title,
+    Tooltip,
+} from 'chart.js';
 import {
     AlertCircle,
     Award,
@@ -21,17 +29,8 @@ import {
     Users,
     Wrench,
 } from 'lucide-vue-next';
-import {
-    BarElement,
-    CategoryScale,
-    Chart as ChartJS,
-    Legend,
-    LinearScale,
-    Title,
-    Tooltip,
-} from 'chart.js';
+import { computed, onMounted, ref } from 'vue';
 import { Bar } from 'vue-chartjs';
-import AppLayout from '@/layouts/AppLayout.vue';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import SearchableSelect, {
@@ -39,6 +38,7 @@ import SearchableSelect, {
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { CustomersApiService } from '@/services/customers';
 import { ReportsApiService } from '@/services/reports';
 import type { BreadcrumbItem } from '@/types';

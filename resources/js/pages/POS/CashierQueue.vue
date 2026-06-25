@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import apiClient from '@/services/api/client';
-import { usePOS } from '@/composables/usePOS';
+import { Inbox, Clock, ShoppingCart, User, Package, X } from 'lucide-vue-next';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import {
     useCashierQueue,
     type PendingQuote,
 } from '@/composables/useCashierQueue';
-import { Inbox, Clock, ShoppingCart, User, Package, X } from 'lucide-vue-next';
+import { usePOS } from '@/composables/usePOS';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
 
 defineOptions({ layout: AppLayout });
 

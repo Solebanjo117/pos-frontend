@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { usePricingFormulas } from '@/composables/usePricingFormulas';
-import type { PricingFormula } from '@/types/pricing-formula';
 import {
     Calculator,
     Plus,
@@ -16,6 +11,11 @@ import {
     Check,
     AlertCircle,
 } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
+import { usePricingFormulas } from '@/composables/usePricingFormulas';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import type { PricingFormula } from '@/types/pricing-formula';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

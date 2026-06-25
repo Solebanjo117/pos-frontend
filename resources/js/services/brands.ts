@@ -1,10 +1,10 @@
-import apiClient from './api/client';
 import type {
     Brand,
     BrandFilters,
     CreateBrandData,
     UpdateBrandData,
 } from '@/types/brand';
+import apiClient from './api/client';
 
 const BASE_URL = '/brands';
 

@@ -1,11 +1,11 @@
-import { ref, computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 import { PosSessionApiService } from '../services/pos-session';
-import type { PosSession, PosSessionSummary } from '../types/pos-session';
 import type {
     CashMovementPayload,
     CashMovementRecord,
 } from '../services/pos-session';
+import type { PosSession, PosSessionSummary } from '../types/pos-session';
 
 export function usePosSession() {
     const page = usePage();

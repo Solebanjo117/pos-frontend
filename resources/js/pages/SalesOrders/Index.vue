@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { useSalesOrders } from '@/composables/useSalesOrders';
-import { usePosSettings } from '@/composables/usePosSettings';
-import type { SalesOrderStatus } from '@/types/sales-order';
 import {
     Search,
     Filter,
@@ -17,6 +12,11 @@ import {
     ShoppingCart,
     DollarSign,
 } from 'lucide-vue-next';
+import { ref, onMounted, computed, watch } from 'vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useSalesOrders } from '@/composables/useSalesOrders';
+import AppLayout from '@/layouts/AppLayout.vue';
+import type { SalesOrderStatus } from '@/types/sales-order';
 
 defineOptions({ layout: AppLayout });
 

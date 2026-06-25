@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { AlertCircle, Banknote, LogIn } from 'lucide-vue-next';
+import { ref } from 'vue';
 
 const props = defineProps<{
     show: boolean;

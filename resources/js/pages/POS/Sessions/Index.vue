@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import {
     AlertCircle,
@@ -20,8 +19,17 @@ import {
     User,
     Warehouse,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
+import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
+import SearchableSelect, {
+    type SelectOption,
+} from '@/components/ui/SearchableSelect.vue';
+import { usePosSession } from '@/composables/usePosSession';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useUsers } from '@/composables/useUsers';
+import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
 import {
     PosSessionsApiService,
     type AccountPaymentRecord,
@@ -33,15 +41,7 @@ import {
     type PurchasePaymentRecord,
     type SessionSalesOrder,
 } from '@/services/posSessions';
-import { useWarehouses } from '@/composables/useWarehouses';
-import { useUsers } from '@/composables/useUsers';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { usePosSession } from '@/composables/usePosSession';
-import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
-import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
+import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { X, Package, Layers, ShoppingCart, Truck } from 'lucide-vue-next';
-import PriceDisplay from '@/components/ui/PriceDisplay.vue';
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
+import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import type { Product, ProductVariant } from '@/types/product';
 
 const props = defineProps<{

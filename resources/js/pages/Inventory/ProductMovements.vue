@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     AlertCircle,
@@ -13,18 +12,19 @@ import {
     Warehouse,
     X,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { productsApi } from '@/services/api/products';
-import { usePosSettings } from '@/composables/usePosSettings';
+import { type BreadcrumbItem } from '@/types';
 import type {
     ProductDetail,
     ProductInventory,
     ProductVariant,
     VariantInventory,
 } from '@/types/product';
-import { type BreadcrumbItem } from '@/types';
 
 type WarehouseOption = {
     id: number;

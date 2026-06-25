@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
-import { onMounted } from 'vue';
 
 const { settings, fetchSettings } = useStoreSettings();
 // Ensure settings are loaded (composable is singleton, won't double-fetch)

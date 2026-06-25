@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import apiClient from '@/services/api/client';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
 import {
     FileText,
     Search,
@@ -19,6 +13,12 @@ import {
     Hash,
     AlertTriangle,
 } from 'lucide-vue-next';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import SearchableSelect, {
+    type SelectOption,
+} from '@/components/ui/SearchableSelect.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
 
 defineOptions({ layout: AppLayout });
 

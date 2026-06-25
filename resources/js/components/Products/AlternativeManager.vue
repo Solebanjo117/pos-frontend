@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
-import apiClient from '@/services/api/client';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import apiClient from '@/services/api/client';
 
 interface Alternative {
     id: number; // This is the PRODUCT ID of the alternative

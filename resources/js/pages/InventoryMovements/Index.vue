@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowLeftRight,
@@ -11,12 +10,13 @@ import {
     Search,
     Warehouse,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import { usePosSettings } from '@/composables/usePosSettings';
+import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
 import type {

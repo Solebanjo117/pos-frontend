@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { Car, Loader2, Plus, X } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import UniversalImporter from '@/components/Import/UniversalImporter.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
-import SearchableSelect from '@/components/ui/SearchableSelect.vue';
-import { importService, type ImporterConfig } from '@/services/import';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -15,10 +14,11 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Car, Loader2, Plus, X } from 'lucide-vue-next';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { useToast } from '@/composables/useToast';
+import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
+import { importService, type ImporterConfig } from '@/services/import';
 
 const toast = useToast();
 

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import {
     X,
     RotateCcw,
@@ -12,8 +11,9 @@ import {
     User,
     ChevronDown,
 } from 'lucide-vue-next';
-import type { User as UserType } from '@/types';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import type { User as UserType } from '@/types';
 
 const { methods, fetchMethods } = usePaymentMethods();
 

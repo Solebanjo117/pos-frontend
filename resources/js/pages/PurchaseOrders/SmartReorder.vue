@@ -1,13 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import {
-    smartReorderService,
-    type SupplierLowStock,
-    type LowStockStats,
-    type CreatedPurchaseOrder,
-} from '@/services/smart-reorder';
 import {
     PackageX,
     AlertTriangle,
@@ -18,11 +10,19 @@ import {
     Plus,
     CheckCircle2,
 } from 'lucide-vue-next';
-import apiClient from '@/services/api/client';
-import { useToast } from '@/composables/useToast';
+import { ref, onMounted, computed } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { useToast } from '@/composables/useToast';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import {
+    smartReorderService,
+    type SupplierLowStock,
+    type LowStockStats,
+    type CreatedPurchaseOrder,
+} from '@/services/smart-reorder';
 
 const toast = useToast();
 const lowStockData = ref<SupplierLowStock[]>([]);

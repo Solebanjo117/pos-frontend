@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { useCategories } from '@/composables/useCategories';
-import { useStoreSettings } from '@/composables/useStoreSettings';
-import { categoriesService } from '@/services/categories';
 import { ArrowLeft, Plus, Save, X } from 'lucide-vue-next';
-import type {
-    CreateCategoryData,
-    Category,
-    CategoryDefaultAttribute,
-} from '@/types/category';
+import { ref, onMounted, computed } from 'vue';
 import CategoryImagesSection, {
     type PendingCategoryImage,
 } from '@/components/Categories/CategoryImagesSection.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { useCategories } from '@/composables/useCategories';
+import { useStoreSettings } from '@/composables/useStoreSettings';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { categoriesService } from '@/services/categories';
+import type {
+    CreateCategoryData,
+    Category,
+    CategoryDefaultAttribute,
+} from '@/types/category';
 
 const { loading, error, createCategory, fetchCategoriesWithParent } =
     useCategories();

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Trash2, Save, Lock, CreditCard, FileText } from 'lucide-vue-next';
+import { computed } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 
 const props = defineProps<{

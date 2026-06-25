@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import apiClient from '@/services/api/client';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import apiClient from '@/services/api/client';
 
 interface OemReference {
     id: number;

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import {
     Archive,
@@ -11,9 +10,10 @@ import {
     Loader2,
     RefreshCw,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
-import { useToast } from '@/composables/useToast';
 import apiClient from '@/services/api/client';
 
 const toast = useToast();

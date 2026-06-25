@@ -26,8 +26,8 @@ import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
-import { useStoreSettings } from '@/composables/useStoreSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';

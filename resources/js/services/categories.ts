@@ -1,10 +1,10 @@
-import apiClient from './api/client';
 import type {
     Category,
     CategoryFilters,
     CreateCategoryData,
     UpdateCategoryData,
 } from '@/types/category';
+import apiClient from './api/client';
 
 const BASE_URL = '/categories';
 

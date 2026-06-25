@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'pos_backend' => [
+        'url' => env('POS_BACKEND_URL', 'http://pos-backend.test'),
+        'urls' => array_filter(array_map('trim', explode(',', env('POS_BACKEND_URLS', 'http://pos-backend.test')))),
+        'proxy_secret' => env('FRONTEND_PROXY_SECRET', 'local-frontend-backend-proxy-secret'),
+        'connect_timeout' => (int) env('POS_BACKEND_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('POS_BACKEND_TIMEOUT', 30),
+    ],
+
 ];

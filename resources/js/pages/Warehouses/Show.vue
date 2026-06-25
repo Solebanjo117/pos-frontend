@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { useWarehouses } from '@/composables/useWarehouses';
-import WarehousesApiService from '@/services/warehouses';
-import type { WarehouseInventoryFilters } from '@/types/warehouse';
 import { Pencil } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
+import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
+import WarehousesApiService from '@/services/warehouses';
+import { type BreadcrumbItem } from '@/types';
+import type { WarehouseInventoryFilters } from '@/types/warehouse';
 
 interface Props {
     warehouseId: number;

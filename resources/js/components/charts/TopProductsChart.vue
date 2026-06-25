@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Bar } from 'vue-chartjs';
 import {
     Chart as ChartJS,
     Title,
@@ -11,6 +9,8 @@ import {
     LinearScale,
     type ChartOptions,
 } from 'chart.js';
+import { computed } from 'vue';
+import { Bar } from 'vue-chartjs';
 
 ChartJS.register(
     Title,

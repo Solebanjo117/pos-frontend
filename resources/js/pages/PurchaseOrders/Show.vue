@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
-import { useStoreSettings } from '@/composables/useStoreSettings';
-import { usePosSettings } from '@/composables/usePosSettings';
 import {
     ClipboardCheck,
     Copy,
@@ -20,11 +15,16 @@ import {
     UserRound,
     XCircle,
 } from 'lucide-vue-next';
-import apiClient from '@/services/api/client';
-import { purchaseOrdersService } from '@/services/purchase-orders';
+import { computed, ref, onMounted } from 'vue';
+import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
-import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
+import { useStoreSettings } from '@/composables/useStoreSettings';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import { purchaseOrdersService } from '@/services/purchase-orders';
 
 const props = defineProps<{ purchaseOrderId: number }>();
 const {

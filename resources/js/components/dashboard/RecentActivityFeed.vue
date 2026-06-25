@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { RecentActivity } from '@/types/dashboard';
-import { CheckCircle2Icon, PackageIcon } from 'lucide-vue-next';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { CheckCircle2Icon, PackageIcon } from 'lucide-vue-next';
+import type { RecentActivity } from '@/types/dashboard';
 
 interface Props {
     activities: RecentActivity[];

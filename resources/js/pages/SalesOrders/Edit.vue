@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { useSalesOrders } from '@/composables/useSalesOrders';
-import { useProducts } from '@/composables/useProducts';
-import { useWarehouses } from '@/composables/useWarehouses';
-import { useCustomers } from '@/composables/useCustomers';
-import { CustomersApiService } from '@/services/customers';
-import { useStoreSettings } from '@/composables/useStoreSettings';
-import apiClient from '@/services/api/client';
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-vue-next';
-import type { UpdateSalesOrderData } from '@/types/sales-order';
-import type { CustomerVehicle } from '@/types/customer';
+import { ref, computed, onMounted, watch } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { useCustomers } from '@/composables/useCustomers';
+import { useProducts } from '@/composables/useProducts';
+import { useSalesOrders } from '@/composables/useSalesOrders';
+import { useStoreSettings } from '@/composables/useStoreSettings';
+import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import { CustomersApiService } from '@/services/customers';
+import type { CustomerVehicle } from '@/types/customer';
+import type { UpdateSalesOrderData } from '@/types/sales-order';
 
 defineOptions({ layout: AppLayout });
 

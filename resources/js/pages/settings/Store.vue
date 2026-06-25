@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import {
     Building2,
@@ -22,6 +21,7 @@ import {
     Upload,
     Wrench,
 } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';

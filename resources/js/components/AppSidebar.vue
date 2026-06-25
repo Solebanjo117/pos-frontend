@@ -24,6 +24,7 @@ import {
     Warehouse,
     Wrench,
 } from 'lucide-vue-next';
+import { onMounted, computed } from 'vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -36,18 +37,17 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+
+import { useAuth } from '@/composables/useAuth';
+import { useCashierQueue } from '@/composables/useCashierQueue';
+import { useDeliveryQueue } from '@/composables/useDeliveryQueue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { usePurchaseOrderQueue } from '@/composables/usePurchaseOrderQueue';
+import { useStoreSettings } from '@/composables/useStoreSettings';
+import { useWarehouseQueue } from '@/composables/useWarehouseQueue';
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import AppLogo from './AppLogo.vue';
-
-import { onMounted, computed } from 'vue';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { useAuth } from '@/composables/useAuth';
-import { useStoreSettings } from '@/composables/useStoreSettings';
-import { useCashierQueue } from '@/composables/useCashierQueue';
-import { useWarehouseQueue } from '@/composables/useWarehouseQueue';
-import { useDeliveryQueue } from '@/composables/useDeliveryQueue';
-import { usePurchaseOrderQueue } from '@/composables/usePurchaseOrderQueue';
 
 const { fetchSettings } = usePosSettings();
 const { fetchCurrentUser, isAdmin, role: userRole, hasRole } = useAuth();

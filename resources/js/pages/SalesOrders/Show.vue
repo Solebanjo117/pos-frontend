@@ -1,21 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
-import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
-import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
-import { useSalesOrders } from '@/composables/useSalesOrders';
-import { useUsers } from '@/composables/useUsers';
-import apiClient from '@/services/api/client';
-import { salesOrdersService } from '@/services/sales-orders';
-import { SalesReturnsApiService } from '@/services/sales-returns';
-import type { Product, ProductVariant } from '@/types/product';
-import type { ProductVariantSelection } from '@/types/product-variant-picker';
-import type {
-    SalesOrderOperationalDetail,
-    SalesOrderOperationalItem,
-} from '@/types/sales-order';
 import {
     Activity,
     AlertTriangle,
@@ -35,6 +19,22 @@ import {
     User,
     XCircle,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
+import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
+import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import { useSalesOrders } from '@/composables/useSalesOrders';
+import { useUsers } from '@/composables/useUsers';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import { salesOrdersService } from '@/services/sales-orders';
+import { SalesReturnsApiService } from '@/services/sales-returns';
+import type { Product, ProductVariant } from '@/types/product';
+import type { ProductVariantSelection } from '@/types/product-variant-picker';
+import type {
+    SalesOrderOperationalDetail,
+    SalesOrderOperationalItem,
+} from '@/types/sales-order';
 
 const props = defineProps<{ id: number }>();
 

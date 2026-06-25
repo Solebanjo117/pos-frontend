@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { X, Search, Plus, Package, ChevronDown } from 'lucide-vue-next';
-import apiClient from '@/services/api/client';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import apiClient from '@/services/api/client';
 import type { User } from '@/types';
 
 interface FoundProduct {

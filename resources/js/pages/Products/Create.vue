@@ -1,24 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { useProducts } from '@/composables/useProducts';
-import { useToast } from '@/composables/useToast';
-import type { CreateProductRequest, Product } from '@/types/product';
-import type { Category } from '@/types/category';
-import type { Brand } from '@/types/brand';
-import apiClient from '@/services/api/client';
-import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import { Plus, X, Globe, Wrench } from 'lucide-vue-next';
+import { ref, onMounted, watch, computed } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
+import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
+import type { PendingImage } from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
+import type { DraftCompatData } from '@/components/Products/VehicleCompatSection.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
 import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
-import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
-import type { DraftCompatData } from '@/components/Products/VehicleCompatSection.vue';
-import type { PendingImage } from '@/components/Products/ProductImagesSection.vue';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { useToast } from '@/composables/useToast';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import { type BreadcrumbItem } from '@/types';
+import type { Brand } from '@/types/brand';
+import type { Category } from '@/types/category';
+import type { CreateProductRequest, Product } from '@/types/product';
 import {
     normalizeIdArray,
     normalizeInitialInventoryPayload,
@@ -27,16 +37,6 @@ import {
     normalizeVehicleCompatibilityPayload,
     toPositiveInt,
 } from '@/utils/productPayload';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Plus, X, Globe, Wrench } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

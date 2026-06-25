@@ -1,17 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import SearchableSelect from '@/components/ui/SearchableSelect.vue';
-import ProductSearchModal from '@/components/POS/ProductSearchModal.vue';
-import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
-import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
-import { supplyListService, type SupplyListItem } from '@/services/supply-list';
-import { useProducts } from '@/composables/useProducts';
-import { useSuppliers } from '@/composables/useSuppliers';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { useStoreSettings } from '@/composables/useStoreSettings';
-import { useToast } from '@/composables/useToast';
 import {
     Trash2,
     ArrowRight,
@@ -26,10 +14,22 @@ import {
     CalendarDays,
     Warehouse,
 } from 'lucide-vue-next';
+import { ref, onMounted, computed } from 'vue';
+import ProductSearchModal from '@/components/POS/ProductSearchModal.vue';
+import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
+import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useProducts } from '@/composables/useProducts';
+import { useStoreSettings } from '@/composables/useStoreSettings';
+import { useSuppliers } from '@/composables/useSuppliers';
+import { useToast } from '@/composables/useToast';
+import AppLayout from '@/layouts/AppLayout.vue';
 import {
     smartReorderService,
     type LowStockStats,
 } from '@/services/smart-reorder';
+import { supplyListService, type SupplyListItem } from '@/services/supply-list';
 
 // LL-001: AppLayout for all page-level components
 defineOptions({ layout: AppLayout });

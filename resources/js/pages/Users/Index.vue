@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import {
@@ -14,9 +13,10 @@ import {
     Users,
     XCircle,
 } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
+import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
-import { useToast } from '@/composables/useToast';
 
 const toast = useToast();
 

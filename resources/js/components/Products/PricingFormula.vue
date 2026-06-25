@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, nextTick } from 'vue';
-import { Calculator, ChevronDown, Check, X } from 'lucide-vue-next';
-import apiClient from '@/services/api/client';
 import { useDebounceFn } from '@vueuse/core';
+import { Calculator, ChevronDown, Check, X } from 'lucide-vue-next';
+import { ref, watch, computed, onMounted, nextTick } from 'vue';
 import { usePricingFormulas } from '@/composables/usePricingFormulas';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import apiClient from '@/services/api/client';
 
 const props = defineProps<{
     cost: number;

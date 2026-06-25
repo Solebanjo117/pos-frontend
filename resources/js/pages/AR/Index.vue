@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     AlertCircle,
@@ -13,11 +12,12 @@ import {
     TrendingUp,
     Users,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import FinanceAgingBars from '@/components/Finance/FinanceAgingBars.vue';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { AccountsReceivableApiService } from '@/services/payments';
 import type { BreadcrumbItem } from '@/types';
 

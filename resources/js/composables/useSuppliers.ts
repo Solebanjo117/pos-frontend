@@ -1,6 +1,6 @@
 import { ref } from 'vue';
-import { suppliersService } from '@/services/suppliers';
 import { brandsService } from '@/services/brands';
+import { suppliersService } from '@/services/suppliers';
 import type {
     Supplier,
     SupplierFilters,

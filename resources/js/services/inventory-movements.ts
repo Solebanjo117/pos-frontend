@@ -1,5 +1,4 @@
-import { AxiosResponse } from 'axios';
-import apiClient from './api/client';
+import type { AxiosResponse } from 'axios';
 import type {
     InventoryMovement,
     InventoryMovementFilters,
@@ -8,6 +7,7 @@ import type {
     CreateTransferMovementRequest,
     PaginatedMovementsResponse,
 } from '@/types/inventory-movement';
+import apiClient from './api/client';
 
 class InventoryMovementsApiService {
     /**

@@ -1,5 +1,5 @@
-import axios, { type AxiosInstance, type AxiosError } from 'axios';
 import { router } from '@inertiajs/vue3';
+import axios, { type AxiosInstance, type AxiosError } from 'axios';
 
 declare module 'axios' {
     export interface AxiosRequestConfig {
@@ -7,8 +7,13 @@ declare module 'axios' {
     }
 }
 
+const configuredApiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const apiBaseURL = configuredApiBaseURL.includes('pos-backend.test')
+    ? '/api/v1'
+    : configuredApiBaseURL;
+
 const apiClient: AxiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+    baseURL: apiBaseURL,
     headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -16,6 +21,11 @@ const apiClient: AxiosInstance = axios.create({
     timeout: 15000,
     withCredentials: true, // Send cookies with requests
 });
+
+let isRedirectingToLogin = false;
+
+const isPublicAuthPage = (): boolean =>
+    window.location.pathname === '/login' || window.location.pathname === '/';
 
 // Get CSRF token from page meta tag (Laravel default)
 const getCSRFToken = (): string | null => {
@@ -159,10 +169,8 @@ apiClient.interceptors.response.use(
                 case 401:
                     // Session expired or unauthenticated
                     // Only redirect if we are not already on the login or welcome pages
-                    if (
-                        window.location.pathname !== '/login' &&
-                        window.location.pathname !== '/'
-                    ) {
+                    if (!isPublicAuthPage() && !isRedirectingToLogin) {
+                        isRedirectingToLogin = true;
                         console.warn(
                             '[API] 401 Unauthorized — redirecting to login',
                         );

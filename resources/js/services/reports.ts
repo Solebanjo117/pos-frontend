@@ -1,4 +1,3 @@
-import apiClient from './api/client';
 import type {
     StockLevelsReport,
     StockLevelsFilters,
@@ -10,7 +9,12 @@ import type {
     CustomerReferenceReport,
     SalesByClientFilters,
     SalesByClientReport,
+    DailyFinancialSummary,
+    BalanceSheetReport,
+    FinancialAdjustment,
+    CapitalMovement,
 } from '@/types/report';
+import apiClient from './api/client';
 
 export const ReportsApiService = {
     /**
@@ -202,5 +206,101 @@ export const ReportsApiService = {
             responseType: 'blob',
         });
         return response.data;
+    },
+
+    async getDailySummary(filters: {
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        rebuild?: boolean;
+    }): Promise<DailyFinancialSummary> {
+        const response = await apiClient.get('/reports/daily-summary', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getFinancialSnapshots(filters: {
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        rebuild?: boolean;
+    }): Promise<DailyFinancialSummary> {
+        const response = await apiClient.get('/reports/financial-snapshots', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getFinancialWeekly(filters: {
+        date?: string | null;
+        week_start?: string | null;
+        warehouse_id?: number | null;
+        rebuild?: boolean;
+    }): Promise<DailyFinancialSummary> {
+        const response = await apiClient.get('/reports/financial-weekly', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getBalanceSheet(filters: {
+        date_from?: string | null;
+        date_to?: string | null;
+        warehouse_id?: number | null;
+    }): Promise<BalanceSheetReport> {
+        const response = await apiClient.get('/reports/balance-sheet', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async createAdjustment(payload: {
+        type: 'cash' | 'inventory';
+        amount: number;
+        reason: string;
+        adjustment_date: string;
+        warehouse_id?: number | null;
+        notes?: string | null;
+    }): Promise<FinancialAdjustment> {
+        const response = await apiClient.post('/reports/adjustments', payload);
+        return response.data.data;
+    },
+
+    async getAdjustments(filters?: {
+        date_from?: string;
+        date_to?: string;
+        warehouse_id?: number | null;
+    }): Promise<FinancialAdjustment[]> {
+        const response = await apiClient.get('/reports/adjustments', {
+            params: filters,
+        });
+        return response.data.data ?? [];
+    },
+
+    async createCapitalMovement(payload: {
+        movement_type: 'in' | 'out';
+        amount: number;
+        reason: string;
+        movement_date: string;
+        warehouse_id?: number | null;
+        notes?: string | null;
+    }): Promise<CapitalMovement> {
+        const response = await apiClient.post(
+            '/reports/capital-movements',
+            payload,
+        );
+        return response.data.data;
+    },
+
+    async getCapitalMovements(filters?: {
+        date_from?: string;
+        date_to?: string;
+        warehouse_id?: number | null;
+    }): Promise<CapitalMovement[]> {
+        const response = await apiClient.get('/reports/capital-movements', {
+            params: filters,
+        });
+        return response.data.data ?? [];
     },
 };

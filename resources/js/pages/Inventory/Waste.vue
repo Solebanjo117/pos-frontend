@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import {
     AlertTriangle,
@@ -8,13 +7,14 @@ import {
     PackageSearch,
     Warehouse,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
-import apiClient from '@/services/api/client';
 import { usePosSettings } from '@/composables/usePosSettings';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
 
 interface Variant {
     id: number;

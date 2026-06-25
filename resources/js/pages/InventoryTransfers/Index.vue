@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowLeftRight,
@@ -11,9 +10,10 @@ import {
     Building2,
     Eye,
 } from 'lucide-vue-next';
+import { ref, onMounted, computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
 import apiClient from '@/services/api/client';
+import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

@@ -1,42 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { importService, type ImporterConfig } from '@/services/import';
-import type {
-    ImportRow,
-    ImportSummary,
-    ImportRun,
-    ImportResult,
-    ImportPaginationMeta,
-    ImportSheet,
-    DetectedColumn,
-    VehicleCandidate,
-} from '@/types/import';
-import ImportDiagnosticsPanel from '@/components/Import/ImportDiagnosticsPanel.vue';
-import ImportFileUploader from '@/components/Import/ImportFileUploader.vue';
-import ImportFlatPreviewTable from '@/components/Import/ImportFlatPreviewTable.vue';
-import ImportGroupedPreviewTable from '@/components/Import/ImportGroupedPreviewTable.vue';
-import ImportHistoryPanel from '@/components/Import/ImportHistoryPanel.vue';
-import ImportPreviewTable from '@/components/Import/ImportPreviewTable.vue';
-import ImportResultsPanel from '@/components/Import/ImportResultsPanel.vue';
-import ImportSheetMapper from '@/components/Import/ImportSheetMapper.vue';
-import SearchableSelect from '@/components/ui/SearchableSelect.vue';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { useToast } from '@/composables/useToast';
 import {
     UploadCloud,
     Download,
@@ -63,16 +26,52 @@ import {
     Minimize2,
     ArrowRight,
 } from 'lucide-vue-next';
-import apiClient from '@/services/api/client';
-import { useImportPolling } from '@/composables/useImportPolling';
-import { useImportPreviewPagination } from '@/composables/useImportPreviewPagination';
-import { useImportProfiles } from '@/composables/useImportProfiles';
-import { useImportTableEditing } from '@/composables/useImportTableEditing';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import ImportDiagnosticsPanel from '@/components/Import/ImportDiagnosticsPanel.vue';
+import ImportFileUploader from '@/components/Import/ImportFileUploader.vue';
+import ImportFlatPreviewTable from '@/components/Import/ImportFlatPreviewTable.vue';
+import ImportGroupedPreviewTable from '@/components/Import/ImportGroupedPreviewTable.vue';
+import ImportHistoryPanel from '@/components/Import/ImportHistoryPanel.vue';
+import ImportPreviewTable from '@/components/Import/ImportPreviewTable.vue';
+import ImportResultsPanel from '@/components/Import/ImportResultsPanel.vue';
+import ImportSheetMapper from '@/components/Import/ImportSheetMapper.vue';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
     hasExplicitMapping,
     mappingsAreEqual,
     useImportMapping,
 } from '@/composables/useImportMapping';
+import { useImportPreviewPagination } from '@/composables/useImportPreviewPagination';
+import { useImportProfiles } from '@/composables/useImportProfiles';
+import { useImportTableEditing } from '@/composables/useImportTableEditing';
+import { useToast } from '@/composables/useToast';
+import apiClient from '@/services/api/client';
+import { importService, type ImporterConfig } from '@/services/import';
+import type {
+    ImportRow,
+    ImportSummary,
+    ImportRun,
+    ImportResult,
+    ImportPaginationMeta,
+    ImportSheet,
+    DetectedColumn,
+    VehicleCandidate,
+} from '@/types/import';
 
 const toast = useToast();
 
@@ -149,6 +148,10 @@ const TERMINAL_IMPORT_STATUSES = ['completed', 'failed', 'cancelled'];
 const bulkEditMode = ref(false);
 const bulkValues = ref<Record<string, any>>({});
 const importStartedAt = ref<Date | null>(null);
+const pendingPollCount = ref(0);
+const processNowAttempted = ref(false);
+let importStatusTimer: ReturnType<typeof setInterval> | null = null;
+let importStatusRefreshInFlight = false;
 const {
     importProfiles,
     selectedProfileId,
@@ -1830,16 +1833,6 @@ const toggleAllRows = () => {
     selectedRows.value = nextSelection;
 };
 
-const toggleRowSelection = (rowIndex: number) => {
-    const newSet = new Set(selectedRows.value);
-    if (newSet.has(rowIndex)) {
-        newSet.delete(rowIndex);
-    } else {
-        newSet.add(rowIndex);
-    }
-    selectedRows.value = newSet;
-};
-
 const bulkValueEntries = () =>
     Object.entries(bulkValues.value).filter(
         ([, value]) => value !== null && value !== undefined && value !== '',
@@ -1907,11 +1900,9 @@ const applyBulkValues = (scope: 'all' | 'filtered' | 'page' | 'selected') => {
         return;
     }
 
-    let appliedCount = 0;
     rowsToApply.forEach((row) => {
         entries.forEach(([key, value]) => {
             commitPreviewCellEdit(row.__preview_index, key, value);
-            appliedCount++;
         });
     });
 
@@ -3766,14 +3757,17 @@ const startImportStatusPolling = () => {
         if (importStatusRefreshInFlight) return;
 
         importStatusRefreshInFlight = true;
-        refreshImportRun().catch(() => {
-            error.value = 'No se pudo actualizar el avance de la importacion.';
-            fullImportRunning.value = false;
-            validationRunning.value = false;
-            stopImportStatusPolling();
-        }).finally(() => {
-            importStatusRefreshInFlight = false;
-        });
+        refreshImportRun()
+            .catch(() => {
+                error.value =
+                    'No se pudo actualizar el avance de la importacion.';
+                fullImportRunning.value = false;
+                validationRunning.value = false;
+                stopImportStatusPolling();
+            })
+            .finally(() => {
+                importStatusRefreshInFlight = false;
+            });
     }, 2500);
 };
 

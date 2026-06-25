@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem } from '@/types';
 import {
     Search,
     Plus,
@@ -14,8 +11,11 @@ import {
     User,
     FilterX,
 } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
 import Pagination from '@/components/Pagination.vue';
 import { useCustomers } from '@/composables/useCustomers';
+import AppLayout from '@/layouts/AppLayout.vue';
+import type { BreadcrumbItem } from '@/types';
 import type { Customer } from '@/types/customer';
 
 const breadcrumbs: BreadcrumbItem[] = [

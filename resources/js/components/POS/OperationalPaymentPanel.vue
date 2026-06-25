@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
 import {
     Banknote,
     CreditCard,
@@ -8,6 +7,7 @@ import {
     AlertTriangle,
     Gift,
 } from 'lucide-vue-next';
+import { ref, computed, watch, onMounted } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type { Customer } from '@/types/customer';
 

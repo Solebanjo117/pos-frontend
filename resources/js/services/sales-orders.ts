@@ -1,4 +1,3 @@
-import apiClient from './api/client';
 import type {
     SalesOrder,
     SalesOrderFilters,
@@ -10,6 +9,7 @@ import type {
     SalesOrderItem,
     SalesOrderOperationalDetail,
 } from '@/types/sales-order';
+import apiClient from './api/client';
 
 export interface StockWarning {
     type: string;

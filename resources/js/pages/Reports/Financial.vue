@@ -1,41 +1,34 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import {
     AlertCircle,
-    Banknote,
     BarChart3,
     Calendar,
-    CreditCard,
-    DollarSign,
-    Download,
     FileText,
-    Printer,
+    Landmark,
     RefreshCw,
     Scale,
-    TrendingDown,
-    TrendingUp,
-    Wallet,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
-import FinanceAccountingPanel from '@/components/Finance/FinanceAccountingPanel.vue';
-import FinanceAgingBars from '@/components/Finance/FinanceAgingBars.vue';
-import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
-import FinanceMethodBars from '@/components/Finance/FinanceMethodBars.vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import CapitalMovementModal from '@/components/Finance/CapitalMovementModal.vue';
+import FinanceAdjustmentModal from '@/components/Finance/FinanceAdjustmentModal.vue';
+import FinanceBalanceSheet from '@/components/Finance/FinanceBalanceSheet.vue';
+import FinanceDailySummaryTable from '@/components/Finance/FinanceDailySummaryTable.vue';
+import FinanceIncomeStatement from '@/components/Finance/FinanceIncomeStatement.vue';
+import FinanceKpiRow from '@/components/Finance/FinanceKpiRow.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { InventoryApiService } from '@/services/inventory';
 import type { BreadcrumbItem } from '@/types';
-import type { StatementSection } from '@/types/report';
+import type { ExpenseBreakdown } from '@/types/report';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
-type ReportTab = 'income' | 'position' | 'credits';
-type IncomeBasis = 'cash' | 'accrual_operational';
-type PositionMode = 'current_snapshot' | 'as_of';
+type ReportTab = 'summary' | 'balance' | 'income' | 'investment';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -45,23 +38,29 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const {
     incomeStatementReport,
-    financialPositionReport,
-    brandProfitabilityReport,
-    categoryProfitabilityReport,
+    dailySummary,
+    balanceSheet,
+    adjustments,
+    capitalMovements,
     loading,
     error,
     fetchIncomeStatement,
-    fetchFinancialPosition,
-    fetchBrandProfitability,
-    fetchCategoryProfitability,
+    fetchDailySummary,
+    fetchBalanceSheet,
+    storeAdjustment,
+    fetchAdjustments,
+    storeCapitalMovement,
+    fetchCapitalMovements,
 } = useReports();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 
 const warehouses = ref<any[]>([]);
 const activePreset = ref<DatePreset>('month');
-const activeTab = ref<ReportTab>('income');
-const incomeBasis = ref<IncomeBasis>('cash');
-const positionMode = ref<PositionMode>('current_snapshot');
+const activeTab = ref<ReportTab>('summary');
+const adjustmentOpen = ref(false);
+const adjustmentType = ref<'cash' | 'inventory'>('cash');
+const capitalMovementOpen = ref(false);
+const capitalMovementType = ref<'in' | 'out'>('in');
 
 const today = new Date();
 const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -72,9 +71,10 @@ const filters = ref({
 });
 
 const tabs: Array<{ key: ReportTab; label: string; icon: any }> = [
-    { key: 'income', label: 'Estado de Resultados', icon: FileText },
-    { key: 'position', label: 'Balance General', icon: Scale },
-    { key: 'credits', label: 'Creditos', icon: CreditCard },
+    { key: 'summary', label: 'Resumen Diario', icon: BarChart3 },
+    { key: 'balance', label: 'Balance Sheet', icon: Scale },
+    { key: 'income', label: 'Income Statement', icon: FileText },
+    { key: 'investment', label: 'Inversion', icon: Landmark },
 ];
 const datePresets: Array<{ key: DatePreset; label: string }> = [
     { key: 'today', label: 'Hoy' },
@@ -92,10 +92,7 @@ const warehouseOptions = computed<SelectOption[]>(() => [
 ]);
 
 const selectedWarehouseLabel = computed(() => {
-    if (!filters.value.warehouse_id) {
-        return 'Todas las sucursales';
-    }
-
+    if (!filters.value.warehouse_id) return 'Todas las sucursales';
     return (
         warehouses.value.find(
             (warehouse) => warehouse.id === filters.value.warehouse_id,
@@ -103,96 +100,102 @@ const selectedWarehouseLabel = computed(() => {
     );
 });
 
+const formatCurrency = (value: number): string =>
+    new Intl.NumberFormat('es-PA', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
+const kpis = computed(() => {
+    const totals = dailySummary.value?.totals ?? {};
+    const credits = incomeStatementReport.value?.credit_balances ?? {};
+
+    return [
+        { key: 'cash', label: 'Cash', value: totals.cash ?? 0 },
+        {
+            key: 'inventory',
+            label: 'Inventario',
+            value: totals.inventory ?? 0,
+        },
+        { key: 'sales', label: 'Ventas', value: totals.sales ?? 0 },
+        { key: 'purchase', label: 'Compras', value: totals.purchase ?? 0 },
+        { key: 'expenses', label: 'Gastos', value: totals.expenses ?? 0 },
+        { key: 'profit', label: 'Profit', value: totals.profit ?? 0 },
+        {
+            key: 'receivable',
+            label: 'C x C',
+            value: credits.accounts_receivable?.total_open_balance ?? 0,
+        },
+        {
+            key: 'payable',
+            label: 'C x P',
+            value: credits.accounts_payable?.total_open_balance ?? 0,
+        },
+        {
+            key: 'investment',
+            label: 'Inversion',
+            value: totals.net_investment ?? totals.investment ?? 0,
+        },
+    ];
+});
+
 const incomeSummary = computed(() => incomeStatementReport.value?.summary);
-const positionSummary = computed(() => financialPositionReport.value?.summary);
-const creditBalances = computed(
-    () =>
-        incomeStatementReport.value?.credit_balances ??
-        financialPositionReport.value?.credit_balances,
+const expenseBreakdown = computed<ExpenseBreakdown | null>(
+    () => incomeStatementReport.value?.expense_breakdown ?? null,
 );
 
-const incomeSections = computed<StatementSection[]>(
-    () => incomeStatementReport.value?.sections ?? [],
-);
-const positionSections = computed<StatementSection[]>(
-    () => financialPositionReport.value?.sections ?? [],
-);
+const topExpenses = computed(() => {
+    const breakdown = expenseBreakdown.value;
+    if (!breakdown) return [];
+    return [...breakdown.items, breakdown.other]
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5);
+});
 
-const brandRows = computed(() =>
-    (brandProfitabilityReport.value ?? []).slice(0, 5).map((row: any) => ({
-        label: row.brand_name ?? row.name ?? 'Sin marca',
-        amount: Number(row.revenue ?? row.total_revenue ?? 0),
-        detail: `Margen ${formatPercent(Number(row.margin_percentage ?? row.margin ?? 0))}`,
-    })),
-);
+const investmentTotals = computed(() => {
+    const totals = dailySummary.value?.totals ?? {};
 
-const categoryRows = computed(() =>
-    (categoryProfitabilityReport.value ?? []).slice(0, 5).map((row: any) => ({
-        label: row.category_name ?? row.name ?? 'Sin categoria',
-        amount: Number(row.revenue ?? row.total_revenue ?? 0),
-        detail: `Margen ${formatPercent(Number(row.margin_percentage ?? row.margin ?? 0))}`,
-    })),
-);
-
-const paymentRows = computed(() => [
-    {
-        label: 'Cuentas por cobrar',
-        amount: Number(
-            creditBalances.value?.accounts_receivable?.total_open_balance ?? 0,
-        ),
-        detail: `${creditBalances.value?.accounts_receivable?.open_documents_count ?? 0} documentos abiertos`,
-    },
-    {
-        label: 'Cuentas por pagar',
-        amount: Number(
-            creditBalances.value?.accounts_payable?.total_open_balance ?? 0,
-        ),
-        detail: `${creditBalances.value?.accounts_payable?.open_documents_count ?? 0} documentos abiertos`,
-    },
-]);
-
-const timelineRows = computed(() => {
-    const timeline = incomeStatementReport.value?.timeline ?? [];
-    const max = Math.max(
-        ...timeline.map((row: any) =>
-            Math.max(Number(row.revenue || 0), Number(row.cogs || 0)),
-        ),
-        1,
-    );
-
-    return timeline.slice(-8).map((row: any) => ({
-        date: row.date,
-        revenue: Number(row.revenue || 0),
-        cogs: Number(row.cogs || 0),
-        profit: Number(row.profit ?? row.gross_profit ?? 0),
-        revenuePct: (Number(row.revenue || 0) / max) * 100,
-        cogsPct: (Number(row.cogs || 0) / max) * 100,
-    }));
+    return {
+        investmentIn: totals.investment_in ?? 0,
+        investmentOut: totals.investment_out ?? 0,
+        netInvestment: totals.net_investment ?? totals.investment ?? 0,
+        closingCash: totals.closing_cash ?? totals.cash ?? 0,
+    };
 });
 
 const loadWarehouses = async (): Promise<void> => {
-    warehouses.value = await InventoryApiService.getWarehouses();
+    try {
+        warehouses.value = await InventoryApiService.getWarehouses();
+    } catch (err) {
+        console.error('Error loading warehouses:', err);
+        warehouses.value = [];
+    }
 };
 
 const loadReports = async (): Promise<void> => {
-    if (!filters.value.date_from || !filters.value.date_to) {
-        return;
-    }
+    if (!filters.value.date_from || !filters.value.date_to) return;
 
-    await Promise.all([
+    // Heavy report endpoints are proxied to the backend and can be slow on
+    // wide date ranges. Use allSettled so one failing/timed-out report does
+    // not break the whole Finance page, and surface a single soft error.
+    const results = await Promise.allSettled([
+        fetchDailySummary(filters.value),
         fetchIncomeStatement({
             ...filters.value,
-            basis: incomeBasis.value,
-            compare: 'previous_period',
+            basis: 'cash',
+            compare: 'none',
         }),
-        fetchFinancialPosition({
-            warehouse_id: filters.value.warehouse_id,
-            date_to: filters.value.date_to,
-            mode: positionMode.value,
-        }),
-        fetchBrandProfitability(filters.value),
-        fetchCategoryProfitability(filters.value),
+        fetchBalanceSheet(filters.value),
+        fetchAdjustments(filters.value),
     ]);
+
+    const failed = results.filter((result) => result.status === 'rejected');
+    if (failed.length > 0 && !error.value) {
+        error.value =
+            'Algunos datos financieros no se pudieron cargar. Revisa la conexión o reduce el rango de fechas e intenta de nuevo.';
+    }
 };
 
 const setPreset = (preset: DatePreset): void => {
@@ -220,45 +223,53 @@ const setPreset = (preset: DatePreset): void => {
     void loadReports();
 };
 
-const formatCurrency = (value: number): string =>
-    new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value) || 0);
+const openAdjustment = (type: 'cash' | 'inventory') => {
+    adjustmentType.value = type;
+    adjustmentOpen.value = true;
+};
 
-const formatPercent = (value: number): string =>
-    `${(Number(value) || 0).toFixed(2)}%`;
+const submitAdjustment = async (payload: {
+    type: 'cash' | 'inventory';
+    amount: number;
+    reason: string;
+    adjustment_date: string;
+    notes: string;
+}) => {
+    await storeAdjustment({
+        ...payload,
+        warehouse_id: filters.value.warehouse_id,
+    });
+    await loadReports();
+};
 
-const formatShortDate = (date: string): string =>
-    new Intl.DateTimeFormat('es-PA', {
-        day: '2-digit',
-        month: 'short',
-    }).format(new Date(`${date}T00:00:00`));
+const openCapitalMovement = (type: 'in' | 'out') => {
+    capitalMovementType.value = type;
+    capitalMovementOpen.value = true;
+};
 
-const sectionTone = (
-    section: StatementSection,
-): 'asset' | 'liability' | 'profit' | 'expense' | 'neutral' => {
-    if (section.rows.some((row) => row.type === 'asset')) {
-        return 'asset';
-    }
-
-    if (section.rows.some((row) => row.type === 'liability')) {
-        return 'liability';
-    }
-
-    if (section.rows.some((row) => row.type === 'expense')) {
-        return 'expense';
-    }
-
-    if (section.rows.some((row) => row.type === 'profit')) {
-        return 'profit';
-    }
-
-    return 'neutral';
+const submitCapitalMovement = async (payload: {
+    movement_type: 'in' | 'out';
+    amount: number;
+    reason: string;
+    movement_date: string;
+    notes: string;
+}) => {
+    await storeCapitalMovement({
+        ...payload,
+        warehouse_id: filters.value.warehouse_id,
+    });
+    await loadReports();
 };
 
 onMounted(async () => {
-    await Promise.all([initWarehouse(), loadWarehouses()]);
+    // Resolve warehouse context + list first (lightweight), tolerating failures
+    // so a single error here never throws out of the mounted hook.
+    const setup = await Promise.allSettled([initWarehouse(), loadWarehouses()]);
+    if (setup.some((result) => result.status === 'rejected') && !error.value) {
+        error.value =
+            'No se pudo cargar la configuración de sucursales. Mostrando datos disponibles.';
+    }
+
     filters.value.warehouse_id = currentWarehouseId.value;
     await loadReports();
 });
@@ -275,7 +286,7 @@ watch(currentWarehouseId, (value) => {
     <Head title="Finanzas y Rentabilidad" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-3 p-4">
             <FinanceReportShell
                 eyebrow="Reportes"
                 title="Finanzas y Rentabilidad"
@@ -293,23 +304,9 @@ watch(currentWarehouseId, (value) => {
                         />
                         Actualizar
                     </button>
-                    <button
-                        disabled
-                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-400 dark:border-slate-800 dark:text-slate-600"
-                    >
-                        <Download :size="16" />
-                        Excel
-                    </button>
-                    <button
-                        disabled
-                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-400 dark:border-slate-800 dark:text-slate-600"
-                    >
-                        <Printer :size="16" />
-                        Imprimir
-                    </button>
                 </template>
 
-                <div class="space-y-5">
+                <div class="space-y-3">
                     <div
                         class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-5 dark:border-slate-800 dark:bg-slate-900/60"
                     >
@@ -382,12 +379,18 @@ watch(currentWarehouseId, (value) => {
 
                     <div
                         v-if="error"
-                        class="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+                        class="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
                     >
                         <AlertCircle :size="18" />
                         {{ error }}
                     </div>
+                </div>
+            </FinanceReportShell>
 
+            <FinanceKpiRow :kpis="kpis" :currency-formatter="formatCurrency" />
+
+            <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
+                <div class="space-y-3">
                     <nav class="flex flex-wrap gap-2">
                         <button
                             v-for="tab in tabs"
@@ -404,285 +407,242 @@ watch(currentWarehouseId, (value) => {
                             {{ tab.label }}
                         </button>
                     </nav>
-                </div>
-            </FinanceReportShell>
 
-            <section v-if="activeTab === 'income'" class="space-y-5">
-                <div class="grid gap-3 md:grid-cols-4">
-                    <FinanceKpiCard
-                        label="Ventas Brutas"
-                        :value="
-                            formatCurrency(incomeSummary?.total_revenue ?? 0)
-                        "
-                        detail="Ingresos del periodo"
-                        accent="emerald"
-                        :icon="TrendingUp"
-                    />
-                    <FinanceKpiCard
-                        label="Costo de Ventas"
-                        :value="formatCurrency(incomeSummary?.total_cogs ?? 0)"
-                        detail="COGS operativo"
-                        accent="amber"
-                        :icon="TrendingDown"
-                    />
-                    <FinanceKpiCard
-                        label="Utilidad Neta"
-                        :value="formatCurrency(incomeSummary?.net_profit ?? 0)"
-                        :detail="`Margen ${formatPercent(incomeSummary?.margin_percentage ?? 0)}`"
-                        accent="indigo"
-                        :icon="DollarSign"
-                    />
-                    <FinanceKpiCard
-                        label="Gastos Operativos"
-                        :value="
-                            formatCurrency(
-                                incomeSummary?.total_operational_expenses ?? 0,
-                            )
-                        "
-                        :detail="`${incomeSummary?.orders_count ?? 0} ordenes`"
-                        accent="rose"
-                        :icon="Wallet"
-                    />
-                </div>
-
-                <div
-                    class="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]"
-                >
-                    <div class="space-y-4">
-                        <FinanceAccountingPanel
-                            v-for="section in incomeSections"
-                            :key="section.key"
-                            :title="section.label"
-                            :total="section.amount"
-                            :rows="section.rows"
-                            :tone="sectionTone(section)"
-                            :icon="FileText"
-                            :currency-formatter="formatCurrency"
-                        />
-                    </div>
-
-                    <aside class="space-y-4">
-                        <div
-                            class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
-                        >
-                            <h3
-                                class="text-sm font-semibold text-slate-900 dark:text-slate-100"
-                            >
-                                Tendencia del periodo
-                            </h3>
-                            <div class="mt-4 space-y-3">
-                                <div
-                                    v-for="row in timelineRows"
-                                    :key="row.date"
-                                    class="grid grid-cols-[72px_1fr] items-center gap-3"
-                                >
-                                    <span
-                                        class="text-xs text-slate-500 dark:text-slate-400"
-                                    >
-                                        {{ formatShortDate(row.date) }}
-                                    </span>
-                                    <div class="space-y-1">
-                                        <div
-                                            class="h-2 rounded-full bg-slate-100 dark:bg-slate-800"
-                                        >
-                                            <div
-                                                class="h-2 rounded-full bg-emerald-500"
-                                                :style="{
-                                                    width: `${row.revenuePct}%`,
-                                                }"
-                                            />
-                                        </div>
-                                        <div
-                                            class="h-2 rounded-full bg-slate-100 dark:bg-slate-800"
-                                        >
-                                            <div
-                                                class="h-2 rounded-full bg-amber-500"
-                                                :style="{
-                                                    width: `${row.cogsPct}%`,
-                                                }"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <FinanceMethodBars
-                            :rows="brandRows"
-                            :currency-formatter="formatCurrency"
-                        />
-                        <FinanceMethodBars
-                            :rows="categoryRows"
-                            :currency-formatter="formatCurrency"
-                        />
-                    </aside>
-                </div>
-            </section>
-
-            <section v-if="activeTab === 'position'" class="space-y-5">
-                <div class="grid gap-3 md:grid-cols-4">
-                    <FinanceKpiCard
-                        label="Activos"
-                        :value="
-                            formatCurrency(positionSummary?.total_assets ?? 0)
-                        "
-                        detail="Caja, bancos, CxC e inventario"
-                        accent="sky"
-                        :icon="TrendingUp"
-                    />
-                    <FinanceKpiCard
-                        label="Pasivos"
-                        :value="
-                            formatCurrency(
-                                positionSummary?.total_liabilities ?? 0,
-                            )
-                        "
-                        detail="Cuentas por pagar y obligaciones"
-                        accent="amber"
-                        :icon="Banknote"
-                    />
-                    <FinanceKpiCard
-                        label="Patrimonio"
-                        :value="
-                            formatCurrency(
-                                positionSummary?.operational_equity ?? 0,
-                            )
-                        "
-                        detail="Balance operativo"
-                        accent="emerald"
-                        :icon="Scale"
-                    />
-                    <FinanceKpiCard
-                        label="Endeudamiento"
-                        :value="
-                            formatPercent(
-                                ((positionSummary?.total_liabilities ?? 0) /
-                                    Math.max(
-                                        positionSummary?.total_assets ?? 0,
-                                        1,
-                                    )) *
-                                    100,
-                            )
-                        "
-                        detail="Pasivo / Activo"
-                        accent="indigo"
-                        :icon="BarChart3"
-                    />
-                </div>
-
-                <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-                    <div class="grid gap-4 lg:grid-cols-2">
-                        <FinanceAccountingPanel
-                            v-for="section in positionSections"
-                            :key="section.key"
-                            :title="section.label"
-                            :total="section.amount"
-                            :rows="section.rows"
-                            :tone="sectionTone(section)"
-                            :icon="Scale"
-                            :currency-formatter="formatCurrency"
-                        />
-                    </div>
-                    <aside class="space-y-4">
-                        <FinanceAgingBars
-                            :buckets="
-                                financialPositionReport?.aging
-                                    ?.accounts_receivable
-                            "
-                            :currency-formatter="formatCurrency"
-                        />
-                        <FinanceAgingBars
-                            :buckets="
-                                financialPositionReport?.aging?.accounts_payable
-                            "
-                            :currency-formatter="formatCurrency"
-                        />
-                    </aside>
-                </div>
-            </section>
-
-            <section
-                v-if="activeTab === 'credits'"
-                class="grid gap-5 xl:grid-cols-[360px_1fr]"
-            >
-                <aside class="space-y-4">
-                    <FinanceKpiCard
-                        label="Cuentas por Cobrar"
-                        :value="
-                            formatCurrency(
-                                creditBalances?.accounts_receivable
-                                    ?.total_open_balance ?? 0,
-                            )
-                        "
-                        :detail="`${creditBalances?.accounts_receivable?.accounts_count ?? 0} clientes`"
-                        accent="indigo"
-                        :icon="CreditCard"
-                    />
-                    <FinanceKpiCard
-                        label="Cuentas por Pagar"
-                        :value="
-                            formatCurrency(
-                                creditBalances?.accounts_payable
-                                    ?.total_open_balance ?? 0,
-                            )
-                        "
-                        :detail="`${creditBalances?.accounts_payable?.accounts_count ?? 0} proveedores`"
-                        accent="amber"
-                        :icon="Banknote"
-                    />
-                    <FinanceMethodBars
-                        :rows="paymentRows"
+                    <FinanceDailySummaryTable
+                        v-if="activeTab === 'summary'"
+                        :rows="dailySummary?.rows ?? []"
+                        :totals="dailySummary?.totals ?? {}"
                         :currency-formatter="formatCurrency"
                     />
-                    <Link
-                        href="/ar"
-                        class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
-                    >
-                        Ver cuentas por cobrar
-                    </Link>
-                </aside>
 
-                <div
-                    class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
-                >
-                    <div
-                        class="border-b border-slate-200 px-4 py-3 dark:border-slate-800"
-                    >
-                        <h3
-                            class="text-sm font-semibold text-slate-900 dark:text-slate-100"
+                    <FinanceBalanceSheet
+                        v-if="activeTab === 'balance'"
+                        :data="balanceSheet"
+                        :currency-formatter="formatCurrency"
+                    />
+
+                    <FinanceIncomeStatement
+                        v-if="activeTab === 'income'"
+                        :sales="incomeSummary?.total_revenue ?? 0"
+                        :cogs="incomeSummary?.total_cogs ?? 0"
+                        :net-income="incomeSummary?.gross_profit ?? 0"
+                        :net-profit="incomeSummary?.net_profit ?? 0"
+                        :expense-breakdown="expenseBreakdown"
+                        :currency-formatter="formatCurrency"
+                    />
+
+                    <div v-if="activeTab === 'investment'" class="space-y-3">
+                        <div class="grid gap-3 md:grid-cols-4">
+                            <div
+                                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                            >
+                                <p
+                                    class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Aportes
+                                </p>
+                                <p
+                                    class="mt-1 text-lg font-bold text-emerald-600 tabular-nums dark:text-emerald-400"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            investmentTotals.investmentIn,
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                            >
+                                <p
+                                    class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Retiros
+                                </p>
+                                <p
+                                    class="mt-1 text-lg font-bold text-rose-600 tabular-nums dark:text-rose-400"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            investmentTotals.investmentOut,
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                            >
+                                <p
+                                    class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Neto
+                                </p>
+                                <p
+                                    class="mt-1 text-lg font-bold text-indigo-600 tabular-nums dark:text-indigo-400"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            investmentTotals.netInvestment,
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                            >
+                                <p
+                                    class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Cash cierre
+                                </p>
+                                <p
+                                    class="mt-1 text-lg font-bold text-slate-900 tabular-nums dark:text-slate-100"
+                                >
+                                    {{
+                                        formatCurrency(
+                                            investmentTotals.closingCash,
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
                         >
-                            Documentos abiertos de clientes
-                        </h3>
+                            <div
+                                class="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800"
+                            >
+                                <h3
+                                    class="text-xs font-semibold text-slate-900 dark:text-slate-100"
+                                >
+                                    Historial de inversion
+                                </h3>
+                                <div class="flex gap-2">
+                                    <button
+                                        class="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500"
+                                        @click="openCapitalMovement('in')"
+                                    >
+                                        Aporte
+                                    </button>
+                                    <button
+                                        class="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                                        @click="openCapitalMovement('out')"
+                                    >
+                                        Retiro
+                                    </button>
+                                </div>
+                            </div>
+                            <table class="min-w-full text-xs tabular-nums">
+                                <thead class="bg-slate-50 dark:bg-slate-900">
+                                    <tr>
+                                        <th
+                                            class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                        >
+                                            Fecha
+                                        </th>
+                                        <th
+                                            class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                        >
+                                            Tipo
+                                        </th>
+                                        <th
+                                            class="px-3 py-1.5 text-right font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                        >
+                                            Monto
+                                        </th>
+                                        <th
+                                            class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                        >
+                                            Motivo
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody
+                                    class="divide-y divide-slate-100 dark:divide-slate-800"
+                                >
+                                    <tr
+                                        v-for="movement in capitalMovements"
+                                        :key="movement.id"
+                                        class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                                    >
+                                        <td
+                                            class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
+                                        >
+                                            {{ movement.movement_date }}
+                                        </td>
+                                        <td
+                                            class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
+                                        >
+                                            {{ movement.movement_type_label }}
+                                        </td>
+                                        <td
+                                            class="px-3 py-1.5 text-right font-semibold tabular-nums"
+                                            :class="
+                                                movement.movement_type === 'in'
+                                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                                    : 'text-rose-600 dark:text-rose-400'
+                                            "
+                                        >
+                                            {{
+                                                formatCurrency(movement.amount)
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
+                                        >
+                                            {{ movement.reason }}
+                                        </td>
+                                    </tr>
+                                    <tr v-if="!capitalMovements.length">
+                                        <td
+                                            colspan="4"
+                                            class="px-3 py-6 text-center text-slate-400"
+                                        >
+                                            Sin movimientos de inversion en el
+                                            periodo
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table
-                            class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800"
+
+                    <div
+                        v-if="activeTab === 'balance' && adjustments.length"
+                        class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                    >
+                        <div
+                            class="border-b border-slate-200 px-3 py-2 dark:border-slate-800"
                         >
+                            <h3
+                                class="text-xs font-semibold text-slate-900 dark:text-slate-100"
+                            >
+                                Historial de Ajustes
+                            </h3>
+                        </div>
+                        <table class="min-w-full text-xs tabular-nums">
                             <thead class="bg-slate-50 dark:bg-slate-900">
                                 <tr>
                                     <th
-                                        class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                        class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        Documento
+                                        Fecha
                                     </th>
                                     <th
-                                        class="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                        class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        Cliente
+                                        Tipo
                                     </th>
                                     <th
-                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                        class="px-3 py-1.5 text-right font-semibold text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        Total
+                                        Monto
                                     </th>
                                     <th
-                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
+                                        class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        Pendiente
-                                    </th>
-                                    <th
-                                        class="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-500 uppercase"
-                                    >
-                                        Dias
+                                        Motivo
                                     </th>
                                 </tr>
                             </thead>
@@ -690,60 +650,193 @@ watch(currentWarehouseId, (value) => {
                                 class="divide-y divide-slate-100 dark:divide-slate-800"
                             >
                                 <tr
-                                    v-for="document in creditBalances
-                                        ?.accounts_receivable?.documents ?? []"
-                                    :key="`${document.document_type}-${document.id}`"
+                                    v-for="adj in adjustments"
+                                    :key="adj.id"
                                     class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
                                 >
                                     <td
-                                        class="px-4 py-3 font-medium text-slate-900 dark:text-slate-100"
+                                        class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
                                     >
-                                        {{ document.document_number }}
+                                        {{ adj.adjustment_date }}
                                     </td>
                                     <td
-                                        class="px-4 py-3 text-slate-600 dark:text-slate-300"
+                                        class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
                                     >
-                                        {{
-                                            document.account_name ??
-                                            'Sin cliente'
-                                        }}
+                                        {{ adj.type_label }}
                                     </td>
                                     <td
-                                        class="px-4 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300"
+                                        class="px-3 py-1.5 text-right font-semibold text-slate-900 dark:text-slate-100"
+                                        :class="{
+                                            'text-emerald-600 dark:text-emerald-400':
+                                                adj.amount > 0,
+                                            'text-rose-600 dark:text-rose-400':
+                                                adj.amount < 0,
+                                        }"
                                     >
-                                        {{ formatCurrency(document.total) }}
+                                        {{ formatCurrency(adj.amount) }}
                                     </td>
                                     <td
-                                        class="px-4 py-3 text-right font-semibold text-slate-900 tabular-nums dark:text-slate-100"
+                                        class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
                                     >
-                                        {{
-                                            formatCurrency(document.amount_due)
-                                        }}
-                                    </td>
-                                    <td
-                                        class="px-4 py-3 text-right text-slate-500 tabular-nums"
-                                    >
-                                        {{ document.days_overdue }}
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-if="
-                                        !creditBalances?.accounts_receivable
-                                            ?.documents?.length
-                                    "
-                                >
-                                    <td
-                                        colspan="5"
-                                        class="px-4 py-10 text-center text-slate-500"
-                                    >
-                                        Sin documentos abiertos.
+                                        {{ adj.reason }}
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
-            </section>
+
+                <aside class="space-y-3">
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                    >
+                        <h3
+                            class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                        >
+                            Balance Rapido
+                        </h3>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-600 dark:text-slate-400"
+                                    >Activos</span
+                                >
+                                <span
+                                    class="font-semibold text-slate-900 tabular-nums dark:text-slate-100"
+                                    >{{
+                                        formatCurrency(
+                                            balanceSheet?.totals.total_assets ??
+                                                0,
+                                        )
+                                    }}</span
+                                >
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-600 dark:text-slate-400"
+                                    >Pasivos</span
+                                >
+                                <span
+                                    class="font-semibold text-amber-600 tabular-nums dark:text-amber-400"
+                                    >{{
+                                        formatCurrency(
+                                            balanceSheet?.totals
+                                                .total_liabilities ?? 0,
+                                        )
+                                    }}</span
+                                >
+                            </div>
+                            <div
+                                class="mt-1 flex justify-between border-t border-slate-200 pt-1 dark:border-slate-800"
+                            >
+                                <span
+                                    class="font-bold text-slate-900 dark:text-slate-100"
+                                    >Balance</span
+                                >
+                                <span
+                                    class="font-bold text-indigo-600 tabular-nums dark:text-indigo-400"
+                                    >{{
+                                        formatCurrency(
+                                            balanceSheet?.totals.balance ?? 0,
+                                        )
+                                    }}</span
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                    >
+                        <h3
+                            class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                        >
+                            Top Gastos
+                        </h3>
+                        <div class="space-y-1 text-xs">
+                            <div
+                                v-for="item in topExpenses"
+                                :key="item.label"
+                                class="flex justify-between"
+                            >
+                                <span
+                                    class="text-slate-600 dark:text-slate-400"
+                                    >{{ item.label }}</span
+                                >
+                                <span
+                                    class="text-slate-900 tabular-nums dark:text-slate-100"
+                                    >{{ formatCurrency(item.amount) }}</span
+                                >
+                            </div>
+                            <div
+                                v-if="!topExpenses.length"
+                                class="py-2 text-center text-slate-400"
+                            >
+                                Sin gastos en el periodo
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                    >
+                        <h3
+                            class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                        >
+                            Ajustes
+                        </h3>
+                        <div class="space-y-1.5">
+                            <button
+                                class="w-full rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                                @click="openAdjustment('cash')"
+                            >
+                                Ajustar Cash
+                            </button>
+                            <button
+                                class="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                                @click="openAdjustment('inventory')"
+                            >
+                                Ajustar Inventario
+                            </button>
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                    >
+                        <h3
+                            class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                        >
+                            Inversion
+                        </h3>
+                        <div class="space-y-1.5">
+                            <button
+                                class="w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500"
+                                @click="openCapitalMovement('in')"
+                            >
+                                Registrar Aporte
+                            </button>
+                            <button
+                                class="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                                @click="openCapitalMovement('out')"
+                            >
+                                Registrar Retiro
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
         </div>
+
+        <FinanceAdjustmentModal
+            v-model:open="adjustmentOpen"
+            :default-type="adjustmentType"
+            :warehouse-id="filters.warehouse_id"
+            @submit="submitAdjustment"
+        />
+        <CapitalMovementModal
+            v-model:open="capitalMovementOpen"
+            :default-type="capitalMovementType"
+            :warehouse-id="filters.warehouse_id"
+            @submit="submitCapitalMovement"
+        />
     </AppLayout>
 </template>

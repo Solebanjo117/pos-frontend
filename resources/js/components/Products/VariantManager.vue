@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, nextTick, onMounted, watch } from 'vue';
-import { useProducts } from '@/composables/useProducts';
-import { useStoreSettings } from '@/composables/useStoreSettings';
-import { usePosSettings } from '@/composables/usePosSettings';
-import apiClient from '@/services/api/client';
+import PricingFormula from '@/components/Products/PricingFormula.vue';
+import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -11,11 +11,11 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
-import PricingFormula from '@/components/Products/PricingFormula.vue';
-import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
-import { CircleDollarSign } from 'lucide-vue-next';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useProducts } from '@/composables/useProducts';
+import { useStoreSettings } from '@/composables/useStoreSettings';
+import apiClient from '@/services/api/client';
 
 type HeaderLotSyncState = {
     revision: number;

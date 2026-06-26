@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import {
     Trash2,
@@ -12,10 +11,11 @@ import {
     GripVertical,
     Truck,
 } from 'lucide-vue-next';
-import { formatCurrency } from '@/utils/formatters';
-import PricingFormula from '@/components/Products/PricingFormula.vue';
-import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
+import { ref, computed } from 'vue';
 import draggable from 'vuedraggable';
+import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
+import PricingFormula from '@/components/Products/PricingFormula.vue';
+import { formatCurrency } from '@/utils/formatters';
 
 const props = defineProps<{
     items: any[];

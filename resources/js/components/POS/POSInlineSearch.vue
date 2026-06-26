@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
-import apiClient from '@/services/api/client';
-import { formatCurrency } from '@/utils/formatters';
 import { Search } from 'lucide-vue-next';
+import { ref, computed, watch, nextTick } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import apiClient from '@/services/api/client';
+import { formatCurrency } from '@/utils/formatters';
 
 interface Category {
     id: number;

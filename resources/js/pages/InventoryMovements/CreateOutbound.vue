@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import { PackageMinus, Trash2, Plus } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { ref, onMounted, computed, nextTick } from 'vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
-import { type BreadcrumbItem } from '@/types';
-import type { ProductVariantSelection } from '@/types/product-variant-picker';
-import { useInventoryMovements } from '@/composables/useInventoryMovements';
-import { useProducts } from '@/composables/useProducts';
-import { useWarehouses } from '@/composables/useWarehouses';
-import { usePosSettings } from '@/composables/usePosSettings';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { useInventoryMovements } from '@/composables/useInventoryMovements';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useProducts } from '@/composables/useProducts';
+import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
+import { type BreadcrumbItem } from '@/types';
+import type { ProductVariantSelection } from '@/types/product-variant-picker';
 
 interface OutboundItem {
     id: string;

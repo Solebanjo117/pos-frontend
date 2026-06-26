@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import {
     ChevronLeft,
     ChevronRight,
@@ -9,6 +8,7 @@ import {
     Trash2,
     X,
 } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { categoriesService } from '@/services/categories';
 

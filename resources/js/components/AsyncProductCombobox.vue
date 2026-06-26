@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
-import { Search, X, Loader2, Package } from 'lucide-vue-next';
 import { useDebounceFn } from '@vueuse/core';
+import { Search, X, Loader2, Package } from 'lucide-vue-next';
+import { ref, watch, computed } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import apiClient from '@/services/api/client';
 import type { Product } from '@/types/product';
 
@@ -156,7 +157,6 @@ watch(products, () => {
 });
 
 // Mount/unmount click outside listener
-import { onMounted, onUnmounted } from 'vue';
 
 onMounted(() => {
     document.addEventListener('click', handleClickOutside);

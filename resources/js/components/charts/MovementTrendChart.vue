@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Line } from 'vue-chartjs';
 import {
     Chart as ChartJS,
     Title,
@@ -12,6 +10,8 @@ import {
     PointElement,
     type ChartOptions,
 } from 'chart.js';
+import { computed } from 'vue';
+import { Line } from 'vue-chartjs';
 
 ChartJS.register(
     Title,

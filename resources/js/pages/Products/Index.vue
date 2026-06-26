@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { useProducts } from '@/composables/useProducts';
-import { usePOS } from '@/composables/usePOS';
-import type { Product, ProductFilters } from '@/types/product';
+import { ShoppingCart, Check, Info, Filter } from 'lucide-vue-next';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import ProductCatalogView from '@/components/Products/ProductCatalogView.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import ProductFiltersComponent from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
-import { ShoppingCart, Check, Info, Filter } from 'lucide-vue-next';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { useCategories } from '@/composables/useCategories';
 import { useBrands } from '@/composables/useBrands';
-import { productsApi } from '@/services/api/products';
+import { useCategories } from '@/composables/useCategories';
+import { usePOS } from '@/composables/usePOS';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useProducts } from '@/composables/useProducts';
 
 import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { productsApi } from '@/services/api/products';
+import { type BreadcrumbItem } from '@/types';
+import type { Product, ProductFilters } from '@/types/product';
 
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 const { warehouses } = useWarehouses();

@@ -1,4 +1,3 @@
-import apiClient from './api/client';
 import type {
     PurchaseOrder,
     PurchaseOrderFilters,
@@ -10,6 +9,7 @@ import type {
     PurchaseOrderCandidateSource,
     PurchaseOrderWarning,
 } from '@/types/purchase-order';
+import apiClient from './api/client';
 
 const BASE_URL = '/purchase-orders';
 

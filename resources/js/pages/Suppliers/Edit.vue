@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { useSuppliers } from '@/composables/useSuppliers';
 import { ArrowLeft, Save } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
+import { useSuppliers } from '@/composables/useSuppliers';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { UpdateSupplierData } from '@/types/supplier';
 
 const props = defineProps<{ supplierId: number }>();

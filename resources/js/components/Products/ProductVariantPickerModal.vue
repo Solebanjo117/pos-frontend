@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
 import {
     ChevronDown,
     ChevronRight,
@@ -9,13 +8,14 @@ import {
     Search,
     X,
 } from 'lucide-vue-next';
+import { computed, nextTick, ref, watch } from 'vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import ProductFilters from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
-import apiClient from '@/services/api/client';
 import { usePosSettings } from '@/composables/usePosSettings';
+import apiClient from '@/services/api/client';
 import type { Product, ProductVariant } from '@/types/product';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
 

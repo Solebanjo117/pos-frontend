@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Plus, Save, Trash2, Wrench } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { CustomersApiService } from '@/services/customers';
-import WarehousesApiService from '@/services/warehouses';
-import UsersApiService, { type User } from '@/services/users';
 import { productsApi } from '@/services/api/products';
+import { CustomersApiService } from '@/services/customers';
+import UsersApiService, { type User } from '@/services/users';
+import WarehousesApiService from '@/services/warehouses';
 import {
     WorkOrdersApiService,
     type WorkOrder,

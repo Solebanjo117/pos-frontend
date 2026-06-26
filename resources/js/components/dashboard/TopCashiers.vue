@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { TopCashier } from '@/types/dashboard';
 import { UserIcon } from 'lucide-vue-next';
+import type { TopCashier } from '@/types/dashboard';
 
 interface Props {
     cashiers: TopCashier[];

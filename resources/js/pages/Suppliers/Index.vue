@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { useSuppliers } from '@/composables/useSuppliers';
 import {
     Search,
     Plus,
@@ -13,7 +10,10 @@ import {
     Package,
     Upload,
 } from 'lucide-vue-next';
+import { computed, ref, onMounted } from 'vue';
 import Pagination from '@/components/Pagination.vue';
+import { useSuppliers } from '@/composables/useSuppliers';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { suppliersService } from '@/services/suppliers';
 import type {
     SupplierCommercialDashboard,

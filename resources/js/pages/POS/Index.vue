@@ -1,20 +1,6 @@
 <script setup lang="ts">
-import {
-    ref,
-    reactive,
-    computed,
-    onMounted,
-    onUnmounted,
-    watch,
-    nextTick,
-} from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { usePOS } from '@/composables/usePOS';
-import { useProducts } from '@/composables/useProducts';
-import { useCustomers } from '@/composables/useCustomers';
-import { useWarehouses } from '@/composables/useWarehouses';
-import apiClient from '@/services/api/client';
+import { router } from '@inertiajs/vue3';
 import {
     Search,
     Trash2,
@@ -32,33 +18,46 @@ import {
     ArrowUpDown,
     Filter,
 } from 'lucide-vue-next';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { useStoreSettings } from '@/composables/useStoreSettings';
-// POSFilterSidebar removed — filtering now handled inside ProductSearchModal via ProductFilters
-import { usePosSession } from '@/composables/usePosSession';
-
-import CashRegisterStatus from '@/components/POS/CashRegisterStatus.vue';
-import POSControls from '@/components/POS/POSControls.vue';
-import POSInlineSearch from '@/components/POS/POSInlineSearch.vue';
-import ProductTable from '@/components/POS/ProductTable.vue';
-import SummarySection from '@/components/POS/SummarySection.vue';
+import {
+    ref,
+    reactive,
+    computed,
+    onMounted,
+    onUnmounted,
+    watch,
+    nextTick,
+} from 'vue';
 import ActionButtons from '@/components/POS/ActionButtons.vue';
-
-import OpenSessionModal from '@/components/POS/OpenSessionModal.vue';
-import CashMovementModal from '@/components/POS/CashMovementModal.vue';
-import VariantSelectModal from '@/components/POS/VariantSelectModal.vue';
-import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
+import AddCustomLineModal from '@/components/POS/AddCustomLineModal.vue';
 import AddPaymentModal from '@/components/POS/AddPaymentModal.vue';
-import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue';
+import CashMovementModal from '@/components/POS/CashMovementModal.vue';
+import CashRegisterStatus from '@/components/POS/CashRegisterStatus.vue';
+import OpenSessionModal from '@/components/POS/OpenSessionModal.vue';
+import type POSControls from '@/components/POS/POSControls.vue';
+import POSInlineSearch from '@/components/POS/POSInlineSearch.vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductSearchModal from '@/components/POS/ProductSearchModal.vue';
+import ProductTable from '@/components/POS/ProductTable.vue';
 import QuickCustomerModal from '@/components/POS/QuickCustomerModal.vue';
-import AddCustomLineModal from '@/components/POS/AddCustomLineModal.vue';
-import PriceDisplay from '@/components/ui/PriceDisplay.vue';
+import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
+import SummarySection from '@/components/POS/SummarySection.vue';
+import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue';
+import VariantSelectModal from '@/components/POS/VariantSelectModal.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import PriceDisplay from '@/components/ui/PriceDisplay.vue';
+import { useCustomers } from '@/composables/useCustomers';
+import { usePOS } from '@/composables/usePOS';
+import { usePosSession } from '@/composables/usePosSession';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useProducts } from '@/composables/useProducts';
+import { useStoreSettings } from '@/composables/useStoreSettings';
+import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+// POSFilterSidebar removed — filtering now handled inside ProductSearchModal via ProductFilters
+
 import { SalesOrderPaymentApiService } from '@/services/payments';
 import { SalesReturnsApiService } from '@/services/sales-returns';
-import { router } from '@inertiajs/vue3';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
 
 defineOptions({ layout: AppLayout });

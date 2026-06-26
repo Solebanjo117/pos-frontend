@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { useVehicleMakes } from '@/composables/useVehicleMakes';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { useVehicleMakes } from '@/composables/useVehicleMakes';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

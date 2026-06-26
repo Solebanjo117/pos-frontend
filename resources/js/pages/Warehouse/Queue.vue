@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import {
-    useWarehouseQueue,
-    type WarehouseOrder,
-} from '@/composables/useWarehouseQueue';
 import {
     PackageSearch,
     Clock,
@@ -13,6 +7,12 @@ import {
     User,
     CheckCircle,
 } from 'lucide-vue-next';
+import { ref, onMounted, onUnmounted } from 'vue';
+import {
+    useWarehouseQueue,
+    type WarehouseOrder,
+} from '@/composables/useWarehouseQueue';
+import AppLayout from '@/layouts/AppLayout.vue';
 
 defineOptions({ layout: AppLayout });
 

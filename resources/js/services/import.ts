@@ -1,4 +1,3 @@
-import apiClient from './api/client';
 import type {
     ImportRun,
     ImportRunRowsResponse,
@@ -8,6 +7,7 @@ import type {
     ImportBatchVehicleCandidatesResponse,
     VehicleCandidate,
 } from '@/types/import';
+import apiClient from './api/client';
 
 export interface ImportColumn {
     key: string;

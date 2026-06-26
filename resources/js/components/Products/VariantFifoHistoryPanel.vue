@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
 import {
     Check,
     ChevronDown,
@@ -8,6 +7,7 @@ import {
     RefreshCw,
     X,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { productsApi } from '@/services/api/products';
 import type {

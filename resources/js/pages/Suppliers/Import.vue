@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
 import UniversalImporter from '@/components/Import/UniversalImporter.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { ImporterConfig } from '@/services/import';
 
 const importConfig: ImporterConfig = {

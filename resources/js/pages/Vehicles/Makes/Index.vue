@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
+import { Search, Plus, Pencil, Trash2 } from 'lucide-vue-next';
+import { ref, onMounted, watch } from 'vue';
+import { useVehicleMakes } from '@/composables/useVehicleMakes';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { useVehicleMakes } from '@/composables/useVehicleMakes';
-import { Search, Plus, Pencil, Trash2 } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

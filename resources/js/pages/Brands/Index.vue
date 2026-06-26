@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { Search, Plus, Pencil, Trash2, Tag, Upload } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
+import Pagination from '@/components/Pagination.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useToast } from '@/composables/useToast';
-import { Search, Plus, Pencil, Trash2, Tag, Upload } from 'lucide-vue-next';
-import Pagination from '@/components/Pagination.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { BrandFilters } from '@/types/brand';
 
 const { brands, loading, error, pagination, fetchBrands, deleteBrand } =

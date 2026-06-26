@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
+import { CheckCircle } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { useWarehouses } from '@/composables/useWarehouses';
 import type { WarehouseFilters } from '@/types/warehouse';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { CheckCircle } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

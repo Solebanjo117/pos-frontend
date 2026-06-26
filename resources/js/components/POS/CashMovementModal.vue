@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import {
     X,
     ArrowDownUp,
@@ -9,6 +8,7 @@ import {
     FileText,
     Loader2,
 } from 'lucide-vue-next';
+import { ref, computed } from 'vue';
 
 interface Props {
     show: boolean;

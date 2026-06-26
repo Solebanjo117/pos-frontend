@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowLeft,
@@ -22,9 +21,10 @@ import {
     Trash2,
     X,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
-import AppLayout from '@/layouts/AppLayout.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
+import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { suppliersService } from '@/services/suppliers';
 import type { Product } from '@/types/product';

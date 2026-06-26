@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowLeftRight,
@@ -10,9 +9,10 @@ import {
     Building2,
     ArrowRight,
 } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
 import apiClient from '@/services/api/client';
+import { type BreadcrumbItem } from '@/types';
 
 const props = defineProps<{ transferId: number }>();
 

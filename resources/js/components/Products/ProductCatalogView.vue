@@ -2,9 +2,9 @@
 import { ref, computed } from 'vue';
 import type { Product } from '@/types/product';
 import ProductCard from './ProductCard.vue';
+import ProductDetailModal from './ProductDetailModal.vue';
 import ProductFiltersComponent from './ProductFilters.vue';
 import type { ProductFilterValues } from './ProductFilters.vue';
-import ProductDetailModal from './ProductDetailModal.vue';
 
 interface FilterOption {
     id: number;

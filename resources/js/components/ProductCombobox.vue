@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { Check, ChevronsUpDown, Search } from 'lucide-vue-next';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { type Product, type ProductVariant } from '@/types/product';
 
 const props = defineProps<{
@@ -92,7 +92,7 @@ const filteredItems = computed(() => {
                     productMatches; // if parent matches, show variants too
 
                 if (variantMatches) {
-                    let label = `${product.name}`;
+                    const label = `${product.name}`;
                     let subLabel = `SKU: ${variant.sku}`;
                     if (variant.brand) subLabel += ` | ${variant.brand.name}`;
 

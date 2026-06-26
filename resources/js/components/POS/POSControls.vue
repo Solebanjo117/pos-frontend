@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { Search } from 'lucide-vue-next';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 
 interface Category {

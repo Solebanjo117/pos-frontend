@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { usePosSettings } from '@/composables/usePosSettings';
-import apiClient from '@/services/api/client';
+import { computed, ref, onMounted } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

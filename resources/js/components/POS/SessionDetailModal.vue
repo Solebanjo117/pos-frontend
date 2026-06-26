@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import {
     AlertCircle,
@@ -16,6 +15,8 @@ import {
     Warehouse,
     X,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type {
     AccountPaymentRecord,
     CashMovementRecord,
@@ -26,7 +27,6 @@ import type {
     PurchasePaymentRecord,
     SessionSalesOrder,
 } from '@/services/posSessions';
-import { usePaymentMethods } from '@/composables/usePaymentMethods';
 
 interface ReconciliationRow {
     code: string;

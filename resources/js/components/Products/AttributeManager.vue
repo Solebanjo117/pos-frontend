@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
 import { Trash2, Lock } from 'lucide-vue-next';
+import { computed, ref, onMounted } from 'vue';
 import {
     useProductAttributes,
     type ProductAttribute,
@@ -120,7 +120,7 @@ const handleAdd = async () => {
     }
 };
 
-let debounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+const debounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
 
 const debouncedSave = (
     attr: ProductAttribute,

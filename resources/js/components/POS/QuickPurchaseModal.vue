@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
 import {
     X,
     PackageCheck,
@@ -8,15 +7,16 @@ import {
     ShoppingCart,
     List,
 } from 'lucide-vue-next';
+import { ref, watch, computed } from 'vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
-import { useSuppliers } from '@/composables/useSuppliers';
+import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
-import { supplyListService } from '@/services/supply-list';
+import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
+import { supplyListService } from '@/services/supply-list';
 import type { Supplier } from '@/types/supplier';
 
 // Reusing global store settings if needed, or simply pass props.
-import { usePosSettings } from '@/composables/usePosSettings';
 
 const props = withDefaults(
     defineProps<{

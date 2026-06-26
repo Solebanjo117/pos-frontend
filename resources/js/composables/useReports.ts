@@ -5,6 +5,10 @@ import type {
     StockLevelsFilters,
     MovementHistoryReport,
     MovementHistoryFilters,
+    DailyFinancialSummary,
+    BalanceSheetReport,
+    FinancialAdjustment,
+    CapitalMovement,
 } from '@/types/report';
 
 export function useReports() {
@@ -99,6 +103,10 @@ export function useReports() {
     const brandProfitabilityReport = ref<any[] | null>(null);
     const categoryProfitabilityReport = ref<any[] | null>(null);
     const zReport = ref<any>(null);
+    const dailySummary = ref<DailyFinancialSummary | null>(null);
+    const balanceSheet = ref<BalanceSheetReport | null>(null);
+    const adjustments = ref<FinancialAdjustment[]>([]);
+    const capitalMovements = ref<CapitalMovement[]>([]);
 
     /**
      * Fetch financial report
@@ -277,6 +285,141 @@ export function useReports() {
         }
     };
 
+    const fetchDailySummary = async (filters: {
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        rebuild?: boolean;
+    }) => {
+        loading.value = true;
+        error.value = null;
+        try {
+            dailySummary.value =
+                await ReportsApiService.getDailySummary(filters);
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message || 'Error fetching daily summary';
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const fetchFinancialSnapshots = async (filters: {
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        rebuild?: boolean;
+    }) => {
+        loading.value = true;
+        error.value = null;
+        try {
+            dailySummary.value =
+                await ReportsApiService.getFinancialSnapshots(filters);
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message ||
+                'Error fetching financial snapshots';
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const fetchBalanceSheet = async (filters: {
+        date_from?: string | null;
+        date_to?: string | null;
+        warehouse_id?: number | null;
+    }) => {
+        loading.value = true;
+        error.value = null;
+        try {
+            balanceSheet.value =
+                await ReportsApiService.getBalanceSheet(filters);
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message || 'Error fetching balance sheet';
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const storeAdjustment = async (payload: {
+        type: 'cash' | 'inventory';
+        amount: number;
+        reason: string;
+        adjustment_date: string;
+        warehouse_id?: number | null;
+        notes?: string | null;
+    }) => {
+        loading.value = true;
+        error.value = null;
+        try {
+            await ReportsApiService.createAdjustment(payload);
+            await fetchAdjustments({
+                date_from: payload.adjustment_date,
+                date_to: payload.adjustment_date,
+                warehouse_id: payload.warehouse_id,
+            });
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message || 'Error creating adjustment';
+            throw err;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const fetchAdjustments = async (filters?: {
+        date_from?: string;
+        date_to?: string;
+        warehouse_id?: number | null;
+    }) => {
+        try {
+            adjustments.value = await ReportsApiService.getAdjustments(filters);
+        } catch (err: any) {
+            console.error('Error fetching adjustments:', err);
+        }
+    };
+
+    const storeCapitalMovement = async (payload: {
+        movement_type: 'in' | 'out';
+        amount: number;
+        reason: string;
+        movement_date: string;
+        warehouse_id?: number | null;
+        notes?: string | null;
+    }) => {
+        loading.value = true;
+        error.value = null;
+        try {
+            await ReportsApiService.createCapitalMovement(payload);
+            await fetchCapitalMovements({
+                date_from: payload.movement_date,
+                date_to: payload.movement_date,
+                warehouse_id: payload.warehouse_id,
+            });
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message ||
+                'Error creating capital movement';
+            throw err;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const fetchCapitalMovements = async (filters?: {
+        date_from?: string;
+        date_to?: string;
+        warehouse_id?: number | null;
+    }) => {
+        try {
+            capitalMovements.value =
+                await ReportsApiService.getCapitalMovements(filters);
+        } catch (err: any) {
+            console.error('Error fetching capital movements:', err);
+        }
+    };
+
     return {
         stockLevelsReport,
         movementHistoryReport,
@@ -286,6 +429,10 @@ export function useReports() {
         brandProfitabilityReport,
         categoryProfitabilityReport,
         zReport,
+        dailySummary,
+        balanceSheet,
+        adjustments,
+        capitalMovements,
         loading,
         error,
         fetchStockLevels,
@@ -298,5 +445,12 @@ export function useReports() {
         fetchCategoryProfitability,
         fetchZReport,
         exportZReport,
+        fetchDailySummary,
+        fetchFinancialSnapshots,
+        fetchBalanceSheet,
+        storeAdjustment,
+        fetchAdjustments,
+        storeCapitalMovement,
+        fetchCapitalMovements,
     };
 }

@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
-import InputError from '@/components/InputError.vue';
-import { Spinner } from '@/components/ui/spinner';
-import { store } from '@/routes/login';
 import {
     User,
     Lock,
@@ -13,6 +10,9 @@ import {
     Receipt,
 } from 'lucide-vue-next';
 import { ref } from 'vue';
+import InputError from '@/components/InputError.vue';
+import { Spinner } from '@/components/ui/spinner';
+import { store } from '@/routes/login';
 
 defineProps<{
     status?: string;

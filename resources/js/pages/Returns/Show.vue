@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { SalesReturnsApiService } from '@/services/sales-returns';
-import type { SalesReturnOperationalDetail } from '@/types/sales-return';
 import {
     ArrowLeft,
     CheckCircle2,
@@ -14,6 +10,10 @@ import {
     Wallet,
     XCircle,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { SalesReturnsApiService } from '@/services/sales-returns';
+import type { SalesReturnOperationalDetail } from '@/types/sales-return';
 
 defineOptions({ layout: AppLayout });
 

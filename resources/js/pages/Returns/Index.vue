@@ -1,13 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { SalesReturnsApiService } from '@/services/sales-returns';
-import type {
-    SalesReturnListRow,
-    SalesReturnRefundMethod,
-    SalesReturnStatus,
-} from '@/types/sales-return';
 import {
     CheckCircle2,
     ChevronDown,
@@ -17,6 +9,14 @@ import {
     Search,
     XCircle,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { SalesReturnsApiService } from '@/services/sales-returns';
+import type {
+    SalesReturnListRow,
+    SalesReturnRefundMethod,
+    SalesReturnStatus,
+} from '@/types/sales-return';
 
 defineOptions({ layout: AppLayout });
 

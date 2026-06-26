@@ -1,4 +1,3 @@
-import apiClient from './api/client';
 import type {
     InventoryItem,
     Warehouse,
@@ -6,6 +5,7 @@ import type {
     UpdateInventoryRequest,
     InventoryPaginatedResponse,
 } from '@/types/inventory';
+import apiClient from './api/client';
 
 const BASE_PATH = '/inventory';
 

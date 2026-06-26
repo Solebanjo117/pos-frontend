@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import {
     ClipboardCheck,
     CreditCard,
@@ -13,8 +10,11 @@ import {
     Save,
     UserRound,
 } from 'lucide-vue-next';
+import { computed, ref, onMounted } from 'vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
+import AppLayout from '@/layouts/AppLayout.vue';
 
 const props = defineProps<{ purchaseOrderId: number }>();
 const { purchaseOrder, loading, error, fetchPurchaseOrderById, receiveItems } =

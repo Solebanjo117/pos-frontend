@@ -1,10 +1,10 @@
-import { ref, computed, onMounted, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
+import { ref, computed, onMounted, watch } from 'vue';
 import { salesOrdersService } from '@/services/sales-orders';
-import { usePosSettings } from './usePosSettings';
-import { useStoreSettings } from './useStoreSettings';
 import type { Product } from '@/types/product';
 import type { CreateSalesOrderData } from '@/types/sales-order';
+import { usePosSettings } from './usePosSettings';
+import { useStoreSettings } from './useStoreSettings';
 
 interface CartItem {
     id: string; // temporal ID for cart

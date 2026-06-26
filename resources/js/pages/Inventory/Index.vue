@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { useInventory } from '@/composables/useInventory';
-import type { InventoryFilters } from '@/types/inventory';
+import { ref, onMounted, computed } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { useInventory } from '@/composables/useInventory';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import type { InventoryFilters } from '@/types/inventory';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

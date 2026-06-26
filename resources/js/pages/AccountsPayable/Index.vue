@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
 import {
     AlertCircle,
     Banknote,
@@ -13,8 +10,11 @@ import {
     ReceiptText,
     TrendingDown,
 } from 'lucide-vue-next';
-import apiClient from '@/services/api/client';
+import { ref, onMounted, computed } from 'vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
+import { type BreadcrumbItem } from '@/types';
 
 interface Payment {
     method: string;

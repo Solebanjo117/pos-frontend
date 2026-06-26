@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { ChevronRight } from 'lucide-vue-next';
+import { ref } from 'vue';
 
 const props = withDefaults(
     defineProps<{

@@ -1,4 +1,3 @@
-import apiClient from './client';
 import type {
     Product,
     ProductDetail,
@@ -11,6 +10,7 @@ import type {
     PaginatedResponse,
     ApiResponse,
 } from '@/types/product';
+import apiClient from './client';
 
 export const productsApi = {
     /**

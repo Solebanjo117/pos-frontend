@@ -1,21 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
-import { type BreadcrumbItem } from '@/types';
-import { useProducts } from '@/composables/useProducts';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { productsApi } from '@/services/api/products';
-import { useToast } from '@/composables/useToast';
-import type {
-    AlternativeProduct,
-    ProductDetail,
-    ProductImage,
-    ProductOperationalProfile,
-    ProductPricing,
-    ProductVariant,
-} from '@/types/product';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -32,6 +16,22 @@ import {
     Tags,
     Warehouse,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
+import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useProducts } from '@/composables/useProducts';
+import { useToast } from '@/composables/useToast';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { productsApi } from '@/services/api/products';
+import { type BreadcrumbItem } from '@/types';
+import type {
+    AlternativeProduct,
+    ProductDetail,
+    ProductImage,
+    ProductOperationalProfile,
+    ProductPricing,
+    ProductVariant,
+} from '@/types/product';
 
 const props = defineProps<{
     productId: number;

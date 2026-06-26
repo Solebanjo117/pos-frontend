@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     Clock,
@@ -14,20 +13,21 @@ import {
     PackageSearch,
     X,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { useReports } from '@/composables/useReports';
-import { useWarehouses } from '@/composables/useWarehouses';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { useUsers } from '@/composables/useUsers';
-import { useProducts } from '@/composables/useProducts';
+import { ref, onMounted, computed, watch } from 'vue';
 import MovementTrendChart from '@/components/charts/MovementTrendChart.vue';
 import MovementTypeChart from '@/components/charts/MovementTypeChart.vue';
-import ProductCombobox from '@/components/ProductCombobox.vue';
 import Pagination from '@/components/Pagination.vue';
+import ProductCombobox from '@/components/ProductCombobox.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useProducts } from '@/composables/useProducts';
+import { useReports } from '@/composables/useReports';
+import { useUsers } from '@/composables/useUsers';
+import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

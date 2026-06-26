@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
 import { AlertCircle, Calculator, RotateCcw, Send, X } from 'lucide-vue-next';
+import { computed, reactive, ref, watch } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type { PosSession, PosSessionSummary } from '../../types/pos-session';
 

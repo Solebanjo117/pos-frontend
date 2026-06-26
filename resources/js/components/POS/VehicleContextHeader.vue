@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { Car, X, ChevronRight } from 'lucide-vue-next';
+import { ref } from 'vue';
+import VehicleSelector from '@/components/VehicleSelector.vue';
 import {
     useVehicleContext,
     type VehicleContext,
 } from '@/composables/useVehicleContext';
-import VehicleSelector from '@/components/VehicleSelector.vue';
 
 const { vehicle, vehicleDisplay, isVehicleSelected, setVehicle, clearVehicle } =
     useVehicleContext();

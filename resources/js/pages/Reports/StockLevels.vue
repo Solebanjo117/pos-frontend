@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     BarChart3,
@@ -15,21 +14,22 @@ import {
     ChevronsUpDown,
     X,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import type { StockLevelsFilters } from '@/types/report';
-import { useReports } from '@/composables/useReports';
-import { useWarehouses } from '@/composables/useWarehouses';
-import { usePosSettings } from '@/composables/usePosSettings';
-import { useBrands } from '@/composables/useBrands';
-import { useCategories } from '@/composables/useCategories';
+import { ref, onMounted, computed, watch } from 'vue';
+import StockStatusChart from '@/components/charts/StockStatusChart.vue';
+import TopProductsChart from '@/components/charts/TopProductsChart.vue';
+import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue';
+import Pagination from '@/components/Pagination.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
-import Pagination from '@/components/Pagination.vue';
-import StockStatusChart from '@/components/charts/StockStatusChart.vue';
-import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue';
-import TopProductsChart from '@/components/charts/TopProductsChart.vue';
+import { useBrands } from '@/composables/useBrands';
+import { useCategories } from '@/composables/useCategories';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { useReports } from '@/composables/useReports';
+import { useWarehouses } from '@/composables/useWarehouses';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import type { StockLevelsFilters } from '@/types/report';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },

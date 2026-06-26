@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     AlertCircle,
@@ -20,13 +19,14 @@ import {
     Warehouse,
     XCircle,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useSuppliers } from '@/composables/useSuppliers';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type {
     PurchaseOrder,
     PurchaseOrderFilters,

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
 import { Send, Save } from 'lucide-vue-next';
+import { computed, reactive, ref } from 'vue';
 import { Button } from '@/components/ui/button';
-import { changelogApi } from '@/services/api/changelog';
 import { useAuth } from '@/composables/useAuth';
+import { changelogApi } from '@/services/api/changelog';
 
 const emit = defineEmits<{
     saved: [];

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     Calendar,
@@ -9,10 +8,11 @@ import {
     Users,
     Warehouse as WarehouseIcon,
 } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, onMounted, ref } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { CustomersApiService } from '@/services/customers';
 import { InventoryApiService } from '@/services/inventory';
 import { ReportsApiService } from '@/services/reports';

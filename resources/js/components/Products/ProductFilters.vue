@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
 import {
     X,
     Layers,
@@ -8,6 +7,7 @@ import {
     Package,
     RotateCcw,
 } from 'lucide-vue-next';
+import { ref, watch, computed } from 'vue';
 
 interface Category {
     id: number;

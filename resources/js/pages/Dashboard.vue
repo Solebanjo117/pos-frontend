@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
+import {
+    ArcElement,
+    Chart as ChartJS,
+    Legend,
+    Tooltip,
+    type ChartOptions,
+} from 'chart.js';
 import {
     AlertTriangle,
     ArrowRight,
@@ -20,19 +26,16 @@ import {
     Users,
     Warehouse as WarehouseIcon,
 } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Doughnut } from 'vue-chartjs';
-import {
-    ArcElement,
-    Chart as ChartJS,
-    Legend,
-    Tooltip,
-    type ChartOptions,
-} from 'chart.js';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesChart from '@/components/dashboard/SalesChart.vue';
 import PageShell from '@/components/PageShell.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import SalesChart from '@/components/dashboard/SalesChart.vue';
+import { useDashboard } from '@/composables/useDashboard';
+import { usePosSettings } from '@/composables/usePosSettings';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
+import WarehousesApiService from '@/services/warehouses';
 import { type BreadcrumbItem } from '@/types';
 import type {
     DashboardFinancialKpi,
@@ -41,9 +44,6 @@ import type {
     DashboardTopClient,
 } from '@/types/dashboard';
 import type { Warehouse } from '@/types/warehouse';
-import { useDashboard } from '@/composables/useDashboard';
-import { usePosSettings } from '@/composables/usePosSettings';
-import WarehousesApiService from '@/services/warehouses';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 

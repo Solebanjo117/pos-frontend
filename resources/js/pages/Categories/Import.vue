@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { Plus, X } from 'lucide-vue-next';
+import { ref } from 'vue';
 import UniversalImporter from '@/components/Import/UniversalImporter.vue';
-import type { ImporterConfig } from '@/services/import';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -12,9 +12,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Plus, X } from 'lucide-vue-next';
 import { useToast } from '@/composables/useToast';
+import AppLayout from '@/layouts/AppLayout.vue';
+import type { ImporterConfig } from '@/services/import';
 
 const toast = useToast();
 

@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { useCategories } from '@/composables/useCategories';
 import {
     Search,
     Plus,
@@ -15,6 +12,9 @@ import {
     Upload,
     Settings2,
 } from 'lucide-vue-next';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useCategories } from '@/composables/useCategories';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { Category } from '@/types/category';
 
 const { loading, error, fetchCategoriesWithParent, deleteCategory } =
@@ -65,7 +65,9 @@ function categoryParentIds(category: Category): number[] {
 }
 
 function visualPathSeparator(): string {
-    return pathSeparator.value === '' ? DEFAULT_PATH_SEPARATOR : pathSeparator.value;
+    return pathSeparator.value === ''
+        ? DEFAULT_PATH_SEPARATOR
+        : pathSeparator.value;
 }
 
 function buildCategoryPath(
@@ -101,7 +103,7 @@ function buildCategoryPaths(category: Category): string[] {
 
 // Compute filtered categories (flattened for search but still preserving parent-child context if possible)
 const processedCategories = computed(() => {
-    let list = categoriesWithParent.value;
+    const list = categoriesWithParent.value;
     const queryText = searchQuery.value.trim();
 
     // Apply search filter if it exists
@@ -292,7 +294,9 @@ watch(pathSeparator, (value) => {
             <div
                 class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
             >
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_20rem]">
+                <div
+                    class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_20rem]"
+                >
                     <div>
                         <label
                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"

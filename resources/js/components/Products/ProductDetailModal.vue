@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import type { Product } from '@/types/product';
-import apiClient from '@/services/api/client';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import apiClient from '@/services/api/client';
+import type { Product } from '@/types/product';
 
 interface Props {
     product: Product;

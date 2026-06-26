@@ -1,9 +1,9 @@
-import apiClient from './api/client';
 import type {
     SalesReturnCreatePayload,
     SalesReturnListFilters,
     SalesReturnOperationalDetail,
 } from '@/types/sales-return';
+import apiClient from './api/client';
 
 const BASE_PATH = '/sales-returns';
 

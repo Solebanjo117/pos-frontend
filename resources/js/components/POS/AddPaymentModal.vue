@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
 import { Banknote, X, AlertCircle, CreditCard } from 'lucide-vue-next';
+import { ref, computed, onMounted, watch } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 
 const {

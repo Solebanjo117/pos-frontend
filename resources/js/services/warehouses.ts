@@ -1,5 +1,4 @@
-import { AxiosResponse } from 'axios';
-import apiClient from './api/client';
+import type { AxiosResponse } from 'axios';
 import type {
     Warehouse,
     WarehouseFilters,
@@ -8,6 +7,7 @@ import type {
     UpdateWarehouseRequest,
     PaginatedWarehousesResponse,
 } from '@/types/warehouse';
+import apiClient from './api/client';
 
 class WarehousesApiService {
     /**

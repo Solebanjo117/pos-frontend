@@ -1,10 +1,10 @@
-import apiClient from './api/client';
 import type {
     OperationalExpense,
     OperationalExpenseFilters,
     OperationalExpenseListResponse,
     OperationalExpensePayload,
 } from '@/types/operational-expense';
+import apiClient from './api/client';
 
 export const operationalExpensesService = {
     async list(

@@ -1,4 +1,3 @@
-import apiClient from './api/client';
 import type {
     Supplier,
     SupplierFilters,
@@ -11,6 +10,7 @@ import type {
     SupplierCommercialDashboard,
     SupplierCommercialDashboardFilters,
 } from '@/types/supplier';
+import apiClient from './api/client';
 
 const BASE_URL = '/suppliers';
 

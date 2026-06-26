@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import apiClient from '@/services/api/client';
 import {
     Search,
     Activity,
@@ -12,6 +9,9 @@ import {
     Calendar,
     Filter,
 } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
+import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
 
 defineOptions({ layout: AppLayout });
 

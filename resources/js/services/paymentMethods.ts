@@ -1,9 +1,9 @@
-import apiClient from './api/client';
 import type {
     PaymentMethod,
     CreatePaymentMethodData,
     UpdatePaymentMethodData,
 } from '@/types/payment-method';
+import apiClient from './api/client';
 
 const BASE_URL = '/payment-methods';
 

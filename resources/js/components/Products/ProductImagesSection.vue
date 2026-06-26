@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { X } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
 import apiClient from '@/services/api/client';
 import { categoriesService } from '@/services/categories';
-import { X } from 'lucide-vue-next';
 
 interface ProductImage {
     id: number;

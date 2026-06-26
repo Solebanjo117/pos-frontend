@@ -1,9 +1,9 @@
-import apiClient from './api/client';
 import type {
     SalesQuote,
     SalesQuoteOperationalDetail,
     SalesQuotesListFilters,
 } from '@/types/sales-quote';
+import apiClient from './api/client';
 
 const BASE_PATH = '/sales-quotes';
 

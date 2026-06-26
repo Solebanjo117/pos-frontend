@@ -1,4 +1,3 @@
-import apiClient from './api/client';
 import type {
     Customer,
     CustomerFilters,
@@ -11,6 +10,7 @@ import type {
     CustomerSalesHistory,
     CustomerSalesHistoryFilters,
 } from '@/types/customer';
+import apiClient from './api/client';
 
 export const CustomersApiService = {
     /**

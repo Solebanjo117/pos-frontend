@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { Plus, Globe, Car } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted } from 'vue';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { useToast } from '@/composables/useToast';
 import apiClient from '@/services/api/client';
-import SearchableSelect from '@/components/ui/SearchableSelect.vue';
-import { Plus, Globe, Car } from 'lucide-vue-next';
 
 interface VehicleMake {
     id: number;

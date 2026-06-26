@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
+import { ArrowLeft, Save, Building2, User } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { useCustomers } from '@/composables/useCustomers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { ArrowLeft, Save, Building2, User } from 'lucide-vue-next';
-import { useCustomers } from '@/composables/useCustomers';
 import type { CustomerFormData } from '@/types/customer';
 
 const breadcrumbs: BreadcrumbItem[] = [

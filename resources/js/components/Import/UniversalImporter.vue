@@ -136,6 +136,13 @@ type WorkerAwareRun = Partial<ImportResult> & {
     status?: string;
     phase?: string | null;
 };
+type RowsRevalidationProgress = {
+    status: string;
+    processed_rows: number;
+    total_rows: number;
+    rows_revision: number;
+    validated_rows_revision: number;
+};
 
 const searchableOptions = ref<Record<string, ImportSearchableOption[]>>({});
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -701,6 +708,88 @@ const persistedRowsRevalidationActive = computed(() =>
         validationRowsServerMeta.value?.full_revalidation_status ?? '',
     ),
 );
+const rowsRevalidationProgress = computed<RowsRevalidationProgress | null>(
+    () => {
+        const metaProgress =
+            validationRowsServerMeta.value?.revalidation_progress;
+        const summaryProgress = (
+            result.value?.summary as
+                | { revalidation_progress?: RowsRevalidationProgress }
+                | undefined
+        )?.revalidation_progress;
+        const progress = metaProgress ?? summaryProgress;
+
+        if (progress) {
+            return {
+                status:
+                    progress.status ??
+                    validationRowsServerMeta.value?.full_revalidation_status ??
+                    result.value?.summary?.full_revalidation_status ??
+                    'pending',
+                processed_rows: Number(progress.processed_rows ?? 0),
+                total_rows: Number(progress.total_rows ?? 0),
+                rows_revision: Number(progress.rows_revision ?? 0),
+                validated_rows_revision: Number(
+                    progress.validated_rows_revision ?? 0,
+                ),
+            };
+        }
+
+        if (!persistedRowsRevalidationActive.value) {
+            return null;
+        }
+
+        return {
+            status:
+                validationRowsServerMeta.value?.full_revalidation_status ??
+                'pending',
+            processed_rows: Number(result.value?.processed_rows ?? 0),
+            total_rows: Number(
+                result.value?.total_rows ??
+                    validationRowsServerMeta.value?.total ??
+                    0,
+            ),
+            rows_revision: Number(
+                validationRowsServerMeta.value?.rows_revision ?? 0,
+            ),
+            validated_rows_revision: Number(
+                validationRowsServerMeta.value?.validated_rows_revision ?? 0,
+            ),
+        };
+    },
+);
+const rowsRevalidationProgressPercent = computed(() => {
+    const progress = rowsRevalidationProgress.value;
+    if (!progress) {
+        return 0;
+    }
+
+    const total = Number(progress.total_rows ?? 0);
+    if (total <= 0) {
+        return persistedRowsRevalidationActive.value ? 5 : 100;
+    }
+
+    return Math.min(
+        100,
+        Math.max(
+            0,
+            Math.round((Number(progress.processed_rows ?? 0) / total) * 100),
+        ),
+    );
+});
+const rowsRevalidationProgressLabel = computed(() => {
+    const progress = rowsRevalidationProgress.value;
+    if (!progress) {
+        return null;
+    }
+
+    const total = Number(progress.total_rows ?? 0);
+    if (total <= 0) {
+        return 'Preparando revalidacion completa...';
+    }
+
+    return `${rowsRevalidationProgressPercent.value}% - ${Number(progress.processed_rows ?? 0)} / ${total} filas`;
+});
 const canSavePersistedRowChanges = computed(
     () =>
         hasUnsavedPersistedRowChanges.value &&
@@ -1033,7 +1122,9 @@ const actionableRecommendation = computed(() => {
     }
 
     if (persistedRowsRevalidationActive.value) {
-        return 'La revalidacion esta corriendo. Puedes filtrar errores y preparar correcciones mientras termina.';
+        return rowsRevalidationProgressLabel.value
+            ? `Revalidacion completa en curso: ${rowsRevalidationProgressLabel.value}. Puedes filtrar errores y preparar correcciones mientras termina.`
+            : 'La revalidacion esta corriendo. Puedes filtrar errores y preparar correcciones mientras termina.';
     }
 
     if (visibleReferenceCount.value > 0) {
@@ -3234,7 +3325,24 @@ async function requestReferenceRowsRevalidation(
             : validationRowsServerMeta.value;
 
         if (response.data.fallback_full_revalidation === true) {
-            toast.success('Revalidando filas afectadas.');
+            if (validationRowsServerMeta.value) {
+                validationRowsServerMeta.value = {
+                    ...validationRowsServerMeta.value,
+                    revalidation_progress: {
+                        status: response.data.full_revalidation_status,
+                        processed_rows: 0,
+                        total_rows: validationRowsServerMeta.value.total,
+                        rows_revision:
+                            validationRowsServerMeta.value.rows_revision,
+                        validated_rows_revision:
+                            validationRowsServerMeta.value
+                                .validated_rows_revision,
+                    },
+                };
+            }
+            toast.info(
+                'No se pudo limitar por referencia. Se inicio revalidacion completa.',
+            );
             startImportStatusPolling();
             return true;
         }
@@ -3244,7 +3352,7 @@ async function requestReferenceRowsRevalidation(
             await refreshImportRun();
         }
 
-        toast.success('Revalidando filas afectadas.');
+        toast.success('Filas afectadas revalidadas.');
         return true;
     } catch (e: any) {
         error.value =
@@ -3277,6 +3385,16 @@ async function requestFullRowsRevalidation(
                   ...validationRowsServerMeta.value,
                   full_revalidation_status:
                       response.data.full_revalidation_status,
+                  revalidation_progress: {
+                      status: response.data.full_revalidation_status,
+                      processed_rows: 0,
+                      total_rows: validationRowsServerMeta.value.total,
+                      rows_revision:
+                          validationRowsServerMeta.value.rows_revision,
+                      validated_rows_revision:
+                          validationRowsServerMeta.value
+                              .validated_rows_revision,
+                  },
               }
             : validationRowsServerMeta.value;
         if (options.automatic === true) {
@@ -3725,6 +3843,9 @@ const refreshImportRun = async () => {
         )
     ) {
         validationRunning.value = true;
+        if (persistedRowsAvailable.value) {
+            await loadValidatedRunRows(importRunId);
+        }
         await loadImportRuns(false);
         return;
     }
@@ -4817,7 +4938,28 @@ const formatFileSize = (bytes: number) => {
                             "
                             class="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-100"
                         >
-                            Aplicando mapping operativo y revalidando filas...
+                            <div class="font-medium">
+                                Aplicando mapping operativo y revalidando
+                                filas...
+                            </div>
+                            <div
+                                v-if="rowsRevalidationProgressLabel"
+                                class="mt-2"
+                            >
+                                <div
+                                    class="h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/50"
+                                >
+                                    <div
+                                        class="h-full rounded-full bg-blue-500 transition-all"
+                                        :style="{
+                                            width: `${rowsRevalidationProgressPercent}%`,
+                                        }"
+                                    ></div>
+                                </div>
+                                <p class="mt-1">
+                                    {{ rowsRevalidationProgressLabel }}
+                                </p>
+                            </div>
                         </div>
                     </div>
                     <div
@@ -5373,6 +5515,27 @@ const formatFileSize = (bytes: number) => {
                                 productos todavia.
                             </template>
                         </div>
+                        <div
+                            v-if="
+                                persistedRowsRevalidationActive &&
+                                rowsRevalidationProgressLabel
+                            "
+                            class="flex min-w-[220px] flex-1 flex-col gap-1 sm:max-w-xs"
+                        >
+                            <div
+                                class="h-1.5 overflow-hidden rounded-full bg-red-100 dark:bg-red-900/40"
+                            >
+                                <div
+                                    class="h-full rounded-full bg-red-600 transition-all dark:bg-red-400"
+                                    :style="{
+                                        width: `${rowsRevalidationProgressPercent}%`,
+                                    }"
+                                ></div>
+                            </div>
+                            <span class="text-[11px] font-medium">
+                                {{ rowsRevalidationProgressLabel }}
+                            </span>
+                        </div>
                         <button
                             type="button"
                             class="inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 font-medium text-red-700 transition hover:bg-red-100 dark:border-red-700 dark:bg-red-950/40 dark:text-red-100"
@@ -5722,7 +5885,7 @@ const formatFileSize = (bytes: number) => {
                         v-if="persistedRowsAvailable"
                         type="button"
                         aria-label="Revalidar archivo completo desde filas persistidas"
-                        class="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                        class="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
                         :disabled="
                             hasUnsavedPersistedRowChanges ||
                             revalidatingRows ||
@@ -5732,9 +5895,17 @@ const formatFileSize = (bytes: number) => {
                     >
                         <RefreshCw
                             class="h-3.5 w-3.5"
-                            :class="{ 'animate-spin': revalidatingRows }"
+                            :class="{
+                                'animate-spin':
+                                    revalidatingRows ||
+                                    persistedRowsRevalidationActive,
+                            }"
                         />
-                        Revalidar archivo completo
+                        <span v-if="persistedRowsRevalidationActive">
+                            Revalidando:
+                            {{ rowsRevalidationProgressLabel ?? 'en cola...' }}
+                        </span>
+                        <span v-else> Revalidar archivo completo </span>
                     </button>
                     <button
                         v-if="!validatedPreviewReadOnly"

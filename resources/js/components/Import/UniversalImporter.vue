@@ -1722,11 +1722,56 @@ const normalizeCellIdentity = (value: unknown): string =>
         .toLowerCase()
         .replace(/\s+/g, ' ');
 
+const isProductsImport = computed(() => props.config.entity === 'products');
+
+const hasProductVariantPayload = (row: ImportRow): boolean =>
+    Boolean(
+        normalizeCellIdentity(row.brand) ||
+        normalizeCellIdentity(row.system_id) ||
+        normalizeCellIdentity(row.costo) ||
+        normalizeCellIdentity(row.precio) ||
+        normalizeCellIdentity(row.cantidad),
+    );
+
+const productDuplicateKeyForRow = (row: ImportRow): string => {
+    const nameKey = normalizeCellIdentity(row.nombre ?? row.name);
+    if (!nameKey) return '';
+
+    const categoryKey = normalizeCellIdentity(row.categoria) || 'uncategorized';
+    const systemId = normalizeCellIdentity(row.system_id);
+    if (systemId) {
+        return `${categoryKey}|${nameKey}|system:${systemId}`;
+    }
+
+    const brandKey =
+        normalizeCellIdentity(row.brand) ||
+        (hasProductVariantPayload(row) ? 'generica' : 'sin marca');
+    const skuKey = normalizeCellIdentity(row.sku);
+    const variantKey = skuKey
+        ? `brand:${brandKey}|sku:${skuKey}`
+        : `brand:${brandKey}|name:${nameKey}`;
+
+    return `${categoryKey}|${nameKey}|${variantKey}`;
+};
+
 const duplicateMapsForRows = () => {
     const skuCounts = new Map<string, number>();
     const nameCounts = new Map<string, number>();
+    const productIdentityCounts = new Map<string, number>();
 
     editedRows.value.forEach((row) => {
+        if (isProductsImport.value) {
+            const productIdentityKey = productDuplicateKeyForRow(row);
+            if (productIdentityKey) {
+                productIdentityCounts.set(
+                    productIdentityKey,
+                    (productIdentityCounts.get(productIdentityKey) ?? 0) + 1,
+                );
+            }
+
+            return;
+        }
+
         const skuKey = normalizeCellIdentity(row.sku);
         if (skuKey) {
             skuCounts.set(skuKey, (skuCounts.get(skuKey) ?? 0) + 1);
@@ -1743,7 +1788,7 @@ const duplicateMapsForRows = () => {
         }
     });
 
-    return { skuCounts, nameCounts };
+    return { skuCounts, nameCounts, productIdentityCounts };
 };
 
 const localErrorsForRow = (row: ImportRow): string[] => {
@@ -1779,6 +1824,25 @@ const duplicateConflictsForRow = (
     duplicateMaps = duplicateMapsForRows(),
 ) => {
     const conflicts: any[] = [];
+
+    if (isProductsImport.value) {
+        const productIdentityKey = productDuplicateKeyForRow(row);
+        if (
+            productIdentityKey &&
+            (duplicateMaps.productIdentityCounts.get(productIdentityKey) ?? 0) >
+                1
+        ) {
+            conflicts.push({
+                field: 'fila',
+                type: 'duplicate_in_file',
+                message:
+                    'Hay otra fila con la misma identidad de producto y variante en este archivo.',
+            });
+        }
+
+        return conflicts;
+    }
+
     const skuKey = normalizeCellIdentity(row.sku);
     const nameKey = [
         normalizeCellIdentity(row.nombre ?? row.name),

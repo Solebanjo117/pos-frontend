@@ -39,7 +39,6 @@ const importConfig: ImporterConfig = {
             key: 'categoria',
             label: 'Categoria',
             type: 'searchable',
-            required: true,
             searchableEndpoint: '/categories/all',
         },
         { key: 'costo', label: 'Costo', type: 'number' },

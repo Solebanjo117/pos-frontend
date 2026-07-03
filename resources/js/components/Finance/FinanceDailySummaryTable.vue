@@ -11,17 +11,20 @@ const columns: Array<{
     key: string;
     label: string;
 }> = [
-    { key: 'cash', label: 'Cash cierre' },
-    { key: 'inventory', label: 'Inv cierre' },
-    { key: 'purchase', label: 'Purchase' },
-    { key: 'expenses', label: 'Expenses' },
-    { key: 'sales', label: 'Sales' },
+    { key: 'cash', label: 'Cash' },
+    { key: 'bank', label: 'Banco' },
+    { key: 'inventory', label: 'Inventario' },
+    { key: 'sales_total', label: 'Ventas' },
+    { key: 'sales_collected', label: 'Cobrado' },
+    { key: 'sales_pending', label: 'C x C' },
+    { key: 'purchase', label: 'Compras' },
+    { key: 'purchase_paid', label: 'Pagado' },
+    { key: 'purchase_pending', label: 'C x P' },
+    { key: 'expenses', label: 'Gastos' },
     { key: 'cogs', label: 'COGS' },
-    { key: 'profit', label: 'Net Profit' },
-    { key: 'credit_payable', label: 'C x P' },
-    { key: 'credit_receivable', label: 'C x C' },
-    { key: 'cogs_credit', label: 'COGS Cr' },
-    { key: 'investment', label: 'Invest' },
+    { key: 'gross_profit', label: 'Util. bruta' },
+    { key: 'net_profit', label: 'Profit' },
+    { key: 'investment', label: 'Inversion' },
 ];
 
 const formatShortDate = (date: string): string => {
@@ -32,6 +35,9 @@ const formatShortDate = (date: string): string => {
         month: '2-digit',
     }).format(d);
 };
+
+const rowValue = (row: DailyFinancialRow, key: string): number =>
+    Number(row[key as keyof DailyFinancialRow] ?? 0);
 </script>
 
 <template>
@@ -73,18 +79,16 @@ const formatShortDate = (date: string): string => {
                         class="px-2 py-1 text-right text-slate-600 dark:text-slate-400"
                         :class="{
                             'text-emerald-600 dark:text-emerald-400':
-                                col.key === 'profit' && row[col.key] > 0,
+                                ['gross_profit', 'net_profit'].includes(
+                                    col.key,
+                                ) && rowValue(row, col.key) > 0,
                             'text-rose-600 dark:text-rose-400':
-                                col.key === 'profit' && row[col.key] < 0,
+                                ['gross_profit', 'net_profit'].includes(
+                                    col.key,
+                                ) && rowValue(row, col.key) < 0,
                         }"
                     >
-                        {{
-                            currencyFormatter(
-                                row[
-                                    col.key as keyof DailyFinancialRow
-                                ] as number,
-                            )
-                        }}
+                        {{ currencyFormatter(rowValue(row, col.key)) }}
                     </td>
                 </tr>
             </tbody>

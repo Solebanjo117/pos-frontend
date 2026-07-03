@@ -4,6 +4,8 @@ import {
     AlertCircle,
     BarChart3,
     Calendar,
+    CheckCircle2,
+    Clock,
     FileText,
     Landmark,
     RefreshCw,
@@ -17,6 +19,7 @@ import FinanceDailySummaryTable from '@/components/Finance/FinanceDailySummaryTa
 import FinanceIncomeStatement from '@/components/Finance/FinanceIncomeStatement.vue';
 import FinanceKpiRow from '@/components/Finance/FinanceKpiRow.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import FinancialDrilldownDrawer from '@/components/Finance/FinancialDrilldownDrawer.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -25,10 +28,11 @@ import { useReports } from '@/composables/useReports';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { InventoryApiService } from '@/services/inventory';
 import type { BreadcrumbItem } from '@/types';
-import type { ExpenseBreakdown } from '@/types/report';
+import type { ExpenseBreakdown, FinancialAdjustmentType } from '@/types/report';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
 type ReportTab = 'summary' | 'balance' | 'income' | 'investment';
+type ReportMode = 'basic' | 'advanced';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -40,6 +44,8 @@ const {
     incomeStatementReport,
     dailySummary,
     balanceSheet,
+    financialDrilldown,
+    financialAdvancedStatus,
     adjustments,
     capitalMovements,
     loading,
@@ -47,6 +53,8 @@ const {
     fetchIncomeStatement,
     fetchDailySummary,
     fetchBalanceSheet,
+    fetchFinancialDrilldown,
+    fetchFinancialAdvancedStatus,
     storeAdjustment,
     fetchAdjustments,
     storeCapitalMovement,
@@ -57,10 +65,19 @@ const { currentWarehouseId, initWarehouse } = usePosSettings();
 const warehouses = ref<any[]>([]);
 const activePreset = ref<DatePreset>('month');
 const activeTab = ref<ReportTab>('summary');
+const activeMode = ref<ReportMode>('basic');
 const adjustmentOpen = ref(false);
-const adjustmentType = ref<'cash' | 'inventory'>('cash');
+const adjustmentType = ref<FinancialAdjustmentType>('cash');
 const capitalMovementOpen = ref(false);
 const capitalMovementType = ref<'in' | 'out'>('in');
+const drilldownOpen = ref(false);
+const drilldownLoading = ref(false);
+const selectedKpi = ref<{
+    key: string;
+    label: string;
+    value: number;
+    metric?: string;
+} | null>(null);
 
 const today = new Date();
 const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -113,33 +130,104 @@ const kpis = computed(() => {
     const credits = incomeStatementReport.value?.credit_balances ?? {};
 
     return [
-        { key: 'cash', label: 'Cash', value: totals.cash ?? 0 },
+        {
+            key: 'cash',
+            label: 'Cash',
+            value: totals.cash ?? 0,
+            metric: 'cash',
+        },
+        {
+            key: 'bank',
+            label: 'Banco',
+            value: totals.bank ?? 0,
+            metric: 'bank',
+        },
         {
             key: 'inventory',
             label: 'Inventario',
             value: totals.inventory ?? 0,
+            metric: 'inventory',
         },
-        { key: 'sales', label: 'Ventas', value: totals.sales ?? 0 },
-        { key: 'purchase', label: 'Compras', value: totals.purchase ?? 0 },
-        { key: 'expenses', label: 'Gastos', value: totals.expenses ?? 0 },
-        { key: 'profit', label: 'Profit', value: totals.profit ?? 0 },
+        {
+            key: 'sales',
+            label: 'Ventas',
+            value: totals.sales_total ?? totals.sales ?? 0,
+            metric: 'sales',
+        },
+        {
+            key: 'sales_collected',
+            label: 'Cobrado',
+            value: totals.sales_collected ?? 0,
+            metric: 'payments_received',
+        },
+        {
+            key: 'purchase',
+            label: 'Compras',
+            value: totals.purchase ?? 0,
+            metric: 'purchases',
+        },
+        {
+            key: 'purchase_paid',
+            label: 'Pagado',
+            value: totals.purchase_paid ?? 0,
+            metric: 'supplier_payments',
+        },
+        {
+            key: 'expenses',
+            label: 'Gastos',
+            value: totals.expenses ?? 0,
+            metric: 'expenses',
+        },
+        {
+            key: 'gross_profit',
+            label: 'Util. bruta',
+            value: totals.gross_profit ?? 0,
+            metric: 'gross_profit',
+        },
+        {
+            key: 'profit',
+            label: 'Profit',
+            value: totals.net_profit ?? totals.profit ?? 0,
+            metric: 'profit',
+        },
         {
             key: 'receivable',
             label: 'C x C',
-            value: credits.accounts_receivable?.total_open_balance ?? 0,
+            value:
+                totals.accounts_receivable ??
+                credits.accounts_receivable?.total_open_balance ??
+                0,
+            metric: 'receivable',
         },
         {
             key: 'payable',
             label: 'C x P',
-            value: credits.accounts_payable?.total_open_balance ?? 0,
+            value:
+                totals.accounts_payable ??
+                credits.accounts_payable?.total_open_balance ??
+                0,
+            metric: 'payable',
         },
         {
             key: 'investment',
             label: 'Inversion',
             value: totals.net_investment ?? totals.investment ?? 0,
+            metric: 'investment',
         },
     ];
 });
+
+const warningLabels: Record<string, string> = {
+    inventory_historical_value_uses_current_fifo_lot_availability:
+        'Inventario historico estimado con disponibilidad FIFO actual.',
+};
+
+const financeWarnings = computed(() =>
+    [
+        ...(dailySummary.value?.warnings ?? []),
+        ...(balanceSheet.value?.warnings ?? []),
+    ].filter((warning, index, all) => all.indexOf(warning) === index),
+);
 
 const incomeSummary = computed(() => incomeStatementReport.value?.summary);
 const expenseBreakdown = computed<ExpenseBreakdown | null>(
@@ -165,6 +253,16 @@ const investmentTotals = computed(() => {
     };
 });
 
+const advancedReports = computed(
+    () => financialAdvancedStatus.value?.reports ?? [],
+);
+const advancedStatusClass = (status: string): string =>
+    status === 'available'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
+        : status === 'partial'
+          ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'
+          : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300';
+
 const loadWarehouses = async (): Promise<void> => {
     try {
         warehouses.value = await InventoryApiService.getWarehouses();
@@ -189,6 +287,8 @@ const loadReports = async (): Promise<void> => {
         }),
         fetchBalanceSheet(filters.value),
         fetchAdjustments(filters.value),
+        fetchCapitalMovements(filters.value),
+        fetchFinancialAdvancedStatus(),
     ]);
 
     const failed = results.filter((result) => result.status === 'rejected');
@@ -196,6 +296,31 @@ const loadReports = async (): Promise<void> => {
         error.value =
             'Algunos datos financieros no se pudieron cargar. Revisa la conexión o reduce el rango de fechas e intenta de nuevo.';
     }
+};
+
+const openDrilldown = async (
+    kpi: { key: string; label: string; value: number; metric?: string },
+    page = 1,
+): Promise<void> => {
+    selectedKpi.value = kpi;
+    drilldownOpen.value = true;
+    drilldownLoading.value = true;
+
+    try {
+        await fetchFinancialDrilldown({
+            metric: kpi.metric ?? kpi.key,
+            ...filters.value,
+            page,
+            per_page: 25,
+        });
+    } finally {
+        drilldownLoading.value = false;
+    }
+};
+
+const changeDrilldownPage = (page: number): void => {
+    if (!selectedKpi.value) return;
+    void openDrilldown(selectedKpi.value, page);
 };
 
 const setPreset = (preset: DatePreset): void => {
@@ -223,13 +348,13 @@ const setPreset = (preset: DatePreset): void => {
     void loadReports();
 };
 
-const openAdjustment = (type: 'cash' | 'inventory') => {
+const openAdjustment = (type: FinancialAdjustmentType) => {
     adjustmentType.value = type;
     adjustmentOpen.value = true;
 };
 
 const submitAdjustment = async (payload: {
-    type: 'cash' | 'inventory';
+    type: FinancialAdjustmentType;
     amount: number;
     reason: string;
     adjustment_date: string;
@@ -384,12 +509,60 @@ watch(currentWarehouseId, (value) => {
                         <AlertCircle :size="18" />
                         {{ error }}
                     </div>
+
+                    <div
+                        v-if="financeWarnings.length"
+                        class="space-y-1 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+                    >
+                        <div
+                            v-for="warning in financeWarnings"
+                            :key="warning"
+                            class="flex items-center gap-2"
+                        >
+                            <AlertCircle :size="15" />
+                            {{ warningLabels[warning] ?? warning }}
+                        </div>
+                    </div>
+
+                    <div
+                        class="inline-flex overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"
+                    >
+                        <button
+                            class="px-3 py-2 text-xs font-semibold transition"
+                            :class="
+                                activeMode === 'basic'
+                                    ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                                    : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
+                            "
+                            @click="activeMode = 'basic'"
+                        >
+                            Basico
+                        </button>
+                        <button
+                            class="px-3 py-2 text-xs font-semibold transition"
+                            :class="
+                                activeMode === 'advanced'
+                                    ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                                    : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
+                            "
+                            @click="activeMode = 'advanced'"
+                        >
+                            Avanzado
+                        </button>
+                    </div>
                 </div>
             </FinanceReportShell>
 
-            <FinanceKpiRow :kpis="kpis" :currency-formatter="formatCurrency" />
+            <FinanceKpiRow
+                :kpis="kpis"
+                :currency-formatter="formatCurrency"
+                @select="openDrilldown"
+            />
 
-            <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
+            <div
+                v-if="activeMode === 'basic'"
+                class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px]"
+            >
                 <div class="space-y-3">
                     <nav class="flex flex-wrap gap-2">
                         <button
@@ -792,6 +965,12 @@ watch(currentWarehouseId, (value) => {
                             </button>
                             <button
                                 class="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                                @click="openAdjustment('bank')"
+                            >
+                                Ajustar Banco
+                            </button>
+                            <button
+                                class="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
                                 @click="openAdjustment('inventory')"
                             >
                                 Ajustar Inventario
@@ -824,7 +1003,88 @@ watch(currentWarehouseId, (value) => {
                     </div>
                 </aside>
             </div>
+
+            <div v-else class="space-y-3">
+                <div
+                    class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2
+                                class="text-sm font-semibold text-slate-950 dark:text-slate-50"
+                            >
+                                Reportes avanzados
+                            </h2>
+                            <p
+                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                            >
+                                Los reportes contables formales quedan marcados
+                                como pendientes si el ledger aun no tiene datos.
+                            </p>
+                        </div>
+                        <div
+                            class="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                        >
+                            Ledger:
+                            {{
+                                financialAdvancedStatus?.ledger?.is_available
+                                    ? 'Disponible'
+                                    : 'Pendiente'
+                            }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div
+                        v-for="report in advancedReports"
+                        :key="report.key"
+                        class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <h3
+                                    class="text-sm font-semibold text-slate-950 dark:text-slate-50"
+                                >
+                                    {{ report.label }}
+                                </h3>
+                                <p
+                                    class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400"
+                                >
+                                    {{ report.source }}
+                                </p>
+                            </div>
+                            <span
+                                class="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase"
+                                :class="advancedStatusClass(report.status)"
+                            >
+                                <CheckCircle2
+                                    v-if="report.status === 'available'"
+                                    :size="13"
+                                />
+                                <Clock v-else :size="13" />
+                                {{
+                                    report.status === 'available'
+                                        ? 'Disponible'
+                                        : report.status === 'partial'
+                                          ? 'Parcial'
+                                          : 'Pendiente'
+                                }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <FinancialDrilldownDrawer
+            :open="drilldownOpen"
+            :report="financialDrilldown"
+            :loading="drilldownLoading"
+            :currency-formatter="formatCurrency"
+            @close="drilldownOpen = false"
+            @page="changeDrilldownPage"
+        />
 
         <FinanceAdjustmentModal
             v-model:open="adjustmentOpen"

@@ -12,7 +12,10 @@ import type {
     DailyFinancialSummary,
     BalanceSheetReport,
     FinancialAdjustment,
+    FinancialAdjustmentType,
     CapitalMovement,
+    FinancialDrilldownReport,
+    FinancialAdvancedStatusReport,
 } from '@/types/report';
 import apiClient from './api/client';
 
@@ -255,8 +258,29 @@ export const ReportsApiService = {
         return response.data;
     },
 
+    async getFinancialDrilldown(filters: {
+        metric: string;
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        page?: number;
+        per_page?: number;
+    }): Promise<FinancialDrilldownReport> {
+        const response = await apiClient.get('/reports/financial-drilldown', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getFinancialAdvancedStatus(): Promise<FinancialAdvancedStatusReport> {
+        const response = await apiClient.get(
+            '/reports/financial-advanced-status',
+        );
+        return response.data;
+    },
+
     async createAdjustment(payload: {
-        type: 'cash' | 'inventory';
+        type: FinancialAdjustmentType;
         amount: number;
         reason: string;
         adjustment_date: string;

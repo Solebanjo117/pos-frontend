@@ -8,7 +8,10 @@ import type {
     DailyFinancialSummary,
     BalanceSheetReport,
     FinancialAdjustment,
+    FinancialAdjustmentType,
     CapitalMovement,
+    FinancialDrilldownReport,
+    FinancialAdvancedStatusReport,
 } from '@/types/report';
 
 export function useReports() {
@@ -105,6 +108,10 @@ export function useReports() {
     const zReport = ref<any>(null);
     const dailySummary = ref<DailyFinancialSummary | null>(null);
     const balanceSheet = ref<BalanceSheetReport | null>(null);
+    const financialDrilldown = ref<FinancialDrilldownReport | null>(null);
+    const financialAdvancedStatus = ref<FinancialAdvancedStatusReport | null>(
+        null,
+    );
     const adjustments = ref<FinancialAdjustment[]>([]);
     const capitalMovements = ref<CapitalMovement[]>([]);
 
@@ -342,8 +349,39 @@ export function useReports() {
         }
     };
 
+    const fetchFinancialDrilldown = async (filters: {
+        metric: string;
+        date_from: string;
+        date_to: string;
+        warehouse_id?: number | null;
+        page?: number;
+        per_page?: number;
+    }) => {
+        try {
+            financialDrilldown.value =
+                await ReportsApiService.getFinancialDrilldown(filters);
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message ||
+                'Error fetching financial detail';
+            throw err;
+        }
+    };
+
+    const fetchFinancialAdvancedStatus = async () => {
+        try {
+            financialAdvancedStatus.value =
+                await ReportsApiService.getFinancialAdvancedStatus();
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message ||
+                'Error fetching advanced finance status';
+            throw err;
+        }
+    };
+
     const storeAdjustment = async (payload: {
-        type: 'cash' | 'inventory';
+        type: FinancialAdjustmentType;
         amount: number;
         reason: string;
         adjustment_date: string;
@@ -431,6 +469,8 @@ export function useReports() {
         zReport,
         dailySummary,
         balanceSheet,
+        financialDrilldown,
+        financialAdvancedStatus,
         adjustments,
         capitalMovements,
         loading,
@@ -448,6 +488,8 @@ export function useReports() {
         fetchDailySummary,
         fetchFinancialSnapshots,
         fetchBalanceSheet,
+        fetchFinancialDrilldown,
+        fetchFinancialAdvancedStatus,
         storeAdjustment,
         fetchAdjustments,
         storeCapitalMovement,

@@ -1505,7 +1505,7 @@ onMounted(async () => {
             primary-action-label="Registrar pago"
             cancel-label="Cancelar"
             allow-partial
-            :allowed-method-codes="['cash', 'card', 'transfer', 'other']"
+            payment-context="purchase_orders"
             show-reference-number
             show-notes
             reference-number-label="Numero de recibo"

@@ -1,5 +1,17 @@
 export type SalesReturnStatus = 'pending' | 'approved' | 'rejected';
-export type SalesReturnRefundMethod = 'cash' | 'card' | 'transfer' | 'balance';
+export type SalesReturnRefundMethod =
+    | 'cash'
+    | 'card'
+    | 'transfer'
+    | 'yappy'
+    | 'ach'
+    | 'cheque'
+    | 'visa'
+    | 'mastercard'
+    | 'amex'
+    | 'other'
+    | 'balance'
+    | 'store_credit';
 
 export interface SalesReturnListFilters {
     status?: SalesReturnStatus | '';
@@ -56,6 +68,38 @@ export interface SalesReturnListRow {
         product_name?: string | null;
         quantity: number;
     }>;
+}
+
+export interface SalesReturnCandidateItem {
+    id: number;
+    product_id: number;
+    variant_id?: number | null;
+    product_name: string;
+    product_sku: string;
+    quantity: number;
+    sold_quantity?: number;
+    already_returned_quantity?: number;
+    unit_price: number;
+    discount_percent: number;
+    tax_percent?: number;
+    total: number;
+    seller_name?: string | null;
+}
+
+export interface SalesReturnCandidate {
+    id: number;
+    order_number: string;
+    status: string;
+    payment_status?: string | null;
+    date?: string | null;
+    total: number;
+    has_customer: boolean;
+    customer?: {
+        id: number;
+        name: string;
+        code?: string | null;
+    } | null;
+    items: SalesReturnCandidateItem[];
 }
 
 export interface SalesReturnParty {

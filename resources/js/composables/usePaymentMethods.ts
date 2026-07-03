@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import { paymentMethodsService } from '@/services/paymentMethods';
 import type {
     PaymentMethod,
+    PaymentMethodContext,
     CreatePaymentMethodData,
     UpdatePaymentMethodData,
 } from '@/types/payment-method';
@@ -13,11 +14,14 @@ export function usePaymentMethods() {
     const error = ref<string | null>(null);
 
     // Fetch active payment methods (for POS, dropdowns)
-    async function fetchMethods() {
+    async function fetchMethods(context?: PaymentMethodContext, realMoney = false) {
         loading.value = true;
         error.value = null;
         try {
-            methods.value = await paymentMethodsService.getActive();
+            methods.value = await paymentMethodsService.getActive(
+                context,
+                realMoney,
+            );
         } catch (e: any) {
             error.value =
                 e.response?.data?.message || 'Error al cargar métodos de pago';

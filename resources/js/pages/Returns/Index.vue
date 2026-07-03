@@ -10,9 +10,12 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type {
+    SalesReturnCandidate,
+    SalesReturnCreatePayload,
     SalesReturnListRow,
     SalesReturnRefundMethod,
     SalesReturnStatus,
@@ -25,6 +28,13 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const processingId = ref<number | null>(null);
 const expandedId = ref<number | null>(null);
+const invoiceSearch = ref('');
+const candidateLoading = ref(false);
+const candidateError = ref<string | null>(null);
+const candidates = ref<SalesReturnCandidate[]>([]);
+const selectedCandidate = ref<SalesReturnCandidate | null>(null);
+const createReturnLoading = ref(false);
+const createReturnError = ref<string | null>(null);
 
 const filters = ref({
     status: '' as '' | SalesReturnStatus,
@@ -144,6 +154,13 @@ const methodLabel = (method?: string | null): string =>
         cash: 'Efectivo',
         card: 'Tarjeta',
         transfer: 'Transferencia',
+        yappy: 'Yappy',
+        ach: 'ACH',
+        cheque: 'Cheque',
+        visa: 'Visa',
+        mastercard: 'Mastercard',
+        amex: 'AMEX',
+        other: 'Otro',
         balance: 'Saldo a favor',
     })[method || ''] ||
     method ||
@@ -195,6 +212,57 @@ const clearFilters = (): void => {
         date_from: '',
         date_to: '',
     };
+};
+
+const searchCandidates = async (): Promise<void> => {
+    candidateLoading.value = true;
+    candidateError.value = null;
+
+    try {
+        candidates.value = await SalesReturnsApiService.candidates({
+            search: invoiceSearch.value.trim() || undefined,
+            per_page: 10,
+        });
+    } catch (err: any) {
+        candidateError.value =
+            err.response?.data?.message || 'No se pudo buscar la factura';
+    } finally {
+        candidateLoading.value = false;
+    }
+};
+
+const openCreateReturn = (candidate: SalesReturnCandidate): void => {
+    selectedCandidate.value = candidate;
+    createReturnError.value = null;
+};
+
+const closeCreateReturn = (): void => {
+    selectedCandidate.value = null;
+    createReturnError.value = null;
+};
+
+const handleCreateReturn = async (
+    payload: SalesReturnCreatePayload,
+): Promise<void> => {
+    if (!selectedCandidate.value) return;
+
+    createReturnLoading.value = true;
+    createReturnError.value = null;
+    try {
+        await SalesReturnsApiService.createForOrder(
+            selectedCandidate.value.id,
+            payload,
+        );
+        closeCreateReturn();
+        candidates.value = [];
+        invoiceSearch.value = '';
+        await fetchReturns(1);
+    } catch (err: any) {
+        createReturnError.value =
+            err.response?.data?.message || 'No se pudo crear la devolucion';
+    } finally {
+        createReturnLoading.value = false;
+    }
 };
 </script>
 
@@ -261,6 +329,92 @@ const clearFilters = (): void => {
         </section>
 
         <section class="rounded-lg border bg-white p-3">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
+                <div class="flex-1">
+                    <label class="mb-1 block text-xs font-semibold text-gray-500 uppercase">
+                        Buscar factura para devolucion
+                    </label>
+                    <div class="relative">
+                        <Search
+                            class="absolute top-2.5 left-2.5 h-4 w-4 text-gray-400"
+                        />
+                        <input
+                            v-model="invoiceSearch"
+                            type="search"
+                            placeholder="Numero, cliente, codigo o monto"
+                            class="w-full rounded-md border px-8 py-2 text-sm"
+                            @keydown.enter.prevent="searchCandidates"
+                        />
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-800 disabled:opacity-50"
+                    :disabled="candidateLoading"
+                    @click="searchCandidates"
+                >
+                    <Search class="h-4 w-4" />
+                    {{ candidateLoading ? 'Buscando...' : 'Buscar' }}
+                </button>
+            </div>
+            <p
+                v-if="candidateError"
+                class="mt-2 text-sm text-red-600"
+            >
+                {{ candidateError }}
+            </p>
+            <div
+                v-if="candidates.length > 0"
+                class="mt-3 overflow-hidden rounded-md border"
+            >
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+                        <tr>
+                            <th class="px-3 py-2 text-left">Factura</th>
+                            <th class="px-3 py-2 text-left">Cliente</th>
+                            <th class="px-3 py-2 text-left">Fecha</th>
+                            <th class="px-3 py-2 text-right">Total</th>
+                            <th class="px-3 py-2 text-center">Items</th>
+                            <th class="px-3 py-2 text-right">Accion</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <tr
+                            v-for="candidate in candidates"
+                            :key="candidate.id"
+                            class="hover:bg-gray-50"
+                        >
+                            <td class="px-3 py-2 font-semibold text-gray-900">
+                                {{ candidate.order_number }}
+                            </td>
+                            <td class="px-3 py-2 text-gray-600">
+                                {{ candidate.customer?.name || 'Publico general' }}
+                            </td>
+                            <td class="px-3 py-2 text-gray-500">
+                                {{ candidate.date || 'N/A' }}
+                            </td>
+                            <td class="px-3 py-2 text-right font-semibold tabular-nums">
+                                {{ formatCurrency(candidate.total) }}
+                            </td>
+                            <td class="px-3 py-2 text-center">
+                                {{ candidate.items.length }}
+                            </td>
+                            <td class="px-3 py-2 text-right">
+                                <button
+                                    type="button"
+                                    class="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                                    @click="openCreateReturn(candidate)"
+                                >
+                                    Crear devolucion
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="rounded-lg border bg-white p-3">
             <div class="grid gap-2 md:grid-cols-8">
                 <div class="relative md:col-span-2">
                     <Search
@@ -290,6 +444,13 @@ const clearFilters = (): void => {
                     <option value="cash">Efectivo</option>
                     <option value="card">Tarjeta</option>
                     <option value="transfer">Transferencia</option>
+                    <option value="yappy">Yappy</option>
+                    <option value="ach">ACH</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="visa">Visa</option>
+                    <option value="mastercard">Mastercard</option>
+                    <option value="amex">AMEX</option>
+                    <option value="other">Otro</option>
                     <option value="balance">Saldo a favor</option>
                 </select>
                 <input
@@ -565,5 +726,18 @@ const clearFilters = (): void => {
                 </div>
             </div>
         </section>
+
+        <CreateReturnModal
+            v-if="selectedCandidate"
+            :show="selectedCandidate !== null"
+            :order-id="selectedCandidate.id"
+            :order-number="selectedCandidate.order_number"
+            :items="selectedCandidate.items"
+            :has-customer="selectedCandidate.has_customer"
+            :loading="createReturnLoading"
+            :error="createReturnError"
+            @submit="handleCreateReturn"
+            @close="closeCreateReturn"
+        />
     </div>
 </template>

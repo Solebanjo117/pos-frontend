@@ -20,7 +20,7 @@ const { methods, fetchMethods } = usePaymentMethods();
 interface OrderItem {
     id: number;
     product_id: number;
-    variant_id?: number;
+    variant_id?: number | null;
     product_name: string;
     product_sku: string;
     quantity: number;
@@ -28,20 +28,28 @@ interface OrderItem {
     discount_percent: number;
     tax_percent?: number;
     total: number;
-    seller_name?: string;
+    seller_name?: string | null;
 }
 
-const props = defineProps<{
+const props = withDefaults(
+    defineProps<{
     show: boolean;
     orderId: number;
     orderNumber: string;
     items: OrderItem[];
-    users: UserType[];
+    users?: UserType[];
     currentUserId?: number;
     hasCustomer?: boolean;
     loading?: boolean;
     error?: string | null;
-}>();
+    }>(),
+    {
+        users: () => [],
+        hasCustomer: false,
+        loading: false,
+        error: null,
+    },
+);
 
 const emit = defineEmits<{
     (
@@ -74,7 +82,7 @@ watch(
     () => props.show,
     (val) => {
         if (val) {
-            fetchMethods(); // Fetch fresh methods
+            fetchMethods('returns');
             reason.value = '';
             refundMethod.value = 'cash';
             refundNotes.value = '';
@@ -211,6 +219,13 @@ const methodIcons: Record<string, any> = {
     cash: Banknote,
     card: CreditCard,
     transfer: Landmark,
+    yappy: Landmark,
+    ach: Landmark,
+    cheque: Landmark,
+    visa: CreditCard,
+    mastercard: CreditCard,
+    amex: CreditCard,
+    other: Banknote,
     balance: User,
     store_credit: User,
 };
@@ -220,15 +235,26 @@ const methodColors: Record<string, string> = {
     cash: 'green',
     card: 'blue',
     transfer: 'purple',
+    yappy: 'purple',
+    ach: 'purple',
+    cheque: 'purple',
+    visa: 'blue',
+    mastercard: 'blue',
+    amex: 'blue',
+    other: 'gray',
     balance: 'amber',
     store_credit: 'amber',
 };
 
-// Refund methods: cash, card, transfer + balance (if customer)
 const refundMethods = computed(() => {
-    const standardCodes = ['cash', 'card', 'transfer'];
     const result = methods.value
-        .filter((m) => standardCodes.includes(m.code))
+        .filter(
+            (m) =>
+                m.is_active &&
+                !['credit', 'store_credit', 'supplier_credit'].includes(
+                    m.code,
+                ),
+        )
         .map((m) => ({
             value: m.code,
             label: m.name,
@@ -246,6 +272,14 @@ const refundMethods = computed(() => {
         });
     }
     return result;
+});
+
+watch(refundMethods, (available) => {
+    if (!props.show || available.length === 0) return;
+
+    if (!available.some((method) => method.value === refundMethod.value)) {
+        refundMethod.value = available[0].value;
+    }
 });
 
 const refundMethodColor = (method: string, color: string) => {

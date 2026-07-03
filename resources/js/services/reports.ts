@@ -61,6 +61,20 @@ export const ReportsApiService = {
         return response.data;
     },
 
+    async exportInventoryItems(
+        format: 'csv' | 'excel' | 'xlsx',
+        filters?: Record<string, any>,
+    ): Promise<Blob> {
+        const response = await apiClient.get(
+            `/reports/inventory-items/export/${format}`,
+            {
+                params: filters,
+                responseType: 'blob',
+            },
+        );
+        return response.data;
+    },
+
     /**
      * Export movement history report
      */

@@ -1115,7 +1115,7 @@ onMounted(async () => {
             :loading="paymentLoading"
             :error="paymentError"
             :allow-partial="true"
-            :allowed-method-codes="['cash', 'card', 'transfer', 'other']"
+            payment-context="customer_receipts"
             @finish="handlePaymentFinish"
             @cancel="closePayment"
         />

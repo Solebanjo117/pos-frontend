@@ -32,6 +32,17 @@ defineProps<{
                     </div>
                     <div class="flex justify-between">
                         <span class="text-slate-600 dark:text-slate-400"
+                            >Banco</span
+                        >
+                        <span
+                            class="font-semibold text-slate-900 tabular-nums dark:text-slate-100"
+                            >{{
+                                currencyFormatter(data?.assets.bank ?? 0)
+                            }}</span
+                        >
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-600 dark:text-slate-400"
                             >Cash inicial</span
                         >
                         <span
@@ -39,6 +50,19 @@ defineProps<{
                             >{{
                                 currencyFormatter(
                                     data?.assets.cash_initial ?? 0,
+                                )
+                            }}</span
+                        >
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-600 dark:text-slate-400"
+                            >Banco inicial</span
+                        >
+                        <span
+                            class="text-slate-500 tabular-nums dark:text-slate-500"
+                            >{{
+                                currencyFormatter(
+                                    data?.assets.bank_initial ?? 0,
                                 )
                             }}</span
                         >

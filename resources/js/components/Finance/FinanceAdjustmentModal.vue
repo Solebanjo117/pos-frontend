@@ -9,10 +9,11 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import type { FinancialAdjustmentType } from '@/types/report';
 
 const props = defineProps<{
     open: boolean;
-    defaultType?: 'cash' | 'inventory';
+    defaultType?: FinancialAdjustmentType;
     warehouseId?: number | null;
 }>();
 
@@ -21,7 +22,7 @@ const emit = defineEmits<{
     (
         e: 'submit',
         payload: {
-            type: 'cash' | 'inventory';
+            type: FinancialAdjustmentType;
             amount: number;
             reason: string;
             adjustment_date: string;
@@ -30,7 +31,23 @@ const emit = defineEmits<{
     ): void;
 }>();
 
-const type = ref<'cash' | 'inventory'>('cash');
+const adjustmentTypes: Array<{
+    value: FinancialAdjustmentType;
+    label: string;
+}> = [
+    { value: 'cash', label: 'Cash' },
+    { value: 'bank', label: 'Banco' },
+    { value: 'inventory', label: 'Inventario' },
+    { value: 'sales', label: 'Ventas' },
+    { value: 'purchases', label: 'Compras' },
+    { value: 'expenses', label: 'Gastos' },
+    { value: 'investment', label: 'Inversion' },
+    { value: 'accounts_receivable', label: 'CxC' },
+    { value: 'accounts_payable', label: 'CxP' },
+    { value: 'manual_correction', label: 'Manual' },
+];
+
+const type = ref<FinancialAdjustmentType>('cash');
 const amount = ref<number>(0);
 const reason = ref('');
 const adjustmentDate = ref(new Date().toISOString().split('T')[0]);
@@ -69,30 +86,20 @@ const submit = () => {
                 <DialogTitle>Ajustar</DialogTitle>
             </DialogHeader>
             <div class="space-y-3 py-2">
-                <div class="flex gap-2">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     <button
+                        v-for="option in adjustmentTypes"
+                        :key="option.value"
                         type="button"
-                        class="flex-1 rounded-md border px-3 py-2 text-xs font-semibold transition"
+                        class="rounded-md border px-3 py-2 text-xs font-semibold transition"
                         :class="
-                            type === 'cash'
+                            type === option.value
                                 ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/30 dark:text-indigo-300'
                                 : 'border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-400'
                         "
-                        @click="type = 'cash'"
+                        @click="type = option.value"
                     >
-                        Cash
-                    </button>
-                    <button
-                        type="button"
-                        class="flex-1 rounded-md border px-3 py-2 text-xs font-semibold transition"
-                        :class="
-                            type === 'inventory'
-                                ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/30 dark:text-indigo-300'
-                                : 'border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-400'
-                        "
-                        @click="type = 'inventory'"
-                    >
-                        Inventory
+                        {{ option.label }}
                     </button>
                 </div>
                 <div>

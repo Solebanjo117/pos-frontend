@@ -502,10 +502,17 @@ export interface SalesByClientReport {
 export interface DailyFinancialRow {
     date: string;
     cash: number;
+    bank?: number;
+    liquid_assets?: number;
     inventory: number;
     purchase: number;
+    purchase_paid?: number;
+    purchase_pending?: number;
     expenses: number;
     sales: number;
+    sales_total?: number;
+    sales_collected?: number;
+    sales_pending?: number;
     cogs: number;
     profit: number;
     credit_payable: number;
@@ -513,28 +520,46 @@ export interface DailyFinancialRow {
     cogs_credit: number;
     investment: number;
     opening_cash?: number;
+    opening_bank?: number;
     opening_inventory?: number;
     opening_accounts_receivable?: number;
     opening_accounts_payable?: number;
     cash_sales?: number;
+    bank_sales?: number;
     credit_sales?: number;
     cash_purchases?: number;
+    bank_purchases?: number;
     credit_purchases?: number;
     customer_payments?: number;
+    customer_bank_payments?: number;
     supplier_payments?: number;
+    supplier_bank_payments?: number;
+    cash_expenses?: number;
+    bank_expenses?: number;
     cogs_cash_sales?: number;
+    cogs_bank_sales?: number;
     cogs_credit_sales?: number;
     investment_in?: number;
     investment_out?: number;
     cash_adjustments?: number;
+    bank_adjustments?: number;
     inventory_adjustments?: number;
+    sales_adjustments?: number;
+    purchase_adjustments?: number;
+    expense_adjustments?: number;
+    investment_adjustments?: number;
+    accounts_receivable_adjustments?: number;
+    accounts_payable_adjustments?: number;
+    manual_adjustments?: number;
     closing_cash?: number;
+    closing_bank?: number;
     closing_inventory?: number;
     accounts_receivable?: number;
     accounts_payable?: number;
     gross_profit?: number;
     net_profit?: number;
     net_investment?: number;
+    validation_warnings?: string[];
     is_locked?: boolean;
     computed_at?: string | null;
 }
@@ -547,12 +572,15 @@ export interface DailyFinancialSummary {
         date_to: string;
         warehouse_id?: number | null;
     };
+    warnings?: string[];
 }
 
 export interface BalanceSheetReport {
     assets: {
         cash: number;
         cash_initial: number;
+        bank?: number;
+        bank_initial?: number;
         inventory: number;
         inventory_initial: number;
     };
@@ -567,6 +595,43 @@ export interface BalanceSheetReport {
     };
     as_of: string;
     warehouse_id?: number | null;
+    warnings?: string[];
+}
+
+export interface FinancialDrilldownColumn {
+    key: string;
+    label: string;
+    type?: 'money' | 'text' | 'number';
+}
+
+export interface FinancialDrilldownReport {
+    metric: string;
+    label: string;
+    columns: FinancialDrilldownColumn[];
+    rows: Array<Record<string, any>>;
+    total: number;
+    warnings: string[];
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+}
+
+export interface FinancialAdvancedStatusReport {
+    ledger: {
+        journal_entries: number;
+        journal_lines: number;
+        account_ledger_entries: number;
+        is_available: boolean;
+    };
+    reports: Array<{
+        key: string;
+        label: string;
+        status: 'available' | 'partial' | 'pending';
+        source: string;
+    }>;
 }
 
 export interface ExpenseBreakdownItem {
@@ -580,9 +645,21 @@ export interface ExpenseBreakdown {
     total: number;
 }
 
+export type FinancialAdjustmentType =
+    | 'cash'
+    | 'bank'
+    | 'inventory'
+    | 'sales'
+    | 'purchases'
+    | 'expenses'
+    | 'investment'
+    | 'accounts_receivable'
+    | 'accounts_payable'
+    | 'manual_correction';
+
 export interface FinancialAdjustment {
     id: number;
-    type: 'cash' | 'inventory';
+    type: FinancialAdjustmentType;
     type_label: string;
     amount: number;
     reason: string;

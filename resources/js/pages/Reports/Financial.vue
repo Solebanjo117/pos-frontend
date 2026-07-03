@@ -31,7 +31,7 @@ import type { BreadcrumbItem } from '@/types';
 import type { ExpenseBreakdown, FinancialAdjustmentType } from '@/types/report';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
-type ReportTab = 'summary' | 'balance' | 'income' | 'investment';
+type ReportTab = 'summary' | 'balance' | 'income' | 'credits' | 'investment';
 type ReportMode = 'basic' | 'advanced';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -91,6 +91,7 @@ const tabs: Array<{ key: ReportTab; label: string; icon: any }> = [
     { key: 'summary', label: 'Resumen Diario', icon: BarChart3 },
     { key: 'balance', label: 'Balance Sheet', icon: Scale },
     { key: 'income', label: 'Income Statement', icon: FileText },
+    { key: 'credits', label: 'Creditos', icon: Clock },
     { key: 'investment', label: 'Inversion', icon: Landmark },
 ];
 const datePresets: Array<{ key: DatePreset; label: string }> = [
@@ -252,6 +253,38 @@ const investmentTotals = computed(() => {
         closingCash: totals.closing_cash ?? totals.cash ?? 0,
     };
 });
+
+const creditSections = computed(() => {
+    const credits = incomeStatementReport.value?.credit_balances ?? {};
+
+    return [
+        {
+            key: 'receivable',
+            title: 'Cuentas por cobrar',
+            href: '/ar',
+            total: credits.accounts_receivable?.total_open_balance ?? 0,
+            count: credits.accounts_receivable?.open_documents_count ?? 0,
+            documents: credits.accounts_receivable?.documents ?? [],
+        },
+        {
+            key: 'payable',
+            title: 'Cuentas por pagar',
+            href: '/accounts-payable',
+            total: credits.accounts_payable?.total_open_balance ?? 0,
+            count: credits.accounts_payable?.open_documents_count ?? 0,
+            documents: credits.accounts_payable?.documents ?? [],
+        },
+    ];
+});
+
+const formatCreditDate = (value?: string | null): string => {
+    if (!value) return 'N/A';
+    return new Date(value).toLocaleDateString('es-PA', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+    });
+};
 
 const advancedReports = computed(
     () => financialAdvancedStatus.value?.reports ?? [],
@@ -603,6 +636,125 @@ watch(currentWarehouseId, (value) => {
                         :expense-breakdown="expenseBreakdown"
                         :currency-formatter="formatCurrency"
                     />
+
+                    <div v-if="activeTab === 'credits'" class="grid gap-3 xl:grid-cols-2">
+                        <section
+                            v-for="section in creditSections"
+                            :key="section.key"
+                            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                        >
+                            <div
+                                class="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800"
+                            >
+                                <div>
+                                    <h3
+                                        class="text-xs font-semibold text-slate-900 dark:text-slate-100"
+                                    >
+                                        {{ section.title }}
+                                    </h3>
+                                    <p class="text-[11px] text-slate-500">
+                                        {{ section.count }} documentos abiertos
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p
+                                        class="text-sm font-bold text-indigo-600 tabular-nums dark:text-indigo-400"
+                                    >
+                                        {{ formatCurrency(section.total) }}
+                                    </p>
+                                    <a
+                                        :href="section.href"
+                                        class="text-[11px] font-semibold text-cyan-700 hover:underline dark:text-cyan-300"
+                                    >
+                                        Ver detalle
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-xs tabular-nums">
+                                    <thead class="bg-slate-50 dark:bg-slate-900">
+                                        <tr>
+                                            <th
+                                                class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                            >
+                                                Documento
+                                            </th>
+                                            <th
+                                                class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                            >
+                                                Cuenta
+                                            </th>
+                                            <th
+                                                class="px-3 py-1.5 text-right font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                            >
+                                                Saldo
+                                            </th>
+                                            <th
+                                                class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                            >
+                                                Vence
+                                            </th>
+                                            <th
+                                                class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                            >
+                                                Estado
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody
+                                        class="divide-y divide-slate-100 dark:divide-slate-800"
+                                    >
+                                        <tr
+                                            v-for="document in section.documents.slice(0, 8)"
+                                            :key="`${section.key}-${document.document_type}-${document.id}`"
+                                            class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                                        >
+                                            <td class="px-3 py-2">
+                                                <p
+                                                    class="font-semibold text-slate-900 dark:text-slate-100"
+                                                >
+                                                    {{ document.document_number }}
+                                                </p>
+                                                <p class="text-[11px] text-slate-500">
+                                                    {{ formatCreditDate(document.date) }}
+                                                </p>
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-slate-600 dark:text-slate-400"
+                                            >
+                                                {{ document.account_name || 'N/A' }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100"
+                                            >
+                                                {{ formatCurrency(document.amount_due) }}
+                                            </td>
+                                            <td
+                                                class="px-3 py-2 text-slate-600 dark:text-slate-400"
+                                            >
+                                                {{ formatCreditDate(document.due_date) }}
+                                            </td>
+                                            <td class="px-3 py-2">
+                                                <span
+                                                    class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                                                >
+                                                    {{ document.status }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="section.documents.length === 0">
+                                            <td
+                                                colspan="5"
+                                                class="px-3 py-6 text-center text-slate-400"
+                                            >
+                                                Sin creditos abiertos en el periodo
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
 
                     <div v-if="activeTab === 'investment'" class="space-y-3">
                         <div class="grid gap-3 md:grid-cols-4">

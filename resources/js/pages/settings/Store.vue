@@ -75,6 +75,14 @@ const newMethodName = ref('');
 const newMethodRequiresRef = ref(false);
 const addingMethod = ref(false);
 const methodToArchive = ref<any | null>(null);
+const methodContextFields = [
+    { key: 'available_in_sales', label: 'Venta' },
+    { key: 'available_in_customer_receipts', label: 'Cobro' },
+    { key: 'available_in_supplier_payments', label: 'Pago prov.' },
+    { key: 'available_in_purchase_orders', label: 'Compra' },
+    { key: 'available_in_returns', label: 'Dev.' },
+] as const;
+type MethodContextField = (typeof methodContextFields)[number]['key'];
 
 const sections = [
     { id: 'identity', label: 'Identidad' },
@@ -149,11 +157,14 @@ const handleAddMethod = async () => {
 };
 
 const handleToggleActive = async (method: any) => {
-    if (method.is_system) {
-        return;
-    }
-
     await updateMethod(method.id, { is_active: !method.is_active });
+};
+
+const handleToggleMethodContext = async (
+    method: any,
+    field: MethodContextField,
+) => {
+    await updateMethod(method.id, { [field]: !method[field] });
 };
 
 const confirmArchiveMethod = async () => {
@@ -546,6 +557,9 @@ const handleResetData = async () => {
                                             Codigo
                                         </th>
                                         <th class="px-3 py-2 text-left">
+                                            Uso
+                                        </th>
+                                        <th class="px-3 py-2 text-left">
                                             Estado
                                         </th>
                                         <th class="px-3 py-2 text-right">
@@ -613,17 +627,38 @@ const handleResetData = async () => {
                                             {{ method.code }}
                                         </td>
                                         <td class="px-3 py-2">
+                                            <div class="flex flex-wrap gap-2">
+                                                <label
+                                                    v-for="field in methodContextFields"
+                                                    :key="`${method.id}-${field.key}`"
+                                                    class="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        :checked="
+                                                            method[
+                                                                field.key
+                                                            ] ?? true
+                                                        "
+                                                        class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary"
+                                                        @change="
+                                                            handleToggleMethodContext(
+                                                                method,
+                                                                field.key,
+                                                            )
+                                                        "
+                                                    />
+                                                    {{ field.label }}
+                                                </label>
+                                            </div>
+                                        </td>
+                                        <td class="px-3 py-2">
                                             <label
                                                 class="inline-flex items-center gap-2 text-xs font-medium"
-                                                :class="{
-                                                    'cursor-not-allowed opacity-50':
-                                                        method.is_system,
-                                                }"
                                             >
                                                 <input
                                                     type="checkbox"
                                                     :checked="method.is_active"
-                                                    :disabled="method.is_system"
                                                     class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                                                     @change="
                                                         handleToggleActive(

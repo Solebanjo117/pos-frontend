@@ -10,6 +10,7 @@ import {
 import { ref, computed, watch, onMounted } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type { Customer } from '@/types/customer';
+import type { PaymentMethodContext } from '@/types/payment-method';
 
 interface Payment {
     method: string;
@@ -47,6 +48,7 @@ const props = withDefaults(
         allowPartial?: boolean;
         allowedMethodCodes?: string[];
         includeSupplierCredit?: boolean;
+        paymentContext?: PaymentMethodContext;
     }>(),
     {
         mode: 'sale',
@@ -67,6 +69,7 @@ const props = withDefaults(
         allowPartial: false,
         allowedMethodCodes: undefined,
         includeSupplierCredit: false,
+        paymentContext: undefined,
     },
 );
 
@@ -80,9 +83,11 @@ const referenceNumber = ref('');
 const notes = ref('');
 
 const cashDenominations = [100, 50, 20, 10, 5, 1, 0.25];
-const defaultPurchaseAllowedMethods = ['cash', 'card', 'transfer', 'other'];
 
 const isPurchaseMode = computed(() => props.mode === 'purchase');
+const resolvedPaymentContext = computed<PaymentMethodContext>(
+    () => props.paymentContext ?? (isPurchaseMode.value ? 'purchase_orders' : 'sales'),
+);
 const panelTitle = computed(
     () => props.title ?? (isPurchaseMode.value ? 'Registrar pago' : 'PAYMENT'),
 );
@@ -102,12 +107,6 @@ const effectiveAllowedMethods = computed(() => {
         return props.allowedMethodCodes;
     }
 
-    if (isPurchaseMode.value) {
-        return props.includeSupplierCredit
-            ? [...defaultPurchaseAllowedMethods, 'supplier_credit']
-            : defaultPurchaseAllowedMethods;
-    }
-
     return [];
 });
 
@@ -119,21 +118,34 @@ const isAllowedMethod = (code: string): boolean => {
     return effectiveAllowedMethods.value.includes(code);
 };
 
-const showCashMethod = computed(() => isAllowedMethod('cash'));
+const showCashMethod = computed(
+    () =>
+        isAllowedMethod('cash') &&
+        methods.value.some((method) => method.code === 'cash' && method.is_active),
+);
 
 watch(
     () => props.show,
     (show) => {
         if (show) {
-            fetchMethods();
+            fetchMethods(resolvedPaymentContext.value);
             resetPayments();
+        }
+    },
+);
+
+watch(
+    () => props.paymentContext,
+    () => {
+        if (props.show) {
+            fetchMethods(resolvedPaymentContext.value);
         }
     },
 );
 
 onMounted(() => {
     if (props.show) {
-        fetchMethods();
+        fetchMethods(resolvedPaymentContext.value);
     }
 });
 
@@ -195,8 +207,9 @@ const dynamicMethods = computed(() =>
 
         if (isPurchaseMode.value) {
             if (
-                method.code === 'supplier_credit' &&
-                !props.includeSupplierCredit
+                ['credit', 'store_credit'].includes(method.code) ||
+                (method.code === 'supplier_credit' &&
+                    !props.includeSupplierCredit)
             ) {
                 return false;
             }

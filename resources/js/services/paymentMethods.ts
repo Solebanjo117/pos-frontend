@@ -1,5 +1,6 @@
 import type {
     PaymentMethod,
+    PaymentMethodContext,
     CreatePaymentMethodData,
     UpdatePaymentMethodData,
 } from '@/types/payment-method';
@@ -11,8 +12,13 @@ export const paymentMethodsService = {
     /**
      * Get all active payment methods (for POS, dropdowns)
      */
-    async getActive(): Promise<PaymentMethod[]> {
-        const { data } = await apiClient.get(BASE_URL);
+    async getActive(
+        context?: PaymentMethodContext,
+        realMoney = false,
+    ): Promise<PaymentMethod[]> {
+        const { data } = await apiClient.get(BASE_URL, {
+            params: { context, real_money: realMoney || undefined },
+        });
         return data;
     },
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { ShoppingCart, Check, Info, Filter } from 'lucide-vue-next';
+import { ShoppingCart, Check, Info, Filter, Download } from 'lucide-vue-next';
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import ProductCatalogView from '@/components/Products/ProductCatalogView.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
@@ -17,6 +17,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { productsApi } from '@/services/api/products';
+import { ReportsApiService } from '@/services/reports';
 import { type BreadcrumbItem } from '@/types';
 import type { Product, ProductFilters } from '@/types/product';
 
@@ -137,6 +138,7 @@ const addVariantToCart = (product: any, variant: any) => {
 };
 
 const addedFeedback = ref<number | null>(null);
+const exportingInventory = ref<'backup' | 'template' | null>(null);
 
 // ========== VIEW MODE TOGGLE ==========
 const viewMode = ref<'table' | 'catalog'>('table');
@@ -490,6 +492,33 @@ const clearFilters = () => {
     applyFilters();
 };
 
+const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+};
+
+const handleInventoryExport = async (template = false) => {
+    exportingInventory.value = template ? 'template' : 'backup';
+    try {
+        const blob = await ReportsApiService.exportInventoryItems('excel', {
+            ...buildFetchFilters(),
+            template,
+        });
+        downloadBlob(
+            blob,
+            template ? 'inventory-items-template.xlsx' : 'inventory-items-export.xlsx',
+        );
+    } finally {
+        exportingInventory.value = null;
+    }
+};
+
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -662,6 +691,32 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                         <Upload class="h-4 w-4" />
                         Importar
                     </a>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-card dark:text-slate-200 dark:hover:bg-muted"
+                        :disabled="exportingInventory !== null"
+                        @click="handleInventoryExport(false)"
+                    >
+                        <Download class="h-4 w-4" />
+                        {{
+                            exportingInventory === 'backup'
+                                ? 'Exportando...'
+                                : 'Exportar'
+                        }}
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-card dark:text-slate-200 dark:hover:bg-muted"
+                        :disabled="exportingInventory !== null"
+                        @click="handleInventoryExport(true)"
+                    >
+                        <Download class="h-4 w-4" />
+                        {{
+                            exportingInventory === 'template'
+                                ? 'Generando...'
+                                : 'Plantilla'
+                        }}
+                    </button>
 
                     <!-- New Product Button -->
                     <a

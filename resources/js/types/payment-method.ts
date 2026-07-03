@@ -6,15 +6,34 @@ export interface PaymentMethod {
     is_system: boolean;
     requires_reference: boolean;
     requires_cash_count: boolean;
+    liquidity_bucket?: 'cash' | 'bank' | 'credit' | 'store_credit';
+    available_in_sales?: boolean;
+    available_in_customer_receipts?: boolean;
+    available_in_supplier_payments?: boolean;
+    available_in_purchase_orders?: boolean;
+    available_in_returns?: boolean;
     sort_order: number;
     created_at?: string;
     updated_at?: string;
 }
 
+export type PaymentMethodContext =
+    | 'sales'
+    | 'customer_receipts'
+    | 'supplier_payments'
+    | 'purchase_orders'
+    | 'returns';
+
 export interface CreatePaymentMethodData {
     name: string;
     requires_reference?: boolean;
     requires_cash_count?: boolean;
+    liquidity_bucket?: 'cash' | 'bank' | 'credit' | 'store_credit';
+    available_in_sales?: boolean;
+    available_in_customer_receipts?: boolean;
+    available_in_supplier_payments?: boolean;
+    available_in_purchase_orders?: boolean;
+    available_in_returns?: boolean;
 }
 
 export interface UpdatePaymentMethodData {
@@ -22,5 +41,11 @@ export interface UpdatePaymentMethodData {
     is_active?: boolean;
     requires_reference?: boolean;
     requires_cash_count?: boolean;
+    liquidity_bucket?: 'cash' | 'bank' | 'credit' | 'store_credit';
+    available_in_sales?: boolean;
+    available_in_customer_receipts?: boolean;
+    available_in_supplier_payments?: boolean;
+    available_in_purchase_orders?: boolean;
+    available_in_returns?: boolean;
     sort_order?: number;
 }

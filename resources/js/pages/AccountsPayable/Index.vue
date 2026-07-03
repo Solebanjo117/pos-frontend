@@ -862,7 +862,7 @@ onMounted(() => {
             primary-action-label="Registrar pago"
             cancel-label="Cancelar"
             allow-partial
-            :allowed-method-codes="['cash', 'card', 'transfer', 'other']"
+            payment-context="supplier_payments"
             show-reference-number
             show-notes
             reference-number-label="Numero de recibo"

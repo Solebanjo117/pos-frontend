@@ -1,5 +1,6 @@
 import type {
     SalesReturnCreatePayload,
+    SalesReturnCandidate,
     SalesReturnListFilters,
     SalesReturnOperationalDetail,
 } from '@/types/sales-return';
@@ -12,6 +13,17 @@ export const SalesReturnsApiService = {
         const response = await apiClient.get(BASE_PATH, { params });
 
         return response.data;
+    },
+
+    async candidates(params: {
+        search?: string;
+        per_page?: number;
+    } = {}): Promise<SalesReturnCandidate[]> {
+        const response = await apiClient.get(`${BASE_PATH}/candidates`, {
+            params,
+        });
+
+        return response.data.data ?? [];
     },
 
     async getOperationalDetail(

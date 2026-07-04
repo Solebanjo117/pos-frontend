@@ -496,18 +496,10 @@ const referenceActionsDisabled = computed(
 );
 const importConfirmationSummary = computed(() => {
     if (importConfirmMode.value === 'file') {
-        const excludedCount = Math.max(
-            0,
-            Number(
-                validationRowsServerMeta.value?.total ??
-                    editedRows.value.length,
-            ) - validCount.value,
-        );
-
         return {
-            title: 'Importar filas validas',
-            description: `Se importaran ${validCount.value} filas validas. ${excludedCount} fila${excludedCount === 1 ? '' : 's'} con error o conflicto quedaran excluidas para corregirlas despues.`,
-            primaryLabel: 'Importar filas validas',
+            title: 'Importar archivo completo',
+            description: `Se importaran ${validCount.value} filas. Si aparece un error en la verificacion final, no se guardara ninguna fila.`,
+            primaryLabel: 'Importar archivo completo',
         };
     }
 
@@ -948,6 +940,8 @@ const canRunFullFile = computed(
         hasPreview.value &&
         previewSource.value === 'file' &&
         validCount.value > 0 &&
+        errorCount.value === 0 &&
+        conflictCount.value === 0 &&
         !mappingPreviewStale.value &&
         !previewLoading.value &&
         !fullImportRunning.value &&
@@ -977,6 +971,9 @@ const fullFileImportBlockedReason = computed(() => {
     }
     if (validCount.value <= 0) {
         return 'El preview no tiene filas validas para importar.';
+    }
+    if (errorCount.value > 0 || conflictCount.value > 0) {
+        return 'Corrige todos los errores y conflictos antes de importar. Esta importacion es todo-o-nada.';
     }
     if (hasUnsavedPersistedRowChanges.value) {
         return 'Guarda o descarta los cambios antes de importar.';
@@ -1128,12 +1125,20 @@ const actionableRecommendation = computed(() => {
     }
 
     if (visibleReferenceCount.value > 0) {
+        if (props.config.fullFileImport) {
+            return 'Crea o corrige todas las referencias faltantes antes de importar. El archivo completo debe estar limpio.';
+        }
+
         return validCount.value > 0
             ? 'Puedes importar las filas listas. Las filas con referencias faltantes quedaran excluidas para corregirlas despues.'
             : 'Crea o corrige las referencias faltantes para habilitar filas validas.';
     }
 
     if (errorCount.value > 0 || conflictCount.value > 0) {
+        if (props.config.fullFileImport) {
+            return 'Corrige todos los errores o conflictos y revalida antes de importar. No se importaran filas parciales.';
+        }
+
         return validCount.value > 0
             ? 'Puedes importar las filas listas. Las filas con error o conflicto quedaran excluidas para corregirlas despues.'
             : 'Filtra errores o conflictos, corrige las filas y revalida antes de importar.';
@@ -4566,7 +4571,7 @@ const formatFileSize = (bytes: number) => {
                     {{
                         fullImportRunning
                             ? 'Importando archivo...'
-                            : 'Importar filas validas'
+                            : 'Importar archivo completo'
                     }}
                 </button>
 
@@ -7564,7 +7569,7 @@ const formatFileSize = (bytes: number) => {
                     class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <UploadCloud class="h-4 w-4" />
-                    Importar filas validas
+                    Importar archivo completo
                 </button>
             </div>
         </ImportPreviewTable>

@@ -2,6 +2,7 @@
 import { Banknote, X, AlertCircle, CreditCard } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import { formatCurrency, roundMoney } from '@/utils/formatters';
 
 const {
     methods,
@@ -46,10 +47,10 @@ watch(
 );
 
 const amountDue = computed(() =>
-    Math.max(0, props.orderTotal - props.amountPaid),
+    roundMoney(Math.max(0, props.orderTotal - props.amountPaid)),
 );
 const remainingAfterPayment = computed(() =>
-    Math.max(0, amountDue.value - paymentAmount.value),
+    roundMoney(Math.max(0, amountDue.value - paymentAmount.value)),
 );
 
 // Standard methods (cash, card, transfer) - always shown
@@ -88,21 +89,18 @@ const canSubmit = computed(() => {
 });
 
 const handleOpen = () => {
-    paymentAmount.value = amountDue.value;
+    paymentAmount.value = roundMoney(amountDue.value);
     paymentMethod.value = 'cash';
     notes.value = '';
 };
 
 const handleSubmit = () => {
     emit('submit', {
-        amount: paymentAmount.value,
+        amount: roundMoney(paymentAmount.value),
         method: paymentMethod.value,
         notes: notes.value || undefined,
     });
 };
-
-const formatCurrency = (v: number) =>
-    v.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
 // Color mappings for method buttons
 const methodColors: Record<string, string> = {

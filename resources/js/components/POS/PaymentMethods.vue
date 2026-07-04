@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import { formatCurrency } from '@/utils/formatters';
 
 const { methods, fetchMethods, isSpecialMethod } = usePaymentMethods();
 
@@ -31,13 +32,6 @@ const total = computed(() =>
         0,
     ),
 );
-
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(value || 0);
-};
 
 const handleChange = (code: string, rawValue: string) => {
     const val = parseFloat(rawValue);

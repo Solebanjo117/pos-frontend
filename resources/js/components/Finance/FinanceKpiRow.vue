@@ -18,7 +18,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <div class="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-9">
+    <div class="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-10">
         <button
             v-for="kpi in kpis"
             :key="kpi.key"

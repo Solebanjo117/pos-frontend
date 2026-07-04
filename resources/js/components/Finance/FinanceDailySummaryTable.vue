@@ -11,29 +11,40 @@ const columns: Array<{
     key: string;
     label: string;
 }> = [
-    { key: 'cash', label: 'Cash' },
-    { key: 'bank', label: 'Banco' },
-    { key: 'inventory', label: 'Inventario' },
     { key: 'sales_total', label: 'Ventas' },
     { key: 'sales_collected', label: 'Cobrado' },
-    { key: 'sales_pending', label: 'C x C' },
+    { key: 'sales_pending', label: 'CxC' },
+    { key: 'cogs', label: 'COGS' },
+    { key: 'inventory', label: 'Inventario' },
     { key: 'purchase', label: 'Compras' },
     { key: 'purchase_paid', label: 'Pagado' },
-    { key: 'purchase_pending', label: 'C x P' },
+    { key: 'purchase_pending', label: 'CxP' },
     { key: 'expenses', label: 'Gastos' },
-    { key: 'cogs', label: 'COGS' },
-    { key: 'gross_profit', label: 'Util. bruta' },
     { key: 'net_profit', label: 'Profit' },
-    { key: 'investment', label: 'Inversion' },
+];
+
+const monthLabels = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
 ];
 
 const formatShortDate = (date: string): string => {
     const d = new Date(`${date}T00:00:00`);
-    return new Intl.DateTimeFormat('es-PA', {
-        weekday: 'short',
-        day: '2-digit',
-        month: '2-digit',
-    }).format(d);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = monthLabels[d.getMonth()] ?? '';
+    const year = String(d.getFullYear()).slice(-2);
+
+    return `${day}${month}${year}`;
 };
 
 const rowValue = (row: DailyFinancialRow, key: string): number =>
@@ -79,13 +90,11 @@ const rowValue = (row: DailyFinancialRow, key: string): number =>
                         class="px-2 py-1 text-right text-slate-600 dark:text-slate-400"
                         :class="{
                             'text-emerald-600 dark:text-emerald-400':
-                                ['gross_profit', 'net_profit'].includes(
-                                    col.key,
-                                ) && rowValue(row, col.key) > 0,
+                                col.key === 'net_profit' &&
+                                rowValue(row, col.key) > 0,
                             'text-rose-600 dark:text-rose-400':
-                                ['gross_profit', 'net_profit'].includes(
-                                    col.key,
-                                ) && rowValue(row, col.key) < 0,
+                                col.key === 'net_profit' &&
+                                rowValue(row, col.key) < 0,
                         }"
                     >
                         {{ currencyFormatter(rowValue(row, col.key)) }}

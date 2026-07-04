@@ -25,6 +25,7 @@ import type {
     ProductVariant,
     VariantInventory,
 } from '@/types/product';
+import { formatCurrency } from '@/utils/formatters';
 
 type WarehouseOption = {
     id: number;
@@ -404,13 +405,6 @@ function refreshPage(): void {
 
 function goBackToInventory(): void {
     router.visit('/inventory');
-}
-
-function formatCurrency(value?: number | string | null): string {
-    return new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value || 0));
 }
 
 function statusLabel(status: VariantStatus): string {

@@ -1419,7 +1419,12 @@ const openPaymentModal = (method: 'cash' | 'card' | 'transfer' = 'cash') => {
 
 // Handle unified payment panel finish
 const handleUnifiedPaymentFinish = async (
-    payments: Array<{ method: string; amount: number }>,
+    payments: Array<{
+        method: string;
+        amount: number;
+        reference_number?: string | null;
+        notes?: string | null;
+    }>,
 ) => {
     if (props.editMode) {
         // For edit mode, use the existing confirmEditOrder with the payments array
@@ -1427,12 +1432,14 @@ const handleUnifiedPaymentFinish = async (
         const paymentsArray = payments.map((p) => ({
             method: p.method,
             amount: p.amount,
+            reference_number: p.reference_number ?? undefined,
             notes:
-                p.method === 'store_credit'
+                p.notes ??
+                (p.method === 'store_credit'
                     ? 'Aplicado de saldo a favor del cliente'
                     : p.method === 'credit'
                       ? 'Cobrado a crédito del cliente'
-                      : undefined,
+                      : undefined),
         }));
 
         // Temporarily store payments for confirmEditOrder
@@ -1494,12 +1501,14 @@ const handleUnifiedPaymentFinish = async (
     const paymentsArray = payments.map((p) => ({
         method: p.method,
         amount: p.amount,
+        reference_number: p.reference_number ?? undefined,
         notes:
-            p.method === 'store_credit'
+            p.notes ??
+            (p.method === 'store_credit'
                 ? 'Aplicado de saldo a favor del cliente'
                 : p.method === 'credit'
                   ? 'Cobrado a crédito del cliente'
-                  : undefined,
+                  : undefined),
     }));
 
     const result = await processSale(paymentsArray);

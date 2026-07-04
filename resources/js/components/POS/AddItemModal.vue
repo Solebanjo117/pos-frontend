@@ -4,6 +4,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { User } from '@/types';
+import { formatCurrency, roundMoney } from '@/utils/formatters';
 
 interface FoundProduct {
     id: number;
@@ -169,14 +170,13 @@ const removeItem = (idx: number) => {
     pendingItems.value.splice(idx, 1);
 };
 
-const formatCurrency = (v: number) =>
-    v.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-
 const totalEstimated = computed(() =>
-    pendingItems.value.reduce((sum, i) => {
-        const sub = i.quantity * i.unit_price;
-        return sum + sub + (sub * i.tax_percent) / 100;
-    }, 0),
+    roundMoney(
+        pendingItems.value.reduce((sum, i) => {
+            const sub = i.quantity * i.unit_price;
+            return sum + sub + (sub * i.tax_percent) / 100;
+        }, 0),
+    ),
 );
 
 const handleSubmit = async () => {

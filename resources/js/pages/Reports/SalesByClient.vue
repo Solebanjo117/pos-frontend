@@ -33,6 +33,7 @@ import { computed, onMounted, ref } from 'vue';
 import { Bar } from 'vue-chartjs';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -47,6 +48,7 @@ import type {
     SalesByClientReport,
     SalesByClientRow,
 } from '@/types/report';
+import { formatCurrency } from '@/utils/formatters';
 
 ChartJS.register(
     CategoryScale,
@@ -195,12 +197,6 @@ const chartOptions = computed(() => ({
         },
     },
 }));
-
-const formatCurrency = (value: unknown): string =>
-    new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value) || 0);
 
 const formatDate = (value?: string | null): string => {
     if (!value) {
@@ -376,32 +372,13 @@ onMounted(async () => {
                 <div
                     class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-6 dark:border-slate-800 dark:bg-slate-900/60"
                 >
-                    <div>
-                        <label
-                            class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            Desde
-                        </label>
-                        <input
-                            v-model="filters.date_from"
-                            type="date"
-                            class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            @change="applyFilters"
-                        />
-                    </div>
-                    <div>
-                        <label
-                            class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            Hasta
-                        </label>
-                        <input
-                            v-model="filters.date_to"
-                            type="date"
-                            class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            @change="applyFilters"
-                        />
-                    </div>
+                    <DateRangeInput
+                        v-model:from="filters.date_from"
+                        v-model:to="filters.date_to"
+                        label="Rango"
+                        class="md:col-span-2"
+                        @change="applyFilters"
+                    />
                     <div class="md:col-span-2">
                         <label
                             class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"

@@ -161,6 +161,7 @@ const methodLabel = (method?: string | null): string =>
         mastercard: 'Mastercard',
         amex: 'AMEX',
         other: 'Otro',
+        receivable: 'Reducir CxC',
         balance: 'Saldo a favor',
     })[method || ''] ||
     method ||
@@ -394,10 +395,22 @@ const handleCreateReturn = async (
                                 {{ candidate.date || 'N/A' }}
                             </td>
                             <td class="px-3 py-2 text-right font-semibold tabular-nums">
-                                {{ formatCurrency(candidate.total) }}
+                                <div>{{ formatCurrency(candidate.total) }}</div>
+                                <div class="text-xs font-normal text-gray-500">
+                                    Pagado {{ formatCurrency(candidate.total_paid || 0) }}
+                                </div>
+                                <div
+                                    v-if="Number(candidate.amount_due || 0) > 0"
+                                    class="text-xs font-normal text-amber-600"
+                                >
+                                    CxC {{ formatCurrency(candidate.amount_due || 0) }}
+                                </div>
                             </td>
                             <td class="px-3 py-2 text-center">
-                                {{ candidate.items.length }}
+                                <div>{{ candidate.items.length }}</div>
+                                <div class="text-xs text-gray-500">
+                                    {{ formatCurrency(candidate.returnable_amount || 0) }}
+                                </div>
                             </td>
                             <td class="px-3 py-2 text-right">
                                 <button
@@ -451,6 +464,7 @@ const handleCreateReturn = async (
                     <option value="mastercard">Mastercard</option>
                     <option value="amex">AMEX</option>
                     <option value="other">Otro</option>
+                    <option value="receivable">Reducir CxC</option>
                     <option value="balance">Saldo a favor</option>
                 </select>
                 <input
@@ -734,6 +748,13 @@ const handleCreateReturn = async (
             :order-number="selectedCandidate.order_number"
             :items="selectedCandidate.items"
             :has-customer="selectedCandidate.has_customer"
+            :total-paid="selectedCandidate.total_paid || 0"
+            :total-returned="selectedCandidate.total_returned || 0"
+            :amount-due="selectedCandidate.amount_due || 0"
+            :returnable-amount="selectedCandidate.returnable_amount || 0"
+            :recommended-refund-method="
+                selectedCandidate.recommended_refund_method || null
+            "
             :loading="createReturnLoading"
             :error="createReturnError"
             @submit="handleCreateReturn"

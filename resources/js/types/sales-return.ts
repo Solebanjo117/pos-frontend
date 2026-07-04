@@ -10,6 +10,7 @@ export type SalesReturnRefundMethod =
     | 'mastercard'
     | 'amex'
     | 'other'
+    | 'receivable'
     | 'balance'
     | 'store_credit';
 
@@ -34,12 +35,17 @@ export interface SalesReturnListRow {
     warehouse_id?: number | null;
     user_id?: number | null;
     total_amount: number | string;
+    receivable_applied_amount?: number | string;
+    money_refund_amount?: number | string;
+    store_credit_amount?: number | string;
     status: SalesReturnStatus;
     status_label?: string;
     refund_method?: SalesReturnRefundMethod | string | null;
     refund_notes?: string | null;
     reason?: string | null;
     created_at: string;
+    approved_at?: string | null;
+    rejected_at?: string | null;
     processed_by_name?: string | null;
     processed_at?: string | null;
     sales_order?: {
@@ -93,6 +99,11 @@ export interface SalesReturnCandidate {
     payment_status?: string | null;
     date?: string | null;
     total: number;
+    total_paid?: number;
+    total_returned?: number;
+    amount_due?: number;
+    returnable_amount?: number;
+    recommended_refund_method?: SalesReturnRefundMethod | 'refund' | string;
     has_customer: boolean;
     customer?: {
         id: number;
@@ -152,6 +163,9 @@ export interface SalesReturnOperationalItem {
 export interface SalesReturnRefundContext {
     method?: string | null;
     amount: number;
+    receivable_applied_amount?: number;
+    money_refund_amount?: number;
+    store_credit_amount?: number;
     requires_open_session: boolean;
     refund_payment?: {
         id: number;

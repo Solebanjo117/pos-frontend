@@ -31,6 +31,7 @@ import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
+import { formatCurrency } from '@/utils/formatters';
 
 interface CashDrawer {
     opening_amount?: number;
@@ -290,12 +291,6 @@ const handleExport = async (): Promise<void> => {
         exporting.value = false;
     }
 };
-
-const formatCurrency = (value: unknown): string =>
-    new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value) || 0);
 
 const formatSignedCurrency = (value: unknown): string => {
     const amount = Number(value) || 0;

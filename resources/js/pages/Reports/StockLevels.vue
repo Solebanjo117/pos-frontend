@@ -30,6 +30,7 @@ import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import type { StockLevelsFilters } from '@/types/report';
+import { formatCurrency } from '@/utils/formatters';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -202,13 +203,6 @@ const getStatusLabel = (status: string) => {
         default:
             return status;
     }
-};
-
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(value);
 };
 
 const reportTotal = computed(

@@ -15,6 +15,7 @@ import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSecti
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { formatCurrency } from '@/utils/formatters';
 
 const props = defineProps<{ purchaseOrderId: number }>();
 const { purchaseOrder, loading, error, fetchPurchaseOrderById, receiveItems } =
@@ -164,10 +165,6 @@ function handleMassReceive() {
         ...row,
         quantity_received: Number(itemFor(row.item_id)?.pending_quantity || 0),
     }));
-}
-
-function formatCurrency(value: number | string | undefined): string {
-    return `$${Number(value || 0).toFixed(2)}`;
 }
 
 function lineTaxTotal(itemId: number): number {

@@ -1,9 +1,23 @@
-export const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(value);
+export const roundMoney = (value: unknown): number => {
+    const amount = Number(value ?? 0);
+
+    if (!Number.isFinite(amount)) {
+        return 0;
+    }
+
+    const rounded = Math.round((amount + Number.EPSILON) * 100) / 100;
+
+    return Object.is(rounded, -0) ? 0 : rounded;
 };
+
+export const formatCurrency = (value: unknown): string => {
+    const amount = roundMoney(value);
+    const sign = amount < 0 ? '-' : '';
+
+    return `${sign}$${Math.abs(amount).toFixed(2)}`;
+};
+
+export const formatMoney = formatCurrency;
 
 /**
  * Replace hyphens/bars with spaces for display purposes.

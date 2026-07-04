@@ -15,6 +15,7 @@ import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
 import { supplyListService } from '@/services/supply-list';
 import type { Supplier } from '@/types/supplier';
+import { formatCurrency, roundMoney } from '@/utils/formatters';
 
 // Reusing global store settings if needed, or simply pass props.
 
@@ -257,14 +258,7 @@ const handleQuickPurchase = async () => {
     }
 };
 
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(amount);
-};
-
-const totalCost = computed(() => quantity.value * unitCost.value);
+const totalCost = computed(() => roundMoney(quantity.value * unitCost.value));
 </script>
 
 <template>

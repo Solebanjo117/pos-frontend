@@ -23,6 +23,7 @@ import {
     type LowStockStats,
     type CreatedPurchaseOrder,
 } from '@/services/smart-reorder';
+import { formatCurrency } from '@/utils/formatters';
 
 const toast = useToast();
 const lowStockData = ref<SupplierLowStock[]>([]);
@@ -410,7 +411,7 @@ onMounted(async () => {
                         </div>
                         <span
                             class="text-sm font-semibold text-gray-900 dark:text-white"
-                            >${{ po.total?.toFixed(2) || '0.00' }}</span
+                            >{{ formatCurrency(po.total) }}</span
                         >
                     </Link>
                 </div>
@@ -570,7 +571,7 @@ onMounted(async () => {
                                 <td
                                     class="px-4 py-3 text-right text-sm text-gray-900 dark:text-white"
                                 >
-                                    ${{ (item.unit_cost || 0).toFixed(2) }}
+                                    {{ formatCurrency(item.unit_cost || 0) }}
                                 </td>
                                 <td class="px-4 py-3">
                                     <div

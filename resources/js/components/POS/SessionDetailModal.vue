@@ -17,6 +17,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import { formatCurrency } from '@/utils/formatters';
 import type {
     AccountPaymentRecord,
     CashMovementRecord,
@@ -101,12 +102,6 @@ const moneyValue = (value: string | number | null | undefined): number => {
 
     return Number.isFinite(parsed) ? parsed : 0;
 };
-
-const formatCurrency = (value: string | number | null | undefined): string =>
-    new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(moneyValue(value));
 
 const formatDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return 'Sin registro';

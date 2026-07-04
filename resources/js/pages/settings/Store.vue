@@ -30,6 +30,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
+import type { PaymentMethod } from '@/types/payment-method';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -73,8 +74,12 @@ const resetSuccess = ref<string | null>(null);
 const showAddMethodModal = ref(false);
 const newMethodName = ref('');
 const newMethodRequiresRef = ref(false);
+const newMethodLiquidityBucket = ref<
+    'cash' | 'bank' | 'credit' | 'store_credit'
+>('bank');
+const newMethodError = ref<string | null>(null);
 const addingMethod = ref(false);
-const methodToArchive = ref<any | null>(null);
+const methodToArchive = ref<PaymentMethod | null>(null);
 const methodContextFields = [
     { key: 'available_in_sales', label: 'Venta' },
     { key: 'available_in_customer_receipts', label: 'Cobro' },
@@ -83,6 +88,21 @@ const methodContextFields = [
     { key: 'available_in_returns', label: 'Dev.' },
 ] as const;
 type MethodContextField = (typeof methodContextFields)[number]['key'];
+const defaultMethodContexts = () =>
+    ({
+        available_in_sales: true,
+        available_in_customer_receipts: false,
+        available_in_supplier_payments: false,
+        available_in_purchase_orders: false,
+        available_in_returns: false,
+    }) satisfies Record<MethodContextField, boolean>;
+const newMethodContexts = ref(defaultMethodContexts());
+const liquidityBucketOptions = [
+    { value: 'cash', label: 'Cash' },
+    { value: 'bank', label: 'Banco' },
+    { value: 'credit', label: 'Credito' },
+    { value: 'store_credit', label: 'Saldo a favor' },
+] as const;
 
 const sections = [
     { id: 'identity', label: 'Identidad' },
@@ -136,35 +156,74 @@ const handleSave = async () => {
     }
 };
 
+const resetNewMethodForm = () => {
+    newMethodName.value = '';
+    newMethodRequiresRef.value = false;
+    newMethodLiquidityBucket.value = 'bank';
+    newMethodContexts.value = defaultMethodContexts();
+    newMethodError.value = null;
+};
+
 const handleAddMethod = async () => {
     if (!newMethodName.value.trim()) {
         return;
     }
 
     addingMethod.value = true;
+    newMethodError.value = null;
     try {
         await createMethod({
             name: newMethodName.value.trim(),
+            is_active: true,
             requires_reference: newMethodRequiresRef.value,
+            liquidity_bucket: newMethodLiquidityBucket.value,
+            ...newMethodContexts.value,
         });
-        newMethodName.value = '';
-        newMethodRequiresRef.value = false;
+        resetNewMethodForm();
         showAddMethodModal.value = false;
         await fetchAllMethods();
+    } catch (e: any) {
+        newMethodError.value =
+            e.response?.data?.message ||
+            e.response?.data?.errors?.name?.[0] ||
+            'No se pudo crear el metodo de pago.';
     } finally {
         addingMethod.value = false;
     }
 };
 
-const handleToggleActive = async (method: any) => {
+const handleToggleActive = async (method: PaymentMethod) => {
     await updateMethod(method.id, { is_active: !method.is_active });
 };
 
 const handleToggleMethodContext = async (
-    method: any,
+    method: PaymentMethod,
     field: MethodContextField,
 ) => {
     await updateMethod(method.id, { [field]: !method[field] });
+};
+
+const handleToggleRequiresReference = async (method: PaymentMethod) => {
+    await updateMethod(method.id, {
+        requires_reference: !method.requires_reference,
+    });
+};
+
+const handleUpdateLiquidityBucket = async (
+    method: PaymentMethod,
+    liquidityBucket: string,
+) => {
+    if (!['cash', 'bank', 'credit', 'store_credit'].includes(liquidityBucket)) {
+        return;
+    }
+
+    await updateMethod(method.id, {
+        liquidity_bucket: liquidityBucket as
+            | 'cash'
+            | 'bank'
+            | 'credit'
+            | 'store_credit',
+    });
 };
 
 const confirmArchiveMethod = async () => {
@@ -557,6 +616,12 @@ const handleResetData = async () => {
                                             Codigo
                                         </th>
                                         <th class="px-3 py-2 text-left">
+                                            Bucket
+                                        </th>
+                                        <th class="px-3 py-2 text-left">
+                                            Ref.
+                                        </th>
+                                        <th class="px-3 py-2 text-left">
                                             Uso
                                         </th>
                                         <th class="px-3 py-2 text-left">
@@ -625,6 +690,50 @@ const handleResetData = async () => {
                                             class="px-3 py-2 font-mono text-xs text-muted-foreground"
                                         >
                                             {{ method.code }}
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <select
+                                                :value="
+                                                    method.liquidity_bucket ||
+                                                    'bank'
+                                                "
+                                                class="h-8 rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary"
+                                                @change="
+                                                    handleUpdateLiquidityBucket(
+                                                        method,
+                                                        (
+                                                            $event.target as HTMLSelectElement
+                                                        ).value,
+                                                    )
+                                                "
+                                            >
+                                                <option
+                                                    v-for="option in liquidityBucketOptions"
+                                                    :key="option.value"
+                                                    :value="option.value"
+                                                >
+                                                    {{ option.label }}
+                                                </option>
+                                            </select>
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <label
+                                                class="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    :checked="
+                                                        method.requires_reference
+                                                    "
+                                                    class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary"
+                                                    @change="
+                                                        handleToggleRequiresReference(
+                                                            method,
+                                                        )
+                                                    "
+                                                />
+                                                Req.
+                                            </label>
                                         </td>
                                         <td class="px-3 py-2">
                                             <div class="flex flex-wrap gap-2">
@@ -874,7 +983,10 @@ const handleResetData = async () => {
                     <div
                         v-if="showAddMethodModal"
                         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-                        @click.self="showAddMethodModal = false"
+                        @click.self="
+                            showAddMethodModal = false;
+                            resetNewMethodForm();
+                        "
                     >
                         <div
                             class="w-full max-w-md rounded-lg border bg-card p-5 shadow-xl"
@@ -883,6 +995,12 @@ const handleResetData = async () => {
                                 Agregar metodo de pago
                             </h3>
                             <div class="mt-4 space-y-4">
+                                <div
+                                    v-if="newMethodError"
+                                    class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+                                >
+                                    {{ newMethodError }}
+                                </div>
                                 <div class="space-y-1.5">
                                     <label class="text-sm font-medium"
                                         >Nombre</label
@@ -894,6 +1012,23 @@ const handleResetData = async () => {
                                         placeholder="Ej: Yappy, Nequi"
                                     />
                                 </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-sm font-medium">
+                                        Bucket financiero
+                                    </label>
+                                    <select
+                                        v-model="newMethodLiquidityBucket"
+                                        class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
+                                    >
+                                        <option
+                                            v-for="option in liquidityBucketOptions"
+                                            :key="option.value"
+                                            :value="option.value"
+                                        >
+                                            {{ option.label }}
+                                        </option>
+                                    </select>
+                                </div>
                                 <label class="flex items-center gap-2 text-sm">
                                     <input
                                         v-model="newMethodRequiresRef"
@@ -902,6 +1037,29 @@ const handleResetData = async () => {
                                     />
                                     Requiere numero de referencia
                                 </label>
+                                <div class="space-y-2">
+                                    <p class="text-sm font-medium">
+                                        Usos habilitados
+                                    </p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <label
+                                            v-for="field in methodContextFields"
+                                            :key="field.key"
+                                            class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground"
+                                        >
+                                            <input
+                                                v-model="
+                                                    newMethodContexts[
+                                                        field.key
+                                                    ]
+                                                "
+                                                type="checkbox"
+                                                class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            {{ field.label }}
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                             <div class="mt-5 flex justify-end gap-2">
                                 <button
@@ -909,8 +1067,7 @@ const handleResetData = async () => {
                                     class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
                                     @click="
                                         showAddMethodModal = false;
-                                        newMethodName = '';
-                                        newMethodRequiresRef = false;
+                                        resetNewMethodForm();
                                     "
                                 >
                                     Cancelar

@@ -130,6 +130,9 @@ export interface VehicleCandidate {
     model?: string | null;
     chassis?: string | null;
     engine?: string | null;
+    vin?: string | null;
+    carro?: string | null;
+    raw_vehicle_text?: string | null;
     label?: string | null;
     source?: string | null;
     can_create?: boolean;

@@ -2,6 +2,7 @@
 import { AlertCircle, Calculator, RotateCcw, Send, X } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import { formatCurrency, roundMoney } from '@/utils/formatters';
 import type { PosSession, PosSessionSummary } from '../../types/pos-session';
 
 interface CashDenomination {
@@ -80,14 +81,7 @@ const summaryData = computed(
             | null,
 );
 
-const formatCurrency = (value: number): string =>
-    new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value) || 0);
-
-const money = (value: number): number =>
-    Math.round((Number(value) || 0) * 100) / 100;
+const money = (value: number): number => roundMoney(value);
 
 const normalizeCount = (value: string): number => {
     const parsed = Math.floor(Number(value));

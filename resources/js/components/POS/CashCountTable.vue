@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { formatCurrency } from '@/utils/formatters';
 
 interface CashRowConfig {
     id: string;
@@ -100,13 +101,6 @@ const props = defineProps<{
 const emit = defineEmits<{
     (e: 'countChange', id: string, value: number): void;
 }>();
-
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(value || 0);
-};
 
 const rowTotal = (row: CashRowConfig) => {
     const unitKey = `unit_${row.id}`;

@@ -334,7 +334,8 @@ export interface CreateSalesOrderData {
     payments?: Array<{
         amount: number;
         method: string;
-        notes?: string;
+        reference_number?: string | null;
+        notes?: string | null;
     }>;
     notes?: string;
     audit_logs?: Array<{

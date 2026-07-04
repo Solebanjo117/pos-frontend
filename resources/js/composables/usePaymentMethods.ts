@@ -13,14 +13,22 @@ export function usePaymentMethods() {
     const loading = ref(false);
     const error = ref<string | null>(null);
 
+    const normalizeMethodList = (list: PaymentMethod[]) =>
+        [...list]
+            .filter((method) => method.code && method.name && !method.is_archived)
+            .sort((a, b) => {
+                const order = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+
+                return order !== 0 ? order : a.name.localeCompare(b.name);
+            });
+
     // Fetch active payment methods (for POS, dropdowns)
     async function fetchMethods(context?: PaymentMethodContext, realMoney = false) {
         loading.value = true;
         error.value = null;
         try {
-            methods.value = await paymentMethodsService.getActive(
-                context,
-                realMoney,
+            methods.value = normalizeMethodList(
+                await paymentMethodsService.getActive(context, realMoney),
             );
         } catch (e: any) {
             error.value =
@@ -36,7 +44,9 @@ export function usePaymentMethods() {
         loading.value = true;
         error.value = null;
         try {
-            allMethods.value = await paymentMethodsService.getAll();
+            allMethods.value = normalizeMethodList(
+                await paymentMethodsService.getAll(),
+            );
         } catch (e: any) {
             error.value =
                 e.response?.data?.message ||
@@ -94,10 +104,7 @@ export function usePaymentMethods() {
         try {
             await paymentMethodsService.archive(id);
             methods.value = methods.value.filter((m) => m.id !== id);
-            const allIdx = allMethods.value.findIndex((m) => m.id === id);
-            if (allIdx !== -1) {
-                allMethods.value[allIdx].is_active = false;
-            }
+            allMethods.value = allMethods.value.filter((m) => m.id !== id);
         } catch (e: any) {
             error.value =
                 e.response?.data?.message || 'Error al archivar método de pago';

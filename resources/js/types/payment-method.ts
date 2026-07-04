@@ -3,6 +3,7 @@ export interface PaymentMethod {
     name: string;
     code: string;
     is_active: boolean;
+    is_archived?: boolean;
     is_system: boolean;
     requires_reference: boolean;
     requires_cash_count: boolean;
@@ -13,6 +14,7 @@ export interface PaymentMethod {
     available_in_purchase_orders?: boolean;
     available_in_returns?: boolean;
     sort_order: number;
+    archived_at?: string | null;
     created_at?: string;
     updated_at?: string;
 }
@@ -26,6 +28,7 @@ export type PaymentMethodContext =
 
 export interface CreatePaymentMethodData {
     name: string;
+    is_active?: boolean;
     requires_reference?: boolean;
     requires_cash_count?: boolean;
     liquidity_bucket?: 'cash' | 'bank' | 'credit' | 'store_credit';

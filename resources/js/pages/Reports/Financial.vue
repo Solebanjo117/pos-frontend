@@ -3,7 +3,6 @@ import { Head } from '@inertiajs/vue3';
 import {
     AlertCircle,
     BarChart3,
-    Calendar,
     CheckCircle2,
     Clock,
     FileText,
@@ -20,6 +19,7 @@ import FinanceIncomeStatement from '@/components/Finance/FinanceIncomeStatement.
 import FinanceKpiRow from '@/components/Finance/FinanceKpiRow.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import FinancialDrilldownDrawer from '@/components/Finance/FinancialDrilldownDrawer.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -29,6 +29,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { InventoryApiService } from '@/services/inventory';
 import type { BreadcrumbItem } from '@/types';
 import type { ExpenseBreakdown, FinancialAdjustmentType } from '@/types/report';
+import { formatCurrency } from '@/utils/formatters';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
 type ReportTab = 'summary' | 'balance' | 'income' | 'credits' | 'investment';
@@ -118,31 +119,11 @@ const selectedWarehouseLabel = computed(() => {
     );
 });
 
-const formatCurrency = (value: number): string =>
-    new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-    }).format(Number(value) || 0);
-
 const kpis = computed(() => {
     const totals = dailySummary.value?.totals ?? {};
     const credits = incomeStatementReport.value?.credit_balances ?? {};
 
     return [
-        {
-            key: 'cash',
-            label: 'Cash',
-            value: totals.cash ?? 0,
-            metric: 'cash',
-        },
-        {
-            key: 'bank',
-            label: 'Banco',
-            value: totals.bank ?? 0,
-            metric: 'bank',
-        },
         {
             key: 'inventory',
             label: 'Inventario',
@@ -162,6 +143,21 @@ const kpis = computed(() => {
             metric: 'payments_received',
         },
         {
+            key: 'receivable',
+            label: 'CxC',
+            value:
+                totals.accounts_receivable ??
+                credits.accounts_receivable?.total_open_balance ??
+                0,
+            metric: 'receivable',
+        },
+        {
+            key: 'cogs',
+            label: 'COGS',
+            value: totals.cogs ?? 0,
+            metric: 'cogs',
+        },
+        {
             key: 'purchase',
             label: 'Compras',
             value: totals.purchase ?? 0,
@@ -174,35 +170,8 @@ const kpis = computed(() => {
             metric: 'supplier_payments',
         },
         {
-            key: 'expenses',
-            label: 'Gastos',
-            value: totals.expenses ?? 0,
-            metric: 'expenses',
-        },
-        {
-            key: 'gross_profit',
-            label: 'Util. bruta',
-            value: totals.gross_profit ?? 0,
-            metric: 'gross_profit',
-        },
-        {
-            key: 'profit',
-            label: 'Profit',
-            value: totals.net_profit ?? totals.profit ?? 0,
-            metric: 'profit',
-        },
-        {
-            key: 'receivable',
-            label: 'C x C',
-            value:
-                totals.accounts_receivable ??
-                credits.accounts_receivable?.total_open_balance ??
-                0,
-            metric: 'receivable',
-        },
-        {
             key: 'payable',
-            label: 'C x P',
+            label: 'CxP',
             value:
                 totals.accounts_payable ??
                 credits.accounts_payable?.total_open_balance ??
@@ -210,10 +179,16 @@ const kpis = computed(() => {
             metric: 'payable',
         },
         {
-            key: 'investment',
-            label: 'Inversion',
-            value: totals.net_investment ?? totals.investment ?? 0,
-            metric: 'investment',
+            key: 'expenses',
+            label: 'Gastos',
+            value: totals.expenses ?? 0,
+            metric: 'expenses',
+        },
+        {
+            key: 'profit',
+            label: 'Profit',
+            value: totals.net_profit ?? totals.profit ?? 0,
+            metric: 'profit',
         },
     ];
 });
@@ -262,6 +237,7 @@ const creditSections = computed(() => {
             key: 'receivable',
             title: 'Cuentas por cobrar',
             href: '/ar',
+            description: 'Cobros y abonos se operan desde /ar.',
             total: credits.accounts_receivable?.total_open_balance ?? 0,
             count: credits.accounts_receivable?.open_documents_count ?? 0,
             documents: credits.accounts_receivable?.documents ?? [],
@@ -270,6 +246,7 @@ const creditSections = computed(() => {
             key: 'payable',
             title: 'Cuentas por pagar',
             href: '/accounts-payable',
+            description: 'Pagos a proveedores se operan desde /accounts-payable.',
             total: credits.accounts_payable?.total_open_balance ?? 0,
             count: credits.accounts_payable?.open_documents_count ?? 0,
             documents: credits.accounts_payable?.documents ?? [],
@@ -492,34 +469,13 @@ watch(currentWarehouseId, (value) => {
                                 </button>
                             </div>
                         </div>
-                        <div>
-                            <label
-                                class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                            >
-                                <Calendar :size="12" class="mr-1 inline" />
-                                Desde
-                            </label>
-                            <input
-                                v-model="filters.date_from"
-                                type="date"
-                                class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                @change="loadReports"
-                            />
-                        </div>
-                        <div>
-                            <label
-                                class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                            >
-                                <Calendar :size="12" class="mr-1 inline" />
-                                Hasta
-                            </label>
-                            <input
-                                v-model="filters.date_to"
-                                type="date"
-                                class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                @change="loadReports"
-                            />
-                        </div>
+                        <DateRangeInput
+                            v-model:from="filters.date_from"
+                            v-model:to="filters.date_to"
+                            label="Rango"
+                            class="md:col-span-2"
+                            @change="loadReports"
+                        />
                         <div>
                             <label
                                 class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
@@ -631,13 +587,16 @@ watch(currentWarehouseId, (value) => {
                         v-if="activeTab === 'income'"
                         :sales="incomeSummary?.total_revenue ?? 0"
                         :cogs="incomeSummary?.total_cogs ?? 0"
-                        :net-income="incomeSummary?.gross_profit ?? 0"
+                        :net-income="incomeSummary?.net_profit ?? 0"
                         :net-profit="incomeSummary?.net_profit ?? 0"
                         :expense-breakdown="expenseBreakdown"
                         :currency-formatter="formatCurrency"
                     />
 
-                    <div v-if="activeTab === 'credits'" class="grid gap-3 xl:grid-cols-2">
+                    <div
+                        v-if="activeTab === 'credits'"
+                        class="grid gap-3 xl:grid-cols-2"
+                    >
                         <section
                             v-for="section in creditSections"
                             :key="section.key"
@@ -654,6 +613,11 @@ watch(currentWarehouseId, (value) => {
                                     </h3>
                                     <p class="text-[11px] text-slate-500">
                                         {{ section.count }} documentos abiertos
+                                    </p>
+                                    <p
+                                        class="mt-0.5 max-w-64 text-[11px] text-slate-400"
+                                    >
+                                        {{ section.description }}
                                     </p>
                                 </div>
                                 <div class="text-right">
@@ -672,7 +636,9 @@ watch(currentWarehouseId, (value) => {
                             </div>
                             <div class="overflow-x-auto">
                                 <table class="min-w-full text-xs tabular-nums">
-                                    <thead class="bg-slate-50 dark:bg-slate-900">
+                                    <thead
+                                        class="bg-slate-50 dark:bg-slate-900"
+                                    >
                                         <tr>
                                             <th
                                                 class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
@@ -705,7 +671,10 @@ watch(currentWarehouseId, (value) => {
                                         class="divide-y divide-slate-100 dark:divide-slate-800"
                                     >
                                         <tr
-                                            v-for="document in section.documents.slice(0, 8)"
+                                            v-for="document in section.documents.slice(
+                                                0,
+                                                8,
+                                            )"
                                             :key="`${section.key}-${document.document_type}-${document.id}`"
                                             class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
                                         >
@@ -713,26 +682,45 @@ watch(currentWarehouseId, (value) => {
                                                 <p
                                                     class="font-semibold text-slate-900 dark:text-slate-100"
                                                 >
-                                                    {{ document.document_number }}
+                                                    {{
+                                                        document.document_number
+                                                    }}
                                                 </p>
-                                                <p class="text-[11px] text-slate-500">
-                                                    {{ formatCreditDate(document.date) }}
+                                                <p
+                                                    class="text-[11px] text-slate-500"
+                                                >
+                                                    {{
+                                                        formatCreditDate(
+                                                            document.date,
+                                                        )
+                                                    }}
                                                 </p>
                                             </td>
                                             <td
                                                 class="px-3 py-2 text-slate-600 dark:text-slate-400"
                                             >
-                                                {{ document.account_name || 'N/A' }}
+                                                {{
+                                                    document.account_name ||
+                                                    'N/A'
+                                                }}
                                             </td>
                                             <td
                                                 class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100"
                                             >
-                                                {{ formatCurrency(document.amount_due) }}
+                                                {{
+                                                    formatCurrency(
+                                                        document.amount_due,
+                                                    )
+                                                }}
                                             </td>
                                             <td
                                                 class="px-3 py-2 text-slate-600 dark:text-slate-400"
                                             >
-                                                {{ formatCreditDate(document.due_date) }}
+                                                {{
+                                                    formatCreditDate(
+                                                        document.due_date,
+                                                    )
+                                                }}
                                             </td>
                                             <td class="px-3 py-2">
                                                 <span
@@ -742,12 +730,17 @@ watch(currentWarehouseId, (value) => {
                                                 </span>
                                             </td>
                                         </tr>
-                                        <tr v-if="section.documents.length === 0">
+                                        <tr
+                                            v-if="
+                                                section.documents.length === 0
+                                            "
+                                        >
                                             <td
                                                 colspan="5"
                                                 class="px-3 py-6 text-center text-slate-400"
                                             >
-                                                Sin creditos abiertos en el periodo
+                                                Sin creditos abiertos en el
+                                                periodo
                                             </td>
                                         </tr>
                                     </tbody>

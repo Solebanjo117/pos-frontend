@@ -1,18 +1,12 @@
 <script setup lang="ts">
 import type { PosSessionSummary } from '../../types/pos-session';
+import { formatCurrency } from '@/utils/formatters';
 
 defineProps<{
     summary: PosSessionSummary | null;
     totalCounted: number;
     totalElectronic: number;
 }>();
-
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(value || 0);
-};
 </script>
 
 <template>

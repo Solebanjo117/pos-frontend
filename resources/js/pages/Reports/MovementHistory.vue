@@ -18,6 +18,7 @@ import MovementTrendChart from '@/components/charts/MovementTrendChart.vue';
 import MovementTypeChart from '@/components/charts/MovementTypeChart.vue';
 import Pagination from '@/components/Pagination.vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -28,6 +29,7 @@ import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { formatCurrency } from '@/utils/formatters';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -229,12 +231,6 @@ const formatDate = (dateString: string) => {
         minute: '2-digit',
     });
 };
-
-const formatCurrency = (value: number | undefined) =>
-    new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value) || 0);
 
 const activeWarehouseName = computed(() => {
     if (!filters.value.warehouse_id) {
@@ -464,29 +460,12 @@ const sourceLabel = (movement: {
                 <div
                     class="grid items-end gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4"
                 >
-                    <div>
-                        <label
-                            class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-                            >Fecha Desde</label
-                        >
-                        <input
-                            v-model="filters.date_from"
-                            type="date"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
-
-                    <div>
-                        <label
-                            class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-                            >Fecha Hasta</label
-                        >
-                        <input
-                            v-model="filters.date_to"
-                            type="date"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
+                    <DateRangeInput
+                        v-model:from="filters.date_from"
+                        v-model:to="filters.date_to"
+                        label="Rango"
+                        class="md:col-span-2"
+                    />
 
                     <div>
                         <label

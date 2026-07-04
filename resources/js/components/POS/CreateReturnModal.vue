@@ -14,6 +14,7 @@ import {
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type { User as UserType } from '@/types';
+import { formatCurrency, roundMoney } from '@/utils/formatters';
 
 const { methods, fetchMethods } = usePaymentMethods();
 
@@ -24,6 +25,8 @@ interface OrderItem {
     product_name: string;
     product_sku: string;
     quantity: number;
+    sold_quantity?: number;
+    already_returned_quantity?: number;
     unit_price: number;
     discount_percent: number;
     tax_percent?: number;
@@ -33,19 +36,29 @@ interface OrderItem {
 
 const props = withDefaults(
     defineProps<{
-    show: boolean;
-    orderId: number;
-    orderNumber: string;
-    items: OrderItem[];
-    users?: UserType[];
-    currentUserId?: number;
-    hasCustomer?: boolean;
-    loading?: boolean;
-    error?: string | null;
+        show: boolean;
+        orderId: number;
+        orderNumber: string;
+        items: OrderItem[];
+        users?: UserType[];
+        currentUserId?: number;
+        hasCustomer?: boolean;
+        totalPaid?: number;
+        totalReturned?: number;
+        amountDue?: number;
+        returnableAmount?: number;
+        recommendedRefundMethod?: string | null;
+        loading?: boolean;
+        error?: string | null;
     }>(),
     {
         users: () => [],
         hasCustomer: false,
+        totalPaid: 0,
+        totalReturned: 0,
+        amountDue: 0,
+        returnableAmount: 0,
+        recommendedRefundMethod: null,
         loading: false,
         error: null,
     },
@@ -84,7 +97,10 @@ watch(
         if (val) {
             fetchMethods('returns');
             reason.value = '';
-            refundMethod.value = 'cash';
+            refundMethod.value =
+                props.hasCustomer && Number(props.amountDue || 0) > 0
+                    ? 'receivable'
+                    : 'cash';
             refundNotes.value = '';
             returnSearchQuery.value = '';
             showReturnSearchModal.value = false;
@@ -171,6 +187,15 @@ const removeReturnItemFromSearch = (item: OrderItem) => {
     quantities.value[item.id] = Math.max(0, currentQuantity - 1);
 };
 
+const clampQuantity = (item: OrderItem) => {
+    const maxQuantity = Number(item.quantity || 0);
+    const currentQuantity = Number(quantities.value[item.id] || 0);
+    quantities.value[item.id] = Math.min(
+        maxQuantity,
+        Math.max(0, Math.trunc(currentQuantity)),
+    );
+};
+
 const estimatedRefund = computed(() => {
     let total = 0;
     for (const item of props.items) {
@@ -191,7 +216,7 @@ const estimatedRefund = computed(() => {
             }
         }
     }
-    return total;
+    return roundMoney(total);
 });
 
 const handleSubmit = () => {
@@ -199,7 +224,10 @@ const handleSubmit = () => {
         .filter((item) => (quantities.value[item.id] ?? 0) > 0)
         .map((item) => ({
             sales_order_item_id: item.id,
-            quantity: quantities.value[item.id],
+            quantity: Math.min(
+                Number(item.quantity || 0),
+                Math.max(0, Math.trunc(Number(quantities.value[item.id] || 0))),
+            ),
             user_id: returnUsers.value[item.id] ?? null,
         }));
 
@@ -210,9 +238,6 @@ const handleSubmit = () => {
         items: returnItems,
     });
 };
-
-const formatCurrency = (v: number) =>
-    v.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
 // Icon mapping for refund methods
 const methodIcons: Record<string, any> = {
@@ -226,6 +251,7 @@ const methodIcons: Record<string, any> = {
     mastercard: CreditCard,
     amex: CreditCard,
     other: Banknote,
+    receivable: User,
     balance: User,
     store_credit: User,
 };
@@ -242,25 +268,38 @@ const methodColors: Record<string, string> = {
     mastercard: 'blue',
     amex: 'blue',
     other: 'gray',
+    receivable: 'amber',
     balance: 'amber',
     store_credit: 'amber',
 };
 
 const refundMethods = computed(() => {
-    const result = methods.value
+    const result =
+        props.hasCustomer && Number(props.amountDue || 0) > 0
+            ? [
+                  {
+                      value: 'receivable',
+                      label: 'Reducir CxC',
+                      icon: User,
+                      color: 'amber',
+                  },
+              ]
+            : [];
+
+    result.push(
+        ...methods.value
         .filter(
             (m) =>
                 m.is_active &&
-                !['credit', 'store_credit', 'supplier_credit'].includes(
-                    m.code,
-                ),
+                !['credit', 'store_credit', 'supplier_credit'].includes(m.code),
         )
         .map((m) => ({
             value: m.code,
             label: m.name,
             icon: methodIcons[m.code] || Banknote,
             color: methodColors[m.code] || 'gray',
-        }));
+        })),
+    );
 
     // Add balance option if customer exists
     if (props.hasCustomer) {
@@ -365,6 +404,35 @@ const refundMethodColor = (method: string, color: string) => {
                             >
                                 <AlertCircle class="h-4 w-4 flex-shrink-0" />
                                 {{ error }}
+                            </div>
+
+                            <div
+                                class="grid gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm dark:border-border dark:bg-background/50 sm:grid-cols-4"
+                            >
+                                <div>
+                                    <p class="text-xs text-gray-500">Pagado</p>
+                                    <p class="font-semibold text-gray-900 dark:text-white">
+                                        {{ formatCurrency(totalPaid) }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Pendiente CxC</p>
+                                    <p class="font-semibold text-amber-700 dark:text-amber-300">
+                                        {{ formatCurrency(amountDue) }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Ya devuelto</p>
+                                    <p class="font-semibold text-gray-900 dark:text-white">
+                                        {{ formatCurrency(totalReturned) }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Devolvible</p>
+                                    <p class="font-semibold text-red-700 dark:text-red-300">
+                                        {{ formatCurrency(returnableAmount) }}
+                                    </p>
+                                </div>
                             </div>
 
                             <!-- ── Items Table ── -->
@@ -482,6 +550,16 @@ const refundMethodColor = (method: string, color: string) => {
                                                             >
                                                                 Vendido:
                                                                 {{
+                                                                    item.sold_quantity ??
+                                                                    item.quantity
+                                                                }}
+                                                                Â· Devuelto:
+                                                                {{
+                                                                    item.already_returned_quantity ??
+                                                                    0
+                                                                }}
+                                                                Â· Disponible:
+                                                                {{
                                                                     item.quantity
                                                                 }}
                                                             </p>
@@ -556,6 +634,16 @@ const refundMethodColor = (method: string, color: string) => {
                                                             min="0"
                                                             :max="item.quantity"
                                                             class="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-center text-sm font-bold text-gray-900 focus:border-transparent focus:ring-2 focus:ring-red-500 dark:border-border dark:bg-muted dark:text-white"
+                                                            @change="
+                                                                clampQuantity(
+                                                                    item,
+                                                                )
+                                                            "
+                                                            @blur="
+                                                                clampQuantity(
+                                                                    item,
+                                                                )
+                                                            "
                                                         />
                                                         <span
                                                             class="text-xs text-gray-400"
@@ -780,6 +868,10 @@ const refundMethodColor = (method: string, color: string) => {
                                                         class="text-xs text-gray-500 dark:text-gray-400"
                                                     >
                                                         Vendido:
+                                                        {{ item.sold_quantity ?? item.quantity }}
+                                                        Â· Devuelto:
+                                                        {{ item.already_returned_quantity ?? 0 }}
+                                                        Â· Disponible:
                                                         {{ item.quantity }}
                                                         <span
                                                             v-if="

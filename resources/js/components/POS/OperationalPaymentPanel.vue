@@ -10,11 +10,14 @@ import {
 import { ref, computed, watch, onMounted } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type { Customer } from '@/types/customer';
-import type { PaymentMethodContext } from '@/types/payment-method';
+import type { PaymentMethod, PaymentMethodContext } from '@/types/payment-method';
+import { formatCurrency, roundMoney } from '@/utils/formatters';
 
 interface Payment {
     method: string;
     amount: number;
+    reference_number?: string | null;
+    notes?: string | null;
 }
 
 interface PaymentFinishMeta {
@@ -79,6 +82,9 @@ const emit = defineEmits<{
 }>();
 
 const payments = ref<Record<string, number>>({});
+const paymentReferences = ref<Record<string, string>>({});
+const paymentNotes = ref<Record<string, string>>({});
+const activeMethodCode = ref<string | null>(null);
 const referenceNumber = ref('');
 const notes = ref('');
 
@@ -86,7 +92,9 @@ const cashDenominations = [100, 50, 20, 10, 5, 1, 0.25];
 
 const isPurchaseMode = computed(() => props.mode === 'purchase');
 const resolvedPaymentContext = computed<PaymentMethodContext>(
-    () => props.paymentContext ?? (isPurchaseMode.value ? 'purchase_orders' : 'sales'),
+    () =>
+        props.paymentContext ??
+        (isPurchaseMode.value ? 'purchase_orders' : 'sales'),
 );
 const panelTitle = computed(
     () => props.title ?? (isPurchaseMode.value ? 'Registrar pago' : 'PAYMENT'),
@@ -118,11 +126,38 @@ const isAllowedMethod = (code: string): boolean => {
     return effectiveAllowedMethods.value.includes(code);
 };
 
-const showCashMethod = computed(
-    () =>
-        isAllowedMethod('cash') &&
-        methods.value.some((method) => method.code === 'cash' && method.is_active),
-);
+const sortedMethods = computed(() => {
+    const seen = new Set<string>();
+
+    return [...methods.value]
+        .filter((method) => {
+            if (
+                !method.code ||
+                !method.name ||
+                method.is_archived ||
+                seen.has(method.code)
+            ) {
+                return false;
+            }
+
+            seen.add(method.code);
+            return true;
+        })
+        .sort((a, b) => {
+            const order = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+
+            return order !== 0 ? order : a.name.localeCompare(b.name);
+        });
+});
+
+const methodIsAvailable = (code: string): boolean =>
+    isAllowedMethod(code) &&
+    sortedMethods.value.some(
+        (method) =>
+            method.code === code && method.is_active && !method.is_archived,
+    );
+
+const showCashMethod = computed(() => methodIsAvailable('cash'));
 
 watch(
     () => props.show,
@@ -134,14 +169,12 @@ watch(
     },
 );
 
-watch(
-    () => props.paymentContext,
-    () => {
-        if (props.show) {
-            fetchMethods(resolvedPaymentContext.value);
-        }
-    },
-);
+watch(resolvedPaymentContext, () => {
+    if (props.show) {
+        fetchMethods(resolvedPaymentContext.value);
+        resetPayments();
+    }
+});
 
 onMounted(() => {
     if (props.show) {
@@ -151,6 +184,9 @@ onMounted(() => {
 
 const resetPayments = () => {
     payments.value = {};
+    paymentReferences.value = {};
+    paymentNotes.value = {};
+    activeMethodCode.value = null;
     referenceNumber.value = '';
     notes.value = '';
 };
@@ -174,24 +210,71 @@ const storeCreditAvailable = computed(() => {
     return props.customer.store_credit ?? 0;
 });
 
+const showCreditMethod = computed(
+    () =>
+        !isPurchaseMode.value &&
+        Boolean(props.customer) &&
+        creditAvailable.value > 0 &&
+        methodIsAvailable('credit'),
+);
+
+const showStoreCreditMethod = computed(
+    () =>
+        !isPurchaseMode.value &&
+        Boolean(props.customer) &&
+        storeCreditAvailable.value > 0 &&
+        methodIsAvailable('store_credit'),
+);
+
+const normalizePaymentAmount = (value: unknown): number => {
+    const amount = Number(value ?? 0);
+
+    if (!Number.isFinite(amount)) {
+        return 0;
+    }
+
+    return roundMoney(Math.max(0, amount));
+};
+
+const setPaymentAmount = (code: string, value: unknown) => {
+    payments.value[code] = normalizePaymentAmount(value);
+};
+
+const getPaymentAmount = (code: string): number =>
+    normalizePaymentAmount(payments.value[code] ?? 0);
+
+const getPaymentReference = (code: string): string =>
+    paymentReferences.value[code] ?? '';
+
+const getPaymentNotes = (code: string): string =>
+    paymentNotes.value[code] ?? '';
+
+const setPaymentReference = (code: string, value: string) => {
+    paymentReferences.value[code] = value;
+};
+
+const setPaymentNotes = (code: string, value: string) => {
+    paymentNotes.value[code] = value;
+};
+
 const cashAmount = computed({
     get: () => payments.value.cash ?? 0,
     set: (val: number) => {
-        payments.value.cash = val;
+        setPaymentAmount('cash', val);
     },
 });
 
 const creditAmount = computed({
     get: () => payments.value.credit ?? 0,
     set: (val: number) => {
-        payments.value.credit = val;
+        setPaymentAmount('credit', val);
     },
 });
 
 const storeCreditAmount = computed({
     get: () => payments.value.store_credit ?? 0,
     set: (val: number) => {
-        payments.value.store_credit = val;
+        setPaymentAmount('store_credit', val);
     },
 });
 
@@ -200,8 +283,15 @@ const supplierCreditAmount = computed(
 );
 
 const dynamicMethods = computed(() =>
-    methods.value.filter((method) => {
-        if (!method.is_active || method.code === 'cash') {
+    sortedMethods.value.filter((method) => {
+        if (
+            !method.is_active ||
+            method.is_archived ||
+            !method.code ||
+            !method.name ||
+            !isAllowedMethod(method.code) ||
+            method.code === 'cash'
+        ) {
             return false;
         }
 
@@ -214,7 +304,7 @@ const dynamicMethods = computed(() =>
                 return false;
             }
 
-            return isAllowedMethod(method.code);
+            return true;
         }
 
         return !['credit', 'store_credit', 'supplier_credit'].includes(
@@ -223,12 +313,108 @@ const dynamicMethods = computed(() =>
     }),
 );
 
+const activePaymentCodes = computed(() => {
+    const codes = new Set(dynamicMethods.value.map((method) => method.code));
+
+    if (showCashMethod.value) {
+        codes.add('cash');
+    }
+
+    if (showCreditMethod.value) {
+        codes.add('credit');
+    }
+
+    if (showStoreCreditMethod.value) {
+        codes.add('store_credit');
+    }
+
+    return codes;
+});
+
+const selectableMethods = computed(() =>
+    sortedMethods.value.filter((method) => {
+        if (method.code === 'cash') {
+            return showCashMethod.value;
+        }
+
+        if (method.code === 'credit') {
+            return showCreditMethod.value;
+        }
+
+        if (method.code === 'store_credit') {
+            return showStoreCreditMethod.value;
+        }
+
+        return dynamicMethods.value.some(
+            (dynamicMethod) => dynamicMethod.code === method.code,
+        );
+    }),
+);
+
+watch(
+    selectableMethods,
+    (availableMethods) => {
+        if (
+            activeMethodCode.value &&
+            availableMethods.some(
+                (method) => method.code === activeMethodCode.value,
+            )
+        ) {
+            return;
+        }
+
+        activeMethodCode.value = availableMethods[0]?.code ?? null;
+    },
+    { immediate: true },
+);
+
+const activeMethod = computed<PaymentMethod | null>(
+    () =>
+        selectableMethods.value.find(
+            (method) => method.code === activeMethodCode.value,
+        ) ?? null,
+);
+
+const selectedDynamicMethod = computed<PaymentMethod | null>(() => {
+    if (!activeMethod.value) {
+        return null;
+    }
+
+    return dynamicMethods.value.find(
+        (method) => method.code === activeMethod.value?.code,
+    ) ?? null;
+});
+
+const methodBucketLabel = (method: PaymentMethod): string => {
+    if (method.code === 'cash' || method.liquidity_bucket === 'cash') {
+        return 'Cash';
+    }
+
+    if (method.code === 'credit' || method.liquidity_bucket === 'credit') {
+        return 'Credito';
+    }
+
+    if (
+        method.code === 'store_credit' ||
+        method.liquidity_bucket === 'store_credit'
+    ) {
+        return 'Saldo';
+    }
+
+    return 'Banco';
+};
+
 const totalPaid = computed(() =>
-    Object.values(payments.value).reduce((sum, val) => sum + (val || 0), 0),
+    roundMoney(
+        Array.from(activePaymentCodes.value).reduce(
+            (sum, code) => sum + getPaymentAmount(code),
+            0,
+        ),
+    ),
 );
 
 const remainingToPay = computed(() =>
-    Math.max(0, props.amountToCharge - totalPaid.value),
+    roundMoney(Math.max(0, props.amountToCharge - totalPaid.value)),
 );
 
 const changeToGive = computed(() => {
@@ -237,14 +423,14 @@ const changeToGive = computed(() => {
     const neededFromCash = props.amountToCharge - nonCashPaid;
 
     if (cashPaid > neededFromCash && neededFromCash > 0) {
-        return cashPaid - neededFromCash;
+        return roundMoney(cashPaid - neededFromCash);
     }
 
     return 0;
 });
 
 const effectiveCash = computed(() =>
-    Math.max(0, cashAmount.value - changeToGive.value),
+    roundMoney(Math.max(0, cashAmount.value - changeToGive.value)),
 );
 
 const canFinish = computed(() => {
@@ -282,14 +468,17 @@ const handleMax = (methodCode: string) => {
     }
 
     if (methodCode === 'credit') {
-        payments.value[methodCode] = Math.min(remaining, creditAvailable.value);
+        setPaymentAmount(
+            methodCode,
+            Math.min(remaining, creditAvailable.value),
+        );
     } else if (methodCode === 'store_credit') {
-        payments.value[methodCode] = Math.min(
-            remaining,
-            storeCreditAvailable.value,
+        setPaymentAmount(
+            methodCode,
+            Math.min(remaining, storeCreditAvailable.value),
         );
     } else {
-        payments.value[methodCode] = remaining;
+        setPaymentAmount(methodCode, remaining);
     }
 };
 
@@ -298,30 +487,36 @@ const handleDenomination = (amount: number) => {
 };
 
 const handleDynamicPayment = (code: string, value: number) => {
-    payments.value[code] = value;
+    setPaymentAmount(code, value);
 };
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(amount);
 
 const handleFinish = () => {
     const paymentList: Payment[] = [];
 
     if (effectiveCash.value > 0) {
-        paymentList.push({ method: 'cash', amount: effectiveCash.value });
+        paymentList.push({
+            method: 'cash',
+            amount: roundMoney(effectiveCash.value),
+            reference_number: getPaymentReference('cash') || null,
+            notes: getPaymentNotes('cash') || null,
+        });
     }
 
-    if (!isPurchaseMode.value && creditAmount.value > 0) {
-        paymentList.push({ method: 'credit', amount: creditAmount.value });
+    if (showCreditMethod.value && creditAmount.value > 0) {
+        paymentList.push({
+            method: 'credit',
+            amount: roundMoney(creditAmount.value),
+            reference_number: getPaymentReference('credit') || null,
+            notes: getPaymentNotes('credit') || null,
+        });
     }
 
-    if (!isPurchaseMode.value && storeCreditAmount.value > 0) {
+    if (showStoreCreditMethod.value && storeCreditAmount.value > 0) {
         paymentList.push({
             method: 'store_credit',
-            amount: storeCreditAmount.value,
+            amount: roundMoney(storeCreditAmount.value),
+            reference_number: getPaymentReference('store_credit') || null,
+            notes: getPaymentNotes('store_credit') || null,
         });
     }
 
@@ -333,7 +528,12 @@ const handleFinish = () => {
         const amount = payments.value[method.code] ?? 0;
 
         if (amount > 0) {
-            paymentList.push({ method: method.code, amount });
+            paymentList.push({
+                method: method.code,
+                amount: getPaymentAmount(method.code),
+                reference_number: getPaymentReference(method.code) || null,
+                notes: getPaymentNotes(method.code) || null,
+            });
         }
     }
 
@@ -383,7 +583,49 @@ const handleCancel = () => {
                         </div>
 
                         <div
-                            v-if="showCashMethod"
+                            v-if="selectableMethods.length > 0"
+                            class="grid grid-cols-2 gap-2 md:grid-cols-3"
+                        >
+                            <button
+                                v-for="method in selectableMethods"
+                                :key="method.code"
+                                type="button"
+                                class="rounded-md border p-3 text-left transition hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/20"
+                                :class="
+                                    activeMethodCode === method.code
+                                        ? 'border-green-500 bg-green-50 shadow-sm dark:bg-green-950/30'
+                                        : 'border-gray-200 bg-white dark:border-border dark:bg-card'
+                                "
+                                @click="activeMethodCode = method.code"
+                            >
+                                <span
+                                    class="block truncate text-sm font-semibold text-gray-900 dark:text-white"
+                                >
+                                    {{ method.name }}
+                                </span>
+                                <span
+                                    class="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"
+                                >
+                                    {{ methodBucketLabel(method) }}
+                                    <span
+                                        v-if="method.requires_reference"
+                                        class="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                                    >
+                                        Ref.
+                                    </span>
+                                </span>
+                            </button>
+                        </div>
+
+                        <div
+                            v-else
+                            class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                        >
+                            No hay metodos de pago activos para venta.
+                        </div>
+
+                        <div
+                            v-if="activeMethodCode === 'cash' && showCashMethod"
                             class="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20"
                         >
                             <div class="mb-3 flex items-center gap-2">
@@ -457,9 +699,8 @@ const handleCancel = () => {
 
                         <div
                             v-if="
-                                !isPurchaseMode &&
-                                customer &&
-                                creditAvailable > 0
+                                activeMethodCode === 'credit' &&
+                                showCreditMethod
                             "
                             class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
                         >
@@ -517,9 +758,8 @@ const handleCancel = () => {
 
                         <div
                             v-if="
-                                !isPurchaseMode &&
-                                customer &&
-                                storeCreditAvailable > 0
+                                activeMethodCode === 'store_credit' &&
+                                showStoreCreditMethod
                             "
                             class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-900/20"
                         >
@@ -568,7 +808,7 @@ const handleCancel = () => {
                         </div>
 
                         <div
-                            v-if="dynamicMethods.length > 0"
+                            v-if="selectedDynamicMethod"
                             class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-muted/50"
                         >
                             <div class="mb-3 flex items-center gap-2">
@@ -578,21 +818,21 @@ const handleCancel = () => {
                                 <span
                                     class="text-sm font-bold text-gray-700 uppercase dark:text-gray-300"
                                 >
-                                    Otros metodos
+                                    {{ selectedDynamicMethod.name }}
+                                </span>
+                                <span
+                                    class="ml-auto rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                                >
+                                    {{
+                                        methodBucketLabel(
+                                            selectedDynamicMethod,
+                                        )
+                                    }}
                                 </span>
                             </div>
 
-                            <div class="space-y-2">
-                                <div
-                                    v-for="method in dynamicMethods"
-                                    :key="method.code"
-                                    class="flex items-center gap-2"
-                                >
-                                    <label
-                                        class="w-32 truncate text-sm font-medium text-gray-600 uppercase dark:text-gray-400"
-                                    >
-                                        {{ method.name }}
-                                    </label>
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-2">
                                     <div class="relative flex-1">
                                         <span
                                             class="absolute top-1/2 left-3 -translate-y-1/2 font-bold text-gray-500"
@@ -600,15 +840,19 @@ const handleCancel = () => {
                                             $
                                         </span>
                                         <input
-                                            :value="payments[method.code] ?? 0"
+                                            :value="
+                                                getPaymentAmount(
+                                                    selectedDynamicMethod.code,
+                                                )
+                                            "
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            class="w-full rounded-md border border-gray-300 bg-white py-2 pr-3 pl-8 text-right text-gray-800 focus:ring-2 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                            class="w-full rounded-md border border-gray-300 bg-white py-2 pr-3 pl-8 text-right text-lg font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                                             placeholder="0.00"
                                             @input="
                                                 handleDynamicPayment(
-                                                    method.code,
+                                                    selectedDynamicMethod.code,
                                                     parseFloat(
                                                         (
                                                             $event.target as HTMLInputElement
@@ -620,11 +864,66 @@ const handleCancel = () => {
                                     </div>
                                     <button
                                         type="button"
-                                        class="rounded-md bg-blue-600 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
-                                        @click="handleMax(method.code)"
+                                        class="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                                        @click="
+                                            handleMax(
+                                                selectedDynamicMethod.code,
+                                            )
+                                        "
                                     >
                                         Max
                                     </button>
+                                </div>
+
+                                <div v-if="selectedDynamicMethod.requires_reference">
+                                    <label
+                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Referencia / autorizacion
+                                    </label>
+                                    <input
+                                        :value="
+                                            getPaymentReference(
+                                                selectedDynamicMethod.code,
+                                            )
+                                        "
+                                        type="text"
+                                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                        placeholder="Ej: autorizacion, ACH, recibo"
+                                        @input="
+                                            setPaymentReference(
+                                                selectedDynamicMethod.code,
+                                                (
+                                                    $event.target as HTMLInputElement
+                                                ).value,
+                                            )
+                                        "
+                                    />
+                                </div>
+
+                                <div v-if="selectedDynamicMethod.code === 'other'">
+                                    <label
+                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Notas
+                                    </label>
+                                    <textarea
+                                        :value="
+                                            getPaymentNotes(
+                                                selectedDynamicMethod.code,
+                                            )
+                                        "
+                                        rows="2"
+                                        class="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                        @input="
+                                            setPaymentNotes(
+                                                selectedDynamicMethod.code,
+                                                (
+                                                    $event.target as HTMLTextAreaElement
+                                                ).value,
+                                            )
+                                        "
+                                    ></textarea>
                                 </div>
                             </div>
                         </div>

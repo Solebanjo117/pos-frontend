@@ -8,6 +8,7 @@ import { useInventory } from '@/composables/useInventory';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import type { InventoryFilters } from '@/types/inventory';
+import { formatCurrency as formatMoney } from '@/utils/formatters';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -128,10 +129,7 @@ const warehouseFilterModel = computed<number | null>({
 
 const formatCurrency = (value: number | null) => {
     if (value === null || value === undefined) return '—';
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(value);
+    return formatMoney(value);
 };
 </script>
 

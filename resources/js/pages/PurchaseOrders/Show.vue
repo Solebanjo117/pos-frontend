@@ -25,6 +25,7 @@ import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
+import { formatCurrency } from '@/utils/formatters';
 
 const props = defineProps<{ purchaseOrderId: number }>();
 const {
@@ -164,10 +165,6 @@ function itemLineTotal(item: any): number {
     );
 }
 
-function formatCurrency(value: number | string | undefined | null): string {
-    return `$${Number(value || 0).toFixed(2)}`;
-}
-
 function lineLandedUnitCost(item: any): number {
     return Number(item.line_cost_summary?.landed_unit_cost || 0);
 }
@@ -292,7 +289,7 @@ onMounted(async () => {
             :title="`Orden de compra ${purchaseOrder?.po_number || `#${purchaseOrderId}`}`"
             :subtitle="purchaseOrder?.supplier?.name || 'OC diaria general'"
             :status-label="purchaseOrder?.status_label"
-            :total="purchaseOrder?.formatted_total"
+            :total="formatCurrency(purchaseOrder?.total)"
         >
             <template #actions>
                 <div class="group relative">
@@ -582,7 +579,9 @@ onMounted(async () => {
                                                         class="px-3 py-2 text-right font-mono"
                                                     >
                                                         {{
-                                                            purchaseOrder.formatted_total
+                                                            formatCurrency(
+                                                                purchaseOrder.total,
+                                                            )
                                                         }}
                                                     </td>
                                                 </tr>
@@ -628,10 +627,10 @@ onMounted(async () => {
                                             <div
                                                 class="border-b border-gray-200 px-3 py-2 text-right font-mono dark:border-border"
                                             >
-                                                ${{
-                                                    Number(
+                                                {{
+                                                    formatCurrency(
                                                         purchaseOrder.subtotal,
-                                                    ).toFixed(2)
+                                                    )
                                                 }}
                                             </div>
                                             <div
@@ -642,10 +641,10 @@ onMounted(async () => {
                                             <div
                                                 class="border-b border-gray-200 px-3 py-2 text-right font-mono dark:border-border"
                                             >
-                                                ${{
-                                                    Number(
+                                                {{
+                                                    formatCurrency(
                                                         purchaseOrder.tax_amount,
-                                                    ).toFixed(2)
+                                                    )
                                                 }}
                                             </div>
                                             <div
@@ -656,10 +655,10 @@ onMounted(async () => {
                                             <div
                                                 class="border-b border-gray-200 px-3 py-2 text-right font-mono dark:border-border"
                                             >
-                                                ${{
-                                                    Number(
+                                                {{
+                                                    formatCurrency(
                                                         purchaseOrder.shipping_cost,
-                                                    ).toFixed(2)
+                                                    )
                                                 }}
                                             </div>
                                             <div
@@ -671,7 +670,9 @@ onMounted(async () => {
                                                 class="px-3 py-2 text-right font-mono font-semibold"
                                             >
                                                 {{
-                                                    purchaseOrder.formatted_total
+                                                    formatCurrency(
+                                                        purchaseOrder.total,
+                                                    )
                                                 }}
                                             </div>
                                         </div>
@@ -831,11 +832,11 @@ onMounted(async () => {
                                             <td
                                                 class="px-3 py-2 text-right font-mono"
                                             >
-                                                ${{
-                                                    Number(
+                                                {{
+                                                    formatCurrency(
                                                         item.product?.pricing
                                                             ?.base_price || 0,
-                                                    ).toFixed(2)
+                                                    )
                                                 }}
                                             </td>
                                             <td class="px-3 py-2 text-right">
@@ -850,19 +851,19 @@ onMounted(async () => {
                                             <td
                                                 class="px-3 py-2 text-right font-mono"
                                             >
-                                                ${{
-                                                    Number(
+                                                {{
+                                                    formatCurrency(
                                                         item.unit_cost,
-                                                    ).toFixed(2)
+                                                    )
                                                 }}
                                             </td>
                                             <td
                                                 class="px-3 py-2 text-right font-mono font-semibold"
                                             >
-                                                ${{
-                                                    Number(
+                                                {{
+                                                    formatCurrency(
                                                         item.subtotal,
-                                                    ).toFixed(2)
+                                                    )
                                                 }}
                                             </td>
                                             <td
@@ -880,36 +881,38 @@ onMounted(async () => {
                                             <td
                                                 class="px-3 py-2 text-right font-mono"
                                             >
-                                                ${{
-                                                    Number(
+                                                {{
+                                                    formatCurrency(
                                                         item.tax_amount || 0,
-                                                    ).toFixed(2)
+                                                    )
                                                 }}
                                             </td>
                                             <td
                                                 class="px-3 py-2 text-right font-mono"
                                             >
-                                                ${{
-                                                    Number(
+                                                {{
+                                                    formatCurrency(
                                                         item.misc_cost || 0,
-                                                    ).toFixed(2)
+                                                    )
                                                 }}
                                             </td>
                                             <td
                                                 class="px-3 py-2 text-right font-mono"
                                             >
-                                                ${{
-                                                    lineLandedUnitCost(
-                                                        item,
-                                                    ).toFixed(4)
+                                                {{
+                                                    formatCurrency(
+                                                        lineLandedUnitCost(
+                                                            item,
+                                                        ),
+                                                    )
                                                 }}
                                             </td>
                                             <td
                                                 class="px-3 py-2 text-right font-mono font-semibold"
                                             >
-                                                ${{
-                                                    itemLineTotal(item).toFixed(
-                                                        2,
+                                                {{
+                                                    formatCurrency(
+                                                        itemLineTotal(item),
                                                     )
                                                 }}
                                             </td>
@@ -1407,10 +1410,10 @@ onMounted(async () => {
                                             }}
                                         </span>
                                         <span class="text-sm text-gray-500">
-                                            Pagado ${{
-                                                amountPaid.toFixed(2)
-                                            }}
-                                            / Saldo ${{ amountDue.toFixed(2) }}
+                                            Pagado
+                                            {{ formatCurrency(amountPaid) }}
+                                            / Saldo
+                                            {{ formatCurrency(amountDue) }}
                                         </span>
                                     </div>
                                     <button

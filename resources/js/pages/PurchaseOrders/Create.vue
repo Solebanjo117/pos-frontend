@@ -40,6 +40,7 @@ import type {
     PurchaseOrderCandidateSource,
     PurchaseOrderWarning,
 } from '@/types/purchase-order';
+import { formatCurrency } from '@/utils/formatters';
 
 const props = defineProps<{ purchaseOrderId?: number }>();
 
@@ -215,7 +216,7 @@ const toolbarSubtitle = computed(() => {
         (item) => Number(item.id) === Number(form.value.warehouse_id),
     )?.name;
 
-    return [supplier, warehouse, `$${total.value.toFixed(2)}`]
+    return [supplier, warehouse, formatCurrency(total.value)]
         .filter(Boolean)
         .join(' | ');
 });
@@ -903,7 +904,7 @@ watch(
             :title="toolbarTitle"
             :subtitle="toolbarSubtitle"
             status-label="Borrador"
-            :total="`$${total.toFixed(2)}`"
+            :total="formatCurrency(total)"
         >
             <template #actions>
                 <Link
@@ -1276,14 +1277,15 @@ watch(
                                             <td
                                                 class="px-3 py-2 text-right text-sm font-medium text-gray-600 dark:text-gray-300"
                                             >
-                                                ${{
-                                                    (
+                                                {{
+                                                    formatCurrency(
                                                         row.quantity *
-                                                        (row.units_per_package ||
-                                                            1) *
-                                                        row.cost *
-                                                        (row.tax_rate / 100)
-                                                    ).toFixed(2)
+                                                            (row.units_per_package ||
+                                                                1) *
+                                                            row.cost *
+                                                            (row.tax_rate /
+                                                                100),
+                                                    )
                                                 }}
                                             </td>
                                             <td
@@ -1294,14 +1296,16 @@ watch(
                                             <td
                                                 class="px-3 py-2 text-right text-sm font-medium text-gray-900 dark:text-white"
                                             >
-                                                ${{
-                                                    (
+                                                {{
+                                                    formatCurrency(
                                                         row.quantity *
-                                                        (row.units_per_package ||
-                                                            1) *
-                                                        row.cost *
-                                                        (1 + row.tax_rate / 100)
-                                                    ).toFixed(2)
+                                                            (row.units_per_package ||
+                                                                1) *
+                                                            row.cost *
+                                                            (1 +
+                                                                row.tax_rate /
+                                                                    100),
+                                                    )
                                                 }}
                                             </td>
                                         </tr>
@@ -1515,8 +1519,10 @@ watch(
                                         <td
                                             class="px-4 py-2 text-right text-sm font-semibold text-gray-900 dark:text-white"
                                         >
-                                            ${{
-                                                itemLineTotal(item).toFixed(2)
+                                            {{
+                                                formatCurrency(
+                                                    itemLineTotal(item),
+                                                )
                                             }}
                                         </td>
                                         <td class="px-2 py-2 text-right">
@@ -1604,17 +1610,17 @@ watch(
                 >
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         <span class="mr-4"
-                            >Subtotal: ${{ subtotal.toFixed(2) }}</span
+                            >Subtotal: {{ formatCurrency(subtotal) }}</span
                         >
                         <span class="mr-4"
-                            >ITBM: ${{ taxTotal.toFixed(2) }}</span
+                            >ITBM: {{ formatCurrency(taxTotal) }}</span
                         >
                         <span class="mr-4"
-                            >Misc: ${{ miscTotal.toFixed(2) }}</span
+                            >Misc: {{ formatCurrency(miscTotal) }}</span
                         >
                         <span
                             class="font-semibold text-gray-900 dark:text-white"
-                            >Total: ${{ total.toFixed(2) }}</span
+                            >Total: {{ formatCurrency(total) }}</span
                         >
                     </div>
                     <div class="flex justify-end gap-3">

@@ -33,6 +33,7 @@ import type {
     PurchaseOrderPaymentStatus,
     PurchaseOrderStatus,
 } from '@/types/purchase-order';
+import { formatCurrency } from '@/utils/formatters';
 
 const { hasRole } = useAuth();
 const {
@@ -299,13 +300,6 @@ function getPaymentStatusClass(status: string): string {
     }
 
     return 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800';
-}
-
-function formatCurrency(value: number | string | null | undefined): string {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value ?? 0));
 }
 
 function formatDate(value?: string | null): string {

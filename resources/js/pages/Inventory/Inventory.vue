@@ -18,6 +18,7 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
+import { formatCurrency } from '@/utils/formatters';
 
 type ViewMode = 'summary' | 'lots' | 'movements';
 
@@ -397,17 +398,6 @@ function viewInventoryProduct(
 
 function historyKey(row: InventoryRow): string {
     return `${row.product_id}:${row.variant_id}:${row.warehouse_id}`;
-}
-
-function formatCurrency(value?: number | null): string {
-    if (value === null || value === undefined) {
-        return '-';
-    }
-
-    return new Intl.NumberFormat('es-PA', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value));
 }
 
 function formatDate(value?: string | null): string {
@@ -802,34 +792,31 @@ function pageItemLabel(): string {
                 class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
             >
                 <div class="overflow-x-auto">
-                    <table class="min-w-full text-left text-sm">
+                    <table class="min-w-[920px] text-left text-sm">
                         <thead
                             class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase dark:bg-muted dark:text-gray-300"
                         >
                             <tr>
-                                <th class="px-4 py-3">Producto</th>
-                                <th class="px-4 py-3">Variante</th>
+                                <th class="w-[30%] px-3 py-2">Descripcion</th>
+                                <th class="w-[24%] px-3 py-2">
+                                    Codigo / Marca
+                                </th>
                                 <th
                                     v-if="showWarehouseColumn"
-                                    class="px-4 py-3"
+                                    class="w-[14%] px-3 py-2"
                                 >
                                     Almacen
                                 </th>
-                                <th class="px-4 py-3 text-right">Disponible</th>
-                                <th class="px-4 py-3 text-right">Reservado</th>
-                                <th class="px-4 py-3 text-right">
-                                    Costo actual
+                                <th class="w-16 px-2 py-2 text-right">Qty</th>
+                                <th class="w-16 px-2 py-2 text-right">Hold</th>
+                                <th class="w-24 px-2 py-2 text-right">Costo</th>
+                                <th class="w-24 px-2 py-2 text-right">
+                                    Precio
                                 </th>
-                                <th class="px-4 py-3 text-right">
-                                    Precio actual
+                                <th class="w-24 px-3 py-2">Estado</th>
+                                <th class="w-12 px-2 py-2 text-right">
+                                    Accion
                                 </th>
-                                <th class="px-4 py-3 text-right">
-                                    Valor inventario
-                                </th>
-                                <th class="px-4 py-3">Ultimo ingreso</th>
-                                <th class="px-4 py-3">Ultima salida</th>
-                                <th class="px-4 py-3">Estado</th>
-                                <th class="px-4 py-3 text-right">Accion</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -840,7 +827,7 @@ function pageItemLabel(): string {
                                 <tr
                                     class="border-t border-gray-100 dark:border-border"
                                 >
-                                    <td class="px-4 py-3">
+                                    <td class="px-3 py-2">
                                         <button
                                             type="button"
                                             class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
@@ -860,7 +847,7 @@ function pageItemLabel(): string {
                                             {{ row.product_sku }}
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3">
+                                    <td class="px-3 py-2">
                                         <button
                                             type="button"
                                             class="block text-left font-medium text-blue-600 hover:underline disabled:text-gray-900 disabled:no-underline dark:text-primary dark:disabled:text-white"
@@ -883,20 +870,20 @@ function pageItemLabel(): string {
                                     </td>
                                     <td
                                         v-if="showWarehouseColumn"
-                                        class="px-4 py-3 text-gray-700 dark:text-gray-200"
+                                        class="px-3 py-2 text-gray-700 dark:text-gray-200"
                                     >
                                         {{ row.warehouse_name }}
                                     </td>
                                     <td
-                                        class="px-4 py-3 text-right font-semibold text-gray-950 dark:text-white"
+                                        class="px-2 py-2 text-right font-semibold text-gray-950 dark:text-white"
                                     >
                                         {{ row.quantity_available }}
                                     </td>
-                                    <td class="px-4 py-3 text-right">
+                                    <td class="px-2 py-2 text-right">
                                         {{ row.quantity_reserved }}
                                     </td>
                                     <td
-                                        class="px-4 py-3 text-right font-semibold"
+                                        class="px-2 py-2 text-right font-semibold tabular-nums"
                                     >
                                         {{
                                             formatCurrency(
@@ -905,7 +892,7 @@ function pageItemLabel(): string {
                                         }}
                                     </td>
                                     <td
-                                        class="px-4 py-3 text-right font-semibold"
+                                        class="px-2 py-2 text-right font-semibold tabular-nums"
                                     >
                                         {{
                                             formatCurrency(
@@ -914,20 +901,7 @@ function pageItemLabel(): string {
                                             )
                                         }}
                                     </td>
-                                    <td
-                                        class="px-4 py-3 text-right font-semibold"
-                                    >
-                                        {{
-                                            formatCurrency(row.fifo_stock_value)
-                                        }}
-                                    </td>
-                                    <td class="px-4 py-3 text-xs">
-                                        {{ formatDate(row.last_received_at) }}
-                                    </td>
-                                    <td class="px-4 py-3 text-xs">
-                                        {{ formatDate(row.last_sold_at) }}
-                                    </td>
-                                    <td class="px-4 py-3">
+                                    <td class="px-3 py-2">
                                         <span
                                             :class="statusClass(row.status)"
                                             class="rounded-full px-2 py-1 text-xs font-medium"
@@ -935,11 +909,13 @@ function pageItemLabel(): string {
                                             {{ statusLabel(row.status) }}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-3 text-right">
+                                    <td class="px-2 py-2 text-right">
                                         <button
                                             type="button"
-                                            class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline dark:text-primary"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-primary dark:hover:bg-primary/10"
                                             :disabled="!row.variant_id"
+                                            title="Ver movimientos"
+                                            aria-label="Ver movimientos"
                                             @click="
                                                 viewInventoryProduct(
                                                     row.product_id,
@@ -949,14 +925,13 @@ function pageItemLabel(): string {
                                             "
                                         >
                                             <History class="h-4 w-4" />
-                                            Ver movimientos
                                         </button>
                                     </td>
                                 </tr>
                             </template>
                             <tr v-if="inventoryRows.length === 0">
                                 <td
-                                    :colspan="showWarehouseColumn ? 11 : 10"
+                                    :colspan="showWarehouseColumn ? 9 : 8"
                                     class="px-4 py-10 text-center text-sm text-gray-500"
                                 >
                                     No se encontraron registros de inventario.

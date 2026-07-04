@@ -9,6 +9,7 @@ import {
     Warehouse as WarehouseIcon,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -21,6 +22,7 @@ import type {
     CustomerReferenceReport,
     CustomerReferenceReportRow,
 } from '@/types/report';
+import { formatCurrency } from '@/utils/formatters';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -71,12 +73,6 @@ const summary = computed(
             customers_count: 0,
         },
 );
-
-const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(value || 0);
 
 const fetchReport = async () => {
     loading.value = true;
@@ -160,17 +156,12 @@ onMounted(async () => {
                 </div>
 
                 <div
-                    class="grid gap-2 rounded-lg border border-gray-200 bg-white p-2 md:grid-cols-5 dark:border-border dark:bg-card"
+                    class="grid gap-2 rounded-lg border border-gray-200 bg-white p-2 md:grid-cols-6 dark:border-border dark:bg-card"
                 >
-                    <input
-                        v-model="filters.date_from"
-                        type="date"
-                        class="h-10 rounded-md border border-gray-300 px-3 text-sm dark:border-border dark:bg-muted"
-                    />
-                    <input
-                        v-model="filters.date_to"
-                        type="date"
-                        class="h-10 rounded-md border border-gray-300 px-3 text-sm dark:border-border dark:bg-muted"
+                    <DateRangeInput
+                        v-model:from="filters.date_from"
+                        v-model:to="filters.date_to"
+                        class="md:col-span-2"
                     />
                     <SearchableSelect
                         v-model="filters.warehouse_id"

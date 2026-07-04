@@ -5,6 +5,7 @@ import type { Product } from '@/types/product';
 import type { CreateSalesOrderData } from '@/types/sales-order';
 import { usePosSettings } from './usePosSettings';
 import { useStoreSettings } from './useStoreSettings';
+import { roundMoney } from '@/utils/formatters';
 
 interface CartItem {
     id: string; // temporal ID for cart
@@ -788,7 +789,8 @@ export function usePOS() {
         paymentsArray?: Array<{
             method: string;
             amount: number;
-            notes?: string;
+            reference_number?: string | null;
+            notes?: string | null;
         }>,
     ) => {
         if (cart.value.length === 0) {
@@ -814,9 +816,11 @@ export function usePOS() {
             }
         } else {
             // Multi-tender check
-            const totalPaid = paymentsArray.reduce(
-                (acc, p) => acc + p.amount,
-                0,
+            const totalPaid = roundMoney(
+                paymentsArray.reduce(
+                    (acc, p) => acc + roundMoney(Math.max(0, Number(p.amount) || 0)),
+                    0,
+                ),
             );
             if (totalPaid < cartTotal.value && !customer_id.value) {
                 error.value =

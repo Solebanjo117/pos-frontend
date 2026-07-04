@@ -5,6 +5,8 @@ import type { Customer } from '@/types/customer';
 interface Payment {
     method: string;
     amount: number;
+    reference_number?: string | null;
+    notes?: string | null;
 }
 
 defineProps<{

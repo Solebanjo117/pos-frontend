@@ -76,7 +76,8 @@ function buildCategoryPath(
 ): string {
     const path = [category.name];
     const visited = new Set<number>([category.id]);
-    let parentId = activeParentId ?? categoryParentIds(category)[0] ?? null;
+    let parentId: number | null =
+        activeParentId ?? categoryParentIds(category)[0] ?? null;
 
     while (parentId) {
         if (visited.has(parentId)) break;

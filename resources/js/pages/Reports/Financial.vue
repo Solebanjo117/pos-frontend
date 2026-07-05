@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import CapitalMovementModal from '@/components/Finance/CapitalMovementModal.vue';
+import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import FinanceAdjustmentModal from '@/components/Finance/FinanceAdjustmentModal.vue';
 import FinanceBalanceSheet from '@/components/Finance/FinanceBalanceSheet.vue';
 import FinanceDailySummaryTable from '@/components/Finance/FinanceDailySummaryTable.vue';
@@ -34,6 +35,11 @@ import { formatCurrency } from '@/utils/formatters';
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
 type ReportTab = 'summary' | 'balance' | 'income' | 'credits' | 'investment';
 type ReportMode = 'basic' | 'advanced';
+type DrilldownFilters = {
+    date_from: string;
+    date_to: string;
+    warehouse_id: number | null;
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -79,6 +85,7 @@ const selectedKpi = ref<{
     value: number;
     metric?: string;
 } | null>(null);
+const activeDrilldownFilters = ref<DrilldownFilters | null>(null);
 
 const today = new Date();
 const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -311,15 +318,23 @@ const loadReports = async (): Promise<void> => {
 const openDrilldown = async (
     kpi: { key: string; label: string; value: number; metric?: string },
     page = 1,
+    overrideFilters: DrilldownFilters | null = null,
 ): Promise<void> => {
     selectedKpi.value = kpi;
+    activeDrilldownFilters.value =
+        overrideFilters ??
+        activeDrilldownFilters.value ?? {
+            date_from: filters.value.date_from,
+            date_to: filters.value.date_to,
+            warehouse_id: filters.value.warehouse_id,
+        };
     drilldownOpen.value = true;
     drilldownLoading.value = true;
 
     try {
         await fetchFinancialDrilldown({
             metric: kpi.metric ?? kpi.key,
-            ...filters.value,
+            ...activeDrilldownFilters.value,
             page,
             per_page: 25,
         });
@@ -330,7 +345,40 @@ const openDrilldown = async (
 
 const changeDrilldownPage = (page: number): void => {
     if (!selectedKpi.value) return;
-    void openDrilldown(selectedKpi.value, page);
+    void openDrilldown(selectedKpi.value, page, activeDrilldownFilters.value);
+};
+
+const openKpiDrilldown = (
+    kpi: { key: string; label: string; value: number; metric?: string },
+): void => {
+    void openDrilldown(kpi, 1, {
+        date_from: filters.value.date_from,
+        date_to: filters.value.date_to,
+        warehouse_id: filters.value.warehouse_id,
+    });
+};
+
+const openDailySummaryDrilldown = (payload: {
+    date: string;
+    key: string;
+    label: string;
+    metric: string;
+    value: number;
+}): void => {
+    void openDrilldown(
+        {
+            key: payload.key,
+            label: `${payload.label} ${payload.date}`,
+            value: payload.value,
+            metric: payload.metric,
+        },
+        1,
+        {
+            date_from: payload.date,
+            date_to: payload.date,
+            warehouse_id: filters.value.warehouse_id,
+        },
+    );
 };
 
 const setPreset = (preset: DatePreset): void => {
@@ -377,6 +425,16 @@ const submitAdjustment = async (payload: {
     await loadReports();
 };
 
+const updateAdjustmentBusinessDatetime = (
+    adjustmentId: number,
+    businessDatetime: string | null,
+): void => {
+    const adjustment = adjustments.value.find((item) => item.id === adjustmentId);
+    if (adjustment) {
+        adjustment.business_datetime = businessDatetime;
+    }
+};
+
 const openCapitalMovement = (type: 'in' | 'out') => {
     capitalMovementType.value = type;
     capitalMovementOpen.value = true;
@@ -394,6 +452,16 @@ const submitCapitalMovement = async (payload: {
         warehouse_id: filters.value.warehouse_id,
     });
     await loadReports();
+};
+
+const updateCapitalMovementBusinessDatetime = (
+    movementId: number,
+    businessDatetime: string | null,
+): void => {
+    const movement = capitalMovements.value.find((item) => item.id === movementId);
+    if (movement) {
+        movement.business_datetime = businessDatetime;
+    }
 };
 
 onMounted(async () => {
@@ -545,7 +613,7 @@ watch(currentWarehouseId, (value) => {
             <FinanceKpiRow
                 :kpis="kpis"
                 :currency-formatter="formatCurrency"
-                @select="openDrilldown"
+                @select="openKpiDrilldown"
             />
 
             <div
@@ -575,6 +643,7 @@ watch(currentWarehouseId, (value) => {
                         :rows="dailySummary?.rows ?? []"
                         :totals="dailySummary?.totals ?? {}"
                         :currency-formatter="formatCurrency"
+                        @select="openDailySummaryDrilldown"
                     />
 
                     <FinanceBalanceSheet
@@ -888,6 +957,26 @@ watch(currentWarehouseId, (value) => {
                                             class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
                                         >
                                             {{ movement.movement_date }}
+                                            <BusinessDatetimeEditor
+                                                class="mt-1"
+                                                compact
+                                                record-type="capital_movement"
+                                                :record-id="movement.id"
+                                                :created-at="
+                                                    movement.created_at ??
+                                                    movement.movement_date
+                                                "
+                                                :business-datetime="
+                                                    movement.business_datetime
+                                                "
+                                                @updated="
+                                                    (value) =>
+                                                        updateCapitalMovementBusinessDatetime(
+                                                            movement.id,
+                                                            value,
+                                                        )
+                                                "
+                                            />
                                         </td>
                                         <td
                                             class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
@@ -976,6 +1065,26 @@ watch(currentWarehouseId, (value) => {
                                         class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
                                     >
                                         {{ adj.adjustment_date }}
+                                        <BusinessDatetimeEditor
+                                            class="mt-1"
+                                            compact
+                                            record-type="financial_adjustment"
+                                            :record-id="adj.id"
+                                            :created-at="
+                                                adj.created_at ??
+                                                adj.adjustment_date
+                                            "
+                                            :business-datetime="
+                                                adj.business_datetime
+                                            "
+                                            @updated="
+                                                (value) =>
+                                                    updateAdjustmentBusinessDatetime(
+                                                        adj.id,
+                                                        value,
+                                                    )
+                                            "
+                                        />
                                     </td>
                                     <td
                                         class="px-3 py-1.5 text-slate-600 dark:text-slate-400"

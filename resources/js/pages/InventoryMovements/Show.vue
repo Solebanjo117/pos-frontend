@@ -13,6 +13,7 @@ import {
     Warehouse,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -146,6 +147,12 @@ function formatDate(dateString?: string | null): string {
     }).format(new Date(dateString));
 }
 
+function updateMovementBusinessDatetime(value: string | null): void {
+    if (currentMovement.value) {
+        currentMovement.value.business_datetime = value;
+    }
+}
+
 function formatNumber(value?: number | null): string {
     return new Intl.NumberFormat('es-MX', {
         maximumFractionDigits: 2,
@@ -260,6 +267,14 @@ function openReference(): void {
                         Volver a inventario
                     </button>
                 </div>
+
+                <BusinessDatetimeEditor
+                    record-type="inventory_movement"
+                    :record-id="currentMovement.id"
+                    :created-at="currentMovement.created_at"
+                    :business-datetime="currentMovement.business_datetime"
+                    @updated="updateMovementBusinessDatetime"
+                />
 
                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                     <div

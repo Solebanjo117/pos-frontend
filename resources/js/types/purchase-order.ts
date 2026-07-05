@@ -85,6 +85,7 @@ export interface PurchaseOrder {
     items_count?: number;
     created_at: string;
     updated_at: string;
+    business_datetime?: string | null;
     deleted_at?: string;
 }
 
@@ -277,6 +278,7 @@ export interface PurchaseOrderPayment {
     reference_number?: string | null;
     notes?: string | null;
     paid_at?: string | null;
+    business_datetime?: string | null;
     pos_session_id?: number | null;
     cash_movement_id?: number | null;
     formatted_amount?: string;

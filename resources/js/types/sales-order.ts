@@ -68,6 +68,7 @@ export interface SalesOrderOperationalOrder {
     internal_notes?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
+    business_datetime?: string | null;
     sent_to_warehouse_at?: string | null;
     prepared_at?: string | null;
     prepared_by?: { id: number; name: string } | null;
@@ -132,6 +133,7 @@ export interface SalesOrderOperationalPayment {
     amount: number;
     is_refund: boolean;
     paid_at?: string | null;
+    business_datetime?: string | null;
     notes?: string | null;
     creator_name?: string | null;
 }
@@ -191,6 +193,7 @@ export interface SalesOrderInventoryContext {
         reference_id?: number | null;
         notes?: string | null;
         created_at?: string | null;
+        business_datetime?: string | null;
         user_name?: string | null;
         lot_allocations: Array<{
             id: number;

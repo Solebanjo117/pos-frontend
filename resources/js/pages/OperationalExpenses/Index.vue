@@ -12,6 +12,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -187,6 +188,16 @@ function openEditForm(expense: OperationalExpense) {
         notes: expense.notes || '',
     };
     showForm.value = true;
+}
+
+function updateExpenseBusinessDatetime(
+    expenseId: number,
+    value: string | null,
+): void {
+    const expense = expenses.value.find((row) => row.id === expenseId);
+    if (expense) {
+        expense.business_datetime = value;
+    }
 }
 
 async function saveExpense() {
@@ -412,6 +423,7 @@ onMounted(async () => {
                             <tr>
                                 <th class="px-3 py-2 text-left">Fecha</th>
                                 <th class="px-3 py-2 text-left">Categoria</th>
+                                <th class="px-3 py-2 text-left">Operativa</th>
                                 <th class="px-3 py-2 text-left">Descripcion</th>
                                 <th class="px-3 py-2 text-left">Sucursal</th>
                                 <th class="px-3 py-2 text-left">Metodo</th>
@@ -426,7 +438,7 @@ onMounted(async () => {
                         >
                             <tr v-if="loading">
                                 <td
-                                    colspan="9"
+                                    colspan="10"
                                     class="px-3 py-8 text-center text-gray-500"
                                 >
                                     Cargando gastos...
@@ -434,7 +446,7 @@ onMounted(async () => {
                             </tr>
                             <tr v-else-if="expenses.length === 0">
                                 <td
-                                    colspan="9"
+                                    colspan="10"
                                     class="px-3 py-8 text-center text-gray-500"
                                 >
                                     No hay gastos para este filtro.
@@ -455,6 +467,24 @@ onMounted(async () => {
                                         >
                                             {{ expense.category_label }}
                                         </span>
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <BusinessDatetimeEditor
+                                            compact
+                                            record-type="operational_expense"
+                                            :record-id="expense.id"
+                                            :created-at="expense.created_at"
+                                            :business-datetime="
+                                                expense.business_datetime
+                                            "
+                                            @updated="
+                                                (value) =>
+                                                    updateExpenseBusinessDatetime(
+                                                        expense.id,
+                                                        value,
+                                                    )
+                                            "
+                                        />
                                     </td>
                                     <td class="px-3 py-2 font-medium">
                                         {{ expense.description || '-' }}

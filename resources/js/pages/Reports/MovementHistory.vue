@@ -29,7 +29,7 @@ import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -223,13 +223,7 @@ const getTypeLabel = (type: string) => {
 };
 
 const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-MX', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return formatReportDateTime(dateString);
 };
 
 const activeWarehouseName = computed(() => {

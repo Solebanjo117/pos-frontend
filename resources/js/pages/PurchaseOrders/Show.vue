@@ -16,6 +16,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
+import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
@@ -186,6 +187,22 @@ async function loadPayments() {
     amountPaid.value = res.data.amount_paid;
     amountDue.value = res.data.amount_due;
     paymentStatus.value = res.data.payment_status;
+}
+
+function updatePurchaseOrderBusinessDatetime(value: string | null) {
+    if (purchaseOrder.value) {
+        purchaseOrder.value.business_datetime = value;
+    }
+}
+
+function updatePurchasePaymentBusinessDatetime(
+    paymentId: number,
+    value: string | null,
+) {
+    const payment = payments.value.find((row) => row.id === paymentId);
+    if (payment) {
+        payment.business_datetime = value;
+    }
 }
 
 async function handlePurchasePaymentFinish(
@@ -536,6 +553,23 @@ onMounted(async () => {
                                                 '-'
                                             }}
                                         </div>
+                                    </div>
+                                    <div
+                                        class="border-t border-gray-100 p-3 dark:border-border"
+                                    >
+                                        <BusinessDatetimeEditor
+                                            record-type="purchase_order"
+                                            :record-id="purchaseOrder.id"
+                                            :created-at="
+                                                purchaseOrder.created_at
+                                            "
+                                            :business-datetime="
+                                                purchaseOrder.business_datetime
+                                            "
+                                            @updated="
+                                                updatePurchaseOrderBusinessDatetime
+                                            "
+                                        />
                                     </div>
                                     <div
                                         class="border-t border-gray-100 dark:border-border"
@@ -1462,7 +1496,25 @@ onMounted(async () => {
                                             <td
                                                 class="py-2 text-gray-600 dark:text-gray-400"
                                             >
-                                                {{ formatDate(p.paid_at) }}
+                                                <div class="mb-2">
+                                                    {{ formatDate(p.paid_at) }}
+                                                </div>
+                                                <BusinessDatetimeEditor
+                                                    compact
+                                                    record-type="purchase_order_payment"
+                                                    :record-id="p.id"
+                                                    :created-at="p.paid_at"
+                                                    :business-datetime="
+                                                        p.business_datetime
+                                                    "
+                                                    @updated="
+                                                        (value) =>
+                                                            updatePurchasePaymentBusinessDatetime(
+                                                                p.id,
+                                                                value,
+                                                            )
+                                                    "
+                                                />
                                             </td>
                                             <td class="py-2">
                                                 {{

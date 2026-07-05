@@ -16,6 +16,7 @@ import { computed, onMounted, ref } from 'vue';
 import FinanceAgingBars from '@/components/Finance/FinanceAgingBars.vue';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { AccountsReceivableApiService } from '@/services/payments';
@@ -202,6 +203,17 @@ const documentPaymentMethods = (document: StatementDocument): string => {
                 `${payment.method_label} ${formatCurrency(payment.amount)}`,
         )
         .join(' / ');
+};
+
+const updatePaymentBatchBusinessDatetime = (
+    paymentBatchId: number,
+    businessDatetime: string | null,
+): void => {
+    entries.value
+        .filter((entry) => Number(entry.payment_batch_id) === paymentBatchId)
+        .forEach((entry) => {
+            entry.business_datetime = businessDatetime;
+        });
 };
 
 const statusClass = (status?: string): string => {
@@ -1066,6 +1078,35 @@ onMounted(async () => {
                                                             )
                                                         }}
                                                     </p>
+                                                    <BusinessDatetimeEditor
+                                                        v-if="
+                                                            movement.payment_batch_id
+                                                        "
+                                                        class="mt-1"
+                                                        compact
+                                                        record-type="account_payment_batch"
+                                                        :record-id="
+                                                            Number(
+                                                                movement.payment_batch_id,
+                                                            )
+                                                        "
+                                                        :created-at="
+                                                            movement.created_at ||
+                                                            movement.occurred_at
+                                                        "
+                                                        :business-datetime="
+                                                            movement.business_datetime
+                                                        "
+                                                        @updated="
+                                                            (value) =>
+                                                                updatePaymentBatchBusinessDatetime(
+                                                                    Number(
+                                                                        movement.payment_batch_id,
+                                                                    ),
+                                                                    value,
+                                                                )
+                                                        "
+                                                    />
                                                 </div>
                                                 <p
                                                     class="text-right text-sm font-semibold text-slate-900 tabular-nums dark:text-slate-100"

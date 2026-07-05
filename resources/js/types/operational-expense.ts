@@ -39,6 +39,7 @@ export interface OperationalExpense {
     notes?: string | null;
     created_at: string;
     updated_at: string;
+    business_datetime?: string | null;
 }
 
 export interface OperationalExpensePayload {

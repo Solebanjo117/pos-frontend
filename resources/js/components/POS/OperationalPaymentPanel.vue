@@ -202,6 +202,27 @@ const creditAvailable = computed(() => {
     return Math.max(0, limit - balance);
 });
 
+const creditDueDate = computed(() => {
+    if (!props.customer || isPurchaseMode.value) {
+        return null;
+    }
+
+    const days = Number(props.customer.credit_days ?? 0);
+
+    if (!Number.isFinite(days) || days <= 0) {
+        return null;
+    }
+
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + Math.floor(days));
+
+    return dueDate.toLocaleDateString('es-PA', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    });
+});
+
 const storeCreditAvailable = computed(() => {
     if (!props.customer || isPurchaseMode.value) {
         return 0;
@@ -211,11 +232,27 @@ const storeCreditAvailable = computed(() => {
 });
 
 const showCreditMethod = computed(
-    () =>
-        !isPurchaseMode.value &&
-        Boolean(props.customer) &&
-        creditAvailable.value > 0 &&
-        methodIsAvailable('credit'),
+    () => !isPurchaseMode.value && methodIsAvailable('credit'),
+);
+
+const creditDisabledReason = computed(() => {
+    if (!showCreditMethod.value) {
+        return null;
+    }
+
+    if (!props.customer) {
+        return 'Selecciona un cliente para usar credito.';
+    }
+
+    if (creditAvailable.value <= 0) {
+        return 'El cliente no tiene credito disponible.';
+    }
+
+    return null;
+});
+
+const creditCanBeUsed = computed(
+    () => showCreditMethod.value && creditDisabledReason.value === null,
 );
 
 const showStoreCreditMethod = computed(
@@ -256,6 +293,13 @@ const setPaymentReference = (code: string, value: string) => {
 const setPaymentNotes = (code: string, value: string) => {
     paymentNotes.value[code] = value;
 };
+
+watch(creditCanBeUsed, (canUseCredit) => {
+    if (!canUseCredit) {
+        setPaymentAmount('credit', 0);
+        setPaymentNotes('credit', '');
+    }
+});
 
 const cashAmount = computed({
     get: () => payments.value.cash ?? 0,
@@ -320,7 +364,7 @@ const activePaymentCodes = computed(() => {
         codes.add('cash');
     }
 
-    if (showCreditMethod.value) {
+    if (creditCanBeUsed.value) {
         codes.add('credit');
     }
 
@@ -351,19 +395,28 @@ const selectableMethods = computed(() =>
     }),
 );
 
+const isMethodDisabled = (method: PaymentMethod): boolean =>
+    method.code === 'credit' && !creditCanBeUsed.value;
+
 watch(
     selectableMethods,
     (availableMethods) => {
         if (
             activeMethodCode.value &&
             availableMethods.some(
-                (method) => method.code === activeMethodCode.value,
+                (method) =>
+                    method.code === activeMethodCode.value &&
+                    !isMethodDisabled(method),
             )
         ) {
             return;
         }
 
-        activeMethodCode.value = availableMethods[0]?.code ?? null;
+        activeMethodCode.value =
+            availableMethods.find((method) => !isMethodDisabled(method))
+                ?.code ??
+            availableMethods[0]?.code ??
+            null;
     },
     { immediate: true },
 );
@@ -450,6 +503,10 @@ const canFinish = computed(() => {
         return false;
     }
 
+    if (!isPurchaseMode.value && creditAmount.value > 0 && !creditCanBeUsed.value) {
+        return false;
+    }
+
     if (
         !isPurchaseMode.value &&
         storeCreditAmount.value > storeCreditAvailable.value
@@ -468,6 +525,10 @@ const handleMax = (methodCode: string) => {
     }
 
     if (methodCode === 'credit') {
+        if (!creditCanBeUsed.value) {
+            return;
+        }
+
         setPaymentAmount(
             methodCode,
             Math.min(remaining, creditAvailable.value),
@@ -502,7 +563,7 @@ const handleFinish = () => {
         });
     }
 
-    if (showCreditMethod.value && creditAmount.value > 0) {
+    if (creditCanBeUsed.value && creditAmount.value > 0) {
         paymentList.push({
             method: 'credit',
             amount: roundMoney(creditAmount.value),
@@ -590,13 +651,25 @@ const handleCancel = () => {
                                 v-for="method in selectableMethods"
                                 :key="method.code"
                                 type="button"
+                                :disabled="isMethodDisabled(method)"
                                 class="rounded-md border p-3 text-left transition hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/20"
-                                :class="
+                                :class="[
                                     activeMethodCode === method.code
                                         ? 'border-green-500 bg-green-50 shadow-sm dark:bg-green-950/30'
-                                        : 'border-gray-200 bg-white dark:border-border dark:bg-card'
+                                        : 'border-gray-200 bg-white dark:border-border dark:bg-card',
+                                    getPaymentAmount(method.code) > 0 &&
+                                    activeMethodCode !== method.code &&
+                                    !isMethodDisabled(method)
+                                        ? 'border-green-300'
+                                        : '',
+                                    isMethodDisabled(method)
+                                        ? 'cursor-not-allowed opacity-55 hover:border-gray-200 hover:bg-white dark:hover:bg-card'
+                                        : '',
+                                ]"
+                                @click="
+                                    !isMethodDisabled(method) &&
+                                        (activeMethodCode = method.code)
                                 "
-                                @click="activeMethodCode = method.code"
                             >
                                 <span
                                     class="block truncate text-sm font-semibold text-gray-900 dark:text-white"
@@ -613,6 +686,33 @@ const handleCancel = () => {
                                     >
                                         Ref.
                                     </span>
+                                </span>
+                                <span
+                                    class="mt-1 block text-xs font-semibold"
+                                    :class="
+                                        getPaymentAmount(method.code) > 0
+                                            ? 'text-green-700 dark:text-green-300'
+                                            : 'text-muted-foreground/70'
+                                    "
+                                >
+                                    {{
+                                        getPaymentAmount(method.code) > 0
+                                            ? formatCurrency(
+                                                  getPaymentAmount(
+                                                      method.code,
+                                                  ),
+                                              )
+                                            : formatCurrency(0)
+                                    }}
+                                </span>
+                                <span
+                                    v-if="
+                                        method.code === 'credit' &&
+                                        creditDisabledReason
+                                    "
+                                    class="mt-1 block text-[10px] leading-tight text-amber-700 dark:text-amber-300"
+                                >
+                                    {{ creditDisabledReason }}
                                 </span>
                             </button>
                         </div>
@@ -721,6 +821,23 @@ const handleCancel = () => {
                                 </span>
                             </div>
 
+                            <div
+                                v-if="creditDisabledReason"
+                                class="mb-3 rounded-md border border-amber-200 bg-white/70 p-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200"
+                            >
+                                {{ creditDisabledReason }}
+                            </div>
+
+                            <div
+                                v-else-if="creditDueDate"
+                                class="mb-3 rounded-md bg-white/70 p-2 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-200"
+                            >
+                                Vencimiento estimado:
+                                <span class="font-semibold">
+                                    {{ creditDueDate }}
+                                </span>
+                            </div>
+
                             <div class="flex gap-2">
                                 <div class="relative flex-1">
                                     <span
@@ -733,6 +850,7 @@ const handleCancel = () => {
                                         type="number"
                                         min="0"
                                         :max="creditAvailable"
+                                        :disabled="!creditCanBeUsed"
                                         step="0.01"
                                         class="w-full rounded-md border border-amber-300 bg-white py-2.5 pr-3 pl-8 text-right text-lg font-bold text-amber-800 focus:ring-2 focus:ring-amber-500 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200"
                                         placeholder="0.00"
@@ -741,10 +859,36 @@ const handleCancel = () => {
                                 <button
                                     type="button"
                                     class="rounded-md bg-amber-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-700"
+                                    :disabled="!creditCanBeUsed"
                                     @click="handleMax('credit')"
                                 >
                                     Max
                                 </button>
+                            </div>
+
+                            <div
+                                v-if="creditCanBeUsed"
+                                class="mt-3"
+                            >
+                                <label
+                                    class="mb-1 block text-sm font-medium text-amber-700 dark:text-amber-300"
+                                >
+                                    Nota
+                                </label>
+                                <textarea
+                                    :value="getPaymentNotes('credit')"
+                                    rows="2"
+                                    class="w-full resize-none rounded-md border border-amber-300 bg-white px-3 py-2 text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100"
+                                    placeholder="Nota opcional para CxC"
+                                    @input="
+                                        setPaymentNotes(
+                                            'credit',
+                                            (
+                                                $event.target as HTMLTextAreaElement
+                                            ).value,
+                                        )
+                                    "
+                                ></textarea>
                             </div>
 
                             <p

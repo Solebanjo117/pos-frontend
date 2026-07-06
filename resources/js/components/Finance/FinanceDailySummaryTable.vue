@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DailyFinancialRow } from '@/types/report';
+import { formatReportDate } from '@/utils/formatters';
 
 defineProps<{
     rows: DailyFinancialRow[];
@@ -7,48 +8,50 @@ defineProps<{
     currencyFormatter: (value: number) => string;
 }>();
 
+const emit = defineEmits<{
+    select: [
+        payload: {
+            date: string;
+            key: string;
+            label: string;
+            metric: string;
+            value: number;
+        },
+    ];
+}>();
+
 const columns: Array<{
     key: string;
     label: string;
+    metric: string;
 }> = [
-    { key: 'sales_total', label: 'Ventas' },
-    { key: 'sales_collected', label: 'Cobrado' },
-    { key: 'sales_pending', label: 'CxC' },
-    { key: 'cogs', label: 'COGS' },
-    { key: 'inventory', label: 'Inventario' },
-    { key: 'purchase', label: 'Compras' },
-    { key: 'purchase_paid', label: 'Pagado' },
-    { key: 'purchase_pending', label: 'CxP' },
-    { key: 'expenses', label: 'Gastos' },
-    { key: 'net_profit', label: 'Profit' },
+    { key: 'sales_total', label: 'Ventas', metric: 'sales' },
+    { key: 'sales_collected', label: 'Cobrado', metric: 'payments_received' },
+    { key: 'sales_pending', label: 'CxC', metric: 'receivable' },
+    { key: 'cogs', label: 'COGS', metric: 'cogs' },
+    { key: 'inventory', label: 'Inventario', metric: 'inventory' },
+    { key: 'purchase', label: 'Compras', metric: 'purchases' },
+    { key: 'purchase_paid', label: 'Pagado', metric: 'supplier_payments' },
+    { key: 'purchase_pending', label: 'CxP', metric: 'payable' },
+    { key: 'expenses', label: 'Gastos', metric: 'expenses' },
+    { key: 'net_profit', label: 'Profit', metric: 'profit' },
 ];
-
-const monthLabels = [
-    'JAN',
-    'FEB',
-    'MAR',
-    'APR',
-    'MAY',
-    'JUN',
-    'JUL',
-    'AUG',
-    'SEP',
-    'OCT',
-    'NOV',
-    'DEC',
-];
-
-const formatShortDate = (date: string): string => {
-    const d = new Date(`${date}T00:00:00`);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = monthLabels[d.getMonth()] ?? '';
-    const year = String(d.getFullYear()).slice(-2);
-
-    return `${day}${month}${year}`;
-};
 
 const rowValue = (row: DailyFinancialRow, key: string): number =>
     Number(row[key as keyof DailyFinancialRow] ?? 0);
+
+const selectCell = (
+    row: DailyFinancialRow,
+    column: (typeof columns)[number],
+): void => {
+    emit('select', {
+        date: row.date,
+        key: column.key,
+        label: column.label,
+        metric: column.metric,
+        value: rowValue(row, column.key),
+    });
+};
 </script>
 
 <template>
@@ -82,7 +85,7 @@ const rowValue = (row: DailyFinancialRow, key: string): number =>
                     <td
                         class="px-2 py-1 font-medium whitespace-nowrap text-slate-700 dark:text-slate-300"
                     >
-                        {{ formatShortDate(row.date) }}
+                        {{ formatReportDate(row.date) }}
                     </td>
                     <td
                         v-for="col in columns"
@@ -97,7 +100,14 @@ const rowValue = (row: DailyFinancialRow, key: string): number =>
                                 rowValue(row, col.key) < 0,
                         }"
                     >
-                        {{ currencyFormatter(rowValue(row, col.key)) }}
+                        <button
+                            type="button"
+                            class="w-full rounded px-1 py-0.5 text-right transition hover:bg-slate-100 hover:text-slate-950 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-50"
+                            :title="`Ver detalle de ${col.label} ${formatReportDate(row.date)}`"
+                            @click="selectCell(row, col)"
+                        >
+                            {{ currencyFormatter(rowValue(row, col.key)) }}
+                        </button>
                     </td>
                 </tr>
             </tbody>

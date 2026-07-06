@@ -48,7 +48,7 @@ import type {
     SalesByClientReport,
     SalesByClientRow,
 } from '@/types/report';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
 
 ChartJS.register(
     CategoryScale,
@@ -199,11 +199,7 @@ const chartOptions = computed(() => ({
 }));
 
 const formatDate = (value?: string | null): string => {
-    if (!value) {
-        return '-';
-    }
-
-    return new Date(`${value}T00:00:00`).toLocaleDateString('es-PA');
+    return formatReportDateTime(value);
 };
 
 const statusClass = (status: SalesByClientRow['status']): string => {
@@ -715,7 +711,8 @@ onMounted(async () => {
                                         >
                                             {{
                                                 formatDate(
-                                                    row.last_payment_date,
+                                                    row.last_payment_at ??
+                                                        row.last_payment_date,
                                                 )
                                             }}
                                         </div>
@@ -783,7 +780,8 @@ onMounted(async () => {
                                                                 >
                                                                     {{
                                                                         formatDate(
-                                                                            invoice.date,
+                                                                            invoice.occurred_at ??
+                                                                                invoice.date,
                                                                         )
                                                                     }}
                                                                 </td>

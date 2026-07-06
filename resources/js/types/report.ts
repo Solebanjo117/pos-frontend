@@ -349,6 +349,8 @@ export interface CustomerReferenceReportOrder {
     id: number;
     order_number: string;
     date: string | null;
+    occurred_at?: string | null;
+    business_datetime?: string | null;
     status: string;
     customer_id: number | null;
     customer_name: string | null;
@@ -406,6 +408,8 @@ export interface SalesByClientInvoice {
     id: number;
     order_number: string;
     date: string | null;
+    occurred_at?: string | null;
+    business_datetime?: string | null;
     status: string;
     payment_status: string;
     total: number;
@@ -448,6 +452,7 @@ export interface SalesByClientRow {
     pending_amount: number;
     last_payment_amount: number;
     last_payment_date?: string | null;
+    last_payment_at?: string | null;
     dominant_payment_method?: string | null;
     dominant_payment_method_label: string;
     status: 'aldia' | 'pendiente' | 'vencido';
@@ -601,7 +606,7 @@ export interface BalanceSheetReport {
 export interface FinancialDrilldownColumn {
     key: string;
     label: string;
-    type?: 'money' | 'text' | 'number';
+    type?: 'money' | 'text' | 'number' | 'datetime';
 }
 
 export interface FinancialDrilldownReport {
@@ -664,6 +669,8 @@ export interface FinancialAdjustment {
     amount: number;
     reason: string;
     adjustment_date: string;
+    business_datetime?: string | null;
+    created_at?: string | null;
     notes?: string | null;
     warehouse_id?: number | null;
 }
@@ -674,6 +681,8 @@ export interface CapitalMovement {
     movement_type_label: string;
     amount: number;
     movement_date: string;
+    business_datetime?: string | null;
+    created_at?: string | null;
     reason: string;
     notes?: string | null;
     warehouse_id?: number | null;

@@ -20,6 +20,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
@@ -177,6 +178,32 @@ const loadOperationalDetail = async (): Promise<void> => {
 
 const refreshOrder = async (): Promise<void> => {
     await Promise.all([fetchSalesOrderById(props.id), loadOperationalDetail()]);
+};
+
+const updateOrderBusinessDatetime = (value: string | null): void => {
+    if (operationalDetail.value?.order) {
+        operationalDetail.value.order.business_datetime = value;
+    }
+};
+
+const updatePaymentBusinessDatetime = (
+    paymentId: number,
+    value: string | null,
+): void => {
+    const payment = payments.value.find((row) => row.id === paymentId);
+    if (payment) {
+        payment.business_datetime = value;
+    }
+};
+
+const updateMovementBusinessDatetime = (
+    movementId: number,
+    value: string | null,
+): void => {
+    const movement = movements.value.find((row) => row.id === movementId);
+    if (movement) {
+        movement.business_datetime = value;
+    }
 };
 
 const formatCurrency = (value?: number | string | null): string =>
@@ -756,6 +783,17 @@ onMounted(async () => {
                         </div>
                     </div>
                     <div
+                        class="border-t border-gray-200 p-4 dark:border-border"
+                    >
+                        <BusinessDatetimeEditor
+                            record-type="sales_order"
+                            :record-id="order.id"
+                            :created-at="order.created_at"
+                            :business-datetime="order.business_datetime"
+                            @updated="updateOrderBusinessDatetime"
+                        />
+                    </div>
+                    <div
                         v-if="order.notes || order.internal_notes"
                         class="border-t border-gray-200 p-4 text-sm dark:border-border"
                     >
@@ -1020,7 +1058,25 @@ onMounted(async () => {
                                     </span>
                                 </td>
                                 <td class="px-3 py-2">
-                                    {{ formatDateTime(payment.paid_at) }}
+                                    <div class="mb-2">
+                                        {{ formatDateTime(payment.paid_at) }}
+                                    </div>
+                                    <BusinessDatetimeEditor
+                                        compact
+                                        record-type="sales_order_payment"
+                                        :record-id="payment.id"
+                                        :created-at="payment.paid_at"
+                                        :business-datetime="
+                                            payment.business_datetime
+                                        "
+                                        @updated="
+                                            (value) =>
+                                                updatePaymentBusinessDatetime(
+                                                    payment.id,
+                                                    value,
+                                                )
+                                        "
+                                    />
                                 </td>
                                 <td class="px-3 py-2">
                                     {{ payment.creator_name || 'Sistema' }}
@@ -1206,6 +1262,24 @@ onMounted(async () => {
                                     {{ movement.reference_type }} ·
                                     {{ formatDateTime(movement.created_at) }}
                                 </p>
+                                <div class="mt-2">
+                                    <BusinessDatetimeEditor
+                                        compact
+                                        record-type="inventory_movement"
+                                        :record-id="movement.id"
+                                        :created-at="movement.created_at"
+                                        :business-datetime="
+                                            movement.business_datetime
+                                        "
+                                        @updated="
+                                            (value) =>
+                                                updateMovementBusinessDatetime(
+                                                    movement.id,
+                                                    value,
+                                                )
+                                        "
+                                    />
+                                </div>
                             </td>
                             <td class="px-3 py-3">
                                 {{ movement.product_name || 'Producto' }}

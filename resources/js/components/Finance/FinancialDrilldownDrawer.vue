@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AlertTriangle, ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import type { FinancialDrilldownReport } from '@/types/report';
+import { formatReportDateTime } from '@/utils/formatters';
 
 const props = defineProps<{
     open: boolean;
@@ -23,6 +24,10 @@ const warningLabels: Record<string, string> = {
 const formatCell = (value: unknown, type?: string): string => {
     if (type === 'money') {
         return props.currencyFormatter(Number(value) || 0);
+    }
+
+    if (type === 'datetime') {
+        return formatReportDateTime(value);
     }
 
     if (value === null || value === undefined || value === '') {

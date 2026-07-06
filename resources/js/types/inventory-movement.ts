@@ -66,6 +66,7 @@ export interface InventoryMovement {
     } | null;
     created_at: string;
     updated_at: string;
+    business_datetime?: string | null;
 }
 
 export interface InventoryMovementFilters {

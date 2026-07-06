@@ -11,6 +11,7 @@ import {
     TrendingDown,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -136,6 +137,17 @@ const formatDate = (value?: string | null): string => {
     }
 
     return new Date(value).toLocaleDateString('es-PA');
+};
+
+const updatePaymentBatchBusinessDatetime = (
+    paymentBatchId: number,
+    businessDatetime: string | null,
+): void => {
+    ledgerEntries.value
+        .filter((entry: any) => Number(entry.payment_batch_id) === paymentBatchId)
+        .forEach((entry: any) => {
+            entry.business_datetime = businessDatetime;
+        });
 };
 
 const readReportFilters = (): ReportFilters => {
@@ -844,6 +856,31 @@ onMounted(() => {
                                             <Clock :size="12" />
                                             {{ formatDate(entry.occurred_at) }}
                                         </p>
+                                        <BusinessDatetimeEditor
+                                            v-if="entry.payment_batch_id"
+                                            class="mt-1"
+                                            compact
+                                            record-type="account_payment_batch"
+                                            :record-id="
+                                                Number(entry.payment_batch_id)
+                                            "
+                                            :created-at="
+                                                entry.created_at ||
+                                                entry.occurred_at
+                                            "
+                                            :business-datetime="
+                                                entry.business_datetime
+                                            "
+                                            @updated="
+                                                (value) =>
+                                                    updatePaymentBatchBusinessDatetime(
+                                                        Number(
+                                                            entry.payment_batch_id,
+                                                        ),
+                                                        value,
+                                                    )
+                                            "
+                                        />
                                     </div>
                                 </div>
                             </aside>

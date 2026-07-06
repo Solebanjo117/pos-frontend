@@ -22,7 +22,7 @@ import type {
     CustomerReferenceReport,
     CustomerReferenceReportRow,
 } from '@/types/report';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -324,9 +324,16 @@ onMounted(async () => {
                                                     class="flex w-full justify-between rounded-md px-2 py-1.5 text-left hover:bg-white dark:hover:bg-card"
                                                     @click="openOrder(order.id)"
                                                 >
-                                                    <span>
-                                                        {{ order.order_number }}
-                                                        · {{ order.date }}
+                                                    <span class="flex flex-col">
+                                                        <span>{{ order.order_number }}</span>
+                                                        <span class="text-[11px] text-gray-500">
+                                                            {{
+                                                                formatReportDateTime(
+                                                                    order.occurred_at ??
+                                                                        order.date,
+                                                                )
+                                                            }}
+                                                        </span>
                                                     </span>
                                                     <span class="font-mono">
                                                         {{
@@ -359,12 +366,20 @@ onMounted(async () => {
                                                     class="flex w-full justify-between rounded-md px-2 py-1.5 text-left hover:bg-white dark:hover:bg-card"
                                                     @click="openOrder(order.id)"
                                                 >
-                                                    <span>
-                                                        {{ order.order_number }}
-                                                        ·
-                                                        {{
-                                                            order.customer_name
-                                                        }}
+                                                    <span class="flex flex-col">
+                                                        <span>
+                                                            {{ order.order_number }}
+                                                            &middot;
+                                                            {{ order.customer_name }}
+                                                        </span>
+                                                        <span class="text-[11px] text-gray-500">
+                                                            {{
+                                                                formatReportDateTime(
+                                                                    order.occurred_at ??
+                                                                        order.date,
+                                                                )
+                                                            }}
+                                                        </span>
                                                     </span>
                                                     <span class="font-mono">
                                                         {{

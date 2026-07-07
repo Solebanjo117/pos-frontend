@@ -1,18 +1,38 @@
-export type OperationalExpenseCategory =
-    | 'electricity'
-    | 'accounting'
-    | 'rent'
-    | 'maintenance'
-    | 'software'
-    | 'payroll'
-    | 'utilities'
+export type OperationalExpenseCategory = string;
+
+export type OperationalExpensePaymentMethod = string;
+
+export interface OperationalExpensePaymentMethodOption {
+    value: OperationalExpensePaymentMethod;
+    label: string;
+}
+
+export type OperationalExpenseStatus = 'paid' | 'pending' | 'scheduled';
+
+export type OperationalExpenseRecurrence =
+    | 'one_time'
+    | 'weekly'
+    | 'monthly'
+    | 'yearly';
+
+export type OperationalExpenseKind =
+    | 'operational'
+    | 'administrative'
+    | 'financial'
     | 'other';
 
-export type OperationalExpensePaymentMethod =
-    | 'cash'
-    | 'card'
-    | 'transfer'
-    | 'other';
+export interface OperationalExpenseCategoryRecord {
+    id: number;
+    name: string;
+    slug: string;
+    subcategory?: string | null;
+    default_ledger_account_id?: number | null;
+    expense_kind: OperationalExpenseKind;
+    affects_cash_flow: boolean;
+    affects_income_statement: boolean;
+    is_active: boolean;
+    sort_order: number;
+}
 
 export interface OperationalExpense {
     id: number;
@@ -30,11 +50,24 @@ export interface OperationalExpense {
     pos_session?: { id: number; status: string } | null;
     expense_date: string;
     category: OperationalExpenseCategory;
+    category_id?: number | null;
+    category_record?: OperationalExpenseCategoryRecord | null;
     category_label: string;
+    subcategory?: string | null;
+    supplier_id?: number | null;
+    supplier?: { id: number; name: string } | null;
+    ledger_account_id?: number | null;
+    ledger_account?: { id: number; code: string; name: string } | null;
     description?: string | null;
     amount: number;
     payment_method?: OperationalExpensePaymentMethod | null;
     payment_method_label?: string | null;
+    recurrence?: OperationalExpenseRecurrence | null;
+    status?: OperationalExpenseStatus | null;
+    paid_at?: string | null;
+    affects_cash_flow?: boolean;
+    affects_income_statement?: boolean;
+    expense_kind?: OperationalExpenseKind | null;
     reference_number?: string | null;
     notes?: string | null;
     created_at: string;
@@ -45,10 +78,21 @@ export interface OperationalExpense {
 export interface OperationalExpensePayload {
     warehouse_id: number | null;
     expense_date: string;
-    category: OperationalExpenseCategory;
+    category?: OperationalExpenseCategory | null;
+    category_id: number | null;
+    custom_category_name: string | null;
+    subcategory: string | null;
+    supplier_id: number | null;
+    ledger_account_id: number | null;
     description?: string | null;
     amount: number;
-    payment_method?: OperationalExpensePaymentMethod | null;
+    payment_method: OperationalExpensePaymentMethod | null;
+    recurrence: OperationalExpenseRecurrence;
+    status: OperationalExpenseStatus;
+    paid_at?: string | null;
+    affects_cash_flow: boolean;
+    affects_income_statement: boolean;
+    expense_kind: OperationalExpenseKind;
     reference_number?: string | null;
     notes?: string | null;
 }
@@ -74,6 +118,12 @@ export interface OperationalExpenseListResponse {
         total_amount: number;
         count: number;
     };
-    categories: Record<OperationalExpenseCategory, string>;
-    payment_methods: OperationalExpensePaymentMethod[];
+    categories: Record<string, string>;
+    expense_categories?: OperationalExpenseCategoryRecord[];
+    payment_methods: Array<
+        OperationalExpensePaymentMethod | OperationalExpensePaymentMethodOption
+    >;
+    statuses?: Record<OperationalExpenseStatus, string>;
+    recurrences?: Record<OperationalExpenseRecurrence, string>;
+    expense_kinds?: Record<OperationalExpenseKind, string>;
 }

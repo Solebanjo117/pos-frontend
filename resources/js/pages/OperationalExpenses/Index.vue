@@ -19,11 +19,17 @@ import SearchableSelect, {
 import AppLayout from '@/layouts/AppLayout.vue';
 import { InventoryApiService } from '@/services/inventory';
 import { operationalExpensesService } from '@/services/operational-expenses';
+import { ReportsApiService } from '@/services/reports';
+import { suppliersService } from '@/services/suppliers';
+import type { AccountingAccountSummary } from '@/types/report';
+import type { Supplier } from '@/types/supplier';
 import type {
     OperationalExpense,
     OperationalExpenseCategory,
+    OperationalExpenseCategoryRecord,
     OperationalExpensePayload,
     OperationalExpensePaymentMethod,
+    OperationalExpensePaymentMethodOption,
 } from '@/types/operational-expense';
 
 const today = new Date();
@@ -34,6 +40,10 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 const expenses = ref<OperationalExpense[]>([]);
 const warehouses = ref<any[]>([]);
+const suppliers = ref<Supplier[]>([]);
+const ledgerAccounts = ref<AccountingAccountSummary[]>([]);
+const expenseCategories = ref<OperationalExpenseCategoryRecord[]>([]);
+const expenseToDelete = ref<OperationalExpense | null>(null);
 const categories = ref<Record<string, string>>({
     electricity: 'Luz',
     accounting: 'Contador',
@@ -45,8 +55,26 @@ const categories = ref<Record<string, string>>({
     other: 'Otro',
 });
 const summary = ref({ total_amount: 0, count: 0 });
+const statuses = ref<Record<string, string>>({
+    paid: 'Pagado',
+    pending: 'Pendiente',
+    scheduled: 'Programado',
+});
+const recurrences = ref<Record<string, string>>({
+    one_time: 'Unico',
+    weekly: 'Semanal',
+    monthly: 'Mensual',
+    yearly: 'Anual',
+});
+const expenseKinds = ref<Record<string, string>>({
+    operational: 'Operativo',
+    administrative: 'Administrativo',
+    financial: 'Financiero',
+    other: 'Otro',
+});
 const showForm = ref(false);
 const editingExpense = ref<OperationalExpense | null>(null);
+const creatingCategory = ref(false);
 
 const filters = ref({
     date_from: firstDayOfMonth.toISOString().split('T')[0],
@@ -59,9 +87,20 @@ const filters = ref({
 const form = ref<OperationalExpensePayload>({
     expense_date: today.toISOString().split('T')[0],
     category: 'other',
+    category_id: null,
+    custom_category_name: '',
+    subcategory: '',
     description: '',
     amount: 0,
     payment_method: 'transfer',
+    recurrence: 'one_time',
+    status: 'paid',
+    paid_at: null,
+    affects_cash_flow: true,
+    affects_income_statement: true,
+    expense_kind: 'operational',
+    supplier_id: null,
+    ledger_account_id: null,
     reference_number: '',
     warehouse_id: null,
     notes: '',
@@ -69,16 +108,21 @@ const form = ref<OperationalExpensePayload>({
 
 const categoryOptions = computed<SelectOption[]>(() => [
     { value: '', label: 'Todas' },
-    ...Object.entries(categories.value).map(([value, label]) => ({
-        value,
-        label,
-    })),
+    ...(expenseCategories.value.length
+        ? expenseCategories.value.map((category) => ({
+              value: category.slug,
+              label: category.name,
+          }))
+        : Object.entries(categories.value).map(([value, label]) => ({
+              value,
+              label,
+          }))),
 ]);
 
 const formCategoryOptions = computed<SelectOption[]>(() =>
-    Object.entries(categories.value).map(([value, label]) => ({
-        value,
-        label,
+    expenseCategories.value.map((category) => ({
+        value: category.id,
+        label: category.name,
     })),
 );
 
@@ -98,15 +142,52 @@ const filterWarehouseOptions = computed<SelectOption[]>(() => [
     })),
 ]);
 
-const paymentMethods: Array<{
-    value: OperationalExpensePaymentMethod;
-    label: string;
-}> = [
+const supplierOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Sin proveedor' },
+    ...suppliers.value.map((supplier) => ({
+        value: supplier.id,
+        label: supplier.name,
+    })),
+]);
+
+const ledgerAccountOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Cuenta automatica' },
+    ...ledgerAccounts.value.map((account) => ({
+        value: account.id,
+        label: `${account.code} - ${account.name}`,
+    })),
+]);
+
+const statusOptions = computed<SelectOption[]>(() =>
+    Object.entries(statuses.value).map(([value, label]) => ({ value, label })),
+);
+
+const recurrenceOptions = computed<SelectOption[]>(() =>
+    Object.entries(recurrences.value).map(([value, label]) => ({
+        value,
+        label,
+    })),
+);
+
+const expenseKindOptions = computed<SelectOption[]>(() =>
+    Object.entries(expenseKinds.value).map(([value, label]) => ({
+        value,
+        label,
+    })),
+);
+
+const fallbackPaymentMethods: OperationalExpensePaymentMethodOption[] = [
     { value: 'cash', label: 'Efectivo' },
     { value: 'card', label: 'Tarjeta' },
     { value: 'transfer', label: 'Transferencia' },
+    { value: 'yappy', label: 'Yappy' },
+    { value: 'ach', label: 'ACH' },
+    { value: 'cheque', label: 'Cheque' },
     { value: 'other', label: 'Otro' },
 ];
+const paymentMethods = ref<OperationalExpensePaymentMethodOption[]>([
+    ...fallbackPaymentMethods,
+]);
 
 const sessionLinkedCount = computed(
     () => expenses.value.filter((expense) => expense.pos_session_id).length,
@@ -144,6 +225,32 @@ async function loadWarehouses() {
     }
 }
 
+async function loadSuppliers() {
+    try {
+        suppliers.value = await suppliersService.getAllActive();
+    } catch (e) {
+        suppliers.value = [];
+    }
+}
+
+async function loadLedgerAccounts() {
+    try {
+        const response = await ReportsApiService.getAccountingAccounts({});
+        ledgerAccounts.value = response.data;
+    } catch (e) {
+        ledgerAccounts.value = [];
+    }
+}
+
+async function loadExpenseCategories() {
+    try {
+        expenseCategories.value =
+            await operationalExpensesService.listCategories();
+    } catch (e) {
+        expenseCategories.value = [];
+    }
+}
+
 async function loadExpenses() {
     loading.value = true;
     error.value = null;
@@ -152,6 +259,12 @@ async function loadExpenses() {
         expenses.value = response.data;
         summary.value = response.summary;
         categories.value = response.categories || categories.value;
+        expenseCategories.value =
+            response.expense_categories || expenseCategories.value;
+        statuses.value = response.statuses || statuses.value;
+        recurrences.value = response.recurrences || recurrences.value;
+        expenseKinds.value = response.expense_kinds || expenseKinds.value;
+        paymentMethods.value = normalizePaymentMethods(response.payment_methods);
     } catch (e: any) {
         error.value =
             e.response?.data?.message || 'Error al cargar gastos operativos.';
@@ -160,14 +273,56 @@ async function loadExpenses() {
     }
 }
 
+function normalizePaymentMethods(
+    methods: Array<
+        OperationalExpensePaymentMethod | OperationalExpensePaymentMethodOption
+    > = [],
+): OperationalExpensePaymentMethodOption[] {
+    const normalized = methods
+        .map((method) =>
+            typeof method === 'string'
+                ? {
+                      value: method,
+                      label:
+                          fallbackPaymentMethods.find(
+                              (item) => item.value === method,
+                          )?.label ?? method,
+                  }
+                : method,
+        )
+        .filter((method) => method.value && method.label);
+
+    return normalized.length > 0 ? normalized : [...fallbackPaymentMethods];
+}
+
+function defaultPaymentMethod(): OperationalExpensePaymentMethod {
+    return (
+        paymentMethods.value.find((method) => method.value === 'transfer')
+            ?.value ??
+        paymentMethods.value[0]?.value ??
+        'transfer'
+    );
+}
+
 function openCreateForm() {
     editingExpense.value = null;
     form.value = {
         expense_date: today.toISOString().split('T')[0],
         category: 'other',
+        category_id: expenseCategories.value[0]?.id ?? null,
+        custom_category_name: '',
+        subcategory: '',
         description: '',
         amount: 0,
-        payment_method: 'transfer',
+        payment_method: defaultPaymentMethod(),
+        recurrence: 'one_time',
+        status: 'paid',
+        paid_at: null,
+        affects_cash_flow: true,
+        affects_income_statement: true,
+        expense_kind: 'operational',
+        supplier_id: null,
+        ledger_account_id: null,
         reference_number: '',
         warehouse_id: null,
         notes: '',
@@ -180,9 +335,20 @@ function openEditForm(expense: OperationalExpense) {
     form.value = {
         expense_date: expense.expense_date,
         category: expense.category,
+        category_id: expense.category_id ?? null,
+        custom_category_name: '',
+        subcategory: expense.subcategory || '',
         description: expense.description || '',
         amount: Number(expense.amount || 0),
         payment_method: expense.payment_method || 'transfer',
+        recurrence: expense.recurrence || 'one_time',
+        status: expense.status || 'paid',
+        paid_at: expense.paid_at || null,
+        affects_cash_flow: expense.affects_cash_flow ?? true,
+        affects_income_statement: expense.affects_income_statement ?? true,
+        expense_kind: expense.expense_kind || 'operational',
+        supplier_id: expense.supplier_id ?? null,
+        ledger_account_id: expense.ledger_account_id ?? null,
         reference_number: expense.reference_number || '',
         warehouse_id: expense.warehouse_id ?? null,
         notes: expense.notes || '',
@@ -197,6 +363,37 @@ function updateExpenseBusinessDatetime(
     const expense = expenses.value.find((row) => row.id === expenseId);
     if (expense) {
         expense.business_datetime = value;
+    }
+}
+
+async function createCategoryFromForm() {
+    const name = form.value.custom_category_name?.trim();
+    if (!name) return;
+
+    creatingCategory.value = true;
+    error.value = null;
+
+    try {
+        const category = await operationalExpensesService.createCategory({
+            name,
+            subcategory: form.value.subcategory,
+            default_ledger_account_id: form.value.ledger_account_id,
+            expense_kind: form.value.expense_kind,
+            affects_cash_flow: form.value.affects_cash_flow,
+            affects_income_statement: form.value.affects_income_statement,
+        });
+        expenseCategories.value = [
+            ...expenseCategories.value.filter((item) => item.id !== category.id),
+            category,
+        ].sort((a, b) => a.name.localeCompare(b.name));
+        form.value.category_id = category.id;
+        form.value.category = category.slug;
+        form.value.custom_category_name = '';
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message || 'No se pudo crear la categoria.';
+    } finally {
+        creatingCategory.value = false;
     }
 }
 
@@ -223,7 +420,14 @@ async function saveExpense() {
 }
 
 async function deleteExpense(expense: OperationalExpense) {
-    if (!confirm(`Eliminar gasto ${expense.category_label}?`)) return;
+    expenseToDelete.value = expense;
+}
+
+async function confirmDeleteExpense() {
+    if (!expenseToDelete.value) return;
+
+    const expense = expenseToDelete.value;
+    expenseToDelete.value = null;
     await operationalExpensesService.remove(expense.id);
     await loadExpenses();
 }
@@ -247,7 +451,13 @@ function readInitialFilters() {
 
 onMounted(async () => {
     readInitialFilters();
-    await Promise.all([loadWarehouses(), loadExpenses()]);
+    await Promise.all([
+        loadWarehouses(),
+        loadSuppliers(),
+        loadLedgerAccounts(),
+        loadExpenseCategories(),
+        loadExpenses(),
+    ]);
 });
 </script>
 
@@ -577,31 +787,20 @@ onMounted(async () => {
                     </button>
                 </div>
 
-                <div class="grid gap-4 p-5 md:grid-cols-2">
+                <div class="grid max-h-[70vh] gap-4 overflow-y-auto p-5 md:grid-cols-2">
                     <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Fecha *</label
-                        >
+                        <label class="mb-1 block text-sm font-medium">Nombre / descripcion *</label>
                         <input
-                            v-model="form.expense_date"
-                            type="date"
+                            v-model="form.description"
+                            type="text"
+                            maxlength="255"
                             required
+                            placeholder="Ej: ERP mensual, alquiler, internet"
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
                         />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Categoria *</label
-                        >
-                        <SearchableSelect
-                            v-model="form.category"
-                            :options="formCategoryOptions"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Monto *</label
-                        >
+                        <label class="mb-1 block text-sm font-medium">Monto *</label>
                         <input
                             v-model.number="form.amount"
                             type="number"
@@ -612,21 +811,71 @@ onMounted(async () => {
                         />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Sucursal</label
-                        >
-                        <SearchableSelect
-                            v-model="form.warehouse_id"
-                            :options="warehouseOptions"
+                        <label class="mb-1 block text-sm font-medium">Fecha *</label>
+                        <input
+                            v-model="form.expense_date"
+                            type="date"
+                            required
+                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
                         />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Metodo</label
-                        >
+                        <label class="mb-1 block text-sm font-medium">Estado</label>
+                        <SearchableSelect
+                            v-model="form.status"
+                            :options="statusOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Categoria</label>
+                        <SearchableSelect
+                            v-model="form.category_id"
+                            :options="formCategoryOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Nueva categoria</label>
+                        <div class="flex gap-2">
+                            <input
+                                v-model="form.custom_category_name"
+                                type="text"
+                                maxlength="100"
+                                placeholder="ERP, Hosting, Subscripciones"
+                                class="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                            />
+                            <button
+                                type="button"
+                                class="rounded-md border border-gray-300 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
+                                :disabled="creatingCategory || !form.custom_category_name"
+                                @click="createCategoryFromForm"
+                            >
+                                Crear
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Subcategoria</label>
+                        <input
+                            v-model="form.subcategory"
+                            type="text"
+                            maxlength="100"
+                            placeholder="Mensualidad, software, servicios digitales"
+                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Tipo de gasto</label>
+                        <SearchableSelect
+                            v-model="form.expense_kind"
+                            :options="expenseKindOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Metodo</label>
                         <select
                             v-model="form.payment_method"
-                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                            :disabled="form.status !== 'paid'"
+                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400 dark:border-border dark:bg-muted"
                         >
                             <option
                                 v-for="method in paymentMethods"
@@ -638,9 +887,35 @@ onMounted(async () => {
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Numero de recibo</label
-                        >
+                        <label class="mb-1 block text-sm font-medium">Recurrencia</label>
+                        <SearchableSelect
+                            v-model="form.recurrence"
+                            :options="recurrenceOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Sucursal</label>
+                        <SearchableSelect
+                            v-model="form.warehouse_id"
+                            :options="warehouseOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Proveedor</label>
+                        <SearchableSelect
+                            v-model="form.supplier_id"
+                            :options="supplierOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Cuenta contable</label>
+                        <SearchableSelect
+                            v-model="form.ledger_account_id"
+                            :options="ledgerAccountOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Numero de recibo</label>
                         <input
                             v-model="form.reference_number"
                             type="text"
@@ -648,22 +923,26 @@ onMounted(async () => {
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
                         />
                     </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium"
-                            >Descripcion</label
-                        >
-                        <input
-                            v-model="form.description"
-                            type="text"
-                            maxlength="255"
-                            placeholder="Ej: Alquiler local, luz, contador"
-                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                        />
+                    <div class="flex items-center gap-5 rounded-md border border-gray-200 p-3 dark:border-border">
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input
+                                v-model="form.affects_cash_flow"
+                                type="checkbox"
+                                class="rounded border-gray-300"
+                            />
+                            Afecta caja/banco
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input
+                                v-model="form.affects_income_statement"
+                                type="checkbox"
+                                class="rounded border-gray-300"
+                            />
+                            Afecta resultados
+                        </label>
                     </div>
                     <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium"
-                            >Notas</label
-                        >
+                        <label class="mb-1 block text-sm font-medium">Notas / comprobante</label>
                         <textarea
                             v-model="form.notes"
                             rows="2"
@@ -692,6 +971,54 @@ onMounted(async () => {
                     </button>
                 </div>
             </form>
+        </div>
+
+        <div
+            v-if="expenseToDelete"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+        >
+            <div
+                class="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-border dark:bg-card"
+            >
+                <div class="border-b border-gray-200 px-5 py-4 dark:border-border">
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                        Eliminar gasto operativo
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Esta accion quitara el gasto del listado y registrara la
+                        reversa contable si aplica.
+                    </p>
+                </div>
+                <div class="space-y-2 px-5 py-4 text-sm">
+                    <p class="font-semibold text-gray-900 dark:text-white">
+                        {{ expenseToDelete.category_label }}
+                    </p>
+                    <p class="text-gray-500">
+                        {{ expenseToDelete.description || 'Sin descripcion' }}
+                    </p>
+                    <p class="font-mono text-sm font-semibold">
+                        {{ formatCurrency(expenseToDelete.amount) }}
+                    </p>
+                </div>
+                <div
+                    class="flex justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-border"
+                >
+                    <button
+                        type="button"
+                        class="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
+                        @click="expenseToDelete = null"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                        @click="confirmDeleteExpense"
+                    >
+                        Eliminar
+                    </button>
+                </div>
+            </div>
         </div>
     </AppLayout>
 </template>

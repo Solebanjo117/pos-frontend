@@ -354,6 +354,8 @@ export function useReports() {
         date_from: string;
         date_to: string;
         warehouse_id?: number | null;
+        expense_category?: string | null;
+        expense_group?: string | null;
         page?: number;
         per_page?: number;
     }) => {

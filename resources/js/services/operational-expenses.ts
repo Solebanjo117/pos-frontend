@@ -1,5 +1,6 @@
 import type {
     OperationalExpense,
+    OperationalExpenseCategoryRecord,
     OperationalExpenseFilters,
     OperationalExpenseListResponse,
     OperationalExpensePayload,
@@ -36,5 +37,25 @@ export const operationalExpensesService = {
 
     async remove(id: number): Promise<void> {
         await apiClient.delete(`/operational-expenses/${id}`);
+    },
+
+    async listCategories(): Promise<OperationalExpenseCategoryRecord[]> {
+        const response = await apiClient.get('/operational-expense-categories');
+        return response.data.data ?? [];
+    },
+
+    async createCategory(payload: {
+        name: string;
+        subcategory?: string | null;
+        default_ledger_account_id?: number | null;
+        expense_kind?: string;
+        affects_cash_flow?: boolean;
+        affects_income_statement?: boolean;
+    }): Promise<OperationalExpenseCategoryRecord> {
+        const response = await apiClient.post(
+            '/operational-expense-categories',
+            payload,
+        );
+        return response.data.data;
     },
 };

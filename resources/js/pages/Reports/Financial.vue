@@ -3,7 +3,6 @@ import { Head } from '@inertiajs/vue3';
 import {
     AlertCircle,
     BarChart3,
-    CheckCircle2,
     Clock,
     FileText,
     Landmark,
@@ -14,6 +13,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import CapitalMovementModal from '@/components/Finance/CapitalMovementModal.vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import FinanceAdjustmentModal from '@/components/Finance/FinanceAdjustmentModal.vue';
+import FinanceAdvancedAccountingPanel from '@/components/Finance/FinanceAdvancedAccountingPanel.vue';
 import FinanceBalanceSheet from '@/components/Finance/FinanceBalanceSheet.vue';
 import FinanceDailySummaryTable from '@/components/Finance/FinanceDailySummaryTable.vue';
 import FinanceIncomeStatement from '@/components/Finance/FinanceIncomeStatement.vue';
@@ -39,6 +39,8 @@ type DrilldownFilters = {
     date_from: string;
     date_to: string;
     warehouse_id: number | null;
+    expense_category?: string | null;
+    expense_group?: string | null;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -84,6 +86,8 @@ const selectedKpi = ref<{
     label: string;
     value: number;
     metric?: string;
+    expense_category?: string | null;
+    expense_group?: string | null;
 } | null>(null);
 const activeDrilldownFilters = ref<DrilldownFilters | null>(null);
 
@@ -270,16 +274,6 @@ const formatCreditDate = (value?: string | null): string => {
     });
 };
 
-const advancedReports = computed(
-    () => financialAdvancedStatus.value?.reports ?? [],
-);
-const advancedStatusClass = (status: string): string =>
-    status === 'available'
-        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-        : status === 'partial'
-          ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'
-          : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300';
-
 const loadWarehouses = async (): Promise<void> => {
     try {
         warehouses.value = await InventoryApiService.getWarehouses();
@@ -316,7 +310,14 @@ const loadReports = async (): Promise<void> => {
 };
 
 const openDrilldown = async (
-    kpi: { key: string; label: string; value: number; metric?: string },
+    kpi: {
+        key: string;
+        label: string;
+        value: number;
+        metric?: string;
+        expense_category?: string | null;
+        expense_group?: string | null;
+    },
     page = 1,
     overrideFilters: DrilldownFilters | null = null,
 ): Promise<void> => {
@@ -327,6 +328,8 @@ const openDrilldown = async (
             date_from: filters.value.date_from,
             date_to: filters.value.date_to,
             warehouse_id: filters.value.warehouse_id,
+            expense_category: kpi.expense_category,
+            expense_group: kpi.expense_group,
         };
     drilldownOpen.value = true;
     drilldownLoading.value = true;
@@ -349,13 +352,33 @@ const changeDrilldownPage = (page: number): void => {
 };
 
 const openKpiDrilldown = (
-    kpi: { key: string; label: string; value: number; metric?: string },
+    kpi: {
+        key?: string;
+        label: string;
+        value: number;
+        metric?: string;
+        expense_category?: string | null;
+        expense_group?: string | null;
+    },
 ): void => {
-    void openDrilldown(kpi, 1, {
-        date_from: filters.value.date_from,
-        date_to: filters.value.date_to,
-        warehouse_id: filters.value.warehouse_id,
-    });
+    void openDrilldown(
+        {
+            key: kpi.key ?? kpi.metric ?? kpi.label,
+            label: kpi.label,
+            value: kpi.value,
+            metric: kpi.metric,
+            expense_category: kpi.expense_category,
+            expense_group: kpi.expense_group,
+        },
+        1,
+        {
+            date_from: filters.value.date_from,
+            date_to: filters.value.date_to,
+            warehouse_id: filters.value.warehouse_id,
+            expense_category: kpi.expense_category,
+            expense_group: kpi.expense_group,
+        },
+    );
 };
 
 const openDailySummaryDrilldown = (payload: {
@@ -650,6 +673,7 @@ watch(currentWarehouseId, (value) => {
                         v-if="activeTab === 'balance'"
                         :data="balanceSheet"
                         :currency-formatter="formatCurrency"
+                        @select="openKpiDrilldown"
                     />
 
                     <FinanceIncomeStatement
@@ -660,6 +684,7 @@ watch(currentWarehouseId, (value) => {
                         :net-profit="incomeSummary?.net_profit ?? 0"
                         :expense-breakdown="expenseBreakdown"
                         :currency-formatter="formatCurrency"
+                        @select="openKpiDrilldown"
                     />
 
                     <div
@@ -690,11 +715,20 @@ watch(currentWarehouseId, (value) => {
                                     </p>
                                 </div>
                                 <div class="text-right">
-                                    <p
-                                        class="text-sm font-bold text-indigo-600 tabular-nums dark:text-indigo-400"
+                                    <button
+                                        type="button"
+                                        class="rounded px-1 text-sm font-bold text-indigo-600 tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-indigo-400 dark:hover:bg-slate-800"
+                                        @click="
+                                            openKpiDrilldown({
+                                                key: section.key,
+                                                label: section.title,
+                                                value: section.total,
+                                                metric: section.key,
+                                            })
+                                        "
                                     >
                                         {{ formatCurrency(section.total) }}
-                                    </p>
+                                    </button>
                                     <a
                                         :href="section.href"
                                         class="text-[11px] font-semibold text-cyan-700 hover:underline dark:text-cyan-300"
@@ -820,8 +854,17 @@ watch(currentWarehouseId, (value) => {
 
                     <div v-if="activeTab === 'investment'" class="space-y-3">
                         <div class="grid gap-3 md:grid-cols-4">
-                            <div
-                                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                            <button
+                                type="button"
+                                class="rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900"
+                                @click="
+                                    openKpiDrilldown({
+                                        key: 'investment_in',
+                                        label: 'Aportes',
+                                        value: investmentTotals.investmentIn,
+                                        metric: 'investment_in',
+                                    })
+                                "
                             >
                                 <p
                                     class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
@@ -837,9 +880,18 @@ watch(currentWarehouseId, (value) => {
                                         )
                                     }}
                                 </p>
-                            </div>
-                            <div
-                                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900"
+                                @click="
+                                    openKpiDrilldown({
+                                        key: 'investment_out',
+                                        label: 'Retiros',
+                                        value: investmentTotals.investmentOut,
+                                        metric: 'investment_out',
+                                    })
+                                "
                             >
                                 <p
                                     class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
@@ -855,9 +907,18 @@ watch(currentWarehouseId, (value) => {
                                         )
                                     }}
                                 </p>
-                            </div>
-                            <div
-                                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900"
+                                @click="
+                                    openKpiDrilldown({
+                                        key: 'investment',
+                                        label: 'Inversion neta',
+                                        value: investmentTotals.netInvestment,
+                                        metric: 'investment',
+                                    })
+                                "
                             >
                                 <p
                                     class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
@@ -873,9 +934,18 @@ watch(currentWarehouseId, (value) => {
                                         )
                                     }}
                                 </p>
-                            </div>
-                            <div
-                                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 focus:ring-2 focus:ring-slate-200 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900"
+                                @click="
+                                    openKpiDrilldown({
+                                        key: 'cash',
+                                        label: 'Cash cierre',
+                                        value: investmentTotals.closingCash,
+                                        metric: 'cash',
+                                    })
+                                "
                             >
                                 <p
                                     class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
@@ -891,7 +961,7 @@ watch(currentWarehouseId, (value) => {
                                         )
                                     }}
                                 </p>
-                            </div>
+                            </button>
                         </div>
 
                         <div
@@ -1258,77 +1328,12 @@ watch(currentWarehouseId, (value) => {
                 </aside>
             </div>
 
-            <div v-else class="space-y-3">
-                <div
-                    class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
-                >
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <h2
-                                class="text-sm font-semibold text-slate-950 dark:text-slate-50"
-                            >
-                                Reportes avanzados
-                            </h2>
-                            <p
-                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
-                            >
-                                Los reportes contables formales quedan marcados
-                                como pendientes si el ledger aun no tiene datos.
-                            </p>
-                        </div>
-                        <div
-                            class="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                        >
-                            Ledger:
-                            {{
-                                financialAdvancedStatus?.ledger?.is_available
-                                    ? 'Disponible'
-                                    : 'Pendiente'
-                            }}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <div
-                        v-for="report in advancedReports"
-                        :key="report.key"
-                        class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
-                    >
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <h3
-                                    class="text-sm font-semibold text-slate-950 dark:text-slate-50"
-                                >
-                                    {{ report.label }}
-                                </h3>
-                                <p
-                                    class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400"
-                                >
-                                    {{ report.source }}
-                                </p>
-                            </div>
-                            <span
-                                class="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase"
-                                :class="advancedStatusClass(report.status)"
-                            >
-                                <CheckCircle2
-                                    v-if="report.status === 'available'"
-                                    :size="13"
-                                />
-                                <Clock v-else :size="13" />
-                                {{
-                                    report.status === 'available'
-                                        ? 'Disponible'
-                                        : report.status === 'partial'
-                                          ? 'Parcial'
-                                          : 'Pendiente'
-                                }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <FinanceAdvancedAccountingPanel
+                v-else
+                :filters="filters"
+                :status="financialAdvancedStatus"
+                :currency-formatter="formatCurrency"
+            />
         </div>
 
         <FinancialDrilldownDrawer
@@ -1338,6 +1343,7 @@ watch(currentWarehouseId, (value) => {
             :currency-formatter="formatCurrency"
             @close="drilldownOpen = false"
             @page="changeDrilldownPage"
+            @drilldown="openKpiDrilldown"
         />
 
         <FinanceAdjustmentModal

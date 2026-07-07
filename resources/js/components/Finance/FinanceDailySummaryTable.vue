@@ -29,7 +29,6 @@ const columns: Array<{
     { key: 'sales_collected', label: 'Cobrado', metric: 'payments_received' },
     { key: 'sales_pending', label: 'CxC', metric: 'receivable' },
     { key: 'cogs', label: 'COGS', metric: 'cogs' },
-    { key: 'inventory', label: 'Inventario', metric: 'inventory' },
     { key: 'purchase', label: 'Compras', metric: 'purchases' },
     { key: 'purchase_paid', label: 'Pagado', metric: 'supplier_payments' },
     { key: 'purchase_pending', label: 'CxP', metric: 'payable' },

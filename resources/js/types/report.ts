@@ -345,6 +345,89 @@ export interface FinancialPositionReport {
     }>;
 }
 
+export interface AccountingJournalLine {
+    id: number;
+    account_id?: number | null;
+    account_code?: string | null;
+    account_name?: string | null;
+    third_party_type?: string | null;
+    third_party_id?: number | null;
+    debit: number;
+    credit: number;
+    metadata?: Record<string, unknown> | null;
+}
+
+export interface AccountingJournalEntry {
+    id: number;
+    occurred_at?: string | null;
+    source_type?: string | null;
+    source_id?: number | null;
+    warehouse?: string | null;
+    user?: string | null;
+    memo?: string | null;
+    status?: string | null;
+    debit: number;
+    credit: number;
+    balanced: boolean;
+    lines?: AccountingJournalLine[];
+}
+
+export interface AccountingAccountSummary {
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+    debit: number;
+    credit: number;
+    balance: number;
+    is_active: boolean;
+}
+
+export interface AccountingLedgerLine {
+    id: number;
+    journal_entry_id: number;
+    occurred_at?: string | null;
+    source_type?: string | null;
+    source_id?: number | null;
+    memo?: string | null;
+    user?: string | null;
+    warehouse?: string | null;
+    debit: number;
+    credit: number;
+    balance: number;
+    metadata?: Record<string, unknown> | null;
+}
+
+export interface AccountingPaginatedReport<T> {
+    data: T[];
+    meta?: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+    summary?: Record<string, number>;
+}
+
+export interface AccountingAccountsReport {
+    data: AccountingAccountSummary[];
+    summary: Record<string, number>;
+}
+
+export interface AccountingLedgerReport {
+    account: {
+        id: number;
+        code: string;
+        name: string;
+        type: string;
+    };
+    data: AccountingLedgerLine[];
+    meta?: AccountingPaginatedReport<AccountingLedgerLine>['meta'];
+    summary?: Record<string, number>;
+    debits?: AccountingLedgerLine[];
+    credits?: AccountingLedgerLine[];
+}
+
 export interface CustomerReferenceReportOrder {
     id: number;
     order_number: string;
@@ -642,6 +725,8 @@ export interface FinancialAdvancedStatusReport {
 export interface ExpenseBreakdownItem {
     label: string;
     amount: number;
+    expense_category?: string;
+    expense_group?: 'rent' | 'salary' | 'utilities' | 'internet' | 'other';
 }
 
 export interface ExpenseBreakdown {

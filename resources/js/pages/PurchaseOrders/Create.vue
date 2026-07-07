@@ -116,6 +116,24 @@ const candidateError = ref<string | null>(null);
 const supplierWarnings = ref<PurchaseOrderWarning[]>([]);
 const selectedSupplierBrandIds = ref<number[]>([]);
 const selectedSupplierProductLinks = ref<any[]>([]);
+const supplierLinkPrompt = ref<{
+    product_id: number;
+    variant_id?: number | null;
+    name: string;
+    sku?: string | null;
+    cost: number;
+    minimum_order_quantity?: number | null;
+    lead_time_days?: number | null;
+} | null>(null);
+const purchaseNotice = ref<{
+    title: string;
+    message: string;
+} | null>(null);
+let supplierLinkResolver:
+    | ((value: 'link' | 'continue' | 'cancel') => void)
+    | null = null;
+let purchaseNoticeResolver: (() => void) | null = null;
+const linkingSupplierVariant = ref(false);
 
 const form = ref<CreatePurchaseOrderData>({
     supplier_id: 0,
@@ -270,6 +288,96 @@ function supplierRelationFor(row: any) {
     }
 
     return null;
+}
+
+function requestSupplierLinkDecision(
+    row: typeof supplierLinkPrompt.value,
+): Promise<'link' | 'continue' | 'cancel'> {
+    supplierLinkPrompt.value = row;
+
+    return new Promise((resolve) => {
+        supplierLinkResolver = resolve;
+    });
+}
+
+function resolveSupplierLinkDecision(
+    decision: 'link' | 'continue' | 'cancel',
+): void {
+    supplierLinkResolver?.(decision);
+    supplierLinkResolver = null;
+    supplierLinkPrompt.value = null;
+}
+
+function showPurchaseNotice(title: string, message: string): Promise<void> {
+    purchaseNotice.value = { title, message };
+
+    return new Promise((resolve) => {
+        purchaseNoticeResolver = resolve;
+    });
+}
+
+function closePurchaseNotice(): void {
+    purchaseNoticeResolver?.();
+    purchaseNoticeResolver = null;
+    purchaseNotice.value = null;
+}
+
+async function linkPromptedSupplierVariant(): Promise<void> {
+    if (!supplierLinkPrompt.value || !form.value.supplier_id) return;
+
+    linkingSupplierVariant.value = true;
+
+    try {
+        const row = supplierLinkPrompt.value;
+        await suppliersService.attachVariant(Number(form.value.supplier_id), {
+            ...(row.variant_id
+                ? { variant_id: row.variant_id }
+                : { product_id: row.product_id }),
+            supplier_cost: Number(row.cost || 0),
+            minimum_order_quantity: normalizeQuantity(
+                row.minimum_order_quantity || 1,
+            ),
+            lead_time_days: row.lead_time_days ?? undefined,
+            is_preferred: false,
+        });
+
+        await loadSelectedSupplierContext();
+        resolveSupplierLinkDecision('link');
+    } catch (e: any) {
+        candidateError.value =
+            e.response?.data?.message ||
+            'No se pudo vincular la variante al proveedor.';
+    } finally {
+        linkingSupplierVariant.value = false;
+    }
+}
+
+async function confirmSupplierLinkIfNeeded(row: {
+    product_id: number;
+    variant_id?: number | null;
+    name: string;
+    sku?: string | null;
+    cost: number;
+    minimum_order_quantity?: number | null;
+    lead_time_days?: number | null;
+    is_supplied_by_selected_supplier?: boolean;
+    supplierMatch?: boolean | null;
+}): Promise<boolean> {
+    if (!form.value.supplier_id) {
+        return true;
+    }
+
+    const isLinked =
+        row.is_supplied_by_selected_supplier === true ||
+        row.supplierMatch === true;
+
+    if (isLinked) {
+        return true;
+    }
+
+    const decision = await requestSupplierLinkDecision(row);
+
+    return decision === 'link' || decision === 'continue';
 }
 
 async function loadSelectedSupplierContext() {
@@ -484,85 +592,89 @@ function handlePickerSearch(filters: typeof pickerFilters.value) {
     fetchPickerProducts();
 }
 
-function addVariantSelections(selections: ProductVariantSelection[]) {
-    selections.forEach(
-        ({
-            product,
-            variant,
-            quantity,
-            unitCost,
-            miscCost,
+async function addVariantSelections(selections: ProductVariantSelection[]) {
+    for (const {
+        product,
+        variant,
+        quantity,
+        unitCost,
+        miscCost,
+        supplierMatch,
+        minimumOrderQuantity,
+    } of selections) {
+        if (
+            form.value.items.find(
+                (item: any) =>
+                    candidateKey(item) ===
+                    candidateKey({
+                        product_id: product.id,
+                        variant_id: variant?.id ?? null,
+                    }),
+            )
+        ) {
+            continue;
+        }
+
+        const finalQty = normalizeQuantity(
+            minimumOrderQuantity || quantity || 1,
+        );
+        const canContinue = await confirmSupplierLinkIfNeeded({
+            product_id: product.id,
+            variant_id: variant?.id ?? null,
+            name: product.name,
+            sku: variant?.sku || product.sku_base || null,
+            cost: unitCost || 0,
+            minimum_order_quantity: finalQty,
             supplierMatch,
-            minimumOrderQuantity,
-        }) => {
-            if (
-                form.value.items.find(
-                    (item: any) =>
-                        candidateKey(item) ===
-                        candidateKey({
-                            product_id: product.id,
-                            variant_id: variant?.id ?? null,
-                        }),
-                )
-            ) {
-                return;
-            }
+        });
 
-            if (
-                form.value.supplier_id &&
-                supplierMatch === false &&
-                !confirm(
-                    'Esta variante no esta vinculada al proveedor seleccionado. Puedes continuar, pero la OC quedara con una advertencia. Deseas agregarla?',
-                )
-            ) {
-                return;
-            }
+        if (!canContinue) {
+            continue;
+        }
 
-            const finalQty = normalizeQuantity(
-                minimumOrderQuantity || quantity || 1,
-            );
-            const taxRate = defaultTaxRate();
+        const taxRate = defaultTaxRate();
 
-            form.value.items.push({
-                product_id: product.id,
-                variant_id: variant?.id ?? null,
-                quantity_ordered: finalQty,
-                units_per_package: 1,
-                unit_cost: unitCost || 0,
-                misc_cost: miscCost || 0,
-                tax_rate: taxRate,
-                tax_amount: calculateTaxAmount(
-                    finalQty * (unitCost || 0),
-                    taxRate,
-                ),
-                _taxManual: false,
-                notes: '',
-                _name: product.name,
-                _sku: variant?.sku || product.sku_base || 'N/A',
-                _brand: variant?.brand?.name || product.brand?.name || '',
-            } as any);
-        },
-    );
+        form.value.items.push({
+            product_id: product.id,
+            variant_id: variant?.id ?? null,
+            quantity_ordered: finalQty,
+            units_per_package: 1,
+            unit_cost: unitCost || 0,
+            misc_cost: miscCost || 0,
+            tax_rate: taxRate,
+            tax_amount: calculateTaxAmount(finalQty * (unitCost || 0), taxRate),
+            _taxManual: false,
+            notes: '',
+            _name: product.name,
+            _sku: variant?.sku || product.sku_base || 'N/A',
+            _brand: variant?.brand?.name || product.brand?.name || '',
+        } as any);
+    }
 
     productSearch.value = '';
     searchResults.value = [];
     showProductPicker.value = false;
 }
 
-function addProduct(row: any) {
+async function addProduct(row: any) {
     // row is already a flat variant object from searchResults
     if (
         form.value.items.find((i: any) => candidateKey(i) === candidateKey(row))
     )
         return;
 
-    if (
-        form.value.supplier_id &&
-        !row.is_supplied_by_selected_supplier &&
-        !confirm(
-            'Esta variante no está vinculada al proveedor seleccionado. Puedes continuar, pero la OC quedará con una advertencia. ¿Deseas agregarla?',
-        )
-    ) {
+    const canContinue = await confirmSupplierLinkIfNeeded({
+        product_id: row.product_id,
+        variant_id: row.variant_id ?? null,
+        name: row.product_name,
+        sku: row.sku,
+        cost: Number(row.cost_base ?? row.cost ?? 0),
+        minimum_order_quantity: row.supplier_minimum_order_quantity || 1,
+        lead_time_days: row.supplier_lead_time_days,
+        is_supplied_by_selected_supplier: row.is_supplied_by_selected_supplier,
+    });
+
+    if (!canContinue) {
         return;
     }
 
@@ -785,12 +897,18 @@ async function handleSubmit() {
     supplierWarnings.value = [];
 
     if (!form.value.supplier_id || !form.value.warehouse_id) {
-        alert('Selecciona proveedor y almacén');
+        await showPurchaseNotice(
+            'Datos incompletos',
+            'Selecciona proveedor y almacen antes de guardar la orden.',
+        );
         return;
     }
 
     if (form.value.items.length === 0) {
-        alert('Agrega al menos un producto');
+        await showPurchaseNotice(
+            'Orden sin productos',
+            'Agrega al menos un producto antes de guardar la orden.',
+        );
         return;
     }
     try {
@@ -822,7 +940,8 @@ async function handleSubmit() {
             supplierWarnings.value = created.warnings ?? [];
 
             if (supplierWarnings.value.length) {
-                alert(
+                await showPurchaseNotice(
+                    'Advertencias de proveedor',
                     supplierWarnings.value
                         .map((warning) => warning.message)
                         .join('\n'),
@@ -1672,6 +1791,105 @@ watch(
             @load-more="fetchPickerProducts(true)"
             @search="handlePickerSearch"
         />
+
+        <div
+            v-if="purchaseNotice"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+        >
+            <div
+                class="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-border dark:bg-card"
+            >
+                <div class="border-b border-gray-200 px-5 py-4 dark:border-border">
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                        {{ purchaseNotice.title }}
+                    </h3>
+                </div>
+                <div class="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
+                    <p class="whitespace-pre-line">{{ purchaseNotice.message }}</p>
+                </div>
+                <div
+                    class="flex justify-end border-t border-gray-200 px-5 py-4 dark:border-border"
+                >
+                    <button
+                        type="button"
+                        class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                        @click="closePurchaseNotice"
+                    >
+                        Entendido
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="supplierLinkPrompt"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+        >
+            <div
+                class="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-border dark:bg-card"
+            >
+                <div class="border-b border-gray-200 px-5 py-4 dark:border-border">
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                        Producto no vinculado al proveedor
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Esta pieza no esta vinculada al proveedor seleccionado.
+                    </p>
+                </div>
+                <div class="space-y-2 px-5 py-4 text-sm">
+                    <p class="font-semibold text-gray-900 dark:text-white">
+                        {{ supplierLinkPrompt.name }}
+                    </p>
+                    <p class="text-gray-500">
+                        Codigo: {{ supplierLinkPrompt.sku || 'N/A' }}
+                    </p>
+                    <p class="text-gray-500">
+                        Costo sugerido:
+                        {{ formatCurrency(supplierLinkPrompt.cost || 0) }}
+                    </p>
+                    <p class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                        Puedes vincularla ahora para futuras compras, continuar
+                        dejando advertencia en la orden, o cancelar.
+                    </p>
+                    <p
+                        v-if="candidateError"
+                        class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300"
+                    >
+                        {{ candidateError }}
+                    </p>
+                </div>
+                <div
+                    class="flex flex-wrap justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-border"
+                >
+                    <button
+                        type="button"
+                        class="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
+                        @click="resolveSupplierLinkDecision('cancel')"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md border border-amber-200 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/30"
+                        @click="resolveSupplierLinkDecision('continue')"
+                    >
+                        Continuar sin vincular
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        :disabled="linkingSupplierVariant"
+                        @click="linkPromptedSupplierVariant"
+                    >
+                        {{
+                            linkingSupplierVariant
+                                ? 'Vinculando...'
+                                : 'Vincular ahora'
+                        }}
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <ProductVariantFormModal
             v-if="variantEditTarget"

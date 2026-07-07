@@ -16,6 +16,10 @@ import type {
     CapitalMovement,
     FinancialDrilldownReport,
     FinancialAdvancedStatusReport,
+    AccountingAccountsReport,
+    AccountingJournalEntry,
+    AccountingLedgerReport,
+    AccountingPaginatedReport,
 } from '@/types/report';
 import apiClient from './api/client';
 
@@ -277,6 +281,8 @@ export const ReportsApiService = {
         date_from: string;
         date_to: string;
         warehouse_id?: number | null;
+        expense_category?: string | null;
+        expense_group?: string | null;
         page?: number;
         per_page?: number;
     }): Promise<FinancialDrilldownReport> {
@@ -289,6 +295,76 @@ export const ReportsApiService = {
     async getFinancialAdvancedStatus(): Promise<FinancialAdvancedStatusReport> {
         const response = await apiClient.get(
             '/reports/financial-advanced-status',
+        );
+        return response.data;
+    },
+
+    async getAccountingJournal(filters?: {
+        date_from?: string;
+        date_to?: string;
+        warehouse_id?: number | null;
+        page?: number;
+        per_page?: number;
+    }): Promise<AccountingPaginatedReport<AccountingJournalEntry>> {
+        const response = await apiClient.get('/reports/accounting/journal', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getAccountingAccounts(filters?: {
+        date_from?: string;
+        date_to?: string;
+        warehouse_id?: number | null;
+    }): Promise<AccountingAccountsReport> {
+        const response = await apiClient.get('/reports/accounting/accounts', {
+            params: filters,
+        });
+        return response.data;
+    },
+
+    async getAccountingAccountLedger(
+        accountId: number,
+        filters?: {
+            date_from?: string;
+            date_to?: string;
+            warehouse_id?: number | null;
+            page?: number;
+            per_page?: number;
+        },
+    ): Promise<AccountingLedgerReport> {
+        const response = await apiClient.get(
+            `/reports/accounting/accounts/${accountId}/ledger`,
+            { params: filters },
+        );
+        return response.data;
+    },
+
+    async getAccountingTAccount(
+        accountId: number,
+        filters?: {
+            date_from?: string;
+            date_to?: string;
+            warehouse_id?: number | null;
+            page?: number;
+            per_page?: number;
+        },
+    ): Promise<AccountingLedgerReport> {
+        const response = await apiClient.get(
+            `/reports/accounting/accounts/${accountId}/t-account`,
+            { params: filters },
+        );
+        return response.data;
+    },
+
+    async getAccountingTrialBalance(filters?: {
+        date_from?: string;
+        date_to?: string;
+        warehouse_id?: number | null;
+    }): Promise<AccountingAccountsReport> {
+        const response = await apiClient.get(
+            '/reports/accounting/trial-balance',
+            { params: filters },
         );
         return response.data;
     },

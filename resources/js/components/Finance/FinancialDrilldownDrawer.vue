@@ -13,6 +13,9 @@ const props = defineProps<{
 const emit = defineEmits<{
     close: [];
     page: [page: number];
+    drilldown: [
+        payload: { key: string; metric: string; label: string; value: number },
+    ];
 }>();
 
 const warningLabels: Record<string, string> = {
@@ -35,6 +38,26 @@ const formatCell = (value: unknown, type?: string): string => {
     }
 
     return String(value);
+};
+
+const canOpenNestedDrilldown = (
+    row: Record<string, unknown>,
+    columnKey: string,
+): boolean =>
+    columnKey === 'detail_metric' &&
+    typeof row.detail_metric === 'string' &&
+    row.detail_metric.trim() !== '';
+
+const openNestedDrilldown = (row: Record<string, unknown>): void => {
+    const metric = String(row.detail_metric || '');
+    if (!metric) return;
+
+    emit('drilldown', {
+        key: metric,
+        metric,
+        label: String(row.component || row.source || metric),
+        value: Number(row.amount || 0),
+    });
 };
 </script>
 
@@ -136,7 +159,24 @@ const formatCell = (value: unknown, type?: string): string => {
                                         column.type === 'money',
                                 }"
                             >
-                                {{ formatCell(row[column.key], column.type) }}
+                                <button
+                                    v-if="
+                                        canOpenNestedDrilldown(row, column.key)
+                                    "
+                                    type="button"
+                                    class="rounded px-2 py-1 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700 focus:ring-1 focus:ring-indigo-200 focus:outline-none dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                                    @click="openNestedDrilldown(row)"
+                                >
+                                    Ver movimientos
+                                </button>
+                                <span v-else>
+                                    {{
+                                        formatCell(
+                                            row[column.key],
+                                            column.type,
+                                        )
+                                    }}
+                                </span>
                             </td>
                         </tr>
                     </tbody>

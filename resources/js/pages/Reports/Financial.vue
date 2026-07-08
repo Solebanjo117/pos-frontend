@@ -26,6 +26,7 @@ import SearchableSelect, {
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { InventoryApiService } from '@/services/inventory';
 import type { BreadcrumbItem } from '@/types';
@@ -70,6 +71,7 @@ const {
     fetchCapitalMovements,
 } = useReports();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
+const { fetchSettings: fetchStoreSettings } = useStoreSettings();
 
 const warehouses = ref<any[]>([]);
 const activePreset = ref<DatePreset>('month');
@@ -490,7 +492,11 @@ const updateCapitalMovementBusinessDatetime = (
 onMounted(async () => {
     // Resolve warehouse context + list first (lightweight), tolerating failures
     // so a single error here never throws out of the mounted hook.
-    const setup = await Promise.allSettled([initWarehouse(), loadWarehouses()]);
+    const setup = await Promise.allSettled([
+        fetchStoreSettings(),
+        initWarehouse(),
+        loadWarehouses(),
+    ]);
     if (setup.some((result) => result.status === 'rejected') && !error.value) {
         error.value =
             'No se pudo cargar la configuración de sucursales. Mostrando datos disponibles.';

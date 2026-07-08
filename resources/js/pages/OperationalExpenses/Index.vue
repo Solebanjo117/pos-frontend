@@ -16,6 +16,7 @@ import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { InventoryApiService } from '@/services/inventory';
 import { operationalExpensesService } from '@/services/operational-expenses';
@@ -31,6 +32,7 @@ import type {
     OperationalExpensePaymentMethod,
     OperationalExpensePaymentMethodOption,
 } from '@/types/operational-expense';
+import { formatCurrency, formatReportDate } from '@/utils/formatters';
 
 const today = new Date();
 const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -75,6 +77,7 @@ const expenseKinds = ref<Record<string, string>>({
 const showForm = ref(false);
 const editingExpense = ref<OperationalExpense | null>(null);
 const creatingCategory = ref(false);
+const { fetchSettings: fetchStoreSettings } = useStoreSettings();
 
 const filters = ref({
     date_from: firstDayOfMonth.toISOString().split('T')[0],
@@ -205,16 +208,8 @@ const nonCashExpenseTotal = computed(() =>
         .reduce((total, expense) => total + Number(expense.amount || 0), 0),
 );
 
-function formatCurrency(value: number | string | null | undefined): string {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value || 0));
-}
-
 function formatDate(value?: string | null): string {
-    if (!value) return '-';
-    return new Date(value).toLocaleDateString('es-PA');
+    return formatReportDate(value);
 }
 
 async function loadWarehouses() {
@@ -452,6 +447,7 @@ function readInitialFilters() {
 onMounted(async () => {
     readInitialFilters();
     await Promise.all([
+        fetchStoreSettings(),
         loadWarehouses(),
         loadSuppliers(),
         loadLedgerAccounts(),

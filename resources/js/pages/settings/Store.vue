@@ -8,6 +8,7 @@ import {
     Clock,
     CreditCard,
     FileText,
+    Globe2,
     Image,
     Lock,
     Mail,
@@ -103,10 +104,46 @@ const liquidityBucketOptions = [
     { value: 'credit', label: 'Credito' },
     { value: 'store_credit', label: 'Saldo a favor' },
 ] as const;
+const timezoneOptions = [
+    { value: 'America/Panama', label: 'America/Panama' },
+    { value: 'America/Bogota', label: 'America/Bogota' },
+    { value: 'America/Mexico_City', label: 'America/Mexico_City' },
+    { value: 'America/New_York', label: 'America/New_York' },
+    { value: 'UTC', label: 'UTC' },
+] as const;
+const dateFormatOptions = [
+    { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
+    { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
+    { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
+] as const;
+const timeFormatOptions = [
+    { value: '24h', label: '24 horas' },
+    { value: '12h', label: '12 horas' },
+] as const;
+const datetimeFormatOptions = [
+    { value: 'DD/MM/YYYY HH:mm', label: 'DD/MM/YYYY HH:mm' },
+    { value: 'DD/MM/YYYY hh:mm A', label: 'DD/MM/YYYY hh:mm A' },
+    { value: 'MM/DD/YYYY HH:mm', label: 'MM/DD/YYYY HH:mm' },
+    { value: 'MM/DD/YYYY hh:mm A', label: 'MM/DD/YYYY hh:mm A' },
+    { value: 'YYYY-MM-DD HH:mm', label: 'YYYY-MM-DD HH:mm' },
+    { value: 'YYYY-MM-DD hh:mm A', label: 'YYYY-MM-DD hh:mm A' },
+] as const;
+const countryOptions = [
+    { value: 'Panama', label: 'Panama' },
+    { value: 'Colombia', label: 'Colombia' },
+    { value: 'Mexico', label: 'Mexico' },
+    { value: 'United States', label: 'United States' },
+    { value: 'Other', label: 'Otro' },
+] as const;
+const decimalSeparatorOptions = [
+    { value: '.', label: 'Punto (1,234.56)' },
+    { value: ',', label: 'Coma (1.234,56)' },
+] as const;
 
 const sections = [
     { id: 'identity', label: 'Identidad' },
     { id: 'documents', label: 'Documentos' },
+    { id: 'regional', label: 'Regional' },
     { id: 'payments', label: 'Pagos' },
     { id: 'quotes', label: 'Cotizaciones' },
     { id: 'fiscal', label: 'Fiscal' },
@@ -538,7 +575,7 @@ const handleResetData = async () => {
                                 Documentos e impresion
                             </h3>
                         </div>
-                        <div class="grid gap-4 md:grid-cols-[1fr_180px]">
+                        <div class="grid gap-4">
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium">
                                     Pie de pagina en tickets
@@ -550,10 +587,118 @@ const handleResetData = async () => {
                                     placeholder="Gracias por su compra"
                                 />
                             </div>
-                            <div class="space-y-1.5">
-                                <label class="text-sm font-medium"
-                                    >Moneda</label
+                        </div>
+                    </section>
+
+                    <section
+                        id="regional"
+                        class="scroll-mt-20 rounded-lg border bg-card p-4"
+                    >
+                        <div class="mb-4 flex items-center gap-2">
+                            <Globe2 class="h-4 w-4 text-primary" />
+                            <div>
+                                <h3
+                                    class="text-sm font-semibold text-foreground"
                                 >
+                                    Configuracion regional y sistema
+                                </h3>
+                                <p class="text-xs text-muted-foreground">
+                                    Define como se muestran fechas, horas y
+                                    montos en reportes y pantallas principales.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-medium">
+                                    Zona horaria
+                                </label>
+                                <select
+                                    v-model="settings.regional_timezone"
+                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option
+                                        v-for="option in timezoneOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                    >
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-medium">
+                                    Formato de fecha
+                                </label>
+                                <select
+                                    v-model="settings.regional_date_format"
+                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option
+                                        v-for="option in dateFormatOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                    >
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-medium">
+                                    Formato de hora
+                                </label>
+                                <select
+                                    v-model="settings.regional_time_format"
+                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option
+                                        v-for="option in timeFormatOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                    >
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-medium">
+                                    Fecha y hora
+                                </label>
+                                <select
+                                    v-model="settings.regional_datetime_format"
+                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option
+                                        v-for="option in datetimeFormatOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                    >
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-medium">
+                                    Pais / region
+                                </label>
+                                <select
+                                    v-model="settings.regional_country"
+                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option
+                                        v-for="option in countryOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                    >
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-medium">
+                                    Moneda principal
+                                </label>
                                 <select
                                     v-model="settings.store_currency"
                                     class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
@@ -565,6 +710,45 @@ const handleResetData = async () => {
                                     <option value="COP">COP ($)</option>
                                 </select>
                             </div>
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-medium">
+                                    Separador decimal
+                                </label>
+                                <select
+                                    v-model="
+                                        settings.regional_decimal_separator
+                                    "
+                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option
+                                        v-for="option in decimalSeparatorOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                    >
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <label
+                                class="flex items-start gap-3 rounded-md border p-3"
+                            >
+                                <input
+                                    v-model="
+                                        settings.regional_settings_active
+                                    "
+                                    type="checkbox"
+                                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <span>
+                                    <span class="block text-sm font-medium">
+                                        Usar preferencias regionales
+                                    </span>
+                                    <span class="text-xs text-muted-foreground">
+                                        Si se desactiva, el sistema usa los
+                                        formatos por defecto.
+                                    </span>
+                                </span>
+                            </label>
                         </div>
                     </section>
 

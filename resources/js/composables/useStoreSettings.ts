@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import apiClient from '@/services/api/client';
+import { configureRegionalFormatters } from '@/utils/formatters';
 
 const normalizeTaxRate = (value: unknown): number => {
     const parsed = Number(value);
@@ -42,6 +43,13 @@ export interface StoreSettings {
     require_stock_for_quotes: boolean; // Require available stock to create a quote
     store_tax_rate: number;
     modules_work_orders_enabled: boolean;
+    regional_timezone: string;
+    regional_date_format: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
+    regional_time_format: '12h' | '24h';
+    regional_datetime_format: string;
+    regional_country: string;
+    regional_decimal_separator: '.' | ',';
+    regional_settings_active: boolean;
 }
 
 const settings = ref<StoreSettings>({
@@ -62,12 +70,33 @@ const settings = ref<StoreSettings>({
     require_stock_for_quotes: false,
     store_tax_rate: 7,
     modules_work_orders_enabled: false,
+    regional_timezone: 'America/Panama',
+    regional_date_format: 'DD/MM/YYYY',
+    regional_time_format: '24h',
+    regional_datetime_format: 'DD/MM/YYYY HH:mm',
+    regional_country: 'Panama',
+    regional_decimal_separator: '.',
+    regional_settings_active: true,
 });
 
 const loading = ref(false);
 const saving = ref(false);
 const error = ref<string | null>(null);
 let fetched = false;
+
+const syncRegionalFormatters = (): void => {
+    configureRegionalFormatters({
+        active: settings.value.regional_settings_active,
+        timezone: settings.value.regional_timezone,
+        dateFormat: settings.value.regional_date_format,
+        timeFormat: settings.value.regional_time_format,
+        datetimeFormat: settings.value.regional_datetime_format,
+        currency: settings.value.store_currency,
+        decimalSeparator: settings.value.regional_decimal_separator,
+    });
+};
+
+syncRegionalFormatters();
 
 export function useStoreSettings() {
     async function fetchSettings() {
@@ -83,6 +112,7 @@ export function useStoreSettings() {
             settings.value.store_tax_rate = normalizeTaxRate(
                 settings.value.store_tax_rate,
             );
+            syncRegionalFormatters();
             fetched = true;
         } catch (e: any) {
             error.value =
@@ -109,6 +139,7 @@ export function useStoreSettings() {
             settings.value.store_tax_rate = normalizeTaxRate(
                 settings.value.store_tax_rate,
             );
+            syncRegionalFormatters();
             return true;
         } catch (e: any) {
             error.value =

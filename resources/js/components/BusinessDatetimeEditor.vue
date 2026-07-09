@@ -9,6 +9,7 @@ import {
     type BusinessDatetimeAudit,
     type BusinessDatetimeRecordType,
 } from '@/services/business-datetime';
+import { formatReportDateTime } from '@/utils/formatters';
 
 const props = withDefaults(
     defineProps<{
@@ -63,12 +64,7 @@ const effectiveDatetime = computed(
 const latestAudit = computed(() => audits.value[0] ?? null);
 
 function formatDateTime(value?: string | null): string {
-    if (!value) return '-';
-
-    return new Date(value).toLocaleString('es-PA', {
-        dateStyle: 'short',
-        timeStyle: 'short',
-    });
+    return formatReportDateTime(value);
 }
 
 function toDateTimeLocal(value?: string | null): string {

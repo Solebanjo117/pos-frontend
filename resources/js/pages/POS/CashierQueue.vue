@@ -45,6 +45,8 @@ onUnmounted(() => {
 
 // Process payment: use exactly the same pattern as openQuoteInPOS in SalesQuotes/Index.vue
 const processingId = ref<number | null>(null);
+const queueNotice = ref<{ title: string; message: string } | null>(null);
+const quoteToRemove = ref<PendingQuote | null>(null);
 
 const processPayment = async (quote: PendingQuote) => {
     processingId.value = quote.id;
@@ -73,9 +75,12 @@ const processPayment = async (quote: PendingQuote) => {
         });
         router.visit('/pos');
     } catch (e: any) {
-        alert(
-            e.response?.data?.message || 'Error al cargar la cotización en POS',
-        );
+        queueNotice.value = {
+            title: 'No se pudo abrir en POS',
+            message:
+                e.response?.data?.message ||
+                'Error al cargar la cotizacion en POS',
+        };
     } finally {
         processingId.value = null;
     }
@@ -95,17 +100,28 @@ const formatCurrency = (value: number | string) => {
 const removingId = ref<number | null>(null);
 
 const handleRemoveFromQueue = async (quote: PendingQuote) => {
-    const confirmed = confirm(
-        `¿Remover "${quote.quote_number}" de la cola de caja?\n\nLa cotización NO se eliminará, solo saldrá de la cola.`,
-    );
-    if (!confirmed) return;
+    quoteToRemove.value = quote;
+};
 
+const confirmRemoveFromQueue = async () => {
+    if (!quoteToRemove.value) return;
+
+    const quote = quoteToRemove.value;
+    quoteToRemove.value = null;
     removingId.value = quote.id;
     try {
         const success = await removeFromQueue(quote.id);
-        if (!success) alert('Error al remover la cotización de la cola');
+        if (!success) {
+            queueNotice.value = {
+                title: 'No se pudo remover',
+                message: 'Error al remover la cotizacion de la cola',
+            };
+        }
     } catch (e: any) {
-        alert(e.response?.data?.message || 'Error al remover de la cola');
+        queueNotice.value = {
+            title: 'No se pudo remover',
+            message: e.response?.data?.message || 'Error al remover de la cola',
+        };
     } finally {
         removingId.value = null;
     }
@@ -327,6 +343,79 @@ const summarizedProducts = (items: PendingQuote['items']) => {
                                 ? 'Cargando...'
                                 : 'Procesar Pago'
                         }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="quoteToRemove"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+        >
+            <div
+                class="w-full max-w-md rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-border dark:bg-card"
+            >
+                <div class="border-b border-gray-200 px-5 py-4 dark:border-border">
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                        Remover de cola
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        La cotizacion no se eliminara; solo saldra de la cola de caja.
+                    </p>
+                </div>
+                <div class="space-y-2 px-5 py-4 text-sm">
+                    <p class="font-semibold text-gray-900 dark:text-white">
+                        {{ quoteToRemove.quote_number }}
+                    </p>
+                    <p class="text-gray-500">
+                        {{ quoteToRemove.customer?.name || 'Publico General' }}
+                    </p>
+                </div>
+                <div
+                    class="flex justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-border"
+                >
+                    <button
+                        type="button"
+                        class="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
+                        @click="quoteToRemove = null"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                        @click="confirmRemoveFromQueue"
+                    >
+                        Remover
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="queueNotice"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+        >
+            <div
+                class="w-full max-w-md rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-border dark:bg-card"
+            >
+                <div class="border-b border-gray-200 px-5 py-4 dark:border-border">
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                        {{ queueNotice.title }}
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        {{ queueNotice.message }}
+                    </p>
+                </div>
+                <div
+                    class="flex justify-end border-t border-gray-200 px-5 py-4 dark:border-border"
+                >
+                    <button
+                        type="button"
+                        class="rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                        @click="queueNotice = null"
+                    >
+                        Entendido
                     </button>
                 </div>
             </div>

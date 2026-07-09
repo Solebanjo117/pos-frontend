@@ -13,6 +13,7 @@ import {
     ListOrdered,
     Package,
     PackageSearch,
+    Plus,
     Receipt,
     RotateCcw,
     Settings,
@@ -142,11 +143,11 @@ const canAccessReturns = computed(() =>
 const mainNavItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [];
 
-    // --- Cola ---
-    const queueItems: NavItem[] = [];
+    // --- Caja ---
+    const cashItems: NavItem[] = [];
     if (canAccessCashierQueue.value) {
-        queueItems.push({
-            title: 'Cola Caja',
+        cashItems.push({
+            title: 'Cola',
             href: '/pos/cashier',
             icon: Inbox,
             badge:
@@ -155,6 +156,34 @@ const mainNavItems = computed<NavItem[]>(() => {
                     : undefined,
         });
     }
+    if (canAccessPOS.value) {
+        cashItems.push({
+            title: 'Cobro manual',
+            href: '/pos',
+            icon: ShoppingCart,
+        });
+        cashItems.push({
+            title: 'Cierre de caja',
+            href: '/pos-sessions',
+            icon: Receipt,
+        });
+        cashItems.push({
+            title: 'Historial del dia',
+            href: '/reports/z-report',
+            icon: FileText,
+        });
+    }
+
+    if (cashItems.length > 0) {
+        items.push({
+            title: 'Caja',
+            icon: Banknote,
+            items: cashItems,
+        });
+    }
+
+    // --- Cola ---
+    const queueItems: NavItem[] = [];
     if (canAccessWarehouseQueue.value) {
         queueItems.push({
             title: 'Cola Bodega',
@@ -199,21 +228,8 @@ const mainNavItems = computed<NavItem[]>(() => {
 
     // --- Ventas ---
     const salesItems: NavItem[] = [];
-    if (canAccessPOS.value) {
-        salesItems.push({
-            title: 'Caja',
-            href: '/pos',
-            icon: ShoppingCart,
-        });
-        salesItems.push({
-            title: 'Cierres de Caja',
-            href: '/pos-sessions',
-            icon: Receipt,
-        });
-    }
-
     salesItems.push({
-        title: 'Órdenes de Venta',
+        title: 'Transacciones',
         href: '/sales-orders',
         icon: ClipboardList,
     });
@@ -261,6 +277,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                     icon: Receipt,
                 },
                 {
+                    title: 'Crear gasto',
+                    href: '/operational-expenses?new=1',
+                    icon: Plus,
+                },
+                {
                     title: 'Proveedores',
                     href: '/suppliers',
                     icon: Factory,
@@ -272,14 +293,34 @@ const mainNavItems = computed<NavItem[]>(() => {
     // --- Inventario ---
     const inventoryItems: NavItem[] = [
         {
-            title: 'Inventario',
+            title: 'Buscar item',
             href: '/inventory',
             icon: Warehouse,
         },
         {
-            title: 'Productos',
+            title: 'Items',
             href: '/products',
             icon: Package,
+        },
+        {
+            title: 'Importar items',
+            href: '/products/import',
+            icon: PackageSearch,
+        },
+        {
+            title: 'Movimientos',
+            href: '/inventory-movements',
+            icon: ClipboardList,
+        },
+        {
+            title: 'Transferencias',
+            href: '/inventory-transfers',
+            icon: Truck,
+        },
+        {
+            title: 'Mermas',
+            href: '/inventory/waste',
+            icon: RotateCcw,
         },
     ];
 
@@ -362,27 +403,27 @@ const mainNavItems = computed<NavItem[]>(() => {
             icon: BarChart3,
             items: [
                 {
-                    title: 'Niveles de Stock',
+                    title: 'Inventario: Stock',
                     href: '/reports/stock-levels',
                 },
                 {
-                    title: 'Histórico de Movimientos',
+                    title: 'Inventario: Movimientos',
                     href: '/reports/movement-history',
                 },
                 {
-                    title: 'Finanzas y Rentabilidad',
+                    title: 'Contabilidad: Finanzas',
                     href: '/reports/financial',
                 },
                 {
-                    title: 'Clientes y referencias',
+                    title: 'Clientes: Referencias',
                     href: '/reports/customer-references',
                 },
                 {
-                    title: 'Ventas por Cliente',
+                    title: 'Ventas: Por cliente',
                     href: '/reports/sales-by-client',
                 },
                 {
-                    title: 'Cierre de Caja (Z-Report)',
+                    title: 'Pagos: Cierre Z',
                     href: '/reports/z-report',
                 },
             ],

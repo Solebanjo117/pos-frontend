@@ -21,19 +21,14 @@ import FinanceKpiRow from '@/components/Finance/FinanceKpiRow.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import FinancialDrilldownDrawer from '@/components/Finance/FinancialDrilldownDrawer.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { InventoryApiService } from '@/services/inventory';
 import type { BreadcrumbItem } from '@/types';
 import type { ExpenseBreakdown, FinancialAdjustmentType } from '@/types/report';
 import { formatCurrency } from '@/utils/formatters';
 
-type DatePreset = 'today' | 'week' | 'month' | 'custom';
 type ReportTab = 'summary' | 'balance' | 'income' | 'credits' | 'investment';
 type ReportMode = 'basic' | 'advanced';
 type DrilldownFilters = {
@@ -73,8 +68,6 @@ const {
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 const { fetchSettings: fetchStoreSettings } = useStoreSettings();
 
-const warehouses = ref<any[]>([]);
-const activePreset = ref<DatePreset>('month');
 const activeTab = ref<ReportTab>('summary');
 const activeMode = ref<ReportMode>('basic');
 const adjustmentOpen = ref(false);
@@ -93,11 +86,17 @@ const selectedKpi = ref<{
 } | null>(null);
 const activeDrilldownFilters = ref<DrilldownFilters | null>(null);
 
-const today = new Date();
-const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+const formatInputDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const todayInput = formatInputDate(new Date());
 const filters = ref({
-    date_from: firstDayOfMonth.toISOString().split('T')[0],
-    date_to: today.toISOString().split('T')[0],
+    date_from: todayInput,
+    date_to: todayInput,
     warehouse_id: null as number | null,
 });
 
@@ -108,30 +107,6 @@ const tabs: Array<{ key: ReportTab; label: string; icon: any }> = [
     { key: 'credits', label: 'Creditos', icon: Clock },
     { key: 'investment', label: 'Inversion', icon: Landmark },
 ];
-const datePresets: Array<{ key: DatePreset; label: string }> = [
-    { key: 'today', label: 'Hoy' },
-    { key: 'week', label: 'Semana' },
-    { key: 'month', label: 'Mes' },
-    { key: 'custom', label: 'Manual' },
-];
-
-const warehouseOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Todas' },
-    ...warehouses.value.map((warehouse) => ({
-        value: warehouse.id,
-        label: warehouse.name,
-    })),
-]);
-
-const selectedWarehouseLabel = computed(() => {
-    if (!filters.value.warehouse_id) return 'Todas las sucursales';
-    return (
-        warehouses.value.find(
-            (warehouse) => warehouse.id === filters.value.warehouse_id,
-        )?.name ?? `Sucursal #${filters.value.warehouse_id}`
-    );
-});
-
 const kpis = computed(() => {
     const totals = dailySummary.value?.totals ?? {};
     const credits = incomeStatementReport.value?.credit_balances ?? {};
@@ -166,7 +141,7 @@ const kpis = computed(() => {
         },
         {
             key: 'cogs',
-            label: 'COGS',
+            label: 'Costo',
             value: totals.cogs ?? 0,
             metric: 'cogs',
         },
@@ -223,14 +198,6 @@ const expenseBreakdown = computed<ExpenseBreakdown | null>(
     () => incomeStatementReport.value?.expense_breakdown ?? null,
 );
 
-const topExpenses = computed(() => {
-    const breakdown = expenseBreakdown.value;
-    if (!breakdown) return [];
-    return [...breakdown.items, breakdown.other]
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 5);
-});
-
 const investmentTotals = computed(() => {
     const totals = dailySummary.value?.totals ?? {};
 
@@ -274,15 +241,6 @@ const formatCreditDate = (value?: string | null): string => {
         month: 'short',
         day: '2-digit',
     });
-};
-
-const loadWarehouses = async (): Promise<void> => {
-    try {
-        warehouses.value = await InventoryApiService.getWarehouses();
-    } catch (err) {
-        console.error('Error loading warehouses:', err);
-        warehouses.value = [];
-    }
 };
 
 const loadReports = async (): Promise<void> => {
@@ -406,31 +364,6 @@ const openDailySummaryDrilldown = (payload: {
     );
 };
 
-const setPreset = (preset: DatePreset): void => {
-    activePreset.value = preset;
-    const now = new Date();
-
-    if (preset === 'today') {
-        filters.value.date_from = now.toISOString().split('T')[0];
-        filters.value.date_to = now.toISOString().split('T')[0];
-    }
-
-    if (preset === 'week') {
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-        filters.value.date_from = monday.toISOString().split('T')[0];
-        filters.value.date_to = now.toISOString().split('T')[0];
-    }
-
-    if (preset === 'month') {
-        const first = new Date(now.getFullYear(), now.getMonth(), 1);
-        filters.value.date_from = first.toISOString().split('T')[0];
-        filters.value.date_to = now.toISOString().split('T')[0];
-    }
-
-    void loadReports();
-};
-
 const openAdjustment = (type: FinancialAdjustmentType) => {
     adjustmentType.value = type;
     adjustmentOpen.value = true;
@@ -490,12 +423,11 @@ const updateCapitalMovementBusinessDatetime = (
 };
 
 onMounted(async () => {
-    // Resolve warehouse context + list first (lightweight), tolerating failures
+    // Resolve report context first (lightweight), tolerating failures
     // so a single error here never throws out of the mounted hook.
     const setup = await Promise.allSettled([
         fetchStoreSettings(),
         initWarehouse(),
-        loadWarehouses(),
     ]);
     if (setup.some((result) => result.status === 'rejected') && !error.value) {
         error.value =
@@ -522,7 +454,7 @@ watch(currentWarehouseId, (value) => {
             <FinanceReportShell
                 eyebrow="Reportes"
                 title="Finanzas y Rentabilidad"
-                :subtitle="`${filters.date_from} - ${filters.date_to} · ${selectedWarehouseLabel}`"
+                :subtitle="`${filters.date_from} - ${filters.date_to}`"
                 :icon="BarChart3"
             >
                 <template #actions>
@@ -540,52 +472,15 @@ watch(currentWarehouseId, (value) => {
 
                 <div class="space-y-3">
                     <div
-                        class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-5 dark:border-slate-800 dark:bg-slate-900/60"
+                        class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60"
                     >
-                        <div class="md:col-span-2">
-                            <label
-                                class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                            >
-                                Periodo
-                            </label>
-                            <div
-                                class="grid grid-cols-4 overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"
-                            >
-                                <button
-                                    v-for="preset in datePresets"
-                                    :key="preset.key"
-                                    class="px-3 py-2 text-xs font-medium transition"
-                                    :class="
-                                        activePreset === preset.key
-                                            ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
-                                            : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
-                                    "
-                                    @click="setPreset(preset.key)"
-                                >
-                                    {{ preset.label }}
-                                </button>
-                            </div>
-                        </div>
                         <DateRangeInput
                             v-model:from="filters.date_from"
                             v-model:to="filters.date_to"
-                            label="Rango"
-                            class="md:col-span-2"
+                            label="Rango de fechas"
+                            class="max-w-xl"
                             @change="loadReports"
                         />
-                        <div>
-                            <label
-                                class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                            >
-                                Sucursal
-                            </label>
-                            <SearchableSelect
-                                v-model="filters.warehouse_id"
-                                :options="warehouseOptions"
-                                placeholder="Todas"
-                                @update:model-value="loadReports"
-                            />
-                        </div>
                     </div>
 
                     <div
@@ -1190,94 +1085,6 @@ watch(currentWarehouseId, (value) => {
                 </div>
 
                 <aside class="space-y-3">
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
-                    >
-                        <h3
-                            class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            Balance Rapido
-                        </h3>
-                        <div class="space-y-1 text-xs">
-                            <div class="flex justify-between">
-                                <span class="text-slate-600 dark:text-slate-400"
-                                    >Activos</span
-                                >
-                                <span
-                                    class="font-semibold text-slate-900 tabular-nums dark:text-slate-100"
-                                    >{{
-                                        formatCurrency(
-                                            balanceSheet?.totals.total_assets ??
-                                                0,
-                                        )
-                                    }}</span
-                                >
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-600 dark:text-slate-400"
-                                    >Pasivos</span
-                                >
-                                <span
-                                    class="font-semibold text-amber-600 tabular-nums dark:text-amber-400"
-                                    >{{
-                                        formatCurrency(
-                                            balanceSheet?.totals
-                                                .total_liabilities ?? 0,
-                                        )
-                                    }}</span
-                                >
-                            </div>
-                            <div
-                                class="mt-1 flex justify-between border-t border-slate-200 pt-1 dark:border-slate-800"
-                            >
-                                <span
-                                    class="font-bold text-slate-900 dark:text-slate-100"
-                                    >Balance</span
-                                >
-                                <span
-                                    class="font-bold text-indigo-600 tabular-nums dark:text-indigo-400"
-                                    >{{
-                                        formatCurrency(
-                                            balanceSheet?.totals.balance ?? 0,
-                                        )
-                                    }}</span
-                                >
-                            </div>
-                        </div>
-                    </div>
-
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
-                    >
-                        <h3
-                            class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            Top Gastos
-                        </h3>
-                        <div class="space-y-1 text-xs">
-                            <div
-                                v-for="item in topExpenses"
-                                :key="item.label"
-                                class="flex justify-between"
-                            >
-                                <span
-                                    class="text-slate-600 dark:text-slate-400"
-                                    >{{ item.label }}</span
-                                >
-                                <span
-                                    class="text-slate-900 tabular-nums dark:text-slate-100"
-                                    >{{ formatCurrency(item.amount) }}</span
-                                >
-                            </div>
-                            <div
-                                v-if="!topExpenses.length"
-                                class="py-2 text-center text-slate-400"
-                            >
-                                Sin gastos en el periodo
-                            </div>
-                        </div>
-                    </div>
-
                     <div
                         class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
                     >

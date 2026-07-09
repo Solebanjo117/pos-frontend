@@ -214,7 +214,7 @@ const selectMetric = (metric: string, label: string, value: number): void => {
                     >
                         <span
                             class="font-bold text-slate-900 dark:text-slate-100"
-                            >Total Pasivos</span
+                            >Total Credito</span
                         >
                         <button
                             type="button"
@@ -222,7 +222,7 @@ const selectMetric = (metric: string, label: string, value: number): void => {
                             @click="
                                 selectMetric(
                                     'liabilities',
-                                    'Pasivos',
+                                    'Total Credito',
                                     amount(
                                         props.data?.totals.total_liabilities,
                                     ),

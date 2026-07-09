@@ -18,7 +18,6 @@ import SearchableSelect, {
 } from '@/components/ui/SearchableSelect.vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { InventoryApiService } from '@/services/inventory';
 import { operationalExpensesService } from '@/services/operational-expenses';
 import { ReportsApiService } from '@/services/reports';
 import { suppliersService } from '@/services/suppliers';
@@ -41,7 +40,6 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref<string | null>(null);
 const expenses = ref<OperationalExpense[]>([]);
-const warehouses = ref<any[]>([]);
 const suppliers = ref<Supplier[]>([]);
 const ledgerAccounts = ref<AccountingAccountSummary[]>([]);
 const expenseCategories = ref<OperationalExpenseCategoryRecord[]>([]);
@@ -129,22 +127,6 @@ const formCategoryOptions = computed<SelectOption[]>(() =>
     })),
 );
 
-const warehouseOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Sucursal actual' },
-    ...warehouses.value.map((warehouse) => ({
-        value: warehouse.id,
-        label: warehouse.name,
-    })),
-]);
-
-const filterWarehouseOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Todas' },
-    ...warehouses.value.map((warehouse) => ({
-        value: warehouse.id,
-        label: warehouse.name,
-    })),
-]);
-
 const supplierOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Sin proveedor' },
     ...suppliers.value.map((supplier) => ({
@@ -210,14 +192,6 @@ const nonCashExpenseTotal = computed(() =>
 
 function formatDate(value?: string | null): string {
     return formatReportDate(value);
-}
-
-async function loadWarehouses() {
-    try {
-        warehouses.value = await InventoryApiService.getWarehouses();
-    } catch (e) {
-        warehouses.value = [];
-    }
 }
 
 async function loadSuppliers() {
@@ -396,13 +370,27 @@ async function saveExpense() {
     saving.value = true;
     error.value = null;
     try {
+        const selectedCategory = expenseCategories.value.find(
+            (category) => category.id === form.value.category_id,
+        );
+        const categoryKey = form.value.category ?? '';
+        const payload: OperationalExpensePayload = {
+            ...form.value,
+            description:
+                form.value.description?.trim() ||
+                form.value.notes?.trim() ||
+                selectedCategory?.name ||
+                categories.value[categoryKey] ||
+                'Gasto',
+        };
+
         if (editingExpense.value) {
             await operationalExpensesService.update(
                 editingExpense.value.id,
-                form.value,
+                payload,
             );
         } else {
-            await operationalExpensesService.create(form.value);
+            await operationalExpensesService.create(payload);
         }
         showForm.value = false;
         await loadExpenses();
@@ -448,12 +436,15 @@ onMounted(async () => {
     readInitialFilters();
     await Promise.all([
         fetchStoreSettings(),
-        loadWarehouses(),
         loadSuppliers(),
         loadLedgerAccounts(),
         loadExpenseCategories(),
         loadExpenses(),
     ]);
+
+    if (new URLSearchParams(window.location.search).get('new') === '1') {
+        openCreateForm();
+    }
 });
 </script>
 
@@ -556,7 +547,7 @@ onMounted(async () => {
                 <div
                     class="rounded-lg border border-gray-200 bg-white p-3 dark:border-border dark:bg-card"
                 >
-                    <div class="grid gap-3 md:grid-cols-5">
+                    <div class="grid gap-3 md:grid-cols-4">
                         <div>
                             <label
                                 class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
@@ -592,17 +583,6 @@ onMounted(async () => {
                                 :options="categoryOptions"
                             />
                         </div>
-                        <div>
-                            <label
-                                class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
-                            >
-                                Sucursal
-                            </label>
-                            <SearchableSelect
-                                v-model="filters.warehouse_id"
-                                :options="filterWarehouseOptions"
-                            />
-                        </div>
                         <div class="flex items-end">
                             <button
                                 type="button"
@@ -629,9 +609,8 @@ onMounted(async () => {
                             <tr>
                                 <th class="px-3 py-2 text-left">Fecha</th>
                                 <th class="px-3 py-2 text-left">Categoria</th>
-                                <th class="px-3 py-2 text-left">Operativa</th>
-                                <th class="px-3 py-2 text-left">Descripcion</th>
-                                <th class="px-3 py-2 text-left">Sucursal</th>
+                                <th class="px-3 py-2 text-left">Fecha/Hora</th>
+                                <th class="px-3 py-2 text-left">Proveedor</th>
                                 <th class="px-3 py-2 text-left">Metodo</th>
                                 <th class="px-3 py-2 text-left">Caja</th>
                                 <th class="px-3 py-2 text-left">Recibo</th>
@@ -644,7 +623,7 @@ onMounted(async () => {
                         >
                             <tr v-if="loading">
                                 <td
-                                    colspan="10"
+                                    colspan="9"
                                     class="px-3 py-8 text-center text-gray-500"
                                 >
                                     Cargando gastos...
@@ -652,7 +631,7 @@ onMounted(async () => {
                             </tr>
                             <tr v-else-if="expenses.length === 0">
                                 <td
-                                    colspan="10"
+                                    colspan="9"
                                     class="px-3 py-8 text-center text-gray-500"
                                 >
                                     No hay gastos para este filtro.
@@ -692,13 +671,8 @@ onMounted(async () => {
                                             "
                                         />
                                     </td>
-                                    <td class="px-3 py-2 font-medium">
-                                        {{ expense.description || '-' }}
-                                    </td>
                                     <td class="px-3 py-2">
-                                        {{
-                                            expense.warehouse?.name || 'Global'
-                                        }}
+                                        {{ expense.supplier?.name || '-' }}
                                     </td>
                                     <td class="px-3 py-2">
                                         {{
@@ -785,14 +759,33 @@ onMounted(async () => {
 
                 <div class="grid max-h-[70vh] gap-4 overflow-y-auto p-5 md:grid-cols-2">
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Nombre / descripcion *</label>
+                        <label class="mb-1 block text-sm font-medium">Fecha *</label>
                         <input
-                            v-model="form.description"
-                            type="text"
-                            maxlength="255"
+                            v-model="form.expense_date"
+                            type="date"
                             required
-                            placeholder="Ej: ERP mensual, alquiler, internet"
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Cliente / proveedor</label>
+                        <SearchableSelect
+                            v-model="form.supplier_id"
+                            :options="supplierOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Tipo</label>
+                        <SearchableSelect
+                            v-model="form.expense_kind"
+                            :options="expenseKindOptions"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Categoria</label>
+                        <SearchableSelect
+                            v-model="form.category_id"
+                            :options="formCategoryOptions"
                         />
                     </div>
                     <div>
@@ -804,29 +797,6 @@ onMounted(async () => {
                             step="0.01"
                             required
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-right dark:border-border dark:bg-muted"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Fecha *</label>
-                        <input
-                            v-model="form.expense_date"
-                            type="date"
-                            required
-                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Estado</label>
-                        <SearchableSelect
-                            v-model="form.status"
-                            :options="statusOptions"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Categoria</label>
-                        <SearchableSelect
-                            v-model="form.category_id"
-                            :options="formCategoryOptions"
                         />
                     </div>
                     <div>
@@ -849,102 +819,100 @@ onMounted(async () => {
                             </button>
                         </div>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Subcategoria</label>
-                        <input
-                            v-model="form.subcategory"
-                            type="text"
-                            maxlength="100"
-                            placeholder="Mensualidad, software, servicios digitales"
-                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Tipo de gasto</label>
-                        <SearchableSelect
-                            v-model="form.expense_kind"
-                            :options="expenseKindOptions"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Metodo</label>
-                        <select
-                            v-model="form.payment_method"
-                            :disabled="form.status !== 'paid'"
-                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400 dark:border-border dark:bg-muted"
-                        >
-                            <option
-                                v-for="method in paymentMethods"
-                                :key="method.value"
-                                :value="method.value"
-                            >
-                                {{ method.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Recurrencia</label>
-                        <SearchableSelect
-                            v-model="form.recurrence"
-                            :options="recurrenceOptions"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Sucursal</label>
-                        <SearchableSelect
-                            v-model="form.warehouse_id"
-                            :options="warehouseOptions"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Proveedor</label>
-                        <SearchableSelect
-                            v-model="form.supplier_id"
-                            :options="supplierOptions"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Cuenta contable</label>
-                        <SearchableSelect
-                            v-model="form.ledger_account_id"
-                            :options="ledgerAccountOptions"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium">Numero de recibo</label>
-                        <input
-                            v-model="form.reference_number"
-                            type="text"
-                            maxlength="100"
-                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                        />
-                    </div>
-                    <div class="flex items-center gap-5 rounded-md border border-gray-200 p-3 dark:border-border">
-                        <label class="inline-flex items-center gap-2 text-sm">
-                            <input
-                                v-model="form.affects_cash_flow"
-                                type="checkbox"
-                                class="rounded border-gray-300"
-                            />
-                            Afecta caja/banco
-                        </label>
-                        <label class="inline-flex items-center gap-2 text-sm">
-                            <input
-                                v-model="form.affects_income_statement"
-                                type="checkbox"
-                                class="rounded border-gray-300"
-                            />
-                            Afecta resultados
-                        </label>
-                    </div>
                     <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium">Notas / comprobante</label>
+                        <label class="mb-1 block text-sm font-medium">Notas</label>
                         <textarea
                             v-model="form.notes"
                             rows="2"
                             class="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
                         ></textarea>
                     </div>
+
+                    <details
+                        class="md:col-span-2 rounded-md border border-gray-200 bg-gray-50/80 p-3 dark:border-border dark:bg-muted/40"
+                    >
+                        <summary
+                            class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200"
+                        >
+                            Opciones avanzadas
+                        </summary>
+                        <div class="mt-4 grid gap-4 md:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium">Estado</label>
+                                <SearchableSelect
+                                    v-model="form.status"
+                                    :options="statusOptions"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium">Metodo</label>
+                                <select
+                                    v-model="form.payment_method"
+                                    :disabled="form.status !== 'paid'"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400 dark:border-border dark:bg-muted"
+                                >
+                                    <option
+                                        v-for="method in paymentMethods"
+                                        :key="method.value"
+                                        :value="method.value"
+                                    >
+                                        {{ method.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium">Subcategoria</label>
+                                <input
+                                    v-model="form.subcategory"
+                                    type="text"
+                                    maxlength="100"
+                                    placeholder="Mensualidad, software, servicios digitales"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium">Recurrencia</label>
+                                <SearchableSelect
+                                    v-model="form.recurrence"
+                                    :options="recurrenceOptions"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium">Cuenta contable</label>
+                                <SearchableSelect
+                                    v-model="form.ledger_account_id"
+                                    :options="ledgerAccountOptions"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium">Numero de recibo</label>
+                                <input
+                                    v-model="form.reference_number"
+                                    type="text"
+                                    maxlength="100"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                                />
+                            </div>
+                            <div class="flex items-center gap-5 rounded-md border border-gray-200 p-3 dark:border-border">
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input
+                                        v-model="form.affects_cash_flow"
+                                        type="checkbox"
+                                        class="rounded border-gray-300"
+                                    />
+                                    Afecta caja/banco
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input
+                                        v-model="form.affects_income_statement"
+                                        type="checkbox"
+                                        class="rounded border-gray-300"
+                                    />
+                                    Afecta resultados
+                                </label>
+                            </div>
+                        </div>
+                    </details>
                 </div>
 
                 <div

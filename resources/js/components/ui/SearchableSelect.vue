@@ -32,6 +32,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
     'update:modelValue': [value: number | string | null]
+    search: [value: string]
 }>()
 
 const isOpen = ref(false)
@@ -175,7 +176,10 @@ onMounted(() => document.addEventListener('mousedown', handleClickOutside))
 onUnmounted(() => document.removeEventListener('mousedown', handleClickOutside))
 
 // Reset highlight when search changes
-watch(searchQuery, () => { highlightedIndex.value = 0 })
+watch(searchQuery, (value) => {
+    highlightedIndex.value = 0
+    emit('search', value)
+})
 </script>
 
 <template>

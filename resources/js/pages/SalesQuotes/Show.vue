@@ -158,6 +158,7 @@ const handleOpenInPOS = (): void => {
         quote_number: detail.value.quote.quote_number,
         customer_id: detail.value.quote.customer?.id ?? null,
         items: detail.value.items.map((item) => ({
+            id: item.id,
             product_id: item.product?.id ?? null,
             product_name: item.product_name,
             product_sku: item.product_sku,

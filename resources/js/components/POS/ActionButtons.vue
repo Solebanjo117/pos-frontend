@@ -9,6 +9,7 @@ const props = defineProps<{
     isQuoteSession?: boolean;
     quoteMode?: boolean;
     canClear?: boolean;
+    cashierMode?: boolean;
 }>();
 
 const emit = defineEmits([
@@ -28,7 +29,7 @@ const canManageCashRegister = computed(() =>
 <template>
     <div class="flex flex-1 flex-col justify-end gap-3">
         <!-- Top Actions -->
-        <div class="grid grid-cols-2 gap-2">
+        <div v-if="!props.cashierMode" class="grid grid-cols-2 gap-2">
             <button
                 v-if="props.canClear !== false"
                 @click="emit('clear')"

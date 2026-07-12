@@ -27,6 +27,7 @@ interface CartItem {
     warehouse_id?: number;
     notes?: string; // Phase 2: per-line internal notes
     order_item_id?: number; // Reference to original order item (for returns)
+    source_quote_item_id?: number;
     subtotal: number;
     tax_amount: number;
     total: number;
@@ -863,6 +864,7 @@ export function usePOS() {
                         ? sessionLogs.value
                         : undefined,
                 items: cart.value.map((item) => ({
+                    source_quote_item_id: item.source_quote_item_id,
                     product_id: item.is_custom_line ? null : item.product_id,
                     variant_id: item.variant_id, // Send variant ID to backend
                     warehouse_id:
@@ -1038,6 +1040,7 @@ export function usePOS() {
         quote_number: string;
         customer_id?: number | null;
         items: Array<{
+            id: number;
             product_id: number | null;
             product_name: string;
             product_sku: string;
@@ -1068,6 +1071,7 @@ export function usePOS() {
         newSession.cart = quote.items.map((item, idx): CartItem => {
             const cartItem: CartItem = {
                 id: `q${quote.id}-${item.product_id}-${item.variant_id ?? 'nv'}-${idx}`,
+                source_quote_item_id: item.id,
                 product_id: item.product_id ?? null,
                 variant_id: item.variant_id ?? undefined,
                 variant_brand: item.variant?.brand?.name ?? undefined,

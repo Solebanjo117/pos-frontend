@@ -347,6 +347,7 @@ export interface CreateSalesOrderData {
         timestamp: string;
     }>;
     items?: Array<{
+        source_quote_item_id?: number;
         product_id: number | null;
         variant_id?: number;
         warehouse_id?: number;

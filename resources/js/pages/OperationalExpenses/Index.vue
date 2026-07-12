@@ -20,16 +20,17 @@ import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { operationalExpensesService } from '@/services/operational-expenses';
 import { ReportsApiService } from '@/services/reports';
-import { suppliersService } from '@/services/suppliers';
 import type { AccountingAccountSummary } from '@/types/report';
-import type { Supplier } from '@/types/supplier';
 import type {
     OperationalExpense,
+    OperationalExpenseBeneficiary,
     OperationalExpenseCategory,
     OperationalExpenseCategoryRecord,
     OperationalExpensePayload,
     OperationalExpensePaymentMethod,
     OperationalExpensePaymentMethodOption,
+    OperationalExpenseParty,
+    OperationalExpensePartyType,
 } from '@/types/operational-expense';
 import { formatCurrency, formatReportDate } from '@/utils/formatters';
 
@@ -40,7 +41,7 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref<string | null>(null);
 const expenses = ref<OperationalExpense[]>([]);
-const suppliers = ref<Supplier[]>([]);
+const parties = ref<OperationalExpenseParty[]>([]);
 const ledgerAccounts = ref<AccountingAccountSummary[]>([]);
 const expenseCategories = ref<OperationalExpenseCategoryRecord[]>([]);
 const expenseToDelete = ref<OperationalExpense | null>(null);
@@ -54,7 +55,18 @@ const categories = ref<Record<string, string>>({
     utilities: 'Servicios',
     other: 'Otro',
 });
-const summary = ref({ total_amount: 0, count: 0 });
+const summary = ref<{
+    total_amount: number;
+    count: number;
+    by_category?: Array<{ category: string; total_amount: number; count: number }>;
+    by_party?: Array<{
+        party_type: OperationalExpensePartyType | null;
+        party_id: number | null;
+        party_name: string;
+        total_amount: number;
+        count: number;
+    }>;
+}>({ total_amount: 0, count: 0, by_category: [], by_party: [] });
 const statuses = ref<Record<string, string>>({
     paid: 'Pagado',
     pending: 'Pendiente',
@@ -75,6 +87,36 @@ const expenseKinds = ref<Record<string, string>>({
 const showForm = ref(false);
 const editingExpense = ref<OperationalExpense | null>(null);
 const creatingCategory = ref(false);
+const creatingBeneficiary = ref(false);
+const showBeneficiaryForm = ref(false);
+const viewMode = ref<'movements' | 'category' | 'party'>('movements');
+const beneficiaryForm = ref({
+    name: '',
+    type: 'individual' as 'individual' | 'company',
+    email: '',
+    phone: '',
+});
+const setViewMode = (value: string) => {
+    if (value === 'movements' || value === 'category' || value === 'party') {
+        viewMode.value = value;
+    }
+};
+
+async function openCategoryBreakdown(category: string) {
+    filters.value.category = category;
+    viewMode.value = 'party';
+    await loadExpenses();
+}
+
+async function openPartyMovements(
+    type: OperationalExpensePartyType | null,
+    id: number | null,
+) {
+    filters.value.party_type = type ?? '';
+    filters.value.party_id = id;
+    viewMode.value = 'movements';
+    await loadExpenses();
+}
 const { fetchSettings: fetchStoreSettings } = useStoreSettings();
 
 const filters = ref({
@@ -82,6 +124,9 @@ const filters = ref({
     date_to: today.toISOString().split('T')[0],
     category: '' as OperationalExpenseCategory | '',
     warehouse_id: null as number | null,
+    expense_kind: '' as '' | OperationalExpensePayload['expense_kind'],
+    party_type: '' as '' | OperationalExpensePartyType,
+    party_id: null as number | null,
     per_page: 50,
 });
 
@@ -101,6 +146,10 @@ const form = ref<OperationalExpensePayload>({
     affects_income_statement: true,
     expense_kind: 'operational',
     supplier_id: null,
+    customer_id: null,
+    beneficiary_id: null,
+    party_type: null,
+    party_id: null,
     ledger_account_id: null,
     reference_number: '',
     warehouse_id: null,
@@ -127,13 +176,43 @@ const formCategoryOptions = computed<SelectOption[]>(() =>
     })),
 );
 
-const supplierOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Sin proveedor' },
-    ...suppliers.value.map((supplier) => ({
-        value: supplier.id,
-        label: supplier.name,
+const partyOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Sin persona asociada' },
+    ...parties.value.map((party) => ({
+        value: `${party.type}:${party.id}`,
+        label: party.name,
+        sublabel:
+            party.type === 'customer'
+                ? 'Cliente'
+                : party.type === 'supplier'
+                  ? 'Proveedor'
+                  : 'Beneficiario',
     })),
 ]);
+
+const selectedPartyValue = computed<string | null>({
+    get: () =>
+        form.value.party_type && form.value.party_id
+            ? `${form.value.party_type}:${form.value.party_id}`
+            : null,
+    set: (value) => {
+        const [type, id] = String(value ?? '').split(':');
+        form.value.party_type = (type || null) as OperationalExpensePartyType | null;
+        form.value.party_id = id ? Number(id) : null;
+    },
+});
+
+const filterPartyValue = computed<string | null>({
+    get: () =>
+        filters.value.party_type && filters.value.party_id
+            ? `${filters.value.party_type}:${filters.value.party_id}`
+            : null,
+    set: (value) => {
+        const [type, id] = String(value ?? '').split(':');
+        filters.value.party_type = (type || '') as OperationalExpensePartyType | '';
+        filters.value.party_id = id ? Number(id) : null;
+    },
+});
 
 const ledgerAccountOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Cuenta automatica' },
@@ -194,12 +273,35 @@ function formatDate(value?: string | null): string {
     return formatReportDate(value);
 }
 
-async function loadSuppliers() {
+function categoryName(slug: string): string {
+    return (
+        expenseCategories.value.find((category) => category.slug === slug)
+            ?.name ||
+        categories.value[slug] ||
+        slug
+    );
+}
+
+function partyTypeLabel(type: OperationalExpensePartyType | null): string {
+    if (type === 'customer') return 'Cliente';
+    if (type === 'supplier') return 'Proveedor';
+    if (type === 'beneficiary') return 'Beneficiario';
+    return 'Sin relacion';
+}
+
+let partySearchTimer: ReturnType<typeof setTimeout> | null = null;
+async function loadParties(q = '') {
     try {
-        suppliers.value = await suppliersService.getAllActive();
+        parties.value = await operationalExpensesService.searchParties(q);
     } catch (e) {
-        suppliers.value = [];
+        parties.value = [];
     }
+}
+
+function searchParties(q: string) {
+    if (partySearchTimer) clearTimeout(partySearchTimer);
+    if (q.trim().length < 2) return;
+    partySearchTimer = setTimeout(() => loadParties(q), 250);
 }
 
 async function loadLedgerAccounts() {
@@ -291,6 +393,10 @@ function openCreateForm() {
         affects_income_statement: true,
         expense_kind: 'operational',
         supplier_id: null,
+        customer_id: null,
+        beneficiary_id: null,
+        party_type: null,
+        party_id: null,
         ledger_account_id: null,
         reference_number: '',
         warehouse_id: null,
@@ -301,6 +407,16 @@ function openCreateForm() {
 
 function openEditForm(expense: OperationalExpense) {
     editingExpense.value = expense;
+    if (
+        expense.party &&
+        !parties.value.some(
+            (party) =>
+                party.type === expense.party?.type &&
+                party.id === expense.party?.id,
+        )
+    ) {
+        parties.value.push(expense.party);
+    }
     form.value = {
         expense_date: expense.expense_date,
         category: expense.category,
@@ -317,12 +433,53 @@ function openEditForm(expense: OperationalExpense) {
         affects_income_statement: expense.affects_income_statement ?? true,
         expense_kind: expense.expense_kind || 'operational',
         supplier_id: expense.supplier_id ?? null,
+        customer_id: expense.customer_id ?? null,
+        beneficiary_id: expense.beneficiary_id ?? null,
+        party_type: expense.party?.type ?? null,
+        party_id: expense.party?.id ?? null,
         ledger_account_id: expense.ledger_account_id ?? null,
         reference_number: expense.reference_number || '',
         warehouse_id: expense.warehouse_id ?? null,
         notes: expense.notes || '',
     };
     showForm.value = true;
+}
+
+async function createBeneficiaryFromForm() {
+    const name = beneficiaryForm.value.name.trim();
+    if (!name) return;
+    creatingBeneficiary.value = true;
+    error.value = null;
+    try {
+        const beneficiary: OperationalExpenseBeneficiary =
+            await operationalExpensesService.createBeneficiary({
+                name,
+                type: beneficiaryForm.value.type,
+                email: beneficiaryForm.value.email || null,
+                phone: beneficiaryForm.value.phone || null,
+            });
+        const party: OperationalExpenseParty = {
+            type: 'beneficiary',
+            id: beneficiary.id,
+            name: beneficiary.name,
+        };
+        parties.value = [...parties.value.filter((item) => !(item.type === party.type && item.id === party.id)), party]
+            .sort((a, b) => a.name.localeCompare(b.name));
+        selectedPartyValue.value = `beneficiary:${beneficiary.id}`;
+        beneficiaryForm.value = { name: '', type: 'individual', email: '', phone: '' };
+        showBeneficiaryForm.value = false;
+    } catch (e: any) {
+        error.value = e.response?.data?.message || 'No se pudo crear el beneficiario.';
+    } finally {
+        creatingBeneficiary.value = false;
+    }
+}
+
+function partyHref(expense: OperationalExpense): string | null {
+    if (!expense.party) return null;
+    if (expense.party.type === 'customer') return `/customers/${expense.party.id}`;
+    if (expense.party.type === 'supplier') return `/suppliers/${expense.party.id}`;
+    return `/operational-expense-beneficiaries/${expense.party.id}`;
 }
 
 function updateExpenseBusinessDatetime(
@@ -436,7 +593,7 @@ onMounted(async () => {
     readInitialFilters();
     await Promise.all([
         fetchStoreSettings(),
-        loadSuppliers(),
+        loadParties(),
         loadLedgerAccounts(),
         loadExpenseCategories(),
         loadExpenses(),
@@ -547,7 +704,7 @@ onMounted(async () => {
                 <div
                     class="rounded-lg border border-gray-200 bg-white p-3 dark:border-border dark:bg-card"
                 >
-                    <div class="grid gap-3 md:grid-cols-4">
+                    <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                         <div>
                             <label
                                 class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
@@ -583,6 +740,26 @@ onMounted(async () => {
                                 :options="categoryOptions"
                             />
                         </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold text-gray-500 uppercase">
+                                Tipo
+                            </label>
+                            <SearchableSelect
+                                v-model="filters.expense_kind"
+                                :options="[{ value: '', label: 'Todos' }, ...expenseKindOptions]"
+                            />
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold text-gray-500 uppercase">
+                                Persona / empresa
+                            </label>
+                            <SearchableSelect
+                                v-model="filterPartyValue"
+                                :options="partyOptions"
+                                clearable
+                                @search="searchParties"
+                            />
+                        </div>
                         <div class="flex items-end">
                             <button
                                 type="button"
@@ -599,7 +776,64 @@ onMounted(async () => {
                     </div>
                 </div>
 
+                <div class="flex w-fit items-center rounded-md border border-gray-200 bg-white p-1 dark:border-border dark:bg-card">
+                    <button
+                        v-for="option in [
+                            { value: 'movements', label: 'Movimientos' },
+                            { value: 'category', label: 'Por categoria' },
+                            { value: 'party', label: 'Por persona' },
+                        ]"
+                        :key="option.value"
+                        type="button"
+                        class="rounded px-3 py-1.5 text-xs font-semibold transition"
+                        :class="viewMode === option.value ? 'bg-emerald-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-muted'"
+                        @click="setViewMode(option.value)"
+                    >
+                        {{ option.label }}
+                    </button>
+                </div>
+
                 <div
+                    v-if="viewMode === 'category'"
+                    class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                >
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/50">
+                            <tr><th class="px-4 py-3 text-left">Categoria</th><th class="px-4 py-3 text-right">Movimientos</th><th class="px-4 py-3 text-right">Total</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-border">
+                            <tr v-for="row in summary.by_category || []" :key="row.category" class="cursor-pointer hover:bg-gray-50 dark:hover:bg-muted/40" @click="openCategoryBreakdown(row.category)">
+                                <td class="px-4 py-3 font-medium">{{ categoryName(row.category) }}</td>
+                                <td class="px-4 py-3 text-right">{{ row.count }}</td>
+                                <td class="px-4 py-3 text-right font-mono font-semibold">{{ formatCurrency(row.total_amount) }}</td>
+                            </tr>
+                            <tr v-if="!(summary.by_category || []).length"><td colspan="3" class="px-4 py-8 text-center text-gray-500">Sin gastos por categoria.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div
+                    v-if="viewMode === 'party'"
+                    class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                >
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/50">
+                            <tr><th class="px-4 py-3 text-left">Persona / empresa</th><th class="px-4 py-3 text-left">Tipo</th><th class="px-4 py-3 text-right">Movimientos</th><th class="px-4 py-3 text-right">Total</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-border">
+                            <tr v-for="row in summary.by_party || []" :key="`${row.party_type}:${row.party_id}`" class="cursor-pointer hover:bg-gray-50 dark:hover:bg-muted/40" @click="openPartyMovements(row.party_type, row.party_id)">
+                                <td class="px-4 py-3 font-medium">{{ row.party_name }}</td>
+                                <td class="px-4 py-3 text-gray-500">{{ partyTypeLabel(row.party_type) }}</td>
+                                <td class="px-4 py-3 text-right">{{ row.count }}</td>
+                                <td class="px-4 py-3 text-right font-mono font-semibold">{{ formatCurrency(row.total_amount) }}</td>
+                            </tr>
+                            <tr v-if="!(summary.by_party || []).length"><td colspan="4" class="px-4 py-8 text-center text-gray-500">Sin gastos por persona.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div
+                    v-if="viewMode === 'movements'"
                     class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                 >
                     <table class="min-w-full text-sm">
@@ -610,7 +844,7 @@ onMounted(async () => {
                                 <th class="px-3 py-2 text-left">Fecha</th>
                                 <th class="px-3 py-2 text-left">Categoria</th>
                                 <th class="px-3 py-2 text-left">Fecha/Hora</th>
-                                <th class="px-3 py-2 text-left">Proveedor</th>
+                                <th class="px-3 py-2 text-left">Persona / empresa</th>
                                 <th class="px-3 py-2 text-left">Metodo</th>
                                 <th class="px-3 py-2 text-left">Caja</th>
                                 <th class="px-3 py-2 text-left">Recibo</th>
@@ -672,7 +906,14 @@ onMounted(async () => {
                                         />
                                     </td>
                                     <td class="px-3 py-2">
-                                        {{ expense.supplier?.name || '-' }}
+                                        <a
+                                            v-if="partyHref(expense)"
+                                            :href="partyHref(expense) || undefined"
+                                            class="font-medium text-emerald-700 hover:underline dark:text-emerald-300"
+                                        >
+                                            {{ expense.party?.name }}
+                                        </a>
+                                        <span v-else>-</span>
                                     </td>
                                     <td class="px-3 py-2">
                                         {{
@@ -768,11 +1009,32 @@ onMounted(async () => {
                         />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Cliente / proveedor</label>
+                        <div class="mb-1 flex items-center justify-between gap-2">
+                            <label class="block text-sm font-medium">Cliente / proveedor / beneficiario</label>
+                            <button type="button" class="text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300" @click="showBeneficiaryForm = !showBeneficiaryForm">
+                                Nuevo beneficiario
+                            </button>
+                        </div>
                         <SearchableSelect
-                            v-model="form.supplier_id"
-                            :options="supplierOptions"
+                            v-model="selectedPartyValue"
+                            :options="partyOptions"
+                            clearable
+                            @search="searchParties"
                         />
+                    </div>
+                    <div
+                        v-if="showBeneficiaryForm"
+                        class="md:col-span-2 grid gap-3 rounded-md border border-emerald-200 bg-emerald-50/60 p-3 md:grid-cols-4 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                    >
+                        <input v-model="beneficiaryForm.name" type="text" maxlength="150" placeholder="Nombre del beneficiario" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted" />
+                        <select v-model="beneficiaryForm.type" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted">
+                            <option value="individual">Persona</option>
+                            <option value="company">Empresa</option>
+                        </select>
+                        <input v-model="beneficiaryForm.phone" type="text" placeholder="Telefono opcional" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted" />
+                        <button type="button" :disabled="creatingBeneficiary || !beneficiaryForm.name.trim()" class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" @click="createBeneficiaryFromForm">
+                            {{ creatingBeneficiary ? 'Creando...' : 'Crear y seleccionar' }}
+                        </button>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Tipo</label>

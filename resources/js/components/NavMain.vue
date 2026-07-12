@@ -48,11 +48,13 @@ const isCurrentOrChildUrl = (href: NavItem['href']): boolean => {
     return currentUrl.value.startsWith(`${url}/`);
 };
 
-// Only expand the sidebar group that contains the active page
-const isGroupActive = (item: NavItem): boolean => {
-    if (!item.items) return false;
-    return item.items.some((sub) => isCurrentOrChildUrl(sub.href));
-};
+const isItemActive = (item: NavItem): boolean =>
+    isCurrentOrChildUrl(item.href) ||
+    Boolean(item.items?.some((child) => isItemActive(child)));
+
+// Expand every parent needed to expose the active leaf, including level two.
+const isGroupActive = (item: NavItem): boolean =>
+    Boolean(item.items?.some((child) => isItemActive(child)));
 </script>
 
 <template>
@@ -84,33 +86,66 @@ const isGroupActive = (item: NavItem): boolean => {
                                 <DropdownMenuLabel>
                                     {{ item.title }}
                                 </DropdownMenuLabel>
-                                <DropdownMenuItem
+                                <template
                                     v-for="subItem in item.items"
                                     :key="subItem.title"
-                                    :as-child="true"
                                 >
-                                    <Link
-                                        :href="subItem.href"
-                                        class="flex w-full items-center gap-2"
-                                        :class="{
-                                            'bg-sidebar-primary text-sidebar-primary-foreground':
-                                                subItem.href
-                                                    ? isCurrentUrl(subItem.href)
-                                                    : false,
-                                        }"
+                                    <template
+                                        v-if="subItem.items && subItem.items.length"
                                     >
-                                        <component
-                                            :is="subItem.icon"
-                                            v-if="subItem.icon"
-                                        />
-                                        <span>{{ subItem.title }}</span>
-                                        <span
-                                            v-if="subItem.badge"
-                                            class="ml-auto inline-flex items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
-                                            >{{ subItem.badge }}</span
+                                        <DropdownMenuLabel
+                                            class="pt-2 text-[10px] tracking-wide text-slate-400 uppercase"
                                         >
-                                    </Link>
-                                </DropdownMenuItem>
+                                            {{ subItem.title }}
+                                        </DropdownMenuLabel>
+                                        <DropdownMenuItem
+                                            v-for="nestedItem in subItem.items"
+                                            :key="nestedItem.title"
+                                            :as-child="true"
+                                        >
+                                            <Link
+                                                :href="nestedItem.href"
+                                                class="flex w-full items-center gap-2 pl-4"
+                                                :class="{
+                                                    'bg-sidebar-primary text-sidebar-primary-foreground':
+                                                        isItemActive(nestedItem),
+                                                }"
+                                            >
+                                                <component
+                                                    :is="nestedItem.icon"
+                                                    v-if="nestedItem.icon"
+                                                />
+                                                <span>{{ nestedItem.title }}</span>
+                                                <span
+                                                    v-if="nestedItem.badge"
+                                                    class="ml-auto inline-flex items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                                                    >{{ nestedItem.badge }}</span
+                                                >
+                                            </Link>
+                                        </DropdownMenuItem>
+                                    </template>
+                                    <DropdownMenuItem v-else :as-child="true">
+                                        <Link
+                                            :href="subItem.href"
+                                            class="flex w-full items-center gap-2"
+                                            :class="{
+                                                'bg-sidebar-primary text-sidebar-primary-foreground':
+                                                    isItemActive(subItem),
+                                            }"
+                                        >
+                                            <component
+                                                :is="subItem.icon"
+                                                v-if="subItem.icon"
+                                            />
+                                            <span>{{ subItem.title }}</span>
+                                            <span
+                                                v-if="subItem.badge"
+                                                class="ml-auto inline-flex items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                                                >{{ subItem.badge }}</span
+                                            >
+                                        </Link>
+                                    </DropdownMenuItem>
+                                </template>
                             </DropdownMenuContent>
                         </SidebarMenuItem>
                     </DropdownMenu>
@@ -137,32 +172,87 @@ const isGroupActive = (item: NavItem): boolean => {
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                                 <SidebarMenuSub>
-                                    <SidebarMenuSubItem
+                                    <template
                                         v-for="subItem in item.items"
                                         :key="subItem.title"
                                     >
-                                        <SidebarMenuSubButton
-                                            as-child
-                                            :is-active="
-                                                subItem.href
-                                                    ? isCurrentUrl(subItem.href)
-                                                    : false
+                                        <SidebarMenuSubItem
+                                            v-if="
+                                                subItem.items &&
+                                                subItem.items.length
                                             "
+                                            class="py-1"
                                         >
-                                            <Link :href="subItem.href">
-                                                <component
-                                                    :is="subItem.icon"
-                                                    v-if="subItem.icon"
-                                                />
-                                                <span>{{ subItem.title }}</span>
-                                                <span
-                                                    v-if="subItem.badge"
-                                                    class="ml-auto inline-flex items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
-                                                    >{{ subItem.badge }}</span
+                                            <div
+                                                class="px-2 pb-1 text-[10px] font-semibold tracking-wide text-sidebar-foreground/55 uppercase"
+                                            >
+                                                {{ subItem.title }}
+                                            </div>
+                                            <SidebarMenuSub
+                                                class="mx-0 border-l border-sidebar-border px-1"
+                                            >
+                                                <SidebarMenuSubItem
+                                                    v-for="nestedItem in subItem.items"
+                                                    :key="nestedItem.title"
                                                 >
-                                            </Link>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
+                                                    <SidebarMenuSubButton
+                                                        as-child
+                                                        :is-active="
+                                                            isItemActive(
+                                                                nestedItem,
+                                                            )
+                                                        "
+                                                    >
+                                                        <Link
+                                                            :href="nestedItem.href"
+                                                        >
+                                                            <component
+                                                                :is="nestedItem.icon"
+                                                                v-if="
+                                                                    nestedItem.icon
+                                                                "
+                                                            />
+                                                            <span>
+                                                                {{
+                                                                    nestedItem.title
+                                                                }}
+                                                            </span>
+                                                            <span
+                                                                v-if="
+                                                                    nestedItem.badge
+                                                                "
+                                                                class="ml-auto inline-flex items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                                                                >{{
+                                                                    nestedItem.badge
+                                                                }}</span
+                                                            >
+                                                        </Link>
+                                                    </SidebarMenuSubButton>
+                                                </SidebarMenuSubItem>
+                                            </SidebarMenuSub>
+                                        </SidebarMenuSubItem>
+                                        <SidebarMenuSubItem v-else>
+                                            <SidebarMenuSubButton
+                                                as-child
+                                                :is-active="
+                                                    isItemActive(subItem)
+                                                "
+                                            >
+                                                <Link :href="subItem.href">
+                                                    <component
+                                                        :is="subItem.icon"
+                                                        v-if="subItem.icon"
+                                                    />
+                                                    <span>{{ subItem.title }}</span>
+                                                    <span
+                                                        v-if="subItem.badge"
+                                                        class="ml-auto inline-flex items-center justify-center rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                                                        >{{ subItem.badge }}</span
+                                                    >
+                                                </Link>
+                                            </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
+                                    </template>
                                 </SidebarMenuSub>
                             </CollapsibleContent>
                         </SidebarMenuItem>

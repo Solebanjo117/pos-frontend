@@ -176,6 +176,8 @@ const showShortcutsHelp = ref(false);
 const showProductsModal = ref(false);
 const isSearching = ref(false);
 const showCashMovementModal = ref(false);
+const cashMovementInitialType = ref<'in' | 'out'>('out');
+const pendingCashAction = ref<'in' | 'out' | null>(null);
 const showQuickCustomerModal = ref(false);
 const showCustomLineModal = ref(false);
 const forceShowOpenSessionModal = ref(false);
@@ -1485,18 +1487,6 @@ const handleUnifiedPaymentFinish = async (
         return;
     }
 
-    // Log items being sent to backend for debugging
-    console.log(
-        'Payment attempt - Cart items to be processed:',
-        cart.value.map((item: any) => ({
-            product_id: item.product_id,
-            is_custom_line: !!item.is_custom_line,
-            custom_description: item.custom_description,
-            product_name: item.product_name,
-            quantity: item.quantity,
-        })),
-    );
-
     // Convert payments from unified panel to backend format
     const paymentsArray = payments.map((p) => ({
         method: p.method,
@@ -1703,6 +1693,48 @@ const handleCreditPaymentSubmit = async (payload: {
     }
 };
 
+type CashAction = 'in' | 'out';
+const cashMovementLoading = ref(false);
+const cashMovementError = ref<string | null>(null);
+
+const requestedCashAction = (): CashAction | null => {
+    const action = new URL(window.location.href).searchParams.get('cash_action');
+    return action === 'in' || action === 'out' ? action : null;
+};
+
+const clearCashActionQuery = (): void => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('cash_action')) return;
+
+    url.searchParams.delete('cash_action');
+    window.history.replaceState(
+        window.history.state,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+    );
+};
+
+const openRequestedCashMovement = (action: CashAction): void => {
+    cashMovementInitialType.value = action;
+    cashMovementError.value = null;
+
+    if (isSessionOpen.value) {
+        pendingCashAction.value = null;
+        showCashMovementModal.value = true;
+        return;
+    }
+
+    pendingCashAction.value = action;
+    forceShowOpenSessionModal.value = true;
+};
+
+const closeCashMovement = (): void => {
+    showCashMovementModal.value = false;
+    pendingCashAction.value = null;
+    cashMovementError.value = null;
+    clearCashActionQuery();
+};
+
 // Session Handlers
 const handleOpenSession = async (amount: number) => {
     sessionActionLoading.value = true;
@@ -1714,12 +1746,17 @@ const handleOpenSession = async (amount: number) => {
     if (success) {
         forceShowOpenSessionModal.value = false;
         error.value = null;
-        searchInput.value?.focus();
+        if (pendingCashAction.value) {
+            const action = pendingCashAction.value;
+            pendingCashAction.value = null;
+            cashMovementInitialType.value = action;
+            await nextTick();
+            showCashMovementModal.value = true;
+        } else {
+            searchInput.value?.focus();
+        }
     }
 };
-
-const cashMovementLoading = ref(false);
-const cashMovementError = ref<string | null>(null);
 
 const handleCashMovement = async (payload: {
     type: 'in' | 'out';
@@ -1733,6 +1770,7 @@ const handleCashMovement = async (payload: {
     cashMovementLoading.value = false;
     if (success) {
         showCashMovementModal.value = false;
+        clearCashActionQuery();
         // Refresh session summary to update expected cash
         await checkCurrentSession(currentWarehouseId.value ?? undefined);
     } else {
@@ -1789,6 +1827,11 @@ onMounted(async () => {
     if (!props.quoteMode && !props.returnMode && !props.editMode) {
         // Session source of truth comes from backend before showing open-session flow
         await checkCurrentSession(currentWarehouseId.value ?? undefined);
+
+        const cashAction = requestedCashAction();
+        if (cashAction) {
+            openRequestedCashMovement(cashAction);
+        }
     }
 
     await Promise.all([
@@ -2742,11 +2785,9 @@ onUnmounted(() => {
             :show="showCashMovementModal"
             :loading="cashMovementLoading"
             :error="cashMovementError"
+            :initial-type="cashMovementInitialType"
             @submit="handleCashMovement"
-            @close="
-                showCashMovementModal = false;
-                cashMovementError = null;
-            "
+            @close="closeCashMovement"
         />
 
         <!-- ========== Product Detail Modal (right-click on cart item) ========== -->

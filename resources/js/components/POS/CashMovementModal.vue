@@ -8,17 +8,19 @@ import {
     FileText,
     Loader2,
 } from 'lucide-vue-next';
-import { ref, computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 interface Props {
     show: boolean;
     loading?: boolean;
     error?: string | null;
+    initialType?: 'in' | 'out';
 }
 
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
     error: null,
+    initialType: 'out',
 });
 
 const emit = defineEmits<{
@@ -63,11 +65,21 @@ const handleSubmit = () => {
 };
 
 const resetForm = () => {
-    movementType.value = 'out';
+    movementType.value = props.initialType;
     amount.value = null;
     reason.value = '';
     notes.value = '';
 };
+
+watch(
+    () => [props.show, props.initialType] as const,
+    ([show, initialType]) => {
+        if (show) {
+            movementType.value = initialType;
+        }
+    },
+    { immediate: true },
+);
 
 const handleClose = () => {
     resetForm();

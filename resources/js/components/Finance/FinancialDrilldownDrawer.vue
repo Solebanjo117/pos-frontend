@@ -13,10 +13,20 @@ const props = defineProps<{
 const emit = defineEmits<{
     close: [];
     page: [page: number];
+    'per-page': [perPage: number];
     drilldown: [
         payload: { key: string; metric: string; label: string; value: number },
     ];
 }>();
+
+const perPageOptions = [10, 25, 50, 100];
+
+const changePerPage = (event: Event): void => {
+    const perPage = Number((event.target as HTMLSelectElement).value);
+    if (perPageOptions.includes(perPage)) {
+        emit('per-page', perPage);
+    }
+};
 
 const warningLabels: Record<string, string> = {
     inventory_historical_value_uses_current_fifo_lot_availability:
@@ -120,12 +130,45 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                 v-if="!loading && report"
                 class="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-400"
             >
-                <span>{{ report.meta.total }} registros</span>
                 <span>
-                    Pagina {{ report.meta.current_page }} de
-                    {{ report.meta.last_page }} ·
-                    {{ report.meta.per_page }} por pagina
+                    {{ report.meta.total }} registros · Pagina
+                    {{ report.meta.current_page }} de {{ report.meta.last_page }}
                 </span>
+                <div class="flex items-center gap-2">
+                    <label class="flex items-center gap-1.5">
+                        <span>Mostrar</span>
+                        <select
+                            :value="report.meta.per_page"
+                            class="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                            aria-label="Registros por pagina"
+                            @change="changePerPage"
+                        >
+                            <option
+                                v-for="option in perPageOptions"
+                                :key="option"
+                                :value="option"
+                            >
+                                {{ option }}
+                            </option>
+                        </select>
+                    </label>
+                    <button
+                        class="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                        :disabled="report.meta.current_page <= 1"
+                        aria-label="Pagina anterior"
+                        @click="emit('page', report.meta.current_page - 1)"
+                    >
+                        <ChevronLeft :size="16" />
+                    </button>
+                    <button
+                        class="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                        :disabled="report.meta.current_page >= report.meta.last_page"
+                        aria-label="Pagina siguiente"
+                        @click="emit('page', report.meta.current_page + 1)"
+                    >
+                        <ChevronRight :size="16" />
+                    </button>
+                </div>
             </div>
 
             <div class="min-h-0 flex-1 overflow-auto p-4">
@@ -203,13 +246,18 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
             </div>
 
             <footer
-                class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400"
+                class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400"
             >
-                <span> {{ report?.meta?.total ?? 0 }} registros </span>
+                <span>
+                    {{ report?.meta?.total ?? 0 }} registros · Pagina
+                    {{ report?.meta?.current_page ?? 1 }} de
+                    {{ report?.meta?.last_page ?? 1 }}
+                </span>
                 <div class="flex items-center gap-2">
                     <button
                         class="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
-                        :disabled="!report || report.meta.current_page <= 1"
+                        :disabled="loading || !report || report.meta.current_page <= 1"
+                        aria-label="Pagina anterior"
                         @click="
                             emit('page', (report?.meta.current_page ?? 1) - 1)
                         "
@@ -223,9 +271,11 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                     <button
                         class="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
                         :disabled="
+                            loading ||
                             !report ||
                             report.meta.current_page >= report.meta.last_page
                         "
+                        aria-label="Pagina siguiente"
                         @click="
                             emit('page', (report?.meta.current_page ?? 1) + 1)
                         "

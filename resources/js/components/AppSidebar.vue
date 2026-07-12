@@ -133,6 +133,13 @@ const canAccessPurchaseOrders = computed(() =>
 );
 const canAccessReports = computed(() => hasRole(['admin', 'manager']));
 const canAccessCatalog = computed(() => hasRole(['admin', 'manager']));
+const canAccessInventory = computed(() =>
+    hasRole(['admin', 'manager', 'buyer', 'assistant']),
+);
+const canCreateProduct = computed(() =>
+    hasRole(['admin', 'manager', 'buyer']),
+);
+const canImportProducts = computed(() => hasRole(['admin', 'manager']));
 const canAccessVehicles = computed(() =>
     hasRole(['admin', 'manager', 'seller']),
 );
@@ -158,9 +165,14 @@ const mainNavItems = computed<NavItem[]>(() => {
     }
     if (canAccessPOS.value) {
         cashItems.push({
-            title: 'Cobro manual',
-            href: '/pos',
-            icon: ShoppingCart,
+            title: 'Agregar a caja',
+            href: '/pos?cash_action=in',
+            icon: Plus,
+        });
+        cashItems.push({
+            title: 'Sacar de caja',
+            href: '/pos?cash_action=out',
+            icon: Banknote,
         });
         cashItems.push({
             title: 'Cierre de caja',
@@ -291,41 +303,55 @@ const mainNavItems = computed<NavItem[]>(() => {
     }
 
     // --- Inventario ---
-    const inventoryItems: NavItem[] = [
-        {
+    const itemActions: NavItem[] = [
+        { title: 'Items', href: '/products', icon: Package },
+    ];
+    const operationItems: NavItem[] = [];
+    const catalogItems: NavItem[] = [];
+
+    if (canAccessInventory.value) {
+        itemActions.unshift({
             title: 'Buscar item',
             href: '/inventory',
-            icon: Warehouse,
-        },
-        {
-            title: 'Items',
-            href: '/products',
-            icon: Package,
-        },
-        {
+            icon: PackageSearch,
+        });
+        operationItems.push(
+            {
+                title: 'Movimientos',
+                href: '/inventory-movements',
+                icon: ClipboardList,
+            },
+            {
+                title: 'Transferencias',
+                href: '/inventory-transfers',
+                icon: Truck,
+            },
+            {
+                title: 'Mermas',
+                href: '/inventory/waste',
+                icon: RotateCcw,
+            },
+        );
+    }
+
+    if (canCreateProduct.value) {
+        itemActions.splice(1, 0, {
+            title: 'Nuevo item',
+            href: '/products/create',
+            icon: Plus,
+        });
+    }
+
+    if (canImportProducts.value) {
+        itemActions.push({
             title: 'Importar items',
             href: '/products/import',
             icon: PackageSearch,
-        },
-        {
-            title: 'Movimientos',
-            href: '/inventory-movements',
-            icon: ClipboardList,
-        },
-        {
-            title: 'Transferencias',
-            href: '/inventory-transfers',
-            icon: Truck,
-        },
-        {
-            title: 'Mermas',
-            href: '/inventory/waste',
-            icon: RotateCcw,
-        },
-    ];
+        });
+    }
 
     if (canAccessReturns.value) {
-        inventoryItems.push({
+        operationItems.push({
             title: 'Devoluciones',
             href: '/returns',
             icon: RotateCcw,
@@ -333,17 +359,21 @@ const mainNavItems = computed<NavItem[]>(() => {
     }
 
     if (canAccessCatalog.value) {
-        inventoryItems.push({
-            title: 'Categorias',
-            href: '/categories',
-            icon: Folder,
-        });
-        inventoryItems.push({
-            title: 'Marcas',
-            href: '/brands',
-            icon: Tag,
-        });
+        catalogItems.push(
+            { title: 'Categorias', href: '/categories', icon: Folder },
+            { title: 'Marcas', href: '/brands', icon: Tag },
+        );
     }
+
+    const inventoryItems: NavItem[] = [
+        { title: 'Items', items: itemActions },
+        ...(operationItems.length
+            ? [{ title: 'Operacion', items: operationItems }]
+            : []),
+        ...(catalogItems.length
+            ? [{ title: 'Catalogos', items: catalogItems }]
+            : []),
+    ];
 
     if (inventoryItems.length > 0) {
         items.push({
@@ -403,28 +433,53 @@ const mainNavItems = computed<NavItem[]>(() => {
             icon: BarChart3,
             items: [
                 {
-                    title: 'Inventario: Stock',
-                    href: '/reports/stock-levels',
+                    title: 'Ventas',
+                    items: [
+                        {
+                            title: 'Ventas por cliente',
+                            href: '/reports/sales-by-client',
+                        },
+                    ],
                 },
                 {
-                    title: 'Inventario: Movimientos',
-                    href: '/reports/movement-history',
+                    title: 'Pagos',
+                    items: [
+                        {
+                            title: 'Cierre Z',
+                            href: '/reports/z-report',
+                        },
+                    ],
                 },
                 {
-                    title: 'Contabilidad: Finanzas',
-                    href: '/reports/financial',
+                    title: 'Inventario',
+                    items: [
+                        {
+                            title: 'Niveles de stock',
+                            href: '/reports/stock-levels',
+                        },
+                        {
+                            title: 'Historial de movimientos',
+                            href: '/reports/movement-history',
+                        },
+                    ],
                 },
                 {
-                    title: 'Clientes: Referencias',
-                    href: '/reports/customer-references',
+                    title: 'Clientes',
+                    items: [
+                        {
+                            title: 'Referencias',
+                            href: '/reports/customer-references',
+                        },
+                    ],
                 },
                 {
-                    title: 'Ventas: Por cliente',
-                    href: '/reports/sales-by-client',
-                },
-                {
-                    title: 'Pagos: Cierre Z',
-                    href: '/reports/z-report',
+                    title: 'Finanzas y contabilidad',
+                    items: [
+                        {
+                            title: 'Finanzas y rentabilidad',
+                            href: '/reports/financial',
+                        },
+                    ],
                 },
             ],
         });

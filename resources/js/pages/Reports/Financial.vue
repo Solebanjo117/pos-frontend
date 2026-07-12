@@ -53,7 +53,6 @@ const {
     financialAdvancedStatus,
     adjustments,
     capitalMovements,
-    loading,
     error,
     fetchIncomeStatement,
     fetchDailySummary,
@@ -76,6 +75,9 @@ const capitalMovementOpen = ref(false);
 const capitalMovementType = ref<'in' | 'out'>('in');
 const drilldownOpen = ref(false);
 const drilldownLoading = ref(false);
+const drilldownPerPage = ref(25);
+const reportsLoading = ref(false);
+const reportReloadQueued = ref(false);
 const selectedKpi = ref<{
     key: string;
     label: string;
@@ -246,26 +248,49 @@ const formatCreditDate = (value?: string | null): string => {
 const loadReports = async (): Promise<void> => {
     if (!filters.value.date_from || !filters.value.date_to) return;
 
-    // Heavy report endpoints are proxied to the backend and can be slow on
-    // wide date ranges. Use allSettled so one failing/timed-out report does
-    // not break the whole Finance page, and surface a single soft error.
-    const results = await Promise.allSettled([
-        fetchDailySummary(filters.value),
-        fetchIncomeStatement({
-            ...filters.value,
-            basis: 'cash',
-            compare: 'none',
-        }),
-        fetchBalanceSheet(filters.value),
-        fetchAdjustments(filters.value),
-        fetchCapitalMovements(filters.value),
-        fetchFinancialAdvancedStatus(),
-    ]);
+    if (reportsLoading.value) {
+        reportReloadQueued.value = true;
+        return;
+    }
 
-    const failed = results.filter((result) => result.status === 'rejected');
-    if (failed.length > 0 && !error.value) {
-        error.value =
-            'Algunos datos financieros no se pudieron cargar. Revisa la conexión o reduce el rango de fechas e intenta de nuevo.';
+    reportsLoading.value = true;
+
+    try {
+        do {
+            reportReloadQueued.value = false;
+            const requestFilters = { ...filters.value };
+            const requests: Array<() => Promise<unknown>> = [
+                () => fetchDailySummary(requestFilters),
+                () => fetchFinancialAdvancedStatus(),
+                () =>
+                    fetchIncomeStatement({
+                        ...requestFilters,
+                        basis: 'cash',
+                        compare: 'none',
+                    }),
+                () => fetchBalanceSheet(requestFilters),
+                () => fetchAdjustments(requestFilters),
+                () => fetchCapitalMovements(requestFilters),
+            ];
+            const results: PromiseSettledResult<unknown>[] = [];
+
+            // Keep requests sequential. Besides protecting the shared PHP
+            // worker pool, this avoids Windows file-cache lock collisions in
+            // Laravel's rate limiter when the frontend proxy is in use.
+            for (const request of requests) {
+                results.push(
+                    ...(await Promise.allSettled([request()])),
+                );
+            }
+
+            const failed = results.filter((result) => result.status === 'rejected');
+            if (failed.length > 0 && !error.value) {
+                error.value =
+                    'Algunos datos financieros no se pudieron cargar. Revisa la conexión o reduce el rango de fechas e intenta de nuevo.';
+            }
+        } while (reportReloadQueued.value);
+    } finally {
+        reportsLoading.value = false;
     }
 };
 
@@ -299,7 +324,7 @@ const openDrilldown = async (
             metric: kpi.metric ?? kpi.key,
             ...activeDrilldownFilters.value,
             page,
-            per_page: 25,
+            per_page: drilldownPerPage.value,
         });
     } finally {
         drilldownLoading.value = false;
@@ -309,6 +334,13 @@ const openDrilldown = async (
 const changeDrilldownPage = (page: number): void => {
     if (!selectedKpi.value) return;
     void openDrilldown(selectedKpi.value, page, activeDrilldownFilters.value);
+};
+
+const changeDrilldownPerPage = (perPage: number): void => {
+    if (![10, 25, 50, 100].includes(perPage) || !selectedKpi.value) return;
+
+    drilldownPerPage.value = perPage;
+    void openDrilldown(selectedKpi.value, 1, activeDrilldownFilters.value);
 };
 
 const openKpiDrilldown = (
@@ -459,14 +491,15 @@ watch(currentWarehouseId, (value) => {
             >
                 <template #actions>
                     <button
-                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+                        :disabled="reportsLoading"
                         @click="loadReports"
                     >
                         <RefreshCw
                             :size="16"
-                            :class="{ 'animate-spin': loading }"
+                            :class="{ 'animate-spin': reportsLoading }"
                         />
-                        Actualizar
+                        {{ reportsLoading ? 'Actualizando...' : 'Actualizar' }}
                     </button>
                 </template>
 
@@ -479,7 +512,6 @@ watch(currentWarehouseId, (value) => {
                             v-model:to="filters.date_to"
                             label="Rango de fechas"
                             class="max-w-xl"
-                            @change="loadReports"
                         />
                     </div>
 
@@ -1156,6 +1188,7 @@ watch(currentWarehouseId, (value) => {
             :currency-formatter="formatCurrency"
             @close="drilldownOpen = false"
             @page="changeDrilldownPage"
+            @per-page="changeDrilldownPerPage"
             @drilldown="openKpiDrilldown"
         />
 

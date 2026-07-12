@@ -4,6 +4,8 @@ import type {
     OperationalExpenseFilters,
     OperationalExpenseListResponse,
     OperationalExpensePayload,
+    OperationalExpenseBeneficiary,
+    OperationalExpenseParty,
 } from '@/types/operational-expense';
 import apiClient from './api/client';
 
@@ -55,6 +57,34 @@ export const operationalExpensesService = {
         const response = await apiClient.post(
             '/operational-expense-categories',
             payload,
+        );
+        return response.data.data;
+    },
+
+    async searchParties(q = ''): Promise<OperationalExpenseParty[]> {
+        const response = await apiClient.get('/operational-expenses/parties', {
+            params: { q, limit: 50 },
+        });
+        return response.data.data ?? [];
+    },
+
+    async createBeneficiary(payload: {
+        name: string;
+        type: 'individual' | 'company';
+        email?: string | null;
+        phone?: string | null;
+        notes?: string | null;
+    }): Promise<OperationalExpenseBeneficiary> {
+        const response = await apiClient.post(
+            '/operational-expense-beneficiaries',
+            payload,
+        );
+        return response.data.data;
+    },
+
+    async getBeneficiary(id: number): Promise<OperationalExpenseBeneficiary> {
+        const response = await apiClient.get(
+            `/operational-expense-beneficiaries/${id}`,
         );
         return response.data.data;
     },

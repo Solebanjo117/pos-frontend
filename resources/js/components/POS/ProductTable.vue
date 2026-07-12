@@ -25,6 +25,7 @@ const props = defineProps<{
     warehouseId?: number | null;
     returnMode?: boolean;
     canEditSeller?: boolean;
+    canEditCommercial?: boolean;
 }>();
 
 const emit = defineEmits([
@@ -156,7 +157,10 @@ const getItemCost = (item: any): number => {
 const page = usePage();
 const canEditPrice = computed(() => {
     const role = (page.props.auth?.user as any)?.role;
-    return role === 'admin' || role === 'manager';
+    return (
+        props.canEditCommercial !== false &&
+        (role === 'admin' || role === 'manager')
+    );
 });
 
 // ── Quick Purchase Modal state ─────────────────────────────────────────────────
@@ -197,6 +201,7 @@ const handlePurchaseSuccess = (result: {
                 tag="table"
                 item-key="id"
                 handle=".drag-handle"
+                :disabled="props.canEditCommercial === false"
                 class="w-full min-w-[500px] border-collapse text-left"
             >
                 <template #header>
@@ -261,6 +266,7 @@ const handlePurchaseSuccess = (result: {
                                     class="flex items-center justify-center gap-1"
                                 >
                                     <GripVertical
+                                        v-if="props.canEditCommercial !== false"
                                         class="drag-handle h-4 w-4 cursor-grab transition-colors hover:text-gray-600"
                                         title="Arrastrar para reordenar"
                                     />
@@ -337,6 +343,7 @@ const handlePurchaseSuccess = (result: {
                                         class="flex items-center justify-center gap-2"
                                     >
                                         <button
+                                            v-if="props.canEditCommercial !== false"
                                             @click="
                                                 emit(
                                                     'update-quantity',
@@ -349,6 +356,7 @@ const handlePurchaseSuccess = (result: {
                                             <Minus class="h-3.5 w-3.5" />
                                         </button>
                                         <input
+                                            v-if="props.canEditCommercial !== false"
                                             type="number"
                                             min="1"
                                             :value="item.quantity"
@@ -366,6 +374,7 @@ const handlePurchaseSuccess = (result: {
                                             class="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-gray-900 focus:ring-0 dark:text-white"
                                         />
                                         <button
+                                            v-if="props.canEditCommercial !== false"
                                             @click="
                                                 emit(
                                                     'update-quantity',
@@ -377,6 +386,12 @@ const handlePurchaseSuccess = (result: {
                                         >
                                             <Plus class="h-3.5 w-3.5" />
                                         </button>
+                                        <span
+                                            v-if="props.canEditCommercial === false"
+                                            class="w-12 text-center text-sm font-semibold text-gray-900 dark:text-white"
+                                        >
+                                            {{ item.quantity }}
+                                        </span>
                                     </div>
                                     <span
                                         v-if="getStockLimit(item) !== null"
@@ -412,6 +427,7 @@ const handlePurchaseSuccess = (result: {
 
                             <td class="px-2 py-3 text-center" @click.stop>
                                 <button
+                                    v-if="props.canEditCommercial !== false"
                                     @click="emit('remove', index)"
                                     class="rounded-lg p-1.5 text-gray-300 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 dark:text-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                                 >
@@ -580,7 +596,10 @@ const handlePurchaseSuccess = (result: {
                                         </div>
 
                                         <!-- Discount percent -->
-                                        <div class="space-y-2">
+                                        <div
+                                            v-if="props.canEditCommercial !== false"
+                                            class="space-y-2"
+                                        >
                                             <label
                                                 class="block text-xs font-semibold tracking-wider text-gray-500 uppercase"
                                                 >Descuento (%)</label
@@ -617,7 +636,10 @@ const handlePurchaseSuccess = (result: {
                                         </div>
 
                                         <!-- Seller selector -->
-                                        <div class="space-y-2">
+                                        <div
+                                            v-if="props.canEditCommercial !== false"
+                                            class="space-y-2"
+                                        >
                                             <label
                                                 class="block text-xs font-semibold tracking-wider text-gray-500 uppercase"
                                                 >Vendedor</label
@@ -663,7 +685,10 @@ const handlePurchaseSuccess = (result: {
                                         </div>
 
                                         <!-- Internal Notes -->
-                                        <div class="space-y-2">
+                                        <div
+                                            v-if="props.canEditCommercial !== false"
+                                            class="space-y-2"
+                                        >
                                             <label
                                                 class="block text-xs font-semibold tracking-wider text-gray-500 uppercase"
                                                 >Nota Interna</label
@@ -691,6 +716,7 @@ const handlePurchaseSuccess = (result: {
                                         <!-- Quick Reorder — only when stock = 0 -->
                                         <div
                                             v-if="
+                                                props.canEditCommercial !== false &&
                                                 !item.is_custom_line &&
                                                 item.available_stock !==
                                                     undefined &&

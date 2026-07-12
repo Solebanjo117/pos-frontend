@@ -51,13 +51,16 @@ const quoteToRemove = ref<PendingQuote | null>(null);
 const processPayment = async (quote: PendingQuote) => {
     processingId.value = quote.id;
     try {
-        const res = await apiClient.get(`/sales-quotes/${quote.id}`);
-        const q = res.data;
+        const res = await apiClient.post(
+            `/sales-quotes/${quote.id}/open-at-cashier`,
+        );
+        const q = res.data.data;
         loadQuoteAsSession({
             id: q.id,
             quote_number: q.quote_number,
             customer_id: q.customer?.id ?? null,
             items: (q.items ?? []).map((item: any) => ({
+                id: item.id,
                 product_id: item.product_id,
                 product_name: item.product_name,
                 product_sku: item.product_sku,

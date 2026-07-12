@@ -240,13 +240,15 @@ const mainNavItems = computed<NavItem[]>(() => {
 
     // --- Ventas ---
     const salesItems: NavItem[] = [];
-    salesItems.push({
-        title: 'Transacciones',
-        href: '/sales-orders',
-        icon: ClipboardList,
-    });
+    if (!hasRole(['cashier'])) {
+        salesItems.push({
+            title: 'Transacciones',
+            href: '/sales-orders',
+            icon: ClipboardList,
+        });
+    }
 
-    if (canAccessPOS.value || canAccessQuoteEditor.value) {
+    if (canAccessQuoteEditor.value) {
         salesItems.push({
             title: 'Cotizaciones',
             href: '/sales-quotes',

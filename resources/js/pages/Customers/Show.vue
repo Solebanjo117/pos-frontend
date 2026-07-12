@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     AlertCircle,
     ArrowLeft,
@@ -30,6 +30,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import CustomerProfileMetric from '@/components/Customers/CustomerProfileMetric.vue';
+import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { CustomersApiService } from '@/services/customers';
@@ -54,16 +55,18 @@ const props = defineProps<{
 
 const customerIdNumber = computed(() => Number(props.customerId));
 
-const tabs = [
-    { key: 'invoices', label: 'Facturas' },
-    { key: 'items', label: 'Items Comprados' },
-    { key: 'vehicles', label: 'Vehiculos' },
-    { key: 'work_orders', label: 'Ordenes de Trabajo' },
-    { key: 'payments', label: 'Pagos' },
-    { key: 'history', label: 'Historial' },
-] as const;
-
-type TabKey = (typeof tabs)[number]['key'];
+type TabKey = 'invoices' | 'items' | 'vehicles' | 'work_orders' | 'payments' | 'history' | 'expenses';
+const page = usePage();
+const canViewExpenses = computed(() => ['admin', 'manager'].includes((page.props.auth?.user as any)?.role));
+const tabs = computed(() => [
+    { key: 'invoices' as TabKey, label: 'Facturas' },
+    { key: 'items' as TabKey, label: 'Items Comprados' },
+    { key: 'vehicles' as TabKey, label: 'Vehiculos' },
+    { key: 'work_orders' as TabKey, label: 'Ordenes de Trabajo' },
+    { key: 'payments' as TabKey, label: 'Pagos' },
+    { key: 'history' as TabKey, label: 'Historial' },
+    ...(canViewExpenses.value ? [{ key: 'expenses' as TabKey, label: 'Gastos' }] : []),
+]);
 type PurchasedHistoryItem = CustomerPurchasedItem & {
     order: CustomerSalesHistoryOrder;
 };
@@ -2069,6 +2072,13 @@ onMounted(async () => {
                                         </aside>
                                     </div>
                                 </template>
+
+                                <div v-if="activeTab === 'expenses'" class="p-4">
+                                    <OperationalExpenseHistoryPanel
+                                        party-type="customer"
+                                        :party-id="customerIdNumber"
+                                    />
+                                </div>
 
                                 <footer
                                     v-if="activeTab === 'invoices'"

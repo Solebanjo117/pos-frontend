@@ -880,6 +880,7 @@ const amountToCharge = computed(() => {
 });
 
 const handleUpdateQuantity = (index: number, qty: number) => {
+    if (isStrictCashier.value) return;
     const item = cart.value[index];
     if (!item) return;
 
@@ -1529,10 +1530,25 @@ const closePaymentModal = () => {
 // Detect if the active session was loaded from a SalesQuote
 const isQuoteSession = computed(() => !!activeSession.value?.source_quote_id);
 
+const returnToCashierQueue = () => {
+    if (isStrictCashier.value) {
+        activeSession.value.cart = [];
+        activeSession.value.customer_id = undefined;
+        activeSession.value.source_quote_id = undefined;
+    }
+    router.visit('/pos/cashier');
+};
+
+const handleTicketClose = () => {
+    showPrintTicketModal.value = false;
+    if (isStrictCashier.value) router.visit('/pos/cashier');
+};
+
 // Save changes back to the originating SalesQuote (update it in place)
 const saveQuoteChangesLoading = ref(false);
 
 const handleSaveQuoteChanges = async () => {
+    if (isStrictCashier.value) return;
     const quoteId = activeSession.value?.source_quote_id;
     if (!quoteId) return;
     if (cart.value.length === 0) {
@@ -1728,11 +1744,21 @@ const openRequestedCashMovement = (action: CashAction): void => {
     forceShowOpenSessionModal.value = true;
 };
 
+const closeOpenSessionModal = (): void => {
+    forceShowOpenSessionModal.value = false;
+    if (pendingCashAction.value) {
+        pendingCashAction.value = null;
+        clearCashActionQuery();
+        if (isStrictCashier.value) router.visit('/pos/cashier');
+    }
+};
+
 const closeCashMovement = (): void => {
     showCashMovementModal.value = false;
     pendingCashAction.value = null;
     cashMovementError.value = null;
     clearCashActionQuery();
+    if (isStrictCashier.value) router.visit('/pos/cashier');
 };
 
 // Session Handlers
@@ -1773,6 +1799,7 @@ const handleCashMovement = async (payload: {
         clearCashActionQuery();
         // Refresh session summary to update expected cash
         await checkCurrentSession(currentWarehouseId.value ?? undefined);
+        if (isStrictCashier.value) router.visit('/pos/cashier');
     } else {
         cashMovementError.value = sessionError.value;
     }
@@ -1782,6 +1809,15 @@ let returnSessionId: string | null = null;
 let editSessionId: string | null = null;
 
 onMounted(async () => {
+    if (
+        isStrictCashier.value &&
+        !activeSession.value?.source_quote_id &&
+        !requestedCashAction()
+    ) {
+        router.visit('/pos/cashier', { replace: true });
+        return;
+    }
+
     window.addEventListener('keydown', handleKeyboard);
 
     // UX-001: Prevent accidental tab close or refresh when cart has items
@@ -2184,7 +2220,7 @@ onUnmounted(() => {
                 :loading="sessionActionLoading"
                 :error="sessionError"
                 @submit="handleOpenSession"
-                @close="forceShowOpenSessionModal = false"
+                @close="closeOpenSessionModal"
             />
         </div>
 
@@ -2228,6 +2264,7 @@ onUnmounted(() => {
                 <div
                     v-if="
                         allSessions.length > 0 &&
+                        !isStrictCashier &&
                         !props.returnMode &&
                         !props.editMode
                     "
@@ -2278,7 +2315,7 @@ onUnmounted(() => {
 
                 <!-- R44: Cart search and sort toolbar -->
                 <div
-                    v-if="cart.length > 2"
+                    v-if="cart.length > 2 && !isStrictCashier"
                     class="flex shrink-0 items-center gap-2 px-1"
                 >
                     <div class="relative flex-1">
@@ -2365,30 +2402,31 @@ onUnmounted(() => {
                         :warehouse-id="currentWarehouseId"
                         :return-mode="returnMode"
                         :can-edit-seller="canEditSeller"
+                        :can-edit-commercial="!isStrictCashier"
                         @update-quantity="
                             (idx, qty) => handleUpdateQuantity(idx, qty)
                         "
-                        @remove="(idx) => removeItem(cart[idx].id)"
+                        @remove="(idx) => !isStrictCashier && removeItem(cart[idx].id)"
                         @update-item-tax="(id, tax) => updateItemTax(id, tax)"
                         @toggle-item-tax-exempt="
                             (id) => toggleItemTaxExempt(id)
                         "
                         @update-item-seller="
-                            (id, sellerId) => updateItemSeller(id, sellerId)
+                            (id, sellerId) => !isStrictCashier && updateItemSeller(id, sellerId)
                         "
                         @update-item-notes="
-                            (id, noteText) => updateItemNotes(id, noteText)
+                            (id, noteText) => !isStrictCashier && updateItemNotes(id, noteText)
                         "
                         @update-item-price="
-                            (id, price) => updateItemPrice(id, price)
+                            (id, price) => !isStrictCashier && updateItemPrice(id, price)
                         "
                         @update-item-discount="
-                            (id, discount) => updateDiscount(id, discount)
+                            (id, discount) => !isStrictCashier && updateDiscount(id, discount)
                         "
                         @view-details="
                             (productId) => openProductDetail(productId)
                         "
-                        @reorder="reorderCart"
+                        @reorder="(items) => !isStrictCashier && reorderCart(items)"
                         @reorder-success="handleReorderSuccess"
                     />
                 </div>
@@ -2616,12 +2654,21 @@ onUnmounted(() => {
                         :isQuoteSession="isQuoteSession"
                         :quoteMode="props.quoteMode"
                         :can-clear="canClearCurrentCart"
+                        :cashier-mode="isStrictCashier"
                         @clear="handleClearCurrentCart"
                         @save-quote="handleSaveQuote"
                         @save-quote-changes="handleSaveQuoteChanges"
                         @open-cash-register="forceShowOpenSessionModal = true"
                         @open-payment-modal="openPaymentModal('cash')"
                     />
+                    <button
+                        v-if="isStrictCashier && isQuoteSession"
+                        type="button"
+                        class="mt-3 w-full rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                        @click="returnToCashierQueue"
+                    >
+                        Volver a la cola
+                    </button>
                 </div>
             </div>
         </main>
@@ -2777,7 +2824,7 @@ onUnmounted(() => {
             :show="showPrintTicketModal"
             :order-id="lastOrderId"
             :order-number="lastOrderNumber"
-            @close="showPrintTicketModal = false"
+            @close="handleTicketClose"
         />
 
         <!-- ========== Cash Movement Modal ========== -->

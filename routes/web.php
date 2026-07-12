@@ -7,7 +7,7 @@ use Inertia\Inertia;
 
 Route::get('/', function () {
     if (Auth::check()) {
-        return redirect('/pos');
+        return redirect(Auth::user()?->role === 'cashier' ? '/pos/cashier' : '/pos');
     }
 
     return Inertia::render('Welcome', [
@@ -146,10 +146,11 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
         return Inertia::render('Reports/SalesByClient');
     })->name('sales-by-client');
 
-    Route::get('/z-report', function () {
-        return Inertia::render('Reports/ZReport');
-    })->name('z-report');
 });
+
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/reports/z-report', function () {
+    return Inertia::render('Reports/ZReport');
+})->name('reports.z-report');
 
 // POS Sessions (Cierres de Caja)
 Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/pos-sessions', function () {
@@ -190,11 +191,11 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->group(function () {
     Route::get('/', function () {
         return Inertia::render('SalesOrders/Index');
-    })->name('index');
+    })->name('index')->middleware('role:admin,manager,buyer,seller,assistant');
 
     Route::get('/create', function () {
         return Inertia::render('SalesOrders/Create');
-    })->name('create');
+    })->name('create')->middleware('role:admin,manager,buyer,seller,assistant');
 
     Route::get('/{id}', function ($id) {
         return Inertia::render('SalesOrders/Show', ['id' => (int) $id]);
@@ -202,7 +203,7 @@ Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->grou
 
     Route::get('/{id}/edit', function ($id) {
         return Inertia::render('SalesOrders/Edit', ['id' => (int) $id]);
-    })->name('edit');
+    })->name('edit')->middleware('role:admin,manager,buyer,seller,assistant');
 });
 
 // Returns index (must be before /returns/{orderId})
@@ -332,6 +333,10 @@ Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
     Route::get('/operational-expenses', function () {
         return Inertia::render('OperationalExpenses/Index');
     })->name('operational-expenses.index')->middleware('role:admin,manager');
+
+    Route::get('/operational-expense-beneficiaries/{id}', function ($id) {
+        return Inertia::render('OperationalExpenses/BeneficiaryShow', ['beneficiaryId' => (int) $id]);
+    })->name('operational-expense-beneficiaries.show')->middleware('role:admin,manager');
 });
 
 Route::get('/api/v1/store-settings', FrontendApiProxyController::class)
@@ -495,16 +500,16 @@ Route::middleware(['auth', 'role:admin'])->prefix('settings')->name('settings.')
 Route::middleware(['auth'])->group(function () {
     Route::get('/sales-quotes', function () {
         return Inertia::render('SalesQuotes/Index');
-    })->name('sales-quotes.index');
+    })->name('sales-quotes.index')->middleware('role:admin,manager,buyer,seller,assistant');
     Route::get('/sales-quotes/create', function () {
         return Inertia::render('SalesQuotes/Editor');
-    })->name('sales-quotes.create');
+    })->name('sales-quotes.create')->middleware('role:admin,manager,buyer,seller,assistant');
     Route::get('/sales-quotes/{id}', function ($id) {
         return Inertia::render('SalesQuotes/Show', ['id' => (int) $id]);
     })->name('sales-quotes.show');
     Route::get('/sales-quotes/{id}/edit', function ($id) {
         return Inertia::render('SalesQuotes/Editor', ['quoteId' => (int) $id]);
-    })->name('sales-quotes.edit');
+    })->name('sales-quotes.edit')->middleware('role:admin,manager,buyer,seller,assistant');
 
     // Quote Editor (POS in quote-only mode)
     Route::get('/quotes/create', fn () => Inertia::render('SalesQuotes/Editor')

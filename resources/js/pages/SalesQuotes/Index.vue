@@ -133,6 +133,7 @@ const openQuoteInPOS = async (id: number) => {
             quote_number: q.quote_number,
             customer_id: q.customer?.id ?? null,
             items: (q.items ?? []).map((item: any) => ({
+                id: item.id,
                 product_id: item.product_id,
                 product_name: item.product_name,
                 product_sku: item.product_sku,

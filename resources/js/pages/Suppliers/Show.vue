@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     Banknote,
@@ -23,6 +23,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -71,15 +72,17 @@ interface SupplierProductLink {
 
 const props = defineProps<{ supplierId: number }>();
 
-const tabs = [
-    { key: 'summary', label: 'Resumen' },
-    { key: 'orders', label: 'Ordenes' },
-    { key: 'items', label: 'Items comprados' },
-    { key: 'payments', label: 'Pagos/AP' },
-    { key: 'products', label: 'Productos abastecidos' },
-] as const;
-
-type TabKey = (typeof tabs)[number]['key'];
+type TabKey = 'summary' | 'orders' | 'items' | 'payments' | 'products' | 'expenses';
+const page = usePage();
+const canViewExpenses = computed(() => ['admin', 'manager'].includes((page.props.auth?.user as any)?.role));
+const tabs = computed(() => [
+    { key: 'summary' as TabKey, label: 'Resumen' },
+    { key: 'orders' as TabKey, label: 'Ordenes' },
+    { key: 'items' as TabKey, label: 'Items comprados' },
+    { key: 'payments' as TabKey, label: 'Pagos/AP' },
+    { key: 'products' as TabKey, label: 'Productos abastecidos' },
+    ...(canViewExpenses.value ? [{ key: 'expenses' as TabKey, label: 'Gastos' }] : []),
+]);
 
 const {
     supplier,
@@ -1315,6 +1318,13 @@ const removeVariant = async (variantId?: number | null) => {
                         </dl>
                     </aside>
                 </section>
+
+                <div v-if="activeTab === 'expenses'">
+                    <OperationalExpenseHistoryPanel
+                        party-type="supplier"
+                        :party-id="props.supplierId"
+                    />
+                </div>
 
                 <div
                     v-if="activeTab === 'products'"

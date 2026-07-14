@@ -31,7 +31,7 @@ import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, formatDateInputValue } from '@/utils/formatters';
 
 interface CashDrawer {
     opening_amount?: number;
@@ -85,7 +85,7 @@ const { warehouses, fetchWarehouses } = useWarehouses();
 const { users, fetchUsers } = useUsers();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 
-const selectedDate = ref(new Date().toISOString().split('T')[0]);
+const selectedDate = ref(formatDateInputValue());
 const selectedWarehouseId = ref<number | undefined>();
 const selectedUserId = ref<number | undefined>();
 const exporting = ref(false);

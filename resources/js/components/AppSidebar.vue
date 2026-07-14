@@ -431,15 +431,29 @@ const mainNavItems = computed<NavItem[]>(() => {
     // --- Reportes ---
     if (canAccessReports.value) {
         items.push({
+            title: 'Registros',
+            href: '/records',
+            icon: ClipboardList,
+        });
+        items.push({
             title: 'Reportes',
             icon: BarChart3,
             items: [
+                {
+                    title: 'Centro de reportes',
+                    href: '/reports',
+                    icon: BarChart3,
+                },
                 {
                     title: 'Ventas',
                     items: [
                         {
                             title: 'Ventas por cliente',
                             href: '/reports/sales-by-client',
+                        },
+                        {
+                            title: 'Ventas por producto',
+                            href: '/reports/sales-by-product',
                         },
                     ],
                 },
@@ -463,6 +477,10 @@ const mainNavItems = computed<NavItem[]>(() => {
                             title: 'Historial de movimientos',
                             href: '/reports/movement-history',
                         },
+                        {
+                            title: 'Inventario valorizado',
+                            href: '/reports/valued-inventory',
+                        },
                     ],
                 },
                 {
@@ -480,6 +498,14 @@ const mainNavItems = computed<NavItem[]>(() => {
                         {
                             title: 'Finanzas y rentabilidad',
                             href: '/reports/financial',
+                        },
+                        {
+                            title: 'Compras por proveedor',
+                            href: '/reports/purchases-by-supplier',
+                        },
+                        {
+                            title: 'Notas de credito',
+                            href: '/reports/credit-notes',
                         },
                     ],
                 },

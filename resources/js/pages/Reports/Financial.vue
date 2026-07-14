@@ -5,13 +5,12 @@ import {
     BarChart3,
     Clock,
     FileText,
-    Landmark,
     RefreshCw,
     Scale,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
-import CapitalMovementModal from '@/components/Finance/CapitalMovementModal.vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
+import CapitalMovementModal from '@/components/Finance/CapitalMovementModal.vue';
 import FinanceAdjustmentModal from '@/components/Finance/FinanceAdjustmentModal.vue';
 import FinanceAdvancedAccountingPanel from '@/components/Finance/FinanceAdvancedAccountingPanel.vue';
 import FinanceBalanceSheet from '@/components/Finance/FinanceBalanceSheet.vue';
@@ -21,6 +20,7 @@ import FinanceKpiRow from '@/components/Finance/FinanceKpiRow.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import FinancialDrilldownDrawer from '@/components/Finance/FinancialDrilldownDrawer.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import { useAuth } from '@/composables/useAuth';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -66,6 +66,7 @@ const {
 } = useReports();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 const { fetchSettings: fetchStoreSettings } = useStoreSettings();
+const { isAdmin } = useAuth();
 
 const activeTab = ref<ReportTab>('summary');
 const activeMode = ref<ReportMode>('basic');
@@ -107,7 +108,6 @@ const tabs: Array<{ key: ReportTab; label: string; icon: any }> = [
     { key: 'balance', label: 'Balance Sheet', icon: Scale },
     { key: 'income', label: 'Income Statement', icon: FileText },
     { key: 'credits', label: 'Creditos', icon: Clock },
-    { key: 'investment', label: 'Inversion', icon: Landmark },
 ];
 const kpis = computed(() => {
     const totals = dailySummary.value?.totals ?? {};
@@ -265,7 +265,7 @@ const loadReports = async (): Promise<void> => {
                 () =>
                     fetchIncomeStatement({
                         ...requestFilters,
-                        basis: 'cash',
+                        basis: 'accrual_operational',
                         compare: 'none',
                     }),
                 () => fetchBalanceSheet(requestFilters),
@@ -374,23 +374,27 @@ const openKpiDrilldown = (
 };
 
 const openDailySummaryDrilldown = (payload: {
-    date: string;
+    date?: string;
     key: string;
     label: string;
     metric: string;
     value: number;
 }): void => {
+    const dateFrom = payload.date ?? filters.value.date_from;
+    const dateTo = payload.date ?? filters.value.date_to;
     void openDrilldown(
         {
             key: payload.key,
-            label: `${payload.label} ${payload.date}`,
+            label: payload.date
+                ? `${payload.label} ${payload.date}`
+                : payload.label,
             value: payload.value,
             metric: payload.metric,
         },
         1,
         {
-            date_from: payload.date,
-            date_to: payload.date,
+            date_from: dateFrom,
+            date_to: dateTo,
             warehouse_id: filters.value.warehouse_id,
         },
     );
@@ -492,7 +496,7 @@ watch(currentWarehouseId, (value) => {
                 <template #actions>
                     <button
                         class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-                        :disabled="reportsLoading"
+                        :disabled="reportsLoading || !filters.date_from || !filters.date_to"
                         @click="loadReports"
                     >
                         <RefreshCw
@@ -505,14 +509,22 @@ watch(currentWarehouseId, (value) => {
 
                 <div class="space-y-3">
                     <div
-                        class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60"
+                        class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60"
                     >
                         <DateRangeInput
                             v-model:from="filters.date_from"
                             v-model:to="filters.date_to"
                             label="Rango de fechas"
-                            class="max-w-xl"
+                            class="min-w-0 flex-1 md:max-w-xl"
                         />
+                        <button
+                            v-if="isAdmin"
+                            type="button"
+                            class="h-10 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                            @click="openAdjustment('cash')"
+                        >
+                            Ajustar Cash
+                        </button>
                     </div>
 
                     <div
@@ -616,6 +628,7 @@ watch(currentWarehouseId, (value) => {
                         :net-income="incomeSummary?.net_profit ?? 0"
                         :net-profit="incomeSummary?.net_profit ?? 0"
                         :expense-breakdown="expenseBreakdown"
+                        :sections="incomeStatementReport?.sections ?? []"
                         :currency-formatter="formatCurrency"
                         @select="openKpiDrilldown"
                     />
@@ -1127,12 +1140,6 @@ watch(currentWarehouseId, (value) => {
                         </h3>
                         <div class="space-y-1.5">
                             <button
-                                class="w-full rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
-                                @click="openAdjustment('cash')"
-                            >
-                                Ajustar Cash
-                            </button>
-                            <button
                                 class="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
                                 @click="openAdjustment('bank')"
                             >
@@ -1147,29 +1154,6 @@ watch(currentWarehouseId, (value) => {
                         </div>
                     </div>
 
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
-                    >
-                        <h3
-                            class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            Inversion
-                        </h3>
-                        <div class="space-y-1.5">
-                            <button
-                                class="w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500"
-                                @click="openCapitalMovement('in')"
-                            >
-                                Registrar Aporte
-                            </button>
-                            <button
-                                class="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-                                @click="openCapitalMovement('out')"
-                            >
-                                Registrar Retiro
-                            </button>
-                        </div>
-                    </div>
                 </aside>
             </div>
 

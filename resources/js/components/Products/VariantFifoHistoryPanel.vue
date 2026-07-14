@@ -86,7 +86,7 @@ const savingLotId = ref<number | null>(null);
 const editingLotId = ref<number | null>(null);
 const history = ref<VariantFifoHistory | null>(null);
 const selectedWarehouseId = ref<number | null>(null);
-const activeTab = ref<'lots' | 'purchases' | 'sales'>('lots');
+const activeTab = ref<'timeline' | 'lots' | 'purchases' | 'sales'>('timeline');
 const expandedSaleIds = ref<Set<number>>(new Set());
 const lotEditForm = ref<LotEditForm>({
     received_at: '',
@@ -98,10 +98,25 @@ const lotEditForm = ref<LotEditForm>({
     sale_price: 0,
 });
 const tabs = [
+    { key: 'timeline', label: 'Historial' },
     { key: 'lots', label: 'Lotes disponibles' },
     { key: 'purchases', label: 'Compras' },
     { key: 'sales', label: 'Ventas' },
 ] as const;
+
+const movementLabel = (movement: VariantFifoMovement): string => {
+    const reference = String(movement.reference_type ?? '').toLowerCase();
+    if (reference.includes('purchase')) return movement.movement_type === 'in' ? 'Recepcion' : 'Devolucion a proveedor';
+    if (reference === 'sale' || reference.includes('sales_order')) return 'Venta';
+    if (reference.includes('return')) return 'Devolucion de cliente';
+    if (reference.includes('transfer')) return 'Transferencia';
+    if (reference.includes('waste')) return 'Merma';
+    if (reference.includes('adjust') || reference.includes('opening')) return 'Ajuste';
+    return movement.movement_type === 'in' ? 'Entrada' : movement.movement_type === 'out' ? 'Salida' : 'Transferencia';
+};
+
+const movementSign = (movement: VariantFifoMovement): string =>
+    movement.movement_type === 'out' ? '-' : '+';
 
 const variantWarehouseOptions = computed<WarehouseOption[]>(() => {
     const mapped =
@@ -888,7 +903,40 @@ defineExpose({
 
             <div v-else class="max-w-full overflow-x-auto">
                 <table
-                    v-if="activeTab === 'lots'"
+                    v-if="activeTab === 'timeline'"
+                    class="w-full text-left text-xs text-gray-600 dark:text-gray-300"
+                >
+                    <thead class="bg-gray-50 text-[11px] text-gray-500 uppercase dark:bg-muted">
+                        <tr>
+                            <th class="px-4 py-2">Fecha y hora</th>
+                            <th class="px-4 py-2">Movimiento</th>
+                            <th class="px-4 py-2">Documento</th>
+                            <th class="px-4 py-2 text-right">Cantidad</th>
+                            <th class="px-4 py-2 text-right">Antes</th>
+                            <th class="px-4 py-2 text-right">Despues</th>
+                            <th class="px-4 py-2">Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-border">
+                        <tr v-for="movement in history?.movement_timeline ?? []" :key="movement.id">
+                            <td class="px-4 py-2 whitespace-nowrap">{{ formatDate(movement.created_at) }}</td>
+                            <td class="px-4 py-2 font-medium text-gray-900 dark:text-white">{{ movementLabel(movement) }}</td>
+                            <td class="px-4 py-2 font-mono">{{ movement.reference_type || '-' }}<span v-if="movement.reference_id"> #{{ movement.reference_id }}</span></td>
+                            <td class="px-4 py-2 text-right font-semibold" :class="movement.movement_type === 'out' ? 'text-red-600' : 'text-emerald-600'">
+                                {{ movementSign(movement) }}{{ movement.quantity }}
+                            </td>
+                            <td class="px-4 py-2 text-right">{{ movement.quantity_before ?? '-' }}</td>
+                            <td class="px-4 py-2 text-right">{{ movement.quantity_after ?? '-' }}</td>
+                            <td class="px-4 py-2">{{ movement.user?.name || '-' }}</td>
+                        </tr>
+                        <tr v-if="!(history?.movement_timeline ?? []).length">
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">No hay movimientos para el rango seleccionado.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <table
+                    v-else-if="activeTab === 'lots'"
                     class="w-full text-left text-xs text-gray-600 dark:text-gray-300"
                 >
                     <thead

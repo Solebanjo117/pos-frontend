@@ -1786,8 +1786,10 @@ const handleOpenSession = async (amount: number) => {
 
 const handleCashMovement = async (payload: {
     type: 'in' | 'out';
+    subtype: 'cash_in' | 'cash_out' | 'deposit' | 'withdrawal' | 'adjustment_positive' | 'adjustment_negative';
     amount: number;
     reason: string;
+    reference_number: string;
     notes: string;
 }) => {
     cashMovementLoading.value = true;

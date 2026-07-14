@@ -4,8 +4,17 @@ import apiClient from './api/client';
 export interface CashMovementPayload {
     user_id?: number;
     type: 'in' | 'out';
+    subtype?:
+        | 'cash_in'
+        | 'cash_out'
+        | 'deposit'
+        | 'withdrawal'
+        | 'adjustment_positive'
+        | 'adjustment_negative';
     amount: number;
     reason: string;
+    reference_number?: string;
+    business_datetime?: string;
     notes?: string;
 }
 
@@ -14,8 +23,12 @@ export interface CashMovementRecord {
     pos_session_id: number;
     user_id: number;
     type: 'in' | 'out';
+    subtype?: string | null;
     amount: string;
     reason: string;
+    reference_number?: string | null;
+    balance_before?: string | null;
+    balance_after?: string | null;
     notes: string | null;
     created_at: string;
     updated_at: string;

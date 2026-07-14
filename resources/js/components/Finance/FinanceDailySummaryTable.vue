@@ -2,7 +2,7 @@
 import type { DailyFinancialRow } from '@/types/report';
 import { formatReportDate } from '@/utils/formatters';
 
-defineProps<{
+const props = defineProps<{
     rows: DailyFinancialRow[];
     totals: Record<string, number>;
     currencyFormatter: (value: number) => string;
@@ -11,7 +11,7 @@ defineProps<{
 const emit = defineEmits<{
     select: [
         payload: {
-            date: string;
+            date?: string;
             key: string;
             label: string;
             metric: string;
@@ -27,11 +27,19 @@ const columns: Array<{
 }> = [
     { key: 'sales_total', label: 'Ventas', metric: 'sales' },
     { key: 'sales_collected', label: 'Cobrado', metric: 'payments_received' },
-    { key: 'sales_pending', label: 'CxC', metric: 'receivable' },
+    {
+        key: 'sales_pending',
+        label: 'CxC',
+        metric: 'receivables_generated',
+    },
     { key: 'cogs', label: 'Costo', metric: 'cogs' },
     { key: 'purchase', label: 'Compras', metric: 'purchases' },
     { key: 'purchase_paid', label: 'Pagado', metric: 'supplier_payments' },
-    { key: 'purchase_pending', label: 'CxP', metric: 'payable' },
+    {
+        key: 'purchase_pending',
+        label: 'CxP',
+        metric: 'payables_generated',
+    },
     { key: 'expenses', label: 'Gastos', metric: 'expenses' },
     { key: 'net_profit', label: 'Profit', metric: 'profit' },
 ];
@@ -49,6 +57,15 @@ const selectCell = (
         label: column.label,
         metric: column.metric,
         value: rowValue(row, column.key),
+    });
+};
+
+const selectTotal = (column: (typeof columns)[number]): void => {
+    emit('select', {
+        key: column.key,
+        label: `${column.label} total`,
+        metric: column.metric,
+        value: Number(props.totals[column.key] ?? 0),
     });
 };
 </script>
@@ -120,7 +137,14 @@ const selectCell = (
                         :key="col.key"
                         class="px-2 py-1.5 text-right text-slate-900 dark:text-slate-100"
                     >
-                        {{ currencyFormatter(totals[col.key] ?? 0) }}
+                        <button
+                            type="button"
+                            class="w-full rounded px-1 py-0.5 text-right font-bold transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:hover:bg-slate-800"
+                            :title="`Ver detalle de ${col.label} del rango`"
+                            @click="selectTotal(col)"
+                        >
+                            {{ currencyFormatter(totals[col.key] ?? 0) }}
+                        </button>
                     </td>
                 </tr>
             </tfoot>

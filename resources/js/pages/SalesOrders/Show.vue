@@ -19,7 +19,7 @@ import {
     User,
     XCircle,
 } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
@@ -28,8 +28,10 @@ import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useUsers } from '@/composables/useUsers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
+import { paymentMethodsService } from '@/services/paymentMethods';
 import { salesOrdersService } from '@/services/sales-orders';
 import { SalesReturnsApiService } from '@/services/sales-returns';
+import type { PaymentMethod as ConfiguredPaymentMethod } from '@/types/payment-method';
 import type { Product, ProductVariant } from '@/types/product';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
 import type {
@@ -78,6 +80,14 @@ const activeTab = ref<TabKey>('summary');
 const showPrintModal = ref(false);
 const showReturnModal = ref(false);
 const showAddItemModal = ref(false);
+const showCancellationModal = ref(false);
+const cancellationLoading = ref(false);
+const cancellationError = ref<string | null>(null);
+const cancellationReason = ref('');
+const cancellationNotes = ref('');
+const cancellationMethod = ref<string>('');
+const cancellationMethods = ref<ConfiguredPaymentMethod[]>([]);
+const cancellationReasonInput = ref<HTMLTextAreaElement | null>(null);
 const returnLoading = ref(false);
 const returnError = ref<string | null>(null);
 const savingItemIds = ref<Set<number>>(new Set());
@@ -115,6 +125,8 @@ const paymentStatusLabels: Record<string, string> = {
     partial: 'Parcial',
     paid: 'Pagado',
     refunded: 'Reembolsado',
+    refund_pending: 'Reembolso pendiente',
+    voided_unpaid: 'Sin cobro',
 };
 
 const statusLabels: Record<string, string> = {
@@ -136,6 +148,33 @@ const paidTotal = computed(
 const amountDue = computed(
     () => operationalDetail.value?.ar_context.amount_due ?? 0,
 );
+const cancellationRequiresSettlement = computed(() =>
+    ['confirmed', 'processing', 'completed'].includes(order.value?.status || ''),
+);
+const cancellationOptions = computed(() => {
+    const options: Array<{ code: string; name: string }> = [];
+    if (customer.value && amountDue.value > 0) {
+        options.push({ code: 'receivable', name: 'Reducir CxC' });
+    }
+    options.push(
+        ...cancellationMethods.value
+            .filter(
+                (method) =>
+                    method.is_active &&
+                    !['credit', 'store_credit', 'supplier_credit'].includes(
+                        method.code,
+                    ),
+            )
+            .map((method) => ({ code: method.code, name: method.name })),
+    );
+    if (customer.value) {
+        options.push({ code: 'store_credit', name: 'Saldo a favor' });
+    }
+    return options.filter(
+        (option, index, rows) =>
+            rows.findIndex((row) => row.code === option.code) === index,
+    );
+});
 const customer = computed(() => order.value?.customer ?? null);
 
 const selectedWarehouseId = computed(() => {
@@ -268,10 +307,53 @@ const handleComplete = async (): Promise<void> => {
     await refreshOrder();
 };
 
+const openCancellationModal = async (): Promise<void> => {
+    cancellationReason.value = '';
+    cancellationNotes.value = '';
+    cancellationError.value = null;
+    try {
+        cancellationMethods.value = await paymentMethodsService.getActive(
+            'returns',
+            true,
+        );
+    } catch {
+        cancellationMethods.value = [];
+    }
+    cancellationMethod.value =
+        customer.value && amountDue.value > 0
+            ? 'receivable'
+            : cancellationOptions.value[0]?.code || '';
+    showCancellationModal.value = true;
+    await nextTick();
+    cancellationReasonInput.value?.focus();
+};
+
 const handleCancel = async (): Promise<void> => {
-    if (!confirm('¿Cancelar esta orden? El inventario será revertido.')) return;
-    await cancelSalesOrder(props.id);
-    await refreshOrder();
+    if (cancellationReason.value.trim().length < 3) {
+        cancellationError.value = 'Explique el motivo de la anulación.';
+        return;
+    }
+    if (cancellationRequiresSettlement.value && !cancellationMethod.value) {
+        cancellationError.value = 'Seleccione cómo se resolverá la anulación.';
+        return;
+    }
+
+    cancellationLoading.value = true;
+    cancellationError.value = null;
+    try {
+        await cancelSalesOrder(props.id, {
+            reason: cancellationReason.value.trim(),
+            refund_method: cancellationMethod.value || null,
+            notes: cancellationNotes.value.trim() || null,
+        });
+        showCancellationModal.value = false;
+        await refreshOrder();
+    } catch (err: any) {
+        cancellationError.value =
+            err.response?.data?.message || err.message || 'No se pudo anular la factura.';
+    } finally {
+        cancellationLoading.value = false;
+    }
 };
 
 const setItemSaving = (itemId: number, saving: boolean): void => {
@@ -453,6 +535,12 @@ onMounted(async () => {
         fetchUsers(),
         fetchProductFilterOptions(),
     ]);
+    if (
+        new URLSearchParams(window.location.search).get('action') === 'cancel' &&
+        currentSalesOrder.value?.status !== 'cancelled'
+    ) {
+        await openCancellationModal();
+    }
 });
 </script>
 
@@ -515,10 +603,7 @@ onMounted(async () => {
                                 class="rounded-full px-2 py-1 text-xs font-semibold"
                                 :class="paymentClass(order.payment_status)"
                             >
-                                {{
-                                    paymentStatusLabels[order.payment_status] ||
-                                    order.payment_status
-                                }}
+                                {{ paymentStatusLabels[order.payment_display_status || order.payment_status] || order.payment_display_status || order.payment_status }}
                             </span>
                             <button
                                 v-if="customer"
@@ -600,13 +685,10 @@ onMounted(async () => {
                             Agregar item
                         </button>
                         <button
-                            v-if="
-                                currentSalesOrder?.status !== 'completed' &&
-                                currentSalesOrder?.status !== 'cancelled'
-                            "
+                            v-if="currentSalesOrder?.status !== 'cancelled'"
                             type="button"
                             class="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-300 dark:hover:bg-red-950/30"
-                            @click="handleCancel"
+                            @click="openCancellationModal"
                         >
                             <XCircle :size="16" />
                             Cancelar
@@ -1489,6 +1571,57 @@ onMounted(async () => {
             :order-number="currentSalesOrder.order_number"
             @close="showPrintModal = false"
         />
+
+        <div
+            v-if="showCancellationModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+            @keydown.esc="showCancellationModal = false"
+        >
+            <form
+                class="w-full max-w-md rounded-md border bg-white shadow-xl dark:border-border dark:bg-card"
+                @submit.prevent="handleCancel"
+            >
+                <div class="border-b p-4 dark:border-border">
+                    <h2 class="font-semibold">Anular factura {{ order?.order_number }}</h2>
+                    <p class="mt-1 text-sm text-gray-500">
+                        La factura original se conserva. Inventario y dinero se corrigen con movimientos auditados.
+                    </p>
+                </div>
+                <div class="space-y-3 p-4">
+                    <label class="block text-sm font-medium">
+                        Motivo
+                        <textarea
+                            ref="cancellationReasonInput"
+                            v-model="cancellationReason"
+                            rows="3"
+                            required
+                            minlength="3"
+                            class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                        />
+                    </label>
+                    <label v-if="cancellationRequiresSettlement" class="block text-sm font-medium">
+                        Resolución financiera
+                        <select v-model="cancellationMethod" required class="mt-1 w-full rounded-md border bg-background px-3 py-2">
+                            <option value="" disabled>Seleccionar</option>
+                            <option v-for="method in cancellationOptions" :key="method.code" :value="method.code">
+                                {{ method.name }}
+                            </option>
+                        </select>
+                    </label>
+                    <label class="block text-sm font-medium">
+                        Nota opcional
+                        <textarea v-model="cancellationNotes" rows="2" class="mt-1 w-full rounded-md border bg-background px-3 py-2" />
+                    </label>
+                    <p v-if="cancellationError" class="text-sm text-red-600">{{ cancellationError }}</p>
+                </div>
+                <div class="flex justify-end gap-2 border-t p-4 dark:border-border">
+                    <button type="button" class="rounded-md border px-3 py-2 text-sm" @click="showCancellationModal = false">Volver</button>
+                    <button type="submit" class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="cancellationLoading">
+                        {{ cancellationLoading ? 'Anulando...' : 'Confirmar anulación' }}
+                    </button>
+                </div>
+            </form>
+        </div>
 
         <CreateReturnModal
             v-if="currentSalesOrder"

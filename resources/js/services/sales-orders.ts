@@ -110,8 +110,15 @@ export const salesOrdersService = {
     /**
      * Cancel order and revert inventory
      */
-    async cancel(id: number): Promise<SalesOrder> {
-        const { data } = await apiClient.post(`${BASE_URL}/${id}/cancel`);
+    async cancel(
+        id: number,
+        payload: {
+            reason: string;
+            refund_method?: string | null;
+            notes?: string | null;
+        },
+    ): Promise<SalesOrder> {
+        const { data } = await apiClient.post(`${BASE_URL}/${id}/cancel`, payload);
         return data.data;
     },
 

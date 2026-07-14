@@ -69,6 +69,11 @@ export interface SalesOrderOperationalOrder {
     created_at?: string | null;
     updated_at?: string | null;
     business_datetime?: string | null;
+    payment_display_status?: PaymentStatus | 'refund_pending' | 'voided_unpaid';
+    cancelled_at?: string | null;
+    cancellation_reason?: string | null;
+    cancelled_by?: { id: number; name: string } | null;
+    cancellation_return_id?: number | null;
     sent_to_warehouse_at?: string | null;
     prepared_at?: string | null;
     prepared_by?: { id: number; name: string } | null;

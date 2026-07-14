@@ -176,7 +176,7 @@ async function save(): Promise<void> {
                     class="flex items-center gap-1 text-xs font-semibold uppercase text-gray-500"
                 >
                     <Clock3 class="h-3.5 w-3.5" />
-                    Fecha/Hora operativa
+                    Fecha y hora
                 </p>
                 <p class="mt-1 font-medium text-gray-950 dark:text-white">
                     {{ formatDateTime(effectiveDatetime) }}

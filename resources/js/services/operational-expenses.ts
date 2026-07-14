@@ -41,6 +41,10 @@ export const operationalExpensesService = {
         await apiClient.delete(`/operational-expenses/${id}`);
     },
 
+    async sendToCashier(id: number): Promise<void> {
+        await apiClient.post(`/operational-expenses/${id}/send-to-cashier`);
+    },
+
     async listCategories(): Promise<OperationalExpenseCategoryRecord[]> {
         const response = await apiClient.get('/operational-expense-categories');
         return response.data.data ?? [];

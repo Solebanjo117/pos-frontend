@@ -601,6 +601,8 @@ export interface DailyFinancialRow {
     sales_total?: number;
     sales_collected?: number;
     sales_pending?: number;
+    receivables_generated?: number;
+    payables_generated?: number;
     cogs: number;
     profit: number;
     credit_payable: number;
@@ -671,14 +673,25 @@ export interface BalanceSheetReport {
         bank_initial?: number;
         inventory: number;
         inventory_initial: number;
+        accounts_receivable: number;
     };
     liabilities: {
         accounts_payable: number;
-        accounts_receivable: number;
+        customer_credits: number;
+        pending_refunds: number;
+    };
+    equity: {
+        contributed_capital: number;
+        period_profit: number;
+        retained_earnings: number;
+        total_equity: number;
     };
     totals: {
         total_assets: number;
         total_liabilities: number;
+        total_equity: number;
+        liabilities_and_equity: number;
+        reconciliation_difference: number;
         balance: number;
     };
     as_of: string;

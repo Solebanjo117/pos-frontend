@@ -126,6 +126,9 @@ Route::middleware(['auth'])->prefix('inventory-transfers')->name('inventory-tran
 
 // Reports routes
 Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('reports.')->group(function () {
+    Route::get('/', function () {
+        return Inertia::render('Reports/Index');
+    })->name('index');
     Route::get('/stock-levels', function () {
         return Inertia::render('Reports/StockLevels');
     })->name('stock-levels');
@@ -146,7 +149,16 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
         return Inertia::render('Reports/SalesByClient');
     })->name('sales-by-client');
 
+    Route::get('/sales-by-product', fn () => Inertia::render('Reports/OperationalAnalytics', ['reportKey' => 'sales-by-product']))->name('sales-by-product');
+    Route::get('/purchases-by-supplier', fn () => Inertia::render('Reports/OperationalAnalytics', ['reportKey' => 'purchases-by-supplier']))->name('purchases-by-supplier');
+    Route::get('/credit-notes', fn () => Inertia::render('Reports/OperationalAnalytics', ['reportKey' => 'credit-notes']))->name('credit-notes');
+    Route::get('/valued-inventory', fn () => Inertia::render('Reports/OperationalAnalytics', ['reportKey' => 'valued-inventory']))->name('valued-inventory');
+
 });
+
+Route::middleware(['auth', 'role:admin,manager'])->get('/records', function () {
+    return Inertia::render('Records/Index');
+})->name('records.index');
 
 Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/reports/z-report', function () {
     return Inertia::render('Reports/ZReport');

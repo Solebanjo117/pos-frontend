@@ -8,10 +8,11 @@ import {
     Pencil,
     Plus,
     RefreshCw,
+    Send,
     Trash2,
     X,
 } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -20,7 +21,7 @@ import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { operationalExpensesService } from '@/services/operational-expenses';
 import { ReportsApiService } from '@/services/reports';
-import type { AccountingAccountSummary } from '@/types/report';
+import warehousesService from '@/services/warehouses';
 import type {
     OperationalExpense,
     OperationalExpenseBeneficiary,
@@ -32,10 +33,16 @@ import type {
     OperationalExpenseParty,
     OperationalExpensePartyType,
 } from '@/types/operational-expense';
+import type { AccountingAccountSummary } from '@/types/report';
 import { formatCurrency, formatReportDate } from '@/utils/formatters';
 
 const today = new Date();
 const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+const localDateTimeValue = () => {
+    const value = new Date();
+    value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+    return value.toISOString().slice(0, 16);
+};
 
 const loading = ref(false);
 const saving = ref(false);
@@ -68,9 +75,13 @@ const summary = ref<{
     }>;
 }>({ total_amount: 0, count: 0, by_category: [], by_party: [] });
 const statuses = ref<Record<string, string>>({
+    draft: 'Borrador',
     paid: 'Pagado',
     pending: 'Pendiente',
     scheduled: 'Programado',
+    queued: 'En Caja',
+    cancelled: 'Cancelado',
+    reversed: 'Reversado',
 });
 const recurrences = ref<Record<string, string>>({
     one_time: 'Unico',
@@ -85,6 +96,9 @@ const expenseKinds = ref<Record<string, string>>({
     other: 'Otro',
 });
 const showForm = ref(false);
+const formDialog = ref<HTMLFormElement | null>(null);
+const firstFormInput = ref<HTMLInputElement | null>(null);
+const warehouses = ref<Array<{ id: number; name: string }>>([]);
 const editingExpense = ref<OperationalExpense | null>(null);
 const creatingCategory = ref(false);
 const creatingBeneficiary = ref(false);
@@ -125,6 +139,7 @@ const filters = ref({
     category: '' as OperationalExpenseCategory | '',
     warehouse_id: null as number | null,
     expense_kind: '' as '' | OperationalExpensePayload['expense_kind'],
+    status: '' as '' | NonNullable<OperationalExpense['status']>,
     party_type: '' as '' | OperationalExpensePartyType,
     party_id: null as number | null,
     per_page: 50,
@@ -138,10 +153,14 @@ const form = ref<OperationalExpensePayload>({
     subcategory: '',
     description: '',
     amount: 0,
+    estimated_amount: 0,
+    final_amount: 0,
     payment_method: 'transfer',
+    planned_payment_method: 'transfer',
     recurrence: 'one_time',
     status: 'paid',
     paid_at: null,
+    due_at: null,
     affects_cash_flow: true,
     affects_income_statement: true,
     expense_kind: 'operational',
@@ -154,6 +173,7 @@ const form = ref<OperationalExpensePayload>({
     reference_number: '',
     warehouse_id: null,
     notes: '',
+    business_datetime: localDateTimeValue(),
 });
 
 const categoryOptions = computed<SelectOption[]>(() => [
@@ -186,7 +206,9 @@ const partyOptions = computed<SelectOption[]>(() => [
                 ? 'Cliente'
                 : party.type === 'supplier'
                   ? 'Proveedor'
-                  : 'Beneficiario',
+                  : party.type === 'staff'
+                    ? 'Empleado / vendedor'
+                    : 'Beneficiario',
     })),
 ]);
 
@@ -223,18 +245,13 @@ const ledgerAccountOptions = computed<SelectOption[]>(() => [
 ]);
 
 const statusOptions = computed<SelectOption[]>(() =>
-    Object.entries(statuses.value).map(([value, label]) => ({ value, label })),
+    Object.entries(statuses.value)
+        .filter(([value]) => ['draft', 'pending', 'scheduled', 'paid'].includes(value))
+        .map(([value, label]) => ({ value, label })),
 );
 
 const recurrenceOptions = computed<SelectOption[]>(() =>
     Object.entries(recurrences.value).map(([value, label]) => ({
-        value,
-        label,
-    })),
-);
-
-const expenseKindOptions = computed<SelectOption[]>(() =>
-    Object.entries(expenseKinds.value).map(([value, label]) => ({
         value,
         label,
     })),
@@ -286,6 +303,7 @@ function partyTypeLabel(type: OperationalExpensePartyType | null): string {
     if (type === 'customer') return 'Cliente';
     if (type === 'supplier') return 'Proveedor';
     if (type === 'beneficiary') return 'Beneficiario';
+    if (type === 'staff') return 'Empleado / vendedor';
     return 'Sin relacion';
 }
 
@@ -293,7 +311,7 @@ let partySearchTimer: ReturnType<typeof setTimeout> | null = null;
 async function loadParties(q = '') {
     try {
         parties.value = await operationalExpensesService.searchParties(q);
-    } catch (e) {
+    } catch {
         parties.value = [];
     }
 }
@@ -308,8 +326,18 @@ async function loadLedgerAccounts() {
     try {
         const response = await ReportsApiService.getAccountingAccounts({});
         ledgerAccounts.value = response.data;
-    } catch (e) {
+    } catch {
         ledgerAccounts.value = [];
+    }
+}
+
+async function loadWarehouses() {
+    try {
+        warehouses.value = (await warehousesService.getAllWarehouses()).map(
+            (warehouse) => ({ id: warehouse.id, name: warehouse.name }),
+        );
+    } catch {
+        warehouses.value = [];
     }
 }
 
@@ -317,7 +345,7 @@ async function loadExpenseCategories() {
     try {
         expenseCategories.value =
             await operationalExpensesService.listCategories();
-    } catch (e) {
+    } catch {
         expenseCategories.value = [];
     }
 }
@@ -385,10 +413,14 @@ function openCreateForm() {
         subcategory: '',
         description: '',
         amount: 0,
+        estimated_amount: 0,
+        final_amount: 0,
         payment_method: defaultPaymentMethod(),
+        planned_payment_method: defaultPaymentMethod(),
         recurrence: 'one_time',
         status: 'paid',
         paid_at: null,
+        due_at: null,
         affects_cash_flow: true,
         affects_income_statement: true,
         expense_kind: 'operational',
@@ -401,8 +433,10 @@ function openCreateForm() {
         reference_number: '',
         warehouse_id: null,
         notes: '',
+        business_datetime: localDateTimeValue(),
     };
     showForm.value = true;
+    nextTick(() => firstFormInput.value?.focus());
 }
 
 function openEditForm(expense: OperationalExpense) {
@@ -425,10 +459,14 @@ function openEditForm(expense: OperationalExpense) {
         subcategory: expense.subcategory || '',
         description: expense.description || '',
         amount: Number(expense.amount || 0),
+        estimated_amount: Number(expense.estimated_amount ?? expense.amount ?? 0),
         payment_method: expense.payment_method || 'transfer',
+        planned_payment_method:
+            expense.planned_payment_method || expense.payment_method || 'transfer',
         recurrence: expense.recurrence || 'one_time',
         status: expense.status || 'paid',
         paid_at: expense.paid_at || null,
+        due_at: expense.due_at || null,
         affects_cash_flow: expense.affects_cash_flow ?? true,
         affects_income_statement: expense.affects_income_statement ?? true,
         expense_kind: expense.expense_kind || 'operational',
@@ -441,8 +479,10 @@ function openEditForm(expense: OperationalExpense) {
         reference_number: expense.reference_number || '',
         warehouse_id: expense.warehouse_id ?? null,
         notes: expense.notes || '',
+        business_datetime: expense.business_datetime?.slice(0, 16) || null,
     };
     showForm.value = true;
+    nextTick(() => firstFormInput.value?.focus());
 }
 
 async function createBeneficiaryFromForm() {
@@ -479,7 +519,7 @@ function partyHref(expense: OperationalExpense): string | null {
     if (!expense.party) return null;
     if (expense.party.type === 'customer') return `/customers/${expense.party.id}`;
     if (expense.party.type === 'supplier') return `/suppliers/${expense.party.id}`;
-    return `/operational-expense-beneficiaries/${expense.party.id}`;
+    return `/operational-expense-beneficiaries/${expense.party.related_id ?? expense.party.id}`;
 }
 
 function updateExpenseBusinessDatetime(
@@ -523,7 +563,38 @@ async function createCategoryFromForm() {
     }
 }
 
-async function saveExpense() {
+function closeForm() {
+    if (saving.value) return;
+    showForm.value = false;
+}
+
+function handleFormKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        closeForm();
+        return;
+    }
+
+    if (event.key !== 'Tab' || !formDialog.value) return;
+    const focusable = Array.from(
+        formDialog.value.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+    ).filter((element) => element.offsetParent !== null);
+    if (!focusable.length) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
+async function saveExpense(action: 'close' | 'new' | 'queue' = 'close') {
     saving.value = true;
     error.value = null;
     try {
@@ -531,8 +602,17 @@ async function saveExpense() {
             (category) => category.id === form.value.category_id,
         );
         const categoryKey = form.value.category ?? '';
+        const isPaid = form.value.status === 'paid';
         const payload: OperationalExpensePayload = {
             ...form.value,
+            status: action === 'queue' ? 'pending' : form.value.status,
+            amount: Number(
+                isPaid
+                    ? form.value.final_amount || form.value.estimated_amount || form.value.amount
+                    : form.value.estimated_amount || form.value.amount,
+            ),
+            estimated_amount: Number(form.value.estimated_amount || form.value.amount),
+            payment_method: action === 'queue' ? null : form.value.payment_method,
             description:
                 form.value.description?.trim() ||
                 form.value.notes?.trim() ||
@@ -541,15 +621,25 @@ async function saveExpense() {
                 'Gasto',
         };
 
+        let savedExpense: OperationalExpense;
         if (editingExpense.value) {
-            await operationalExpensesService.update(
+            savedExpense = await operationalExpensesService.update(
                 editingExpense.value.id,
                 payload,
             );
         } else {
-            await operationalExpensesService.create(payload);
+            savedExpense = await operationalExpensesService.create(payload);
         }
-        showForm.value = false;
+
+        if (action === 'queue') {
+            await operationalExpensesService.sendToCashier(savedExpense.id);
+        }
+
+        if (action === 'new') {
+            openCreateForm();
+        } else {
+            showForm.value = false;
+        }
         await loadExpenses();
     } catch (e: any) {
         error.value =
@@ -561,6 +651,17 @@ async function saveExpense() {
 
 async function deleteExpense(expense: OperationalExpense) {
     expenseToDelete.value = expense;
+}
+
+async function sendExpenseToCashier(expense: OperationalExpense) {
+    error.value = null;
+    try {
+        await operationalExpensesService.sendToCashier(expense.id);
+        await loadExpenses();
+    } catch (e: any) {
+        error.value =
+            e.response?.data?.message || 'No se pudo enviar el gasto a Caja.';
+    }
 }
 
 async function confirmDeleteExpense() {
@@ -595,6 +696,7 @@ onMounted(async () => {
         fetchStoreSettings(),
         loadParties(),
         loadLedgerAccounts(),
+        loadWarehouses(),
         loadExpenseCategories(),
         loadExpenses(),
     ]);
@@ -742,11 +844,11 @@ onMounted(async () => {
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-semibold text-gray-500 uppercase">
-                                Tipo
+                                Estado
                             </label>
                             <SearchableSelect
-                                v-model="filters.expense_kind"
-                                :options="[{ value: '', label: 'Todos' }, ...expenseKindOptions]"
+                                v-model="filters.status"
+                                :options="[{ value: '', label: 'Todos' }, ...statusOptions]"
                             />
                         </div>
                         <div>
@@ -945,6 +1047,16 @@ onMounted(async () => {
                                     </td>
                                     <td class="px-3 py-2 text-right">
                                         <button
+                                            v-if="expense.capabilities?.can_send_to_cashier"
+                                            type="button"
+                                            class="p-1 text-gray-500 hover:text-sky-600"
+                                            title="Enviar a Caja"
+                                            @click="sendExpenseToCashier(expense)"
+                                        >
+                                            <Send :size="15" />
+                                        </button>
+                                        <button
+                                            v-if="expense.capabilities?.can_edit"
                                             type="button"
                                             class="p-1 text-gray-500 hover:text-emerald-600"
                                             @click="openEditForm(expense)"
@@ -952,6 +1064,7 @@ onMounted(async () => {
                                             <Pencil :size="15" />
                                         </button>
                                         <button
+                                            v-if="expense.capabilities?.can_cancel || expense.capabilities?.can_reverse"
                                             type="button"
                                             class="p-1 text-gray-500 hover:text-red-600"
                                             @click="deleteExpense(expense)"
@@ -972,14 +1085,19 @@ onMounted(async () => {
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
         >
             <form
+                ref="formDialog"
                 class="w-full max-w-2xl rounded-lg bg-white shadow-2xl dark:bg-card"
-                @submit.prevent="saveExpense"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="expense-dialog-title"
+                @keydown="handleFormKeydown"
+                @submit.prevent="saveExpense('close')"
             >
                 <div
                     class="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-border"
                 >
                     <div>
-                        <h2 class="text-lg font-bold">
+                        <h2 id="expense-dialog-title" class="text-lg font-bold">
                             {{
                                 editingExpense ? 'Editar gasto' : 'Nuevo gasto'
                             }}
@@ -992,7 +1110,7 @@ onMounted(async () => {
                     <button
                         type="button"
                         class="rounded-md p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-muted"
-                        @click="showForm = false"
+                        @click="closeForm"
                     >
                         <X :size="18" />
                     </button>
@@ -1000,12 +1118,14 @@ onMounted(async () => {
 
                 <div class="grid max-h-[70vh] gap-4 overflow-y-auto p-5 md:grid-cols-2">
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Fecha *</label>
+                        <label class="mb-1 block text-sm font-medium">Fecha y hora *</label>
                         <input
-                            v-model="form.expense_date"
-                            type="date"
+                            ref="firstFormInput"
+                            v-model="form.business_datetime"
+                            type="datetime-local"
                             required
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                            @change="form.expense_date = String(form.business_datetime || '').slice(0, 10)"
                         />
                     </div>
                     <div>
@@ -1037,13 +1157,6 @@ onMounted(async () => {
                         </button>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Tipo</label>
-                        <SearchableSelect
-                            v-model="form.expense_kind"
-                            :options="expenseKindOptions"
-                        />
-                    </div>
-                    <div>
                         <label class="mb-1 block text-sm font-medium">Categoria</label>
                         <SearchableSelect
                             v-model="form.category_id"
@@ -1051,14 +1164,27 @@ onMounted(async () => {
                         />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Monto *</label>
+                        <label class="mb-1 block text-sm font-medium">Monto estimado *</label>
                         <input
-                            v-model.number="form.amount"
+                            v-model.number="form.estimated_amount"
                             type="number"
                             min="0.01"
                             step="0.01"
                             required
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-right dark:border-border dark:bg-muted"
+                            @input="form.amount = Number(form.estimated_amount || 0)"
+                        />
+                    </div>
+                    <div v-if="form.status === 'paid'">
+                        <label class="mb-1 block text-sm font-medium">Monto final *</label>
+                        <input
+                            v-model.number="form.final_amount"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            required
+                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-right dark:border-border dark:bg-muted"
+                            @input="form.amount = Number(form.final_amount || form.estimated_amount || 0)"
                         />
                     </div>
                     <div>
@@ -1080,6 +1206,16 @@ onMounted(async () => {
                                 Crear
                             </button>
                         </div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-sm font-medium">Descripcion</label>
+                        <input
+                            v-model="form.description"
+                            type="text"
+                            maxlength="255"
+                            placeholder="Concepto del gasto"
+                            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                        />
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-sm font-medium">Notas</label>
@@ -1107,11 +1243,25 @@ onMounted(async () => {
                                 />
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium">Metodo</label>
+                                <label class="mb-1 block text-sm font-medium">Sucursal</label>
                                 <select
+                                    v-model.number="form.warehouse_id"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                                >
+                                    <option :value="null">Sucursal actual</option>
+                                    <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
+                                        {{ warehouse.name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium">
+                                    {{ form.status === 'paid' ? 'Metodo final' : 'Metodo previsto' }}
+                                </label>
+                                <select
+                                    v-if="form.status === 'paid'"
                                     v-model="form.payment_method"
-                                    :disabled="form.status !== 'paid'"
-                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400 dark:border-border dark:bg-muted"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
                                 >
                                     <option
                                         v-for="method in paymentMethods"
@@ -1121,6 +1271,27 @@ onMounted(async () => {
                                         {{ method.label }}
                                     </option>
                                 </select>
+                                <select
+                                    v-else
+                                    v-model="form.planned_payment_method"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                                >
+                                    <option
+                                        v-for="method in paymentMethods"
+                                        :key="method.value"
+                                        :value="method.value"
+                                    >
+                                        {{ method.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div v-if="form.status !== 'paid'">
+                                <label class="mb-1 block text-sm font-medium">Fecha de pago</label>
+                                <input
+                                    v-model="form.due_at"
+                                    type="datetime-local"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
+                                />
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium">Subcategoria</label>
@@ -1183,13 +1354,32 @@ onMounted(async () => {
                     <button
                         type="button"
                         class="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
-                        @click="showForm = false"
+                        @click="closeForm"
                     >
                         Cancelar
                     </button>
                     <button
+                        v-if="!editingExpense"
+                        type="button"
+                        :disabled="saving || Number(form.estimated_amount || form.amount) <= 0"
+                        class="rounded-md border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                        @click="saveExpense('new')"
+                    >
+                        Guardar y crear otro
+                    </button>
+                    <button
+                        v-if="!editingExpense || editingExpense.capabilities?.can_send_to_cashier"
+                        type="button"
+                        :disabled="saving || Number(form.estimated_amount || form.amount) <= 0"
+                        class="inline-flex items-center gap-2 rounded-md border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/30"
+                        @click="saveExpense('queue')"
+                    >
+                        <Send :size="16" />
+                        Guardar y enviar a Caja
+                    </button>
+                    <button
                         type="submit"
-                        :disabled="saving || form.amount <= 0"
+                        :disabled="saving || Number(form.estimated_amount || form.amount) <= 0"
                         class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
                         <DollarSign :size="16" />

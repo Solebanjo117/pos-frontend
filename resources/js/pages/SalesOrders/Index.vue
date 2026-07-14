@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import {
     Search,
     Filter,
@@ -24,7 +24,6 @@ const {
     salesOrders,
     statistics,
     loading,
-    error,
     total,
     currentPage,
     perPage,
@@ -32,7 +31,6 @@ const {
     fetchSalesOrders,
     fetchStatistics,
     confirmSalesOrder,
-    cancelSalesOrder,
     deleteSalesOrder,
 } = useSalesOrders();
 
@@ -271,19 +269,7 @@ const handleConfirm = async (id: number) => {
 };
 
 const handleCancel = async (id: number) => {
-    if (
-        !confirm(
-            '¿Cancelar esta orden? El inventario será revertido si fue confirmada.',
-        )
-    )
-        return;
-
-    try {
-        await cancelSalesOrder(id);
-        await loadSalesOrders();
-    } catch (err) {
-        console.error('Error al cancelar orden:', err);
-    }
+    router.visit(`/sales-orders/${id}?action=cancel`);
 };
 
 const handleDelete = async (id: number) => {
@@ -840,12 +826,11 @@ watch(currentWarehouseId, async () => {
                                     ></span>
                                     <button
                                         v-if="
-                                            order.status !== 'completed' &&
                                             order.status !== 'cancelled'
                                         "
                                         @click="handleCancel(order.id)"
                                         class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                                        title="Cancelar"
+                                        title="Abrir anulacion auditada"
                                     >
                                         <XCircle :size="18" />
                                     </button>

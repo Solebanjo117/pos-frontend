@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BalanceSheetReport } from '@/types/report';
 
-const props = defineProps<{
+defineProps<{
     data: BalanceSheetReport | null;
     currencyFormatter: (value: number) => string;
 }>();
@@ -11,256 +11,94 @@ const emit = defineEmits<{
 }>();
 
 const amount = (value: number | null | undefined): number => Number(value ?? 0);
-
-const selectMetric = (metric: string, label: string, value: number): void => {
+const selectMetric = (metric: string, label: string, value: number): void =>
     emit('select', { metric, label, value });
-};
+
+const rowClass =
+    'rounded px-1 text-right font-semibold tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:hover:bg-slate-800';
 </script>
 
 <template>
     <div class="space-y-3">
-        <div class="grid gap-3 lg:grid-cols-2">
-            <div
-                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
-            >
-                <h3
-                    class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                >
-                    Activos
-                </h3>
+        <div class="grid gap-3 lg:grid-cols-3">
+            <section class="rounded-md border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                <h3 class="mb-2 text-xs font-bold text-slate-500 uppercase">Activos</h3>
                 <div class="space-y-1 text-xs">
-                    <div class="flex justify-between">
-                        <span class="text-slate-600 dark:text-slate-400"
-                            >Cash</span
-                        >
-                        <button
-                            type="button"
-                            class="rounded px-1 text-right font-semibold text-slate-900 tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-slate-100 dark:hover:bg-slate-800"
-                            @click="
-                                selectMetric(
-                                    'cash',
-                                    'Cash',
-                                    amount(props.data?.assets.cash),
-                                )
-                            "
-                        >
-                            {{ currencyFormatter(props.data?.assets.cash ?? 0) }}
+                    <div v-for="item in [
+                        { metric: 'cash', label: 'Cash', value: data?.assets.cash },
+                        { metric: 'bank', label: 'Banco', value: data?.assets.bank },
+                        { metric: 'receivable', label: 'CxC', value: data?.assets.accounts_receivable },
+                        { metric: 'inventory_bridge', label: 'Inventario', value: data?.assets.inventory },
+                    ]" :key="item.metric" class="flex justify-between gap-3">
+                        <span class="text-slate-600 dark:text-slate-400">{{ item.label }}</span>
+                        <button type="button" :class="rowClass" @click="selectMetric(item.metric, item.label, amount(item.value))">
+                            {{ currencyFormatter(amount(item.value)) }}
                         </button>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-600 dark:text-slate-400"
-                            >Banco</span
-                        >
-                        <button
-                            type="button"
-                            class="rounded px-1 text-right font-semibold text-slate-900 tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-slate-100 dark:hover:bg-slate-800"
-                            @click="
-                                selectMetric(
-                                    'bank',
-                                    'Banco',
-                                    amount(props.data?.assets.bank),
-                                )
-                            "
-                        >
-                            {{ currencyFormatter(props.data?.assets.bank ?? 0) }}
-                        </button>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-600 dark:text-slate-400"
-                            >Cash inicial</span
-                        >
-                        <span
-                            class="text-slate-500 tabular-nums dark:text-slate-500"
-                            >{{
-                                currencyFormatter(
-                                    props.data?.assets.cash_initial ?? 0,
-                                )
-                            }}</span
-                        >
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-600 dark:text-slate-400"
-                            >Banco inicial</span
-                        >
-                        <span
-                            class="text-slate-500 tabular-nums dark:text-slate-500"
-                            >{{
-                                currencyFormatter(
-                                    props.data?.assets.bank_initial ?? 0,
-                                )
-                            }}</span
-                        >
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-600 dark:text-slate-400"
-                            >Inventory</span
-                        >
-                        <button
-                            type="button"
-                            class="rounded px-1 text-right font-semibold text-slate-900 tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-slate-100 dark:hover:bg-slate-800"
-                            @click="
-                                selectMetric(
-                                    'inventory',
-                                    'Inventario',
-                                    amount(props.data?.assets.inventory),
-                                )
-                            "
-                        >
-                            {{ currencyFormatter(props.data?.assets.inventory ?? 0) }}
-                        </button>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-600 dark:text-slate-400"
-                            >Inv inicial</span
-                        >
-                        <span
-                            class="text-slate-500 tabular-nums dark:text-slate-500"
-                            >{{
-                                currencyFormatter(
-                                    props.data?.assets.inventory_initial ?? 0,
-                                )
-                            }}</span
-                        >
-                    </div>
-                    <div
-                        class="mt-1 flex justify-between border-t border-slate-200 pt-1 dark:border-slate-800"
-                    >
-                        <span
-                            class="font-bold text-slate-900 dark:text-slate-100"
-                            >Total Activos</span
-                        >
-                        <button
-                            type="button"
-                            class="rounded px-1 text-right font-bold text-slate-900 tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-slate-100 dark:hover:bg-slate-800"
-                            @click="
-                                selectMetric(
-                                    'assets',
-                                    'Activos',
-                                    amount(props.data?.totals.total_assets),
-                                )
-                            "
-                        >
-                            {{
-                                currencyFormatter(
-                                    props.data?.totals.total_assets ?? 0,
-                                )
-                            }}
+                    <div class="mt-2 flex justify-between border-t pt-1 font-bold dark:border-slate-800">
+                        <span>Total Activos</span>
+                        <button type="button" :class="rowClass" @click="selectMetric('assets', 'Activos', amount(data?.totals.total_assets))">
+                            {{ currencyFormatter(data?.totals.total_assets ?? 0) }}
                         </button>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <div
-                class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
-            >
-                <h3
-                    class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                >
-                    Pasivos y Creditos
-                </h3>
+            <section class="rounded-md border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                <h3 class="mb-2 text-xs font-bold text-slate-500 uppercase">Pasivos</h3>
                 <div class="space-y-1 text-xs">
-                    <div class="flex justify-between">
-                        <span class="text-slate-600 dark:text-slate-400"
-                            >Credito por pagar</span
-                        >
-                        <button
-                            type="button"
-                            class="rounded px-1 text-right font-semibold text-amber-600 tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-amber-400 dark:hover:bg-slate-800"
-                            @click="
-                                selectMetric(
-                                    'payable',
-                                    'Credito por pagar',
-                                    amount(
-                                        props.data?.liabilities
-                                            .accounts_payable,
-                                    ),
-                                )
-                            "
-                        >
-                            {{
-                                currencyFormatter(
-                                    props.data?.liabilities.accounts_payable ?? 0,
-                                )
-                            }}
+                    <div v-for="item in [
+                        { metric: 'payable', label: 'CxP', value: data?.liabilities.accounts_payable },
+                        { metric: 'customer_credits', label: 'Saldos a favor', value: data?.liabilities.customer_credits },
+                        { metric: 'pending_refunds', label: 'Reembolsos pendientes', value: data?.liabilities.pending_refunds },
+                    ]" :key="item.metric" class="flex justify-between gap-3">
+                        <span class="text-slate-600 dark:text-slate-400">{{ item.label }}</span>
+                        <button type="button" :class="rowClass" @click="selectMetric(item.metric, item.label, amount(item.value))">
+                            {{ currencyFormatter(amount(item.value)) }}
                         </button>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-600 dark:text-slate-400"
-                            >Credito por cobrar</span
-                        >
-                        <button
-                            type="button"
-                            class="rounded px-1 text-right font-semibold text-indigo-600 tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-indigo-400 dark:hover:bg-slate-800"
-                            @click="
-                                selectMetric(
-                                    'receivable',
-                                    'Credito por cobrar',
-                                    amount(
-                                        props.data?.liabilities
-                                            .accounts_receivable,
-                                    ),
-                                )
-                            "
-                        >
-                            {{
-                                currencyFormatter(
-                                    props.data?.liabilities.accounts_receivable ?? 0,
-                                )
-                            }}
-                        </button>
-                    </div>
-                    <div
-                        class="mt-1 flex justify-between border-t border-slate-200 pt-1 dark:border-slate-800"
-                    >
-                        <span
-                            class="font-bold text-slate-900 dark:text-slate-100"
-                            >Total Credito</span
-                        >
-                        <button
-                            type="button"
-                            class="rounded px-1 text-right font-bold text-slate-900 tabular-nums transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-slate-100 dark:hover:bg-slate-800"
-                            @click="
-                                selectMetric(
-                                    'liabilities',
-                                    'Total Credito',
-                                    amount(
-                                        props.data?.totals.total_liabilities,
-                                    ),
-                                )
-                            "
-                        >
-                            {{
-                                currencyFormatter(
-                                    props.data?.totals.total_liabilities ?? 0,
-                                )
-                            }}
+                    <div class="mt-2 flex justify-between border-t pt-1 font-bold dark:border-slate-800">
+                        <span>Total Pasivos</span>
+                        <button type="button" :class="rowClass" @click="selectMetric('liabilities', 'Pasivos', amount(data?.totals.total_liabilities))">
+                            {{ currencyFormatter(data?.totals.total_liabilities ?? 0) }}
                         </button>
                     </div>
                 </div>
-            </div>
+            </section>
+
+            <section class="rounded-md border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                <h3 class="mb-2 text-xs font-bold text-slate-500 uppercase">Patrimonio</h3>
+                <div class="space-y-1 text-xs">
+                    <div v-for="item in [
+                        { metric: 'investment', label: 'Capital aportado', value: data?.equity.contributed_capital },
+                        { metric: 'profit', label: 'Utilidad del periodo', value: data?.equity.period_profit },
+                        { metric: 'retained_earnings', label: 'Resultados acumulados', value: data?.equity.retained_earnings },
+                    ]" :key="item.metric" class="flex justify-between gap-3">
+                        <span class="text-slate-600 dark:text-slate-400">{{ item.label }}</span>
+                        <button type="button" :class="rowClass" @click="selectMetric(item.metric, item.label, amount(item.value))">
+                            {{ currencyFormatter(amount(item.value)) }}
+                        </button>
+                    </div>
+                    <div class="mt-2 flex justify-between border-t pt-1 font-bold dark:border-slate-800">
+                        <span>Total Patrimonio</span>
+                        <button type="button" :class="rowClass" @click="selectMetric('equity', 'Patrimonio', amount(data?.totals.total_equity))">
+                            {{ currencyFormatter(data?.totals.total_equity ?? 0) }}
+                        </button>
+                    </div>
+                </div>
+            </section>
         </div>
 
-        <button
-            type="button"
-            class="w-full rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-100 focus:ring-2 focus:ring-indigo-200 focus:outline-none dark:border-indigo-800 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50"
-            @click="
-                selectMetric(
-                    'equity',
-                    'Balance Neto',
-                    amount(props.data?.totals.balance),
-                )
-            "
-        >
-            <div class="flex items-center justify-between">
-                <span
-                    class="text-sm font-bold text-indigo-900 dark:text-indigo-100"
-                    >Balance Neto</span
-                >
-                <span
-                    class="text-lg font-bold text-indigo-700 tabular-nums dark:text-indigo-300"
-                    >{{ currencyFormatter(props.data?.totals.balance ?? 0) }}</span
-                >
+        <div class="flex flex-col gap-2 rounded-md border border-indigo-200 bg-indigo-50 p-3 text-xs dark:border-indigo-800 dark:bg-indigo-950/30 sm:flex-row sm:items-center sm:justify-between">
+            <span class="font-bold text-indigo-900 dark:text-indigo-100">Activos = Pasivos + Patrimonio</span>
+            <div class="flex flex-wrap items-center gap-4 tabular-nums">
+                <span>{{ currencyFormatter(data?.totals.total_assets ?? 0) }}</span>
+                <span>=</span>
+                <span>{{ currencyFormatter(data?.totals.liabilities_and_equity ?? 0) }}</span>
+                <span :class="amount(data?.totals.reconciliation_difference) === 0 ? 'text-emerald-700' : 'text-red-600'">
+                    Diferencia {{ currencyFormatter(data?.totals.reconciliation_difference ?? 0) }}
+                </span>
             </div>
-        </button>
+        </div>
     </div>
 </template>

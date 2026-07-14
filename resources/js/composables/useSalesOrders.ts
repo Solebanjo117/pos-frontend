@@ -192,12 +192,19 @@ export function useSalesOrders() {
     /**
      * Cancel order
      */
-    const cancelSalesOrder = async (id: number) => {
+    const cancelSalesOrder = async (
+        id: number,
+        payload: {
+            reason: string;
+            refund_method?: string | null;
+            notes?: string | null;
+        },
+    ) => {
         loading.value = true;
         error.value = null;
 
         try {
-            const cancelledOrder = await salesOrdersService.cancel(id);
+            const cancelledOrder = await salesOrdersService.cancel(id, payload);
             const index = salesOrders.value.findIndex((o) => o.id === id);
             if (index !== -1) {
                 salesOrders.value[index] = cancelledOrder;

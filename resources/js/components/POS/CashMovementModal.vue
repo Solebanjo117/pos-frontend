@@ -28,16 +28,20 @@ const emit = defineEmits<{
     submit: [
         payload: {
             type: 'in' | 'out';
+            subtype: 'cash_in' | 'cash_out' | 'deposit' | 'withdrawal' | 'adjustment_positive' | 'adjustment_negative';
             amount: number;
             reason: string;
+            reference_number: string;
             notes: string;
         },
     ];
 }>();
 
 const movementType = ref<'out' | 'in'>('out');
+const subtype = ref<'cash_in' | 'cash_out' | 'deposit' | 'withdrawal' | 'adjustment_positive' | 'adjustment_negative'>('cash_out');
 const amount = ref<number | null>(null);
 const reason = ref('');
+const referenceNumber = ref('');
 const notes = ref('');
 
 const reasons = [
@@ -50,6 +54,19 @@ const reasons = [
     'Otros',
 ];
 
+const operations = [
+    { value: 'cash_in', label: 'Entrada de efectivo', type: 'in' },
+    { value: 'cash_out', label: 'Salida de efectivo', type: 'out' },
+    { value: 'deposit', label: 'Deposito desde Caja', type: 'out' },
+    { value: 'withdrawal', label: 'Retiro hacia Caja', type: 'in' },
+    { value: 'adjustment_positive', label: 'Ajuste positivo (admin)', type: 'in' },
+    { value: 'adjustment_negative', label: 'Ajuste negativo (admin)', type: 'out' },
+] as const;
+
+watch(subtype, (value) => {
+    movementType.value = operations.find((operation) => operation.value === value)?.type ?? 'out';
+});
+
 const isValid = computed(() => {
     return amount.value && amount.value > 0 && reason.value.trim().length > 0;
 });
@@ -58,16 +75,20 @@ const handleSubmit = () => {
     if (!isValid.value) return;
     emit('submit', {
         type: movementType.value,
+        subtype: subtype.value,
         amount: amount.value!,
         reason: reason.value,
+        reference_number: referenceNumber.value,
         notes: notes.value,
     });
 };
 
 const resetForm = () => {
     movementType.value = props.initialType;
+    subtype.value = props.initialType === 'in' ? 'cash_in' : 'cash_out';
     amount.value = null;
     reason.value = '';
+    referenceNumber.value = '';
     notes.value = '';
 };
 
@@ -76,6 +97,7 @@ watch(
     ([show, initialType]) => {
         if (show) {
             movementType.value = initialType;
+            subtype.value = initialType === 'in' ? 'cash_in' : 'cash_out';
         }
     },
     { immediate: true },
@@ -123,7 +145,7 @@ const handleClose = () => {
                     >
                     <div class="grid grid-cols-2 gap-2">
                         <button
-                            @click="movementType = 'out'"
+                            @click="subtype = 'cash_out'"
                             :class="
                                 movementType === 'out'
                                     ? 'bg-red-50 text-red-700 ring-2 ring-red-500 dark:bg-red-900/20 dark:text-red-400'
@@ -135,7 +157,7 @@ const handleClose = () => {
                             Retiro / Gasto
                         </button>
                         <button
-                            @click="movementType = 'in'"
+                            @click="subtype = 'cash_in'"
                             :class="
                                 movementType === 'in'
                                     ? 'bg-emerald-50 text-emerald-700 ring-2 ring-emerald-500 dark:bg-emerald-900/20 dark:text-emerald-400'
@@ -147,6 +169,20 @@ const handleClose = () => {
                             Ingreso Extra
                         </button>
                     </div>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-xs font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                        Operacion
+                    </label>
+                    <select
+                        v-model="subtype"
+                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm dark:border-border dark:bg-muted"
+                    >
+                        <option v-for="operation in operations" :key="operation.value" :value="operation.value">
+                            {{ operation.label }}
+                        </option>
+                    </select>
                 </div>
 
                 <!-- Amount -->
@@ -191,6 +227,19 @@ const handleClose = () => {
                             {{ r }}
                         </option>
                     </select>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="mb-2 block text-xs font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                        Referencia (opcional)
+                    </label>
+                    <input
+                        v-model="referenceNumber"
+                        type="text"
+                        maxlength="120"
+                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm dark:border-border dark:bg-muted"
+                    />
                 </div>
 
                 <!-- Notes -->

@@ -5,6 +5,23 @@ import laravel from 'laravel-vite-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+    build: {
+        // Keep Vue, reka-ui and both VueUse versions in one execution unit.
+        // Rolldown otherwise emits an unresolved Vue initializer across chunks.
+        rolldownOptions: {
+            output: {
+                codeSplitting: {
+                    groups: [
+                        {
+                            name: 'vue-ui',
+                            test: /node_modules[\\/](?:vue|@vue|reka-ui|@vueuse)/,
+                            priority: 10,
+                        },
+                    ],
+                },
+            },
+        },
+    },
     plugins: [
         laravel({
             input: ['resources/js/app.ts'],

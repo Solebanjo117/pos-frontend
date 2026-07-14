@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ChevronDown } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
-import type { ExpenseBreakdown } from '@/types/report';
+import type {
+    ExpenseBreakdown,
+    StatementRow,
+    StatementSection,
+} from '@/types/report';
 
 const props = defineProps<{
     sales: number;
@@ -9,11 +13,23 @@ const props = defineProps<{
     netIncome: number;
     netProfit: number;
     expenseBreakdown: ExpenseBreakdown | null;
+    sections?: StatementSection[];
     currencyFormatter: (value: number) => string;
 }>();
 
 const expensesOpen = ref(true);
-const grossProfit = computed(() => props.sales - props.cogs);
+const salesOpen = ref(true);
+const costOpen = ref(true);
+const sectionByKey = (key: string): StatementSection | undefined =>
+    props.sections?.find((section) => section.key === key);
+const salesSection = computed(() => sectionByKey('income'));
+const costSection = computed(() => sectionByKey('cost-of-goods-sold'));
+const grossSection = computed(() => sectionByKey('gross-profit'));
+const salesTotal = computed(() => salesSection.value?.amount ?? props.sales);
+const costTotal = computed(() => costSection.value?.amount ?? props.cogs);
+const grossProfit = computed(
+    () => grossSection.value?.amount ?? salesTotal.value - costTotal.value,
+);
 const expenseTotal = computed(() => props.expenseBreakdown?.total ?? 0);
 
 const emit = defineEmits<{
@@ -35,6 +51,19 @@ const selectMetric = (
     extra: { expense_category?: string; expense_group?: string } = {},
 ): void => {
     emit('select', { metric, label, value, ...extra });
+};
+
+const statementMetric = (row: StatementRow): string => {
+    if (row.key === 'gross-sales') return 'sales_gross';
+    if (row.key === 'discounts') return 'sales_discounts';
+    if (row.key === 'approved-refunds') return 'sales_returns';
+    if (row.key === 'net-sales') return 'sales_net';
+    if (row.key === 'gross-cogs') return 'cogs_gross';
+    if (row.key === 'return-cogs') return 'cogs_returns';
+    if (row.key === 'net-cogs') return 'cogs_net';
+    return row.key.startsWith('operational-expense-')
+        ? 'operational_expenses'
+        : 'sales_net';
 };
 </script>
 
@@ -63,37 +92,119 @@ const selectMetric = (
                     </td>
                 </tr>
                 <tr>
-                    <td
-                        class="px-3 py-2 font-medium text-slate-700 dark:text-slate-300"
-                    >
-                        Sales
+                    <td class="px-3 py-2">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300"
+                            @click="salesOpen = !salesOpen"
+                        >
+                            <ChevronDown
+                                :size="14"
+                                class="transition-transform"
+                                :class="{ '-rotate-90': !salesOpen }"
+                            />
+                            Sales
+                        </button>
                     </td>
                     <td class="px-3 py-2 text-right">
                         <button
                             type="button"
                             class="rounded px-1 text-right font-semibold text-emerald-600 transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-emerald-400 dark:hover:bg-slate-800"
-                            @click="selectMetric('sales', 'Sales', sales)"
+                            @click="
+                                selectMetric(
+                                    'sales_net',
+                                    'Ventas netas',
+                                    salesTotal,
+                                )
+                            "
                         >
-                            {{ currencyFormatter(sales) }}
+                            {{ currencyFormatter(salesTotal) }}
                         </button>
                     </td>
                 </tr>
-                <tr>
-                    <td
-                        class="px-3 py-2 font-medium text-slate-700 dark:text-slate-300"
+                <template v-if="salesOpen">
+                    <tr
+                        v-for="row in salesSection?.rows ?? []"
+                        :key="row.key"
+                        class="bg-slate-50/50 dark:bg-slate-900/40"
                     >
-                        Costo
+                        <td
+                            class="px-3 py-1.5 pl-6 text-slate-500 dark:text-slate-400"
+                        >
+                            {{ row.label }}
+                        </td>
+                        <td class="px-3 py-1.5 text-right">
+                            <button
+                                type="button"
+                                class="rounded px-1 text-right text-slate-500 transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-slate-400 dark:hover:bg-slate-800"
+                                @click="
+                                    selectMetric(
+                                        statementMetric(row),
+                                        row.label,
+                                        row.amount,
+                                    )
+                                "
+                            >
+                                {{ currencyFormatter(row.amount) }}
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+                <tr>
+                    <td class="px-3 py-2">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300"
+                            @click="costOpen = !costOpen"
+                        >
+                            <ChevronDown
+                                :size="14"
+                                class="transition-transform"
+                                :class="{ '-rotate-90': !costOpen }"
+                            />
+                            Costo
+                        </button>
                     </td>
                     <td class="px-3 py-2 text-right">
                         <button
                             type="button"
                             class="rounded px-1 text-right font-semibold text-rose-600 transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-rose-400 dark:hover:bg-slate-800"
-                            @click="selectMetric('cogs', 'Costo', cogs)"
+                            @click="
+                                selectMetric('cogs_net', 'Costo neto', costTotal)
+                            "
                         >
-                            {{ currencyFormatter(-cogs) }}
+                            {{ currencyFormatter(-costTotal) }}
                         </button>
                     </td>
                 </tr>
+                <template v-if="costOpen">
+                    <tr
+                        v-for="row in costSection?.rows ?? []"
+                        :key="row.key"
+                        class="bg-slate-50/50 dark:bg-slate-900/40"
+                    >
+                        <td
+                            class="px-3 py-1.5 pl-6 text-slate-500 dark:text-slate-400"
+                        >
+                            {{ row.label }}
+                        </td>
+                        <td class="px-3 py-1.5 text-right">
+                            <button
+                                type="button"
+                                class="rounded px-1 text-right text-slate-500 transition hover:bg-slate-100 focus:ring-1 focus:ring-slate-300 focus:outline-none dark:text-slate-400 dark:hover:bg-slate-800"
+                                @click="
+                                    selectMetric(
+                                        statementMetric(row),
+                                        row.label,
+                                        row.amount,
+                                    )
+                                "
+                            >
+                                {{ currencyFormatter(row.amount) }}
+                            </button>
+                        </td>
+                    </tr>
+                </template>
                 <tr>
                     <td
                         class="px-3 py-2 font-medium text-slate-700 dark:text-slate-300"

@@ -232,6 +232,19 @@ export const formatReportDateTime = (value: unknown): string => {
     return `${date} ${formatTimePattern(parts)}`;
 };
 
+export const formatDateInputValue = (
+    value: Date | string | number = new Date(),
+): string => {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const parts =
+        partsInTimezone(date, regionalConfig.timezone) ||
+        partsInTimezone(date, defaultRegionalConfig.timezone);
+
+    return parts ? `${parts.year}-${parts.month}-${parts.day}` : '';
+};
+
 /**
  * Replace hyphens/bars with spaces for display purposes.
  * e.g. "FIL-001-BOX" -> "FIL 001 BOX"

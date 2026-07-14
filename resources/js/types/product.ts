@@ -290,12 +290,16 @@ export interface VariantFifoMovement {
     id: number;
     movement_type: 'in' | 'out' | 'transfer';
     quantity: number;
+    quantity_before?: number | null;
+    quantity_after?: number | null;
     reference_type?: string | null;
     reference_id?: number | null;
     reason?: string | null;
     notes?: string | null;
     supplier?: Supplier | null;
     warehouse?: Warehouse | null;
+    destination_warehouse?: Warehouse | null;
+    user?: { id: number; name: string } | null;
     created_at: string;
     fifo_lots?: Array<{
         lot_id: number;
@@ -352,6 +356,7 @@ export interface VariantFifoHistory {
     lots: InventoryFifoLot[];
     purchase_movements: VariantFifoMovement[];
     sale_movements: VariantFifoMovement[];
+    movement_timeline: VariantFifoMovement[];
 }
 
 export interface ProductVin {

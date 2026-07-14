@@ -7,7 +7,14 @@ export interface OperationalExpensePaymentMethodOption {
     label: string;
 }
 
-export type OperationalExpenseStatus = 'paid' | 'pending' | 'scheduled';
+export type OperationalExpenseStatus =
+    | 'draft'
+    | 'pending'
+    | 'scheduled'
+    | 'queued'
+    | 'paid'
+    | 'cancelled'
+    | 'reversed';
 
 export type OperationalExpenseRecurrence =
     | 'one_time'
@@ -24,11 +31,13 @@ export type OperationalExpenseKind =
 export type OperationalExpensePartyType =
     | 'customer'
     | 'supplier'
-    | 'beneficiary';
+    | 'beneficiary'
+    | 'staff';
 
 export interface OperationalExpenseParty {
     type: OperationalExpensePartyType;
     id: number;
+    related_id?: number;
     name: string;
 }
 
@@ -40,6 +49,14 @@ export interface OperationalExpenseBeneficiary {
     phone?: string | null;
     notes?: string | null;
     is_active: boolean;
+    user_id?: number | null;
+    beneficiary_kind?:
+        | 'employee'
+        | 'seller'
+        | 'contractor'
+        | 'company'
+        | 'staff'
+        | 'other';
     expenses_count?: number;
     expenses_sum_amount?: number;
 }
@@ -88,11 +105,20 @@ export interface OperationalExpense {
     ledger_account?: { id: number; code: string; name: string } | null;
     description?: string | null;
     amount: number;
+    estimated_amount?: number | null;
+    final_amount?: number | null;
+    variance_amount?: number | null;
+    variance_reason?: string | null;
     payment_method?: OperationalExpensePaymentMethod | null;
+    planned_payment_method?: OperationalExpensePaymentMethod | null;
     payment_method_label?: string | null;
     recurrence?: OperationalExpenseRecurrence | null;
     status?: OperationalExpenseStatus | null;
     paid_at?: string | null;
+    due_at?: string | null;
+    queued_at?: string | null;
+    cancelled_at?: string | null;
+    reversed_at?: string | null;
     affects_cash_flow?: boolean;
     affects_income_statement?: boolean;
     expense_kind?: OperationalExpenseKind | null;
@@ -101,6 +127,12 @@ export interface OperationalExpense {
     created_at: string;
     updated_at: string;
     business_datetime?: string | null;
+    capabilities?: {
+        can_edit: boolean;
+        can_send_to_cashier: boolean;
+        can_cancel: boolean;
+        can_reverse: boolean;
+    };
 }
 
 export interface OperationalExpensePayload {
@@ -118,15 +150,22 @@ export interface OperationalExpensePayload {
     ledger_account_id: number | null;
     description?: string | null;
     amount: number;
+    estimated_amount?: number | null;
+    final_amount?: number | null;
+    variance_reason?: string | null;
     payment_method: OperationalExpensePaymentMethod | null;
+    planned_payment_method?: OperationalExpensePaymentMethod | null;
     recurrence: OperationalExpenseRecurrence;
     status: OperationalExpenseStatus;
     paid_at?: string | null;
+    due_at?: string | null;
+    change_reason?: string | null;
     affects_cash_flow: boolean;
     affects_income_statement: boolean;
     expense_kind: OperationalExpenseKind;
     reference_number?: string | null;
     notes?: string | null;
+    business_datetime?: string | null;
 }
 
 export interface OperationalExpenseFilters {
@@ -135,6 +174,7 @@ export interface OperationalExpenseFilters {
     category?: OperationalExpenseCategory | '';
     warehouse_id?: number | null;
     expense_kind?: OperationalExpenseKind | '';
+    status?: OperationalExpenseStatus | '';
     party_type?: OperationalExpensePartyType | '';
     party_id?: number | null;
     per_page?: number;

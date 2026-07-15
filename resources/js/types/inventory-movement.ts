@@ -52,6 +52,9 @@ export interface InventoryMovement {
         received_at?: string | null;
     }>;
     quantity: number;
+    quantity_before?: number | null;
+    quantity_after?: number | null;
+    movement_group_uuid?: string | null;
     reference_type?: string | null;
     reference_id?: number;
     reason?: string | null;

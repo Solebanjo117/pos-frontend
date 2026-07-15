@@ -1,3 +1,5 @@
+import type { TransactionTrace } from './transaction-trace';
+
 export type SalesOrderStatus =
     | 'draft'
     | 'pending'
@@ -268,6 +270,7 @@ export interface SalesOrderOperationalDetail {
         metadata?: Record<string, any>;
         timestamp?: string;
     }>;
+    trace: TransactionTrace;
 }
 
 export interface SalesOrder {

@@ -9,6 +9,7 @@ import {
     Minus,
     Printer,
     Receipt,
+    Route,
     TrendingDown,
     TrendingUp,
     User,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import { formatCurrency } from '@/utils/formatters';
 import type {
     AccountPaymentRecord,
@@ -83,6 +85,7 @@ const { fetchMethods, getMethodName } = usePaymentMethods();
 onMounted(fetchMethods);
 
 const activeTab = ref('summary');
+const traceOpen = ref(false);
 const detailTabs = [
     { id: 'summary', label: 'Resumen' },
     { id: 'reconciliation', label: 'Conciliacion' },
@@ -455,6 +458,15 @@ const handlePrint = () => {
                 </div>
 
                 <div class="flex items-center gap-2 print:hidden">
+                    <button
+                        v-if="session"
+                        type="button"
+                        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-border dark:text-slate-200 dark:hover:bg-muted"
+                        @click="traceOpen = true"
+                    >
+                        <Route :size="16" />
+                        Trazabilidad
+                    </button>
                     <button
                         type="button"
                         class="inline-flex h-9 items-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
@@ -1774,6 +1786,12 @@ const handlePrint = () => {
                     </div>
                 </section>
             </main>
+            <TransactionTraceDrawer
+                :open="traceOpen"
+                type="pos_session"
+                :id="session?.id"
+                @close="traceOpen = false"
+            />
         </div>
     </div>
 </template>

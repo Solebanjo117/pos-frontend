@@ -22,6 +22,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -818,31 +819,11 @@ onMounted(async () => {
                 <div
                     class="grid gap-3 md:grid-cols-2 xl:grid-cols-[140px_140px_170px_190px_160px_auto] xl:items-end"
                 >
-                    <div>
-                        <label
-                            class="mb-1.5 flex items-center gap-1 text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            <Calendar :size="13" />
-                            Desde
-                        </label>
-                        <input
-                            v-model="filterDateFrom"
-                            type="date"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
-
-                    <div>
-                        <label
-                            class="mb-1.5 block text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
-                            >Hasta</label
-                        >
-                        <input
-                            v-model="filterDateTo"
-                            type="date"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
+                    <DateRangeInput
+                        v-model:from="filterDateFrom"
+                        v-model:to="filterDateTo"
+                        label="Rango de fechas"
+                    />
 
                     <div>
                         <label

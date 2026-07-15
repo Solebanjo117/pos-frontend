@@ -8,11 +8,13 @@ import {
     ExternalLink,
     FileText,
     ReceiptText,
+    Route,
     TrendingDown,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
+import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -46,6 +48,8 @@ const supplierStatement = ref<any | null>(null);
 const loadingStatement = ref(false);
 const initialSupplierId = ref<number | null>(null);
 const showPaymentModal = ref(false);
+const traceLedgerEntryId = ref<number | null>(null);
+const traceOpen = ref(false);
 const paymentLoading = ref(false);
 const paymentError = ref<string | null>(null);
 const manualApplications = ref<Record<number, number>>({});
@@ -144,7 +148,9 @@ const updatePaymentBatchBusinessDatetime = (
     businessDatetime: string | null,
 ): void => {
     ledgerEntries.value
-        .filter((entry: any) => Number(entry.payment_batch_id) === paymentBatchId)
+        .filter(
+            (entry: any) => Number(entry.payment_batch_id) === paymentBatchId,
+        )
         .forEach((entry: any) => {
             entry.business_datetime = businessDatetime;
         });
@@ -842,6 +848,18 @@ onMounted(() => {
                                                     'Pago'
                                                 }}
                                             </p>
+                                            <button
+                                                type="button"
+                                                class="rounded p-1 text-gray-400 hover:bg-cyan-50 hover:text-cyan-700"
+                                                title="Ver trazabilidad"
+                                                @click="
+                                                    traceLedgerEntryId =
+                                                        entry.id;
+                                                    traceOpen = true;
+                                                "
+                                            >
+                                                <Route :size="15" />
+                                            </button>
                                             <p
                                                 class="font-mono text-sm font-bold text-green-600"
                                             >
@@ -889,6 +907,13 @@ onMounted(() => {
                 </div>
             </div>
         </div>
+
+        <TransactionTraceDrawer
+            :open="traceOpen"
+            type="account_ledger_entry"
+            :id="traceLedgerEntryId"
+            @close="traceOpen = false"
+        />
 
         <OperationalPaymentPanel
             mode="purchase"

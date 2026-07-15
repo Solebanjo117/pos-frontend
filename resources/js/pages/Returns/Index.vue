@@ -11,6 +11,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type {
@@ -332,7 +333,9 @@ const handleCreateReturn = async (
         <section class="rounded-lg border bg-white p-3">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
                 <div class="flex-1">
-                    <label class="mb-1 block text-xs font-semibold text-gray-500 uppercase">
+                    <label
+                        class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                    >
                         Buscar factura para devolucion
                     </label>
                     <div class="relative">
@@ -358,10 +361,7 @@ const handleCreateReturn = async (
                     {{ candidateLoading ? 'Buscando...' : 'Buscar' }}
                 </button>
             </div>
-            <p
-                v-if="candidateError"
-                class="mt-2 text-sm text-red-600"
-            >
+            <p v-if="candidateError" class="mt-2 text-sm text-red-600">
                 {{ candidateError }}
             </p>
             <div
@@ -389,27 +389,46 @@ const handleCreateReturn = async (
                                 {{ candidate.order_number }}
                             </td>
                             <td class="px-3 py-2 text-gray-600">
-                                {{ candidate.customer?.name || 'Publico general' }}
+                                {{
+                                    candidate.customer?.name ||
+                                    'Publico general'
+                                }}
                             </td>
                             <td class="px-3 py-2 text-gray-500">
                                 {{ candidate.date || 'N/A' }}
                             </td>
-                            <td class="px-3 py-2 text-right font-semibold tabular-nums">
+                            <td
+                                class="px-3 py-2 text-right font-semibold tabular-nums"
+                            >
                                 <div>{{ formatCurrency(candidate.total) }}</div>
                                 <div class="text-xs font-normal text-gray-500">
-                                    Pagado {{ formatCurrency(candidate.total_paid || 0) }}
+                                    Pagado
+                                    {{
+                                        formatCurrency(
+                                            candidate.total_paid || 0,
+                                        )
+                                    }}
                                 </div>
                                 <div
                                     v-if="Number(candidate.amount_due || 0) > 0"
                                     class="text-xs font-normal text-amber-600"
                                 >
-                                    CxC {{ formatCurrency(candidate.amount_due || 0) }}
+                                    CxC
+                                    {{
+                                        formatCurrency(
+                                            candidate.amount_due || 0,
+                                        )
+                                    }}
                                 </div>
                             </td>
                             <td class="px-3 py-2 text-center">
                                 <div>{{ candidate.items.length }}</div>
                                 <div class="text-xs text-gray-500">
-                                    {{ formatCurrency(candidate.returnable_amount || 0) }}
+                                    {{
+                                        formatCurrency(
+                                            candidate.returnable_amount || 0,
+                                        )
+                                    }}
                                 </div>
                             </td>
                             <td class="px-3 py-2 text-right">
@@ -481,16 +500,11 @@ const handleCreateReturn = async (
                     placeholder="Factura ID"
                     class="rounded-md border px-3 py-2 text-sm"
                 />
-                <input
-                    v-model="filters.date_from"
-                    type="date"
-                    class="rounded-md border px-3 py-2 text-sm"
-                />
                 <div class="flex gap-2">
-                    <input
-                        v-model="filters.date_to"
-                        type="date"
-                        class="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
+                    <DateRangeInput
+                        v-model:from="filters.date_from"
+                        v-model:to="filters.date_to"
+                        label="Rango de fechas"
                     />
                     <button
                         type="button"

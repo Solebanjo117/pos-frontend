@@ -13,6 +13,7 @@ import {
     DollarSign,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -517,39 +518,15 @@ watch(currentWarehouseId, async () => {
                     </select>
                 </div>
 
-                <div>
-                    <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                        Fecha Desde
-                    </label>
-                    <input
-                        v-model="filters.date_from"
-                        type="date"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        @change="
-                            currentPage = 1;
-                            loadSalesOrders();
-                        "
-                    />
-                </div>
-
-                <div>
-                    <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                        Fecha Hasta
-                    </label>
-                    <input
-                        v-model="filters.date_to"
-                        type="date"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        @change="
-                            currentPage = 1;
-                            loadSalesOrders();
-                        "
-                    />
-                </div>
+                <DateRangeInput
+                    v-model:from="filters.date_from"
+                    v-model:to="filters.date_to"
+                    label="Rango de fechas"
+                    @change="
+                        currentPage = 1;
+                        loadSalesOrders();
+                    "
+                />
             </div>
 
             <div
@@ -825,9 +802,7 @@ watch(currentWarehouseId, async () => {
                                         class="mx-1 h-5 border-l border-gray-200 dark:border-border"
                                     ></span>
                                     <button
-                                        v-if="
-                                            order.status !== 'cancelled'
-                                        "
+                                        v-if="order.status !== 'cancelled'"
                                         @click="handleCancel(order.id)"
                                         class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                                         title="Abrir anulacion auditada"

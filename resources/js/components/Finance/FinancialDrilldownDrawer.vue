@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { AlertTriangle, ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
+import { ref } from 'vue';
+import TraceableCell from '@/components/Traceability/TraceableCell.vue';
+import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import type { FinancialDrilldownReport } from '@/types/report';
+import type { TransactionTraceNode } from '@/types/transaction-trace';
 import { formatReportDateTime } from '@/utils/formatters';
 
 const props = defineProps<{
@@ -20,6 +24,19 @@ const emit = defineEmits<{
 }>();
 
 const perPageOptions = [10, 25, 50, 100];
+const traceOpen = ref(false);
+const traceNode = ref<TransactionTraceNode | null>(null);
+
+const inspectTrace = (node: TransactionTraceNode): void => {
+    traceNode.value = node;
+    traceOpen.value = true;
+};
+
+const nodeFor = (
+    row: Record<string, unknown>,
+    columnKey: string,
+): TransactionTraceNode | null =>
+    (row[`${columnKey}_node`] as TransactionTraceNode | undefined) ?? null;
 
 const changePerPage = (event: Event): void => {
     const perPage = Number((event.target as HTMLSelectElement).value);
@@ -32,6 +49,8 @@ const warningLabels: Record<string, string> = {
     inventory_historical_value_uses_current_fifo_lot_availability:
         'Inventario historico estimado con disponibilidad FIFO actual.',
     metric_not_supported: 'Este indicador aun no tiene desglose disponible.',
+    bank_is_operational_payment_bucket:
+        'Banco agrupa metodos de pago con destino bancario; no representa conciliacion por cuentas bancarias formales.',
 };
 
 const formatCell = (value: unknown, type?: string): string => {
@@ -78,7 +97,7 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
         @click.self="emit('close')"
     >
         <aside
-            class="ml-auto flex h-full w-full max-w-3xl flex-col border-l border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950"
+            class="ml-auto flex h-full w-full max-w-5xl flex-col border-l border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950"
         >
             <header
                 class="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800"
@@ -132,7 +151,8 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
             >
                 <span>
                     {{ report.meta.total }} registros · Pagina
-                    {{ report.meta.current_page }} de {{ report.meta.last_page }}
+                    {{ report.meta.current_page }} de
+                    {{ report.meta.last_page }}
                 </span>
                 <div class="flex items-center gap-2">
                     <label class="flex items-center gap-1.5">
@@ -162,7 +182,9 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                     </button>
                     <button
                         class="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
-                        :disabled="report.meta.current_page >= report.meta.last_page"
+                        :disabled="
+                            report.meta.current_page >= report.meta.last_page
+                        "
                         aria-label="Pagina siguiente"
                         @click="emit('page', report.meta.current_page + 1)"
                     >
@@ -179,63 +201,119 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                     Cargando detalle...
                 </div>
 
-                <table
-                    v-else-if="report?.rows?.length"
-                    class="min-w-full text-xs tabular-nums"
-                >
-                    <thead class="sticky top-0 bg-slate-50 dark:bg-slate-900">
-                        <tr>
-                            <th
-                                v-for="column in report.columns"
-                                :key="column.key"
-                                class="px-3 py-2 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
-                                :class="{
-                                    'text-right': column.type === 'money',
-                                }"
-                            >
-                                {{ column.label }}
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody
-                        class="divide-y divide-slate-100 dark:divide-slate-800"
-                    >
-                        <tr
+                <template v-else-if="report?.rows?.length">
+                    <div class="space-y-2 md:hidden">
+                        <article
                             v-for="row in report.rows"
                             :key="row.id ?? JSON.stringify(row)"
-                            class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                            class="rounded-md border border-slate-200 p-3 text-xs dark:border-slate-800"
                         >
-                            <td
+                            <div
                                 v-for="column in report.columns"
                                 :key="column.key"
-                                class="px-3 py-2 text-slate-700 dark:text-slate-300"
-                                :class="{
-                                    'text-right font-semibold text-slate-950 dark:text-slate-50':
-                                        column.type === 'money',
-                                }"
+                                class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 border-b border-slate-100 py-1.5 last:border-0 dark:border-slate-800"
                             >
-                                <button
-                                    v-if="
-                                        canOpenNestedDrilldown(row, column.key)
+                                <span class="text-slate-500">{{
+                                    column.label
+                                }}</span>
+                                <TraceableCell
+                                    v-if="nodeFor(row, column.key)"
+                                    :node="nodeFor(row, column.key)"
+                                    @inspect="inspectTrace"
+                                />
+                                <span
+                                    v-else
+                                    class="min-w-0 break-words text-slate-800 dark:text-slate-200"
+                                    :title="
+                                        column.type === 'datetime'
+                                            ? String(row.occurred_at || '')
+                                            : undefined
                                     "
-                                    type="button"
-                                    class="rounded px-2 py-1 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700 focus:ring-1 focus:ring-indigo-200 focus:outline-none dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-                                    @click="openNestedDrilldown(row)"
+                                    >{{
+                                        formatCell(row[column.key], column.type)
+                                    }}</span
                                 >
-                                    Ver movimientos
-                                </button>
-                                <span v-else>
-                                    {{
-                                        formatCell(
-                                            row[column.key],
-                                            column.type,
-                                        )
-                                    }}
-                                </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </div>
+                        </article>
+                    </div>
+
+                    <table
+                        class="hidden w-full table-fixed text-xs tabular-nums md:table"
+                    >
+                        <thead
+                            class="sticky top-0 bg-slate-50 dark:bg-slate-900"
+                        >
+                            <tr>
+                                <th
+                                    v-for="column in report.columns"
+                                    :key="column.key"
+                                    class="px-3 py-2 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
+                                    :class="{
+                                        'text-right': column.type === 'money',
+                                        'w-32': column.type === 'datetime',
+                                        'w-28': column.type === 'money',
+                                    }"
+                                >
+                                    {{ column.label }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody
+                            class="divide-y divide-slate-100 dark:divide-slate-800"
+                        >
+                            <tr
+                                v-for="row in report.rows"
+                                :key="row.id ?? JSON.stringify(row)"
+                                class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                            >
+                                <td
+                                    v-for="column in report.columns"
+                                    :key="column.key"
+                                    class="px-3 py-2 text-slate-700 dark:text-slate-300"
+                                    :class="{
+                                        'text-right font-semibold text-slate-950 dark:text-slate-50':
+                                            column.type === 'money',
+                                    }"
+                                >
+                                    <button
+                                        v-if="
+                                            canOpenNestedDrilldown(
+                                                row,
+                                                column.key,
+                                            )
+                                        "
+                                        type="button"
+                                        class="rounded px-2 py-1 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700 focus:ring-1 focus:ring-indigo-200 focus:outline-none dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                                        @click="openNestedDrilldown(row)"
+                                    >
+                                        Ver movimientos
+                                    </button>
+                                    <TraceableCell
+                                        v-else-if="nodeFor(row, column.key)"
+                                        :node="nodeFor(row, column.key)"
+                                        @inspect="inspectTrace"
+                                    />
+                                    <span
+                                        v-else
+                                        class="block min-w-0 break-words"
+                                        :title="
+                                            column.type === 'datetime'
+                                                ? String(row.occurred_at || '')
+                                                : undefined
+                                        "
+                                    >
+                                        {{
+                                            formatCell(
+                                                row[column.key],
+                                                column.type,
+                                            )
+                                        }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </template>
 
                 <div
                     v-else
@@ -256,7 +334,9 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                 <div class="flex items-center gap-2">
                     <button
                         class="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
-                        :disabled="loading || !report || report.meta.current_page <= 1"
+                        :disabled="
+                            loading || !report || report.meta.current_page <= 1
+                        "
                         aria-label="Pagina anterior"
                         @click="
                             emit('page', (report?.meta.current_page ?? 1) - 1)
@@ -285,5 +365,11 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                 </div>
             </footer>
         </aside>
+        <TransactionTraceDrawer
+            :open="traceOpen"
+            :type="traceNode?.type"
+            :id="traceNode?.id"
+            @close="traceOpen = false"
+        />
     </div>
 </template>

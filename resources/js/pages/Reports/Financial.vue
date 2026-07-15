@@ -20,6 +20,8 @@ import FinanceKpiRow from '@/components/Finance/FinanceKpiRow.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import FinancialDrilldownDrawer from '@/components/Finance/FinancialDrilldownDrawer.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import TraceableCell from '@/components/Traceability/TraceableCell.vue';
+import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
@@ -27,6 +29,8 @@ import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import type { ExpenseBreakdown, FinancialAdjustmentType } from '@/types/report';
+import type { CreditDocument } from '@/types/report';
+import type { TransactionTraceNode } from '@/types/transaction-trace';
 import { formatCurrency } from '@/utils/formatters';
 
 type ReportTab = 'summary' | 'balance' | 'income' | 'credits' | 'investment';
@@ -75,6 +79,8 @@ const adjustmentType = ref<FinancialAdjustmentType>('cash');
 const capitalMovementOpen = ref(false);
 const capitalMovementType = ref<'in' | 'out'>('in');
 const drilldownOpen = ref(false);
+const transactionTraceOpen = ref(false);
+const transactionTraceNode = ref<TransactionTraceNode | null>(null);
 const drilldownLoading = ref(false);
 const drilldownPerPage = ref(25);
 const reportsLoading = ref(false);
@@ -89,17 +95,18 @@ const selectedKpi = ref<{
 } | null>(null);
 const activeDrilldownFilters = ref<DrilldownFilters | null>(null);
 
-const formatInputDate = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
-const todayInput = formatInputDate(new Date());
+const panamaToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Panama',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+}).format(new Date());
+const urlParams = new URLSearchParams(window.location.search);
+const initialDateFrom = urlParams.get('date_from') || panamaToday;
+const initialDateTo = urlParams.get('date_to') || panamaToday;
 const filters = ref({
-    date_from: todayInput,
-    date_to: todayInput,
+    date_from: initialDateFrom,
+    date_to: initialDateTo,
     warehouse_id: null as number | null,
 });
 
@@ -228,7 +235,8 @@ const creditSections = computed(() => {
             key: 'payable',
             title: 'Cuentas por pagar',
             href: '/accounts-payable',
-            description: 'Pagos a proveedores se operan desde /accounts-payable.',
+            description:
+                'Pagos a proveedores se operan desde /accounts-payable.',
             total: credits.accounts_payable?.total_open_balance ?? 0,
             count: credits.accounts_payable?.open_documents_count ?? 0,
             documents: credits.accounts_payable?.documents ?? [],
@@ -243,6 +251,24 @@ const formatCreditDate = (value?: string | null): string => {
         month: 'short',
         day: '2-digit',
     });
+};
+
+const creditDocumentNode = (
+    document: CreditDocument,
+): TransactionTraceNode => ({
+    type: document.document_type,
+    id: document.id,
+    label: document.document_number,
+    number: document.document_number,
+    href: null,
+    can_view: true,
+    restricted: false,
+    traceable: true,
+});
+
+const inspectTransaction = (node: TransactionTraceNode): void => {
+    transactionTraceNode.value = node;
+    transactionTraceOpen.value = true;
 };
 
 const loadReports = async (): Promise<void> => {
@@ -278,12 +304,12 @@ const loadReports = async (): Promise<void> => {
             // worker pool, this avoids Windows file-cache lock collisions in
             // Laravel's rate limiter when the frontend proxy is in use.
             for (const request of requests) {
-                results.push(
-                    ...(await Promise.allSettled([request()])),
-                );
+                results.push(...(await Promise.allSettled([request()])));
             }
 
-            const failed = results.filter((result) => result.status === 'rejected');
+            const failed = results.filter(
+                (result) => result.status === 'rejected',
+            );
             if (failed.length > 0 && !error.value) {
                 error.value =
                     'Algunos datos financieros no se pudieron cargar. Revisa la conexión o reduce el rango de fechas e intenta de nuevo.';
@@ -307,8 +333,7 @@ const openDrilldown = async (
     overrideFilters: DrilldownFilters | null = null,
 ): Promise<void> => {
     selectedKpi.value = kpi;
-    activeDrilldownFilters.value =
-        overrideFilters ??
+    activeDrilldownFilters.value = overrideFilters ??
         activeDrilldownFilters.value ?? {
             date_from: filters.value.date_from,
             date_to: filters.value.date_to,
@@ -343,16 +368,14 @@ const changeDrilldownPerPage = (perPage: number): void => {
     void openDrilldown(selectedKpi.value, 1, activeDrilldownFilters.value);
 };
 
-const openKpiDrilldown = (
-    kpi: {
-        key?: string;
-        label: string;
-        value: number;
-        metric?: string;
-        expense_category?: string | null;
-        expense_group?: string | null;
-    },
-): void => {
+const openKpiDrilldown = (kpi: {
+    key?: string;
+    label: string;
+    value: number;
+    metric?: string;
+    expense_category?: string | null;
+    expense_group?: string | null;
+}): void => {
     void openDrilldown(
         {
             key: kpi.key ?? kpi.metric ?? kpi.label,
@@ -423,7 +446,9 @@ const updateAdjustmentBusinessDatetime = (
     adjustmentId: number,
     businessDatetime: string | null,
 ): void => {
-    const adjustment = adjustments.value.find((item) => item.id === adjustmentId);
+    const adjustment = adjustments.value.find(
+        (item) => item.id === adjustmentId,
+    );
     if (adjustment) {
         adjustment.business_datetime = businessDatetime;
     }
@@ -452,7 +477,9 @@ const updateCapitalMovementBusinessDatetime = (
     movementId: number,
     businessDatetime: string | null,
 ): void => {
-    const movement = capitalMovements.value.find((item) => item.id === movementId);
+    const movement = capitalMovements.value.find(
+        (item) => item.id === movementId,
+    );
     if (movement) {
         movement.business_datetime = businessDatetime;
     }
@@ -496,7 +523,11 @@ watch(currentWarehouseId, (value) => {
                 <template #actions>
                     <button
                         class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-                        :disabled="reportsLoading || !filters.date_from || !filters.date_to"
+                        :disabled="
+                            reportsLoading ||
+                            !filters.date_from ||
+                            !filters.date_to
+                        "
                         @click="loadReports"
                     >
                         <RefreshCw
@@ -728,13 +759,16 @@ watch(currentWarehouseId, (value) => {
                                             class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
                                         >
                                             <td class="px-3 py-2">
-                                                <p
-                                                    class="font-semibold text-slate-900 dark:text-slate-100"
-                                                >
-                                                    {{
-                                                        document.document_number
-                                                    }}
-                                                </p>
+                                                <TraceableCell
+                                                    :node="
+                                                        creditDocumentNode(
+                                                            document,
+                                                        )
+                                                    "
+                                                    @inspect="
+                                                        inspectTransaction
+                                                    "
+                                                />
                                                 <p
                                                     class="text-[11px] text-slate-500"
                                                 >
@@ -1153,7 +1187,6 @@ watch(currentWarehouseId, (value) => {
                             </button>
                         </div>
                     </div>
-
                 </aside>
             </div>
 
@@ -1174,6 +1207,12 @@ watch(currentWarehouseId, (value) => {
             @page="changeDrilldownPage"
             @per-page="changeDrilldownPerPage"
             @drilldown="openKpiDrilldown"
+        />
+        <TransactionTraceDrawer
+            :open="transactionTraceOpen"
+            :type="transactionTraceNode?.type"
+            :id="transactionTraceNode?.id"
+            @close="transactionTraceOpen = false"
         />
 
         <FinanceAdjustmentModal

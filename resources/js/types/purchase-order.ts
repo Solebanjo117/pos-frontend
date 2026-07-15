@@ -1,3 +1,5 @@
+import type { TransactionTrace } from './transaction-trace';
+
 export type PurchaseOrderStatus =
     | 'draft'
     | 'open'
@@ -82,6 +84,7 @@ export interface PurchaseOrder {
     supplier_summary?: PurchaseOrderSupplierSummary;
     ap_impact?: PurchaseOrderApImpact;
     inventory_impact?: PurchaseOrderInventoryImpact;
+    trace?: TransactionTrace;
     items_count?: number;
     created_at: string;
     updated_at: string;

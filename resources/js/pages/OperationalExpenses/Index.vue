@@ -8,12 +8,15 @@ import {
     Pencil,
     Plus,
     RefreshCw,
+    Route,
     Send,
     Trash2,
     X,
 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
+import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -52,6 +55,8 @@ const parties = ref<OperationalExpenseParty[]>([]);
 const ledgerAccounts = ref<AccountingAccountSummary[]>([]);
 const expenseCategories = ref<OperationalExpenseCategoryRecord[]>([]);
 const expenseToDelete = ref<OperationalExpense | null>(null);
+const traceExpenseId = ref<number | null>(null);
+const traceOpen = ref(false);
 const categories = ref<Record<string, string>>({
     electricity: 'Luz',
     accounting: 'Contador',
@@ -65,7 +70,11 @@ const categories = ref<Record<string, string>>({
 const summary = ref<{
     total_amount: number;
     count: number;
-    by_category?: Array<{ category: string; total_amount: number; count: number }>;
+    by_category?: Array<{
+        category: string;
+        total_amount: number;
+        count: number;
+    }>;
     by_party?: Array<{
         party_type: OperationalExpensePartyType | null;
         party_id: number | null;
@@ -219,7 +228,8 @@ const selectedPartyValue = computed<string | null>({
             : null,
     set: (value) => {
         const [type, id] = String(value ?? '').split(':');
-        form.value.party_type = (type || null) as OperationalExpensePartyType | null;
+        form.value.party_type = (type ||
+            null) as OperationalExpensePartyType | null;
         form.value.party_id = id ? Number(id) : null;
     },
 });
@@ -231,7 +241,9 @@ const filterPartyValue = computed<string | null>({
             : null,
     set: (value) => {
         const [type, id] = String(value ?? '').split(':');
-        filters.value.party_type = (type || '') as OperationalExpensePartyType | '';
+        filters.value.party_type = (type || '') as
+            | OperationalExpensePartyType
+            | '';
         filters.value.party_id = id ? Number(id) : null;
     },
 });
@@ -246,7 +258,9 @@ const ledgerAccountOptions = computed<SelectOption[]>(() => [
 
 const statusOptions = computed<SelectOption[]>(() =>
     Object.entries(statuses.value)
-        .filter(([value]) => ['draft', 'pending', 'scheduled', 'paid'].includes(value))
+        .filter(([value]) =>
+            ['draft', 'pending', 'scheduled', 'paid'].includes(value),
+        )
         .map(([value, label]) => ({ value, label })),
 );
 
@@ -363,7 +377,9 @@ async function loadExpenses() {
         statuses.value = response.statuses || statuses.value;
         recurrences.value = response.recurrences || recurrences.value;
         expenseKinds.value = response.expense_kinds || expenseKinds.value;
-        paymentMethods.value = normalizePaymentMethods(response.payment_methods);
+        paymentMethods.value = normalizePaymentMethods(
+            response.payment_methods,
+        );
     } catch (e: any) {
         error.value =
             e.response?.data?.message || 'Error al cargar gastos operativos.';
@@ -459,10 +475,14 @@ function openEditForm(expense: OperationalExpense) {
         subcategory: expense.subcategory || '',
         description: expense.description || '',
         amount: Number(expense.amount || 0),
-        estimated_amount: Number(expense.estimated_amount ?? expense.amount ?? 0),
+        estimated_amount: Number(
+            expense.estimated_amount ?? expense.amount ?? 0,
+        ),
         payment_method: expense.payment_method || 'transfer',
         planned_payment_method:
-            expense.planned_payment_method || expense.payment_method || 'transfer',
+            expense.planned_payment_method ||
+            expense.payment_method ||
+            'transfer',
         recurrence: expense.recurrence || 'one_time',
         status: expense.status || 'paid',
         paid_at: expense.paid_at || null,
@@ -503,13 +523,23 @@ async function createBeneficiaryFromForm() {
             id: beneficiary.id,
             name: beneficiary.name,
         };
-        parties.value = [...parties.value.filter((item) => !(item.type === party.type && item.id === party.id)), party]
-            .sort((a, b) => a.name.localeCompare(b.name));
+        parties.value = [
+            ...parties.value.filter(
+                (item) => !(item.type === party.type && item.id === party.id),
+            ),
+            party,
+        ].sort((a, b) => a.name.localeCompare(b.name));
         selectedPartyValue.value = `beneficiary:${beneficiary.id}`;
-        beneficiaryForm.value = { name: '', type: 'individual', email: '', phone: '' };
+        beneficiaryForm.value = {
+            name: '',
+            type: 'individual',
+            email: '',
+            phone: '',
+        };
         showBeneficiaryForm.value = false;
     } catch (e: any) {
-        error.value = e.response?.data?.message || 'No se pudo crear el beneficiario.';
+        error.value =
+            e.response?.data?.message || 'No se pudo crear el beneficiario.';
     } finally {
         creatingBeneficiary.value = false;
     }
@@ -517,8 +547,10 @@ async function createBeneficiaryFromForm() {
 
 function partyHref(expense: OperationalExpense): string | null {
     if (!expense.party) return null;
-    if (expense.party.type === 'customer') return `/customers/${expense.party.id}`;
-    if (expense.party.type === 'supplier') return `/suppliers/${expense.party.id}`;
+    if (expense.party.type === 'customer')
+        return `/customers/${expense.party.id}`;
+    if (expense.party.type === 'supplier')
+        return `/suppliers/${expense.party.id}`;
     return `/operational-expense-beneficiaries/${expense.party.related_id ?? expense.party.id}`;
 }
 
@@ -549,7 +581,9 @@ async function createCategoryFromForm() {
             affects_income_statement: form.value.affects_income_statement,
         });
         expenseCategories.value = [
-            ...expenseCategories.value.filter((item) => item.id !== category.id),
+            ...expenseCategories.value.filter(
+                (item) => item.id !== category.id,
+            ),
             category,
         ].sort((a, b) => a.name.localeCompare(b.name));
         form.value.category_id = category.id;
@@ -608,11 +642,16 @@ async function saveExpense(action: 'close' | 'new' | 'queue' = 'close') {
             status: action === 'queue' ? 'pending' : form.value.status,
             amount: Number(
                 isPaid
-                    ? form.value.final_amount || form.value.estimated_amount || form.value.amount
+                    ? form.value.final_amount ||
+                          form.value.estimated_amount ||
+                          form.value.amount
                     : form.value.estimated_amount || form.value.amount,
             ),
-            estimated_amount: Number(form.value.estimated_amount || form.value.amount),
-            payment_method: action === 'queue' ? null : form.value.payment_method,
+            estimated_amount: Number(
+                form.value.estimated_amount || form.value.amount,
+            ),
+            payment_method:
+                action === 'queue' ? null : form.value.payment_method,
             description:
                 form.value.description?.trim() ||
                 form.value.notes?.trim() ||
@@ -806,31 +845,13 @@ onMounted(async () => {
                 <div
                     class="rounded-lg border border-gray-200 bg-white p-3 dark:border-border dark:bg-card"
                 >
-                    <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-                        <div>
-                            <label
-                                class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
-                            >
-                                Desde
-                            </label>
-                            <input
-                                v-model="filters.date_from"
-                                type="date"
-                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
-                            />
-                        </div>
-                        <div>
-                            <label
-                                class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
-                            >
-                                Hasta
-                            </label>
-                            <input
-                                v-model="filters.date_to"
-                                type="date"
-                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
-                            />
-                        </div>
+                    <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+                        <DateRangeInput
+                            v-model:from="filters.date_from"
+                            v-model:to="filters.date_to"
+                            label="Rango de fechas"
+                            @change="loadExpenses"
+                        />
                         <div>
                             <label
                                 class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
@@ -843,16 +864,23 @@ onMounted(async () => {
                             />
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold text-gray-500 uppercase">
+                            <label
+                                class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                            >
                                 Estado
                             </label>
                             <SearchableSelect
                                 v-model="filters.status"
-                                :options="[{ value: '', label: 'Todos' }, ...statusOptions]"
+                                :options="[
+                                    { value: '', label: 'Todos' },
+                                    ...statusOptions,
+                                ]"
                             />
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold text-gray-500 uppercase">
+                            <label
+                                class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
+                            >
                                 Persona / empresa
                             </label>
                             <SearchableSelect
@@ -878,7 +906,9 @@ onMounted(async () => {
                     </div>
                 </div>
 
-                <div class="flex w-fit items-center rounded-md border border-gray-200 bg-white p-1 dark:border-border dark:bg-card">
+                <div
+                    class="flex w-fit items-center rounded-md border border-gray-200 bg-white p-1 dark:border-border dark:bg-card"
+                >
                     <button
                         v-for="option in [
                             { value: 'movements', label: 'Movimientos' },
@@ -888,7 +918,11 @@ onMounted(async () => {
                         :key="option.value"
                         type="button"
                         class="rounded px-3 py-1.5 text-xs font-semibold transition"
-                        :class="viewMode === option.value ? 'bg-emerald-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-muted'"
+                        :class="
+                            viewMode === option.value
+                                ? 'bg-emerald-600 text-white'
+                                : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-muted'
+                        "
                         @click="setViewMode(option.value)"
                     >
                         {{ option.label }}
@@ -900,16 +934,46 @@ onMounted(async () => {
                     class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                 >
                     <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/50">
-                            <tr><th class="px-4 py-3 text-left">Categoria</th><th class="px-4 py-3 text-right">Movimientos</th><th class="px-4 py-3 text-right">Total</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-border">
-                            <tr v-for="row in summary.by_category || []" :key="row.category" class="cursor-pointer hover:bg-gray-50 dark:hover:bg-muted/40" @click="openCategoryBreakdown(row.category)">
-                                <td class="px-4 py-3 font-medium">{{ categoryName(row.category) }}</td>
-                                <td class="px-4 py-3 text-right">{{ row.count }}</td>
-                                <td class="px-4 py-3 text-right font-mono font-semibold">{{ formatCurrency(row.total_amount) }}</td>
+                        <thead
+                            class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/50"
+                        >
+                            <tr>
+                                <th class="px-4 py-3 text-left">Categoria</th>
+                                <th class="px-4 py-3 text-right">
+                                    Movimientos
+                                </th>
+                                <th class="px-4 py-3 text-right">Total</th>
                             </tr>
-                            <tr v-if="!(summary.by_category || []).length"><td colspan="3" class="px-4 py-8 text-center text-gray-500">Sin gastos por categoria.</td></tr>
+                        </thead>
+                        <tbody
+                            class="divide-y divide-gray-100 dark:divide-border"
+                        >
+                            <tr
+                                v-for="row in summary.by_category || []"
+                                :key="row.category"
+                                class="cursor-pointer hover:bg-gray-50 dark:hover:bg-muted/40"
+                                @click="openCategoryBreakdown(row.category)"
+                            >
+                                <td class="px-4 py-3 font-medium">
+                                    {{ categoryName(row.category) }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ row.count }}
+                                </td>
+                                <td
+                                    class="px-4 py-3 text-right font-mono font-semibold"
+                                >
+                                    {{ formatCurrency(row.total_amount) }}
+                                </td>
+                            </tr>
+                            <tr v-if="!(summary.by_category || []).length">
+                                <td
+                                    colspan="3"
+                                    class="px-4 py-8 text-center text-gray-500"
+                                >
+                                    Sin gastos por categoria.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -919,17 +983,57 @@ onMounted(async () => {
                     class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                 >
                     <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/50">
-                            <tr><th class="px-4 py-3 text-left">Persona / empresa</th><th class="px-4 py-3 text-left">Tipo</th><th class="px-4 py-3 text-right">Movimientos</th><th class="px-4 py-3 text-right">Total</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-border">
-                            <tr v-for="row in summary.by_party || []" :key="`${row.party_type}:${row.party_id}`" class="cursor-pointer hover:bg-gray-50 dark:hover:bg-muted/40" @click="openPartyMovements(row.party_type, row.party_id)">
-                                <td class="px-4 py-3 font-medium">{{ row.party_name }}</td>
-                                <td class="px-4 py-3 text-gray-500">{{ partyTypeLabel(row.party_type) }}</td>
-                                <td class="px-4 py-3 text-right">{{ row.count }}</td>
-                                <td class="px-4 py-3 text-right font-mono font-semibold">{{ formatCurrency(row.total_amount) }}</td>
+                        <thead
+                            class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/50"
+                        >
+                            <tr>
+                                <th class="px-4 py-3 text-left">
+                                    Persona / empresa
+                                </th>
+                                <th class="px-4 py-3 text-left">Tipo</th>
+                                <th class="px-4 py-3 text-right">
+                                    Movimientos
+                                </th>
+                                <th class="px-4 py-3 text-right">Total</th>
                             </tr>
-                            <tr v-if="!(summary.by_party || []).length"><td colspan="4" class="px-4 py-8 text-center text-gray-500">Sin gastos por persona.</td></tr>
+                        </thead>
+                        <tbody
+                            class="divide-y divide-gray-100 dark:divide-border"
+                        >
+                            <tr
+                                v-for="row in summary.by_party || []"
+                                :key="`${row.party_type}:${row.party_id}`"
+                                class="cursor-pointer hover:bg-gray-50 dark:hover:bg-muted/40"
+                                @click="
+                                    openPartyMovements(
+                                        row.party_type,
+                                        row.party_id,
+                                    )
+                                "
+                            >
+                                <td class="px-4 py-3 font-medium">
+                                    {{ row.party_name }}
+                                </td>
+                                <td class="px-4 py-3 text-gray-500">
+                                    {{ partyTypeLabel(row.party_type) }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ row.count }}
+                                </td>
+                                <td
+                                    class="px-4 py-3 text-right font-mono font-semibold"
+                                >
+                                    {{ formatCurrency(row.total_amount) }}
+                                </td>
+                            </tr>
+                            <tr v-if="!(summary.by_party || []).length">
+                                <td
+                                    colspan="4"
+                                    class="px-4 py-8 text-center text-gray-500"
+                                >
+                                    Sin gastos por persona.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -946,7 +1050,9 @@ onMounted(async () => {
                                 <th class="px-3 py-2 text-left">Fecha</th>
                                 <th class="px-3 py-2 text-left">Categoria</th>
                                 <th class="px-3 py-2 text-left">Fecha/Hora</th>
-                                <th class="px-3 py-2 text-left">Persona / empresa</th>
+                                <th class="px-3 py-2 text-left">
+                                    Persona / empresa
+                                </th>
                                 <th class="px-3 py-2 text-left">Metodo</th>
                                 <th class="px-3 py-2 text-left">Caja</th>
                                 <th class="px-3 py-2 text-left">Recibo</th>
@@ -1010,7 +1116,9 @@ onMounted(async () => {
                                     <td class="px-3 py-2">
                                         <a
                                             v-if="partyHref(expense)"
-                                            :href="partyHref(expense) || undefined"
+                                            :href="
+                                                partyHref(expense) || undefined
+                                            "
                                             class="font-medium text-emerald-700 hover:underline dark:text-emerald-300"
                                         >
                                             {{ expense.party?.name }}
@@ -1047,16 +1155,34 @@ onMounted(async () => {
                                     </td>
                                     <td class="px-3 py-2 text-right">
                                         <button
-                                            v-if="expense.capabilities?.can_send_to_cashier"
+                                            type="button"
+                                            class="p-1 text-gray-500 hover:text-cyan-700"
+                                            title="Ver trazabilidad"
+                                            @click="
+                                                traceExpenseId = expense.id;
+                                                traceOpen = true;
+                                            "
+                                        >
+                                            <Route :size="15" />
+                                        </button>
+                                        <button
+                                            v-if="
+                                                expense.capabilities
+                                                    ?.can_send_to_cashier
+                                            "
                                             type="button"
                                             class="p-1 text-gray-500 hover:text-sky-600"
                                             title="Enviar a Caja"
-                                            @click="sendExpenseToCashier(expense)"
+                                            @click="
+                                                sendExpenseToCashier(expense)
+                                            "
                                         >
                                             <Send :size="15" />
                                         </button>
                                         <button
-                                            v-if="expense.capabilities?.can_edit"
+                                            v-if="
+                                                expense.capabilities?.can_edit
+                                            "
                                             type="button"
                                             class="p-1 text-gray-500 hover:text-emerald-600"
                                             @click="openEditForm(expense)"
@@ -1064,7 +1190,12 @@ onMounted(async () => {
                                             <Pencil :size="15" />
                                         </button>
                                         <button
-                                            v-if="expense.capabilities?.can_cancel || expense.capabilities?.can_reverse"
+                                            v-if="
+                                                expense.capabilities
+                                                    ?.can_cancel ||
+                                                expense.capabilities
+                                                    ?.can_reverse
+                                            "
                                             type="button"
                                             class="p-1 text-gray-500 hover:text-red-600"
                                             @click="deleteExpense(expense)"
@@ -1079,6 +1210,13 @@ onMounted(async () => {
                 </div>
             </div>
         </div>
+
+        <TransactionTraceDrawer
+            :open="traceOpen"
+            type="operational_expense"
+            :id="traceExpenseId"
+            @close="traceOpen = false"
+        />
 
         <div
             v-if="showForm"
@@ -1116,22 +1254,40 @@ onMounted(async () => {
                     </button>
                 </div>
 
-                <div class="grid max-h-[70vh] gap-4 overflow-y-auto p-5 md:grid-cols-2">
+                <div
+                    class="grid max-h-[70vh] gap-4 overflow-y-auto p-5 md:grid-cols-2"
+                >
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Fecha y hora *</label>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Fecha y hora *</label
+                        >
                         <input
                             ref="firstFormInput"
                             v-model="form.business_datetime"
                             type="datetime-local"
                             required
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                            @change="form.expense_date = String(form.business_datetime || '').slice(0, 10)"
+                            @change="
+                                form.expense_date = String(
+                                    form.business_datetime || '',
+                                ).slice(0, 10)
+                            "
                         />
                     </div>
                     <div>
-                        <div class="mb-1 flex items-center justify-between gap-2">
-                            <label class="block text-sm font-medium">Cliente / proveedor / beneficiario</label>
-                            <button type="button" class="text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300" @click="showBeneficiaryForm = !showBeneficiaryForm">
+                        <div
+                            class="mb-1 flex items-center justify-between gap-2"
+                        >
+                            <label class="block text-sm font-medium"
+                                >Cliente / proveedor / beneficiario</label
+                            >
+                            <button
+                                type="button"
+                                class="text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                                @click="
+                                    showBeneficiaryForm = !showBeneficiaryForm
+                                "
+                            >
                                 Nuevo beneficiario
                             </button>
                         </div>
@@ -1144,27 +1300,57 @@ onMounted(async () => {
                     </div>
                     <div
                         v-if="showBeneficiaryForm"
-                        class="md:col-span-2 grid gap-3 rounded-md border border-emerald-200 bg-emerald-50/60 p-3 md:grid-cols-4 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                        class="grid gap-3 rounded-md border border-emerald-200 bg-emerald-50/60 p-3 md:col-span-2 md:grid-cols-4 dark:border-emerald-900/50 dark:bg-emerald-950/20"
                     >
-                        <input v-model="beneficiaryForm.name" type="text" maxlength="150" placeholder="Nombre del beneficiario" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted" />
-                        <select v-model="beneficiaryForm.type" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted">
+                        <input
+                            v-model="beneficiaryForm.name"
+                            type="text"
+                            maxlength="150"
+                            placeholder="Nombre del beneficiario"
+                            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
+                        />
+                        <select
+                            v-model="beneficiaryForm.type"
+                            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
+                        >
                             <option value="individual">Persona</option>
                             <option value="company">Empresa</option>
                         </select>
-                        <input v-model="beneficiaryForm.phone" type="text" placeholder="Telefono opcional" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted" />
-                        <button type="button" :disabled="creatingBeneficiary || !beneficiaryForm.name.trim()" class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" @click="createBeneficiaryFromForm">
-                            {{ creatingBeneficiary ? 'Creando...' : 'Crear y seleccionar' }}
+                        <input
+                            v-model="beneficiaryForm.phone"
+                            type="text"
+                            placeholder="Telefono opcional"
+                            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
+                        />
+                        <button
+                            type="button"
+                            :disabled="
+                                creatingBeneficiary ||
+                                !beneficiaryForm.name.trim()
+                            "
+                            class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                            @click="createBeneficiaryFromForm"
+                        >
+                            {{
+                                creatingBeneficiary
+                                    ? 'Creando...'
+                                    : 'Crear y seleccionar'
+                            }}
                         </button>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Categoria</label>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Categoria</label
+                        >
                         <SearchableSelect
                             v-model="form.category_id"
                             :options="formCategoryOptions"
                         />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Monto estimado *</label>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Monto estimado *</label
+                        >
                         <input
                             v-model.number="form.estimated_amount"
                             type="number"
@@ -1172,11 +1358,15 @@ onMounted(async () => {
                             step="0.01"
                             required
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-right dark:border-border dark:bg-muted"
-                            @input="form.amount = Number(form.estimated_amount || 0)"
+                            @input="
+                                form.amount = Number(form.estimated_amount || 0)
+                            "
                         />
                     </div>
                     <div v-if="form.status === 'paid'">
-                        <label class="mb-1 block text-sm font-medium">Monto final *</label>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Monto final *</label
+                        >
                         <input
                             v-model.number="form.final_amount"
                             type="number"
@@ -1184,11 +1374,19 @@ onMounted(async () => {
                             step="0.01"
                             required
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-right dark:border-border dark:bg-muted"
-                            @input="form.amount = Number(form.final_amount || form.estimated_amount || 0)"
+                            @input="
+                                form.amount = Number(
+                                    form.final_amount ||
+                                        form.estimated_amount ||
+                                        0,
+                                )
+                            "
                         />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium">Nueva categoria</label>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Nueva categoria</label
+                        >
                         <div class="flex gap-2">
                             <input
                                 v-model="form.custom_category_name"
@@ -1200,7 +1398,10 @@ onMounted(async () => {
                             <button
                                 type="button"
                                 class="rounded-md border border-gray-300 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
-                                :disabled="creatingCategory || !form.custom_category_name"
+                                :disabled="
+                                    creatingCategory ||
+                                    !form.custom_category_name
+                                "
                                 @click="createCategoryFromForm"
                             >
                                 Crear
@@ -1208,7 +1409,9 @@ onMounted(async () => {
                         </div>
                     </div>
                     <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium">Descripcion</label>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Descripcion</label
+                        >
                         <input
                             v-model="form.description"
                             type="text"
@@ -1218,7 +1421,9 @@ onMounted(async () => {
                         />
                     </div>
                     <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium">Notas</label>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Notas</label
+                        >
                         <textarea
                             v-model="form.notes"
                             rows="2"
@@ -1227,7 +1432,7 @@ onMounted(async () => {
                     </div>
 
                     <details
-                        class="md:col-span-2 rounded-md border border-gray-200 bg-gray-50/80 p-3 dark:border-border dark:bg-muted/40"
+                        class="rounded-md border border-gray-200 bg-gray-50/80 p-3 md:col-span-2 dark:border-border dark:bg-muted/40"
                     >
                         <summary
                             class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200"
@@ -1236,27 +1441,41 @@ onMounted(async () => {
                         </summary>
                         <div class="mt-4 grid gap-4 md:grid-cols-2">
                             <div>
-                                <label class="mb-1 block text-sm font-medium">Estado</label>
+                                <label class="mb-1 block text-sm font-medium"
+                                    >Estado</label
+                                >
                                 <SearchableSelect
                                     v-model="form.status"
                                     :options="statusOptions"
                                 />
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium">Sucursal</label>
+                                <label class="mb-1 block text-sm font-medium"
+                                    >Sucursal</label
+                                >
                                 <select
                                     v-model.number="form.warehouse_id"
                                     class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
                                 >
-                                    <option :value="null">Sucursal actual</option>
-                                    <option v-for="warehouse in warehouses" :key="warehouse.id" :value="warehouse.id">
+                                    <option :value="null">
+                                        Sucursal actual
+                                    </option>
+                                    <option
+                                        v-for="warehouse in warehouses"
+                                        :key="warehouse.id"
+                                        :value="warehouse.id"
+                                    >
                                         {{ warehouse.name }}
                                     </option>
                                 </select>
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium">
-                                    {{ form.status === 'paid' ? 'Metodo final' : 'Metodo previsto' }}
+                                    {{
+                                        form.status === 'paid'
+                                            ? 'Metodo final'
+                                            : 'Metodo previsto'
+                                    }}
                                 </label>
                                 <select
                                     v-if="form.status === 'paid'"
@@ -1286,7 +1505,9 @@ onMounted(async () => {
                                 </select>
                             </div>
                             <div v-if="form.status !== 'paid'">
-                                <label class="mb-1 block text-sm font-medium">Fecha de pago</label>
+                                <label class="mb-1 block text-sm font-medium"
+                                    >Fecha de pago</label
+                                >
                                 <input
                                     v-model="form.due_at"
                                     type="datetime-local"
@@ -1294,7 +1515,9 @@ onMounted(async () => {
                                 />
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium">Subcategoria</label>
+                                <label class="mb-1 block text-sm font-medium"
+                                    >Subcategoria</label
+                                >
                                 <input
                                     v-model="form.subcategory"
                                     type="text"
@@ -1304,21 +1527,27 @@ onMounted(async () => {
                                 />
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium">Recurrencia</label>
+                                <label class="mb-1 block text-sm font-medium"
+                                    >Recurrencia</label
+                                >
                                 <SearchableSelect
                                     v-model="form.recurrence"
                                     :options="recurrenceOptions"
                                 />
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium">Cuenta contable</label>
+                                <label class="mb-1 block text-sm font-medium"
+                                    >Cuenta contable</label
+                                >
                                 <SearchableSelect
                                     v-model="form.ledger_account_id"
                                     :options="ledgerAccountOptions"
                                 />
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium">Numero de recibo</label>
+                                <label class="mb-1 block text-sm font-medium"
+                                    >Numero de recibo</label
+                                >
                                 <input
                                     v-model="form.reference_number"
                                     type="text"
@@ -1326,8 +1555,12 @@ onMounted(async () => {
                                     class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
                                 />
                             </div>
-                            <div class="flex items-center gap-5 rounded-md border border-gray-200 p-3 dark:border-border">
-                                <label class="inline-flex items-center gap-2 text-sm">
+                            <div
+                                class="flex items-center gap-5 rounded-md border border-gray-200 p-3 dark:border-border"
+                            >
+                                <label
+                                    class="inline-flex items-center gap-2 text-sm"
+                                >
                                     <input
                                         v-model="form.affects_cash_flow"
                                         type="checkbox"
@@ -1335,7 +1568,9 @@ onMounted(async () => {
                                     />
                                     Afecta caja/banco
                                 </label>
-                                <label class="inline-flex items-center gap-2 text-sm">
+                                <label
+                                    class="inline-flex items-center gap-2 text-sm"
+                                >
                                     <input
                                         v-model="form.affects_income_statement"
                                         type="checkbox"
@@ -1361,16 +1596,25 @@ onMounted(async () => {
                     <button
                         v-if="!editingExpense"
                         type="button"
-                        :disabled="saving || Number(form.estimated_amount || form.amount) <= 0"
+                        :disabled="
+                            saving ||
+                            Number(form.estimated_amount || form.amount) <= 0
+                        "
                         class="rounded-md border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                         @click="saveExpense('new')"
                     >
                         Guardar y crear otro
                     </button>
                     <button
-                        v-if="!editingExpense || editingExpense.capabilities?.can_send_to_cashier"
+                        v-if="
+                            !editingExpense ||
+                            editingExpense.capabilities?.can_send_to_cashier
+                        "
                         type="button"
-                        :disabled="saving || Number(form.estimated_amount || form.amount) <= 0"
+                        :disabled="
+                            saving ||
+                            Number(form.estimated_amount || form.amount) <= 0
+                        "
                         class="inline-flex items-center gap-2 rounded-md border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/30"
                         @click="saveExpense('queue')"
                     >
@@ -1379,7 +1623,10 @@ onMounted(async () => {
                     </button>
                     <button
                         type="submit"
-                        :disabled="saving || Number(form.estimated_amount || form.amount) <= 0"
+                        :disabled="
+                            saving ||
+                            Number(form.estimated_amount || form.amount) <= 0
+                        "
                         class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
                         <DollarSign :size="16" />
@@ -1396,8 +1643,12 @@ onMounted(async () => {
             <div
                 class="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-border dark:bg-card"
             >
-                <div class="border-b border-gray-200 px-5 py-4 dark:border-border">
-                    <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                <div
+                    class="border-b border-gray-200 px-5 py-4 dark:border-border"
+                >
+                    <h3
+                        class="text-base font-bold text-gray-900 dark:text-white"
+                    >
                         Eliminar gasto operativo
                     </h3>
                     <p class="mt-1 text-sm text-gray-500">

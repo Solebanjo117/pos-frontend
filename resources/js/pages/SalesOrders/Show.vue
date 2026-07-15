@@ -21,6 +21,8 @@ import {
 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
+import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
+import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
@@ -149,7 +151,9 @@ const amountDue = computed(
     () => operationalDetail.value?.ar_context.amount_due ?? 0,
 );
 const cancellationRequiresSettlement = computed(() =>
-    ['confirmed', 'processing', 'completed'].includes(order.value?.status || ''),
+    ['confirmed', 'processing', 'completed'].includes(
+        order.value?.status || '',
+    ),
 );
 const cancellationOptions = computed(() => {
     const options: Array<{ code: string; name: string }> = [];
@@ -350,7 +354,9 @@ const handleCancel = async (): Promise<void> => {
         await refreshOrder();
     } catch (err: any) {
         cancellationError.value =
-            err.response?.data?.message || err.message || 'No se pudo anular la factura.';
+            err.response?.data?.message ||
+            err.message ||
+            'No se pudo anular la factura.';
     } finally {
         cancellationLoading.value = false;
     }
@@ -536,7 +542,8 @@ onMounted(async () => {
         fetchProductFilterOptions(),
     ]);
     if (
-        new URLSearchParams(window.location.search).get('action') === 'cancel' &&
+        new URLSearchParams(window.location.search).get('action') ===
+            'cancel' &&
         currentSalesOrder.value?.status !== 'cancelled'
     ) {
         await openCancellationModal();
@@ -603,7 +610,14 @@ onMounted(async () => {
                                 class="rounded-full px-2 py-1 text-xs font-semibold"
                                 :class="paymentClass(order.payment_status)"
                             >
-                                {{ paymentStatusLabels[order.payment_display_status || order.payment_status] || order.payment_display_status || order.payment_status }}
+                                {{
+                                    paymentStatusLabels[
+                                        order.payment_display_status ||
+                                            order.payment_status
+                                    ] ||
+                                    order.payment_display_status ||
+                                    order.payment_status
+                                }}
                             </span>
                             <button
                                 v-if="customer"
@@ -1474,6 +1488,12 @@ onMounted(async () => {
                 v-if="activeTab === 'activity'"
                 class="grid gap-4 xl:grid-cols-2"
             >
+                <TransactionRelationsPanel
+                    :nodes="operationalDetail.trace.relationships"
+                />
+                <TransactionTimeline
+                    :events="operationalDetail.trace.timeline"
+                />
                 <div
                     class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
                 >
@@ -1582,9 +1602,12 @@ onMounted(async () => {
                 @submit.prevent="handleCancel"
             >
                 <div class="border-b p-4 dark:border-border">
-                    <h2 class="font-semibold">Anular factura {{ order?.order_number }}</h2>
+                    <h2 class="font-semibold">
+                        Anular factura {{ order?.order_number }}
+                    </h2>
                     <p class="mt-1 text-sm text-gray-500">
-                        La factura original se conserva. Inventario y dinero se corrigen con movimientos auditados.
+                        La factura original se conserva. Inventario y dinero se
+                        corrigen con movimientos auditados.
                     </p>
                 </div>
                 <div class="space-y-3 p-4">
@@ -1599,25 +1622,58 @@ onMounted(async () => {
                             class="mt-1 w-full rounded-md border bg-background px-3 py-2"
                         />
                     </label>
-                    <label v-if="cancellationRequiresSettlement" class="block text-sm font-medium">
+                    <label
+                        v-if="cancellationRequiresSettlement"
+                        class="block text-sm font-medium"
+                    >
                         Resolución financiera
-                        <select v-model="cancellationMethod" required class="mt-1 w-full rounded-md border bg-background px-3 py-2">
+                        <select
+                            v-model="cancellationMethod"
+                            required
+                            class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                        >
                             <option value="" disabled>Seleccionar</option>
-                            <option v-for="method in cancellationOptions" :key="method.code" :value="method.code">
+                            <option
+                                v-for="method in cancellationOptions"
+                                :key="method.code"
+                                :value="method.code"
+                            >
                                 {{ method.name }}
                             </option>
                         </select>
                     </label>
                     <label class="block text-sm font-medium">
                         Nota opcional
-                        <textarea v-model="cancellationNotes" rows="2" class="mt-1 w-full rounded-md border bg-background px-3 py-2" />
+                        <textarea
+                            v-model="cancellationNotes"
+                            rows="2"
+                            class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                        />
                     </label>
-                    <p v-if="cancellationError" class="text-sm text-red-600">{{ cancellationError }}</p>
+                    <p v-if="cancellationError" class="text-sm text-red-600">
+                        {{ cancellationError }}
+                    </p>
                 </div>
-                <div class="flex justify-end gap-2 border-t p-4 dark:border-border">
-                    <button type="button" class="rounded-md border px-3 py-2 text-sm" @click="showCancellationModal = false">Volver</button>
-                    <button type="submit" class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="cancellationLoading">
-                        {{ cancellationLoading ? 'Anulando...' : 'Confirmar anulación' }}
+                <div
+                    class="flex justify-end gap-2 border-t p-4 dark:border-border"
+                >
+                    <button
+                        type="button"
+                        class="rounded-md border px-3 py-2 text-sm"
+                        @click="showCancellationModal = false"
+                    >
+                        Volver
+                    </button>
+                    <button
+                        type="submit"
+                        class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        :disabled="cancellationLoading"
+                    >
+                        {{
+                            cancellationLoading
+                                ? 'Anulando...'
+                                : 'Confirmar anulación'
+                        }}
                     </button>
                 </div>
             </form>

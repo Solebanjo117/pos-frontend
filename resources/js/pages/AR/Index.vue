@@ -7,6 +7,7 @@ import {
     CreditCard,
     ExternalLink,
     ReceiptText,
+    Route,
     Search,
     Shield,
     TrendingUp,
@@ -18,6 +19,7 @@ import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
+import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { AccountsReceivableApiService } from '@/services/payments';
 import type { BreadcrumbItem } from '@/types';
@@ -121,6 +123,8 @@ const selectedCustomer = ref<Debtor | null>(null);
 const statement = ref<Statement | null>(null);
 const loadingDetails = ref(false);
 const showPaymentModal = ref(false);
+const traceLedgerEntryId = ref<number | null>(null);
+const traceOpen = ref(false);
 const paymentLoading = ref(false);
 const paymentError = ref<string | null>(null);
 const manualApplications = ref<Record<number, number>>({});
@@ -1108,6 +1112,18 @@ onMounted(async () => {
                                                         "
                                                     />
                                                 </div>
+                                                <button
+                                                    type="button"
+                                                    class="rounded p-1 text-slate-400 hover:bg-cyan-50 hover:text-cyan-700"
+                                                    title="Ver trazabilidad"
+                                                    @click="
+                                                        traceLedgerEntryId =
+                                                            movement.id;
+                                                        traceOpen = true;
+                                                    "
+                                                >
+                                                    <Route :size="15" />
+                                                </button>
                                                 <p
                                                     class="text-right text-sm font-semibold text-slate-900 tabular-nums dark:text-slate-100"
                                                 >
@@ -1140,6 +1156,13 @@ onMounted(async () => {
                 </main>
             </div>
         </div>
+
+        <TransactionTraceDrawer
+            :open="traceOpen"
+            type="account_ledger_entry"
+            :id="traceLedgerEntryId"
+            @close="traceOpen = false"
+        />
 
         <OperationalPaymentPanel
             :show="showPaymentModal"

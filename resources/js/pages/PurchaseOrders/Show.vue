@@ -20,6 +20,8 @@ import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
+import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -712,6 +714,23 @@ onMounted(async () => {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </PurchaseOrderSection>
+
+                        <PurchaseOrderSection
+                            v-if="purchaseOrder.trace"
+                            v-show="activeTab === 'summary'"
+                            title="Trazabilidad"
+                            subtitle="Documentos, pagos y movimientos relacionados"
+                            default-open
+                        >
+                            <div class="grid gap-3 p-3 lg:grid-cols-2">
+                                <TransactionRelationsPanel
+                                    :nodes="purchaseOrder.trace.relationships"
+                                />
+                                <TransactionTimeline
+                                    :events="purchaseOrder.trace.timeline"
+                                />
                             </div>
                         </PurchaseOrderSection>
 

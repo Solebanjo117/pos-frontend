@@ -14,10 +14,14 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
+import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
+import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { transactionTraceService } from '@/services/transaction-traces';
 import { type BreadcrumbItem } from '@/types';
 import { type InventoryMovement } from '@/types/inventory-movement';
+import type { TransactionTrace } from '@/types/transaction-trace';
 
 const props = defineProps<{
     id: string;
@@ -40,6 +44,7 @@ const {
 
 const relatedMovements = ref<InventoryMovement[]>([]);
 const loadingRelated = ref(false);
+const trace = ref<TransactionTrace | null>(null);
 
 const fifoLots = computed(() => currentMovement.value?.fifo_lots ?? []);
 const fifoAllocations = computed(
@@ -48,15 +53,32 @@ const fifoAllocations = computed(
 const hasFifoTrace = computed(
     () => fifoLots.value.length > 0 || fifoAllocations.value.length > 0,
 );
-const movementReference = computed(() =>
-    referenceMeta(
-        currentMovement.value?.reference_type,
-        currentMovement.value?.reference_id,
-    ),
-);
+const movementReference = computed(() => {
+    const source = trace.value?.relationships.find(
+        (node) => node.relation === 'source_document',
+    );
+    return {
+        label:
+            source?.label || sourceLabel(currentMovement.value?.reference_type),
+        value:
+            source?.number ||
+            (currentMovement.value?.reference_id
+                ? `#${currentMovement.value.reference_id}`
+                : '-'),
+        href: source?.href || null,
+    };
+});
 
 onMounted(async () => {
-    await fetchMovement(Number(props.id));
+    const movementId = Number(props.id);
+    await Promise.all([
+        fetchMovement(movementId),
+        transactionTraceService
+            .get('inventory_movement', movementId, 1, 50)
+            .then((value) => {
+                trace.value = value;
+            }),
+    ]);
 
     if (currentMovement.value) {
         loadingRelated.value = true;
@@ -108,29 +130,6 @@ function sourceLabel(type?: string | null): string {
     };
 
     return type ? (labels[type] ?? type) : '-';
-}
-
-function referenceMeta(type?: string | null, id?: number | null) {
-    const label = sourceLabel(type);
-
-    if (!type || !id) {
-        return { label, value: '-', href: null };
-    }
-
-    const routes: Record<string, string> = {
-        purchase_order: `/purchase-orders/${id}`,
-        purchase: `/purchase-orders/${id}`,
-        sale: `/sales-orders/${id}`,
-        sales_order: `/sales-orders/${id}`,
-        sales_return: `/returns/${id}`,
-        transfer: `/inventory-transfers/${id}`,
-    };
-
-    return {
-        label,
-        value: `#${id}`,
-        href: routes[type] ?? null,
-    };
 }
 
 function formatDate(dateString?: string | null): string {
@@ -810,6 +809,10 @@ function openReference(): void {
                             Abrir referencia
                         </button>
                     </div>
+                </div>
+                <div v-if="trace" class="grid gap-4 lg:grid-cols-2">
+                    <TransactionRelationsPanel :nodes="trace.relationships" />
+                    <TransactionTimeline :events="trace.timeline" />
                 </div>
             </template>
         </div>

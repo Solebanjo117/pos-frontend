@@ -1,3 +1,5 @@
+import type { TransactionTrace } from './transaction-trace';
+
 export type SalesReturnStatus = 'pending' | 'approved' | 'rejected';
 export type SalesReturnRefundMethod =
     | 'cash'
@@ -255,6 +257,7 @@ export interface SalesReturnOperationalDetail {
         occurred_at?: string | null;
         amount?: number | null;
     }>;
+    trace: TransactionTrace;
 }
 
 export interface SalesReturnCreatePayload {

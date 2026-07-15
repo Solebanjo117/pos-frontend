@@ -23,6 +23,7 @@ import { computed, onMounted, ref } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useSuppliers } from '@/composables/useSuppliers';
@@ -616,32 +617,11 @@ onMounted(async () => {
                         />
                     </div>
 
-                    <div>
-                        <label
-                            class="mb-1.5 flex items-center gap-1 text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            <Calendar :size="13" />
-                            Desde
-                        </label>
-                        <input
-                            v-model="filters.date_from"
-                            type="date"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
-
-                    <div>
-                        <label
-                            class="mb-1.5 block text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            Hasta
-                        </label>
-                        <input
-                            v-model="filters.date_to"
-                            type="date"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
+                    <DateRangeInput
+                        v-model:from="filters.date_from"
+                        v-model:to="filters.date_to"
+                        label="Rango de fechas"
+                    />
 
                     <div class="flex flex-wrap items-end gap-2">
                         <button

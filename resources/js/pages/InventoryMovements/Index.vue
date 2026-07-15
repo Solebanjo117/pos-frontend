@@ -14,6 +14,8 @@ import { computed, onMounted, ref } from 'vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import InventoryMovementDrawer from '@/components/Traceability/InventoryMovementDrawer.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import { usePosSettings } from '@/composables/usePosSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -60,6 +62,8 @@ const filters = ref<InventoryMovementFilters>({
     date_to: '',
 });
 const warehouses = ref<WarehouseOption[]>([]);
+const selectedMovementId = ref<number | null>(null);
+const movementDrawerOpen = ref(false);
 
 const showWarehouseColumns = computed(
     () => !isSingleWarehouseMode() && !filters.value.warehouse_id,
@@ -151,38 +155,12 @@ function goToPage(page: number): void {
 }
 
 function viewMovement(id: number): void {
-    router.visit(`/inventory-movements/${id}`);
+    selectedMovementId.value = id;
+    movementDrawerOpen.value = true;
 }
 
 function viewProduct(id: number): void {
     router.visit(`/products/${id}`);
-}
-
-function openReference(movement: InventoryMovement): void {
-    const href = referenceHref(movement);
-
-    if (href) {
-        router.visit(href);
-    }
-}
-
-function referenceHref(movement: InventoryMovement): string | null {
-    if (!movement.reference_id) {
-        return null;
-    }
-
-    const routes: Record<string, string> = {
-        purchase: `/purchase-orders/${movement.reference_id}`,
-        purchase_order: `/purchase-orders/${movement.reference_id}`,
-        sale: `/sales-orders/${movement.reference_id}`,
-        sales_order: `/sales-orders/${movement.reference_id}`,
-        sales_return: `/returns/${movement.reference_id}`,
-        transfer: `/inventory-transfers/${movement.reference_id}`,
-    };
-
-    return movement.reference_type
-        ? (routes[movement.reference_type] ?? null)
-        : null;
 }
 
 function referenceLabel(type?: string | null): string {
@@ -460,31 +438,11 @@ function formatNumber(value: number): string {
                         />
                     </div>
 
-                    <div>
-                        <label
-                            class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
-                        >
-                            Desde
-                        </label>
-                        <input
-                            v-model="filters.date_from"
-                            type="date"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
-
-                    <div>
-                        <label
-                            class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
-                        >
-                            Hasta
-                        </label>
-                        <input
-                            v-model="filters.date_to"
-                            type="date"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                        />
-                    </div>
+                    <DateRangeInput
+                        v-model:from="filters.date_from"
+                        v-model:to="filters.date_to"
+                        label="Rango de fechas"
+                    />
 
                     <div class="flex items-end gap-2">
                         <button
@@ -554,7 +512,10 @@ function formatNumber(value: number): string {
                             <tr
                                 v-for="movement in movements"
                                 :key="movement.id"
-                                class="border-t border-gray-100 hover:bg-gray-50 dark:border-border dark:hover:bg-muted/40"
+                                class="cursor-pointer border-t border-gray-100 hover:bg-gray-50 dark:border-border dark:hover:bg-muted/40"
+                                tabindex="0"
+                                @click="viewMovement(movement.id)"
+                                @keyup.enter="viewMovement(movement.id)"
                             >
                                 <td
                                     class="px-4 py-3 text-xs text-gray-600 dark:text-gray-300"
@@ -581,7 +542,7 @@ function formatNumber(value: number): string {
                                     <button
                                         type="button"
                                         class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
-                                        @click="
+                                        @click.stop="
                                             viewProduct(movement.product.id)
                                         "
                                     >
@@ -633,16 +594,7 @@ function formatNumber(value: number): string {
                                     {{ formatNumber(movement.quantity) }}
                                 </td>
                                 <td class="max-w-xs px-4 py-3">
-                                    <button
-                                        v-if="referenceHref(movement)"
-                                        type="button"
-                                        class="text-left font-medium text-blue-600 hover:underline dark:text-primary"
-                                        @click="openReference(movement)"
-                                    >
-                                        {{ movementDetail(movement).primary }}
-                                    </button>
                                     <div
-                                        v-else
                                         class="font-medium text-gray-950 dark:text-white"
                                     >
                                         {{
@@ -671,7 +623,7 @@ function formatNumber(value: number): string {
                                     <button
                                         type="button"
                                         class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline dark:text-primary"
-                                        @click="viewMovement(movement.id)"
+                                        @click.stop="viewMovement(movement.id)"
                                     >
                                         <FileText class="h-4 w-4" />
                                         Detalle
@@ -718,6 +670,11 @@ function formatNumber(value: number): string {
                     </div>
                 </div>
             </div>
+            <InventoryMovementDrawer
+                :open="movementDrawerOpen"
+                :movement-id="selectedMovementId"
+                @close="movementDrawerOpen = false"
+            />
         </div>
     </AppLayout>
 </template>

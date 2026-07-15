@@ -5,13 +5,14 @@ import {
     CheckCircle2,
     ExternalLink,
     FileText,
-    Package,
     RotateCcw,
     Wallet,
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
+import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { SalesReturnOperationalDetail } from '@/types/sales-return';
 
@@ -52,7 +53,6 @@ const inventory = computed(
 const arTransactions = computed(
     () => detail.value?.ar_context.customer_transactions ?? [],
 );
-const timeline = computed(() => detail.value?.timeline ?? []);
 
 const loadDetail = async (): Promise<void> => {
     loading.value = true;
@@ -583,26 +583,11 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                 v-if="activeTab === 'activity'"
                 class="rounded-lg border bg-white p-4"
             >
-                <h2 class="font-semibold text-gray-950">Actividad</h2>
-                <div class="mt-4 space-y-3">
-                    <div
-                        v-for="event in timeline"
-                        :key="`${event.type}-${event.occurred_at}`"
-                        class="flex items-start gap-3 border-l-2 border-gray-200 pl-3"
-                    >
-                        <Package class="mt-0.5 h-4 w-4 text-gray-400" />
-                        <div>
-                            <p class="text-sm font-medium text-gray-900">
-                                {{ event.label }}
-                            </p>
-                            <p class="text-xs text-gray-500">
-                                {{ formatDate(event.occurred_at) }}
-                                <span v-if="event.amount !== null">
-                                    · {{ formatCurrency(event.amount) }}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
+                <div class="mb-4 grid gap-4 lg:grid-cols-2">
+                    <TransactionRelationsPanel
+                        :nodes="detail.trace.relationships"
+                    />
+                    <TransactionTimeline :events="detail.trace.timeline" />
                 </div>
             </section>
         </template>

@@ -1,18 +1,25 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import { Building2 } from 'lucide-vue-next';
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { resolveModuleBreadcrumbs } from '@/navigation/modules';
 import apiClient from '@/services/api/client';
 import type { BreadcrumbItem } from '@/types';
 
-withDefaults(
+const props = withDefaults(
     defineProps<{
         breadcrumbs?: BreadcrumbItem[];
     }>(),
     {
         breadcrumbs: () => [],
     },
+);
+
+const page = usePage();
+const resolvedBreadcrumbs = computed<BreadcrumbItem[]>(() =>
+    resolveModuleBreadcrumbs(page.url, props.breadcrumbs),
 );
 
 interface AllowedWarehouse {
@@ -59,8 +66,8 @@ const switchWarehouse = async (event: Event) => {
     >
         <div class="flex flex-1 items-center gap-2">
             <SidebarTrigger class="-ml-1" />
-            <template v-if="breadcrumbs && breadcrumbs.length > 0">
-                <Breadcrumbs :breadcrumbs="breadcrumbs" />
+            <template v-if="resolvedBreadcrumbs.length > 0">
+                <Breadcrumbs :breadcrumbs="resolvedBreadcrumbs" />
             </template>
         </div>
 

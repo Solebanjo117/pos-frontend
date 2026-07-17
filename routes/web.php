@@ -36,6 +36,26 @@ Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/cash', function () {
+    return Inertia::render('Cash/Index');
+})->name('cash.index');
+
+Route::middleware(['auth'])->get('/queues', function () {
+    return Inertia::render('Queues/Index');
+})->name('queues.index');
+
+Route::middleware(['auth', 'role:admin,manager,buyer,seller,assistant'])->get('/sales', function () {
+    return Inertia::render('Sales/Index');
+})->name('sales.index');
+
+Route::middleware(['auth', 'role:admin,manager,buyer'])->get('/purchases', function () {
+    return Inertia::render('Purchases/Index');
+})->name('purchases.index');
+
+Route::middleware(['auth'])->get('/finance', function () {
+    return Inertia::render('Finance/Index');
+})->name('finance.index');
+
 Route::middleware(['auth'])->get('/changelog', function () {
     return Inertia::render('Changelog/Index');
 })->name('changelog.index');
@@ -56,6 +76,10 @@ Route::middleware(['auth'])->prefix('products')->name('products.')->group(functi
 });
 
 // Inventory Routes
+Route::middleware(['auth'])->get('/inventory/overview', function () {
+    return Inertia::render('Inventory/Overview');
+})->name('inventory.overview');
+
 Route::middleware(['auth', 'role:admin,manager,buyer,assistant'])->prefix('inventory')->name('inventory.')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Inventory/Inventory');
@@ -175,6 +199,10 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('Customers/Index');
     })->name('customers.index');
 
+    Route::get('/customers/overview', function () {
+        return Inertia::render('Customers/Overview');
+    })->name('customers.overview');
+
     Route::get('/customers/create', function () {
         return Inertia::render('Customers/Create');
     })->name('customers.create');
@@ -235,6 +263,10 @@ Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/orders/
 
 // Vehicle Management Routes
 Route::middleware(['auth'])->prefix('vehicles')->name('vehicles.')->group(function () {
+    Route::get('/overview', function () {
+        return Inertia::render('Vehicles/Overview');
+    })->name('overview');
+
     Route::get('/', function () {
         return Inertia::render('Vehicles/Index');
     })->name('index');

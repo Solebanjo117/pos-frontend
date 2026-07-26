@@ -11,9 +11,11 @@ import type { BreadcrumbItem } from '@/types';
 const props = withDefaults(
     defineProps<{
         breadcrumbs?: BreadcrumbItem[];
+        showWarehouseSelector?: boolean;
     }>(),
     {
         breadcrumbs: () => [],
+        showWarehouseSelector: true,
     },
 );
 
@@ -73,7 +75,7 @@ const switchWarehouse = async (event: Event) => {
 
         <!-- Global Warehouse Selector -->
         <div
-            v-if="allowedWarehouses.length > 0"
+            v-if="showWarehouseSelector && allowedWarehouses.length > 0"
             class="flex items-center gap-2"
         >
             <Building2 :size="16" class="text-indigo-500" />

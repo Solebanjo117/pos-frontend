@@ -56,6 +56,18 @@ Route::middleware(['auth'])->get('/finance', function () {
     return Inertia::render('Finance/Index');
 })->name('finance.index');
 
+Route::middleware(['auth', 'role:admin,manager'])->prefix('finance')->name('finance.')->group(function (): void {
+    Route::get('/transfers', fn () => Inertia::render('Finance/Transfers/Index'))->name('transfers.index');
+    Route::get('/transfers/create', fn () => Inertia::render('Finance/Transfers/Create'))->name('transfers.create');
+    Route::get('/transfers/{id}', fn (int $id) => Inertia::render('Finance/Transfers/Show', [
+        'transferId' => $id,
+    ]))->name('transfers.show');
+});
+
+Route::middleware(['auth', 'role:admin'])->get('/finance/accounts', function () {
+    return Inertia::render('Finance/Accounts/Index');
+})->name('finance.accounts.index');
+
 Route::middleware(['auth'])->get('/changelog', function () {
     return Inertia::render('Changelog/Index');
 })->name('changelog.index');
@@ -220,11 +232,11 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/ar', function () {
         return Inertia::render('AR/Index');
-    })->name('ar.index');
+    })->name('ar.index')->middleware('role:admin,manager,seller,cashier');
 
     Route::get('/accounts-receivable', function () {
         return Inertia::render('AR/Index');
-    })->name('accounts-receivable.index');
+    })->name('accounts-receivable.index')->middleware('role:admin,manager,seller,cashier');
 });
 
 // Sales Orders routes
@@ -372,7 +384,7 @@ Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
     // ==================== ACCOUNTS PAYABLE ====================
     Route::get('/accounts-payable', function () {
         return Inertia::render('AccountsPayable/Index');
-    })->name('accounts-payable.index');
+    })->name('accounts-payable.index')->middleware('role:admin,manager,buyer');
 
     Route::get('/operational-expenses', function () {
         return Inertia::render('OperationalExpenses/Index');

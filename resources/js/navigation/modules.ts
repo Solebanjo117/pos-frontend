@@ -19,6 +19,7 @@ import {
     Plus,
     Receipt,
     RefreshCw,
+    Repeat2,
     RotateCcw,
     Settings,
     ShoppingCart,
@@ -555,6 +556,8 @@ export const moduleDefinitions: ModuleDefinition[] = [
             '/accounts-payable',
             '/operational-expenses',
             '/operational-expense-beneficiaries',
+            '/finance/transfers',
+            '/finance/accounts',
         ],
         sections: [
             {
@@ -599,12 +602,26 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         icon: Receipt,
                         roles: roles.adminManager,
                     },
+                ],
+            },
+            {
+                title: 'Tesorería',
+                actions: [
                     {
-                        title: 'Registrar gasto',
-                        href: '/operational-expenses?new=1',
-                        description: 'Crear un nuevo gasto operativo.',
-                        icon: Plus,
+                        title: 'Transferencias entre cuentas',
+                        href: '/finance/transfers',
+                        description:
+                            'Mover saldos entre cajas y cuentas financieras.',
+                        icon: Repeat2,
                         roles: roles.adminManager,
+                    },
+                    {
+                        title: 'Cuentas financieras',
+                        href: '/finance/accounts',
+                        description:
+                            'Configurar bancos, caja chica y otras cuentas.',
+                        icon: Landmark,
+                        roles: ['admin'],
                     },
                 ],
             },

@@ -4,15 +4,20 @@ import type { BreadcrumbItem } from '@/types';
 
 type Props = {
     breadcrumbs?: BreadcrumbItem[];
+    showWarehouseSelector?: boolean;
 };
 
 withDefaults(defineProps<Props>(), {
     breadcrumbs: () => [],
+    showWarehouseSelector: true,
 });
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="breadcrumbs">
+    <AppLayout
+        :breadcrumbs="breadcrumbs"
+        :show-warehouse-selector="showWarehouseSelector"
+    >
         <slot />
     </AppLayout>
 </template>

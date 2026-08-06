@@ -35,6 +35,7 @@ const editing = ref<FinancialAccount | null>(null);
 const form = ref({
     name: '',
     type: 'bank',
+    institution_name: '',
     masked_number: '',
     currency: 'USD',
     opening_balance: 0,
@@ -75,6 +76,7 @@ function openCreate(): void {
     form.value = {
         name: '',
         type: 'bank',
+        institution_name: '',
         masked_number: '',
         currency: 'USD',
         opening_balance: 0,
@@ -90,6 +92,7 @@ function openEdit(account: FinancialAccount): void {
     form.value = {
         name: account.name,
         type: account.type,
+        institution_name: account.institution_name || '',
         masked_number: account.masked_number || '',
         currency: account.currency,
         opening_balance: Number(account.opening_balance),
@@ -224,6 +227,17 @@ onMounted(load);
                             :options="typeOptions"
                         />
                     </div>
+                    <div v-if="form.type === 'bank'">
+                        <label class="mb-1.5 block text-sm font-medium"
+                            >Banco o institución</label
+                        >
+                        <input
+                            v-model="form.institution_name"
+                            maxlength="120"
+                            placeholder="Banco General"
+                            class="h-10 w-full rounded-lg border bg-background px-3 text-sm"
+                        />
+                    </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium"
                             >Número enmascarado</label
@@ -280,6 +294,9 @@ onMounted(load);
                         :disabled="
                             saving ||
                             !form.name.trim() ||
+                            (form.type === 'bank' &&
+                                (!form.institution_name.trim() ||
+                                    !form.masked_number.trim())) ||
                             !form.ledger_account_id
                         "
                         @click="save"

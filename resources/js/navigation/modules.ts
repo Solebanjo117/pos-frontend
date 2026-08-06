@@ -56,7 +56,7 @@ export type ModuleId =
     | 'reports'
     | 'settings';
 
-export type ModuleFeature = 'workOrders';
+export type ModuleFeature = 'workOrders' | 'financialAdjustments';
 
 export interface ModuleActionDefinition {
     title: string;
@@ -85,6 +85,7 @@ export interface ModuleDefinition {
 
 export interface NavigationFeatures {
     workOrdersEnabled: boolean;
+    financialAdjustmentsEnabled?: boolean;
 }
 
 const roles = {
@@ -558,6 +559,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
             '/operational-expense-beneficiaries',
             '/finance/transfers',
             '/finance/accounts',
+            '/finance/accounting/adjustments',
         ],
         sections: [
             {
@@ -622,6 +624,15 @@ export const moduleDefinitions: ModuleDefinition[] = [
                             'Configurar bancos, caja chica y otras cuentas.',
                         icon: Landmark,
                         roles: ['admin'],
+                    },
+                    {
+                        title: 'Historial de ajustes',
+                        href: '/finance/accounting/adjustments',
+                        description:
+                            'Correcciones contables, efectos y reversiones trazables.',
+                        icon: History,
+                        roles: roles.adminManager,
+                        feature: 'financialAdjustments',
                     },
                 ],
             },
@@ -921,7 +932,12 @@ const roleAllowsAction = (
 const featureAllowsAction = (
     action: ModuleActionDefinition,
     features: NavigationFeatures,
-): boolean => action.feature !== 'workOrders' || features.workOrdersEnabled;
+): boolean =>
+    action.feature === 'workOrders'
+        ? features.workOrdersEnabled
+        : action.feature === 'financialAdjustments'
+          ? features.financialAdjustmentsEnabled === true
+          : true;
 
 export const getVisibleModules = (
     role: string | null,

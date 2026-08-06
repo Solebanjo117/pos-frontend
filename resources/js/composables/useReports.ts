@@ -7,11 +7,10 @@ import type {
     MovementHistoryFilters,
     DailyFinancialSummary,
     BalanceSheetReport,
-    FinancialAdjustment,
-    FinancialAdjustmentType,
     CapitalMovement,
     FinancialDrilldownReport,
     FinancialAdvancedStatusReport,
+    IncomeStatementReport,
 } from '@/types/report';
 
 export function useReports() {
@@ -101,7 +100,7 @@ export function useReports() {
     };
 
     const financialReport = ref<any>(null);
-    const incomeStatementReport = ref<any>(null);
+    const incomeStatementReport = ref<IncomeStatementReport | null>(null);
     const financialPositionReport = ref<any>(null);
     const brandProfitabilityReport = ref<any[] | null>(null);
     const categoryProfitabilityReport = ref<any[] | null>(null);
@@ -112,7 +111,6 @@ export function useReports() {
     const financialAdvancedStatus = ref<FinancialAdvancedStatusReport | null>(
         null,
     );
-    const adjustments = ref<FinancialAdjustment[]>([]);
     const capitalMovements = ref<CapitalMovement[]>([]);
 
     /**
@@ -382,44 +380,6 @@ export function useReports() {
         }
     };
 
-    const storeAdjustment = async (payload: {
-        type: FinancialAdjustmentType;
-        amount: number;
-        reason: string;
-        adjustment_date: string;
-        warehouse_id?: number | null;
-        notes?: string | null;
-    }) => {
-        loading.value = true;
-        error.value = null;
-        try {
-            await ReportsApiService.createAdjustment(payload);
-            await fetchAdjustments({
-                date_from: payload.adjustment_date,
-                date_to: payload.adjustment_date,
-                warehouse_id: payload.warehouse_id,
-            });
-        } catch (err: any) {
-            error.value =
-                err.response?.data?.message || 'Error creating adjustment';
-            throw err;
-        } finally {
-            loading.value = false;
-        }
-    };
-
-    const fetchAdjustments = async (filters?: {
-        date_from?: string;
-        date_to?: string;
-        warehouse_id?: number | null;
-    }) => {
-        try {
-            adjustments.value = await ReportsApiService.getAdjustments(filters);
-        } catch (err: any) {
-            console.error('Error fetching adjustments:', err);
-        }
-    };
-
     const storeCapitalMovement = async (payload: {
         movement_type: 'in' | 'out';
         amount: number;
@@ -473,7 +433,6 @@ export function useReports() {
         balanceSheet,
         financialDrilldown,
         financialAdvancedStatus,
-        adjustments,
         capitalMovements,
         loading,
         error,
@@ -492,8 +451,6 @@ export function useReports() {
         fetchBalanceSheet,
         fetchFinancialDrilldown,
         fetchFinancialAdvancedStatus,
-        storeAdjustment,
-        fetchAdjustments,
         storeCapitalMovement,
         fetchCapitalMovements,
     };

@@ -11,8 +11,6 @@ import type {
     SalesByClientReport,
     DailyFinancialSummary,
     BalanceSheetReport,
-    FinancialAdjustment,
-    FinancialAdjustmentType,
     CapitalMovement,
     FinancialDrilldownReport,
     FinancialAdvancedStatusReport,
@@ -367,29 +365,6 @@ export const ReportsApiService = {
             { params: filters },
         );
         return response.data;
-    },
-
-    async createAdjustment(payload: {
-        type: FinancialAdjustmentType;
-        amount: number;
-        reason: string;
-        adjustment_date: string;
-        warehouse_id?: number | null;
-        notes?: string | null;
-    }): Promise<FinancialAdjustment> {
-        const response = await apiClient.post('/reports/adjustments', payload);
-        return response.data.data;
-    },
-
-    async getAdjustments(filters?: {
-        date_from?: string;
-        date_to?: string;
-        warehouse_id?: number | null;
-    }): Promise<FinancialAdjustment[]> {
-        const response = await apiClient.get('/reports/adjustments', {
-            params: filters,
-        });
-        return response.data.data ?? [];
     },
 
     async createCapitalMovement(payload: {

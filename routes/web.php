@@ -62,6 +62,16 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('finance')->name('fina
     Route::get('/transfers/{id}', fn (int $id) => Inertia::render('Finance/Transfers/Show', [
         'transferId' => $id,
     ]))->name('transfers.show');
+    Route::get('/accounting/adjustments', function () {
+        abort_unless(auth()->user()?->can_manage_financial_adjustments, 403);
+
+        return Inertia::render('Finance/Adjustments/Index');
+    })->name('adjustments.index');
+    Route::get('/accounting/adjustments/{id}', function (int $id) {
+        abort_unless(auth()->user()?->can_manage_financial_adjustments, 403);
+
+        return Inertia::render('Finance/Adjustments/Show', ['adjustmentId' => $id]);
+    })->name('adjustments.show');
 });
 
 Route::middleware(['auth', 'role:admin'])->get('/finance/accounts', function () {
@@ -447,7 +457,7 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('categories')->name('c
 // ==================== USERS (Admin only) ====================
 Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->group(function () {
     Route::get('/', function () {
-        $users = \App\Models\User::select('id', 'name', 'username', 'email', 'role', 'is_active')
+        $users = \App\Models\User::select('id', 'name', 'username', 'email', 'role', 'is_active', 'can_manage_financial_adjustments')
             ->with('warehouses:id,name')
             ->get();
 
@@ -467,7 +477,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
         return Inertia::render('Users/Form', [
             'userId' => (int) $id,
             'userData' => array_merge(
-                $user->only('id', 'name', 'username', 'email', 'role', 'is_active'),
+                $user->only('id', 'name', 'username', 'email', 'role', 'is_active', 'can_manage_financial_adjustments'),
                 ['warehouse_ids' => $user->warehouses->pluck('id')->toArray()]
             ),
             'warehouses' => $warehouses,
@@ -482,10 +492,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
             'role' => 'required|in:admin,manager,buyer,seller,cashier,assistant',
+            'can_manage_financial_adjustments' => 'nullable|boolean',
             'warehouse_ids' => 'nullable|array',
             'warehouse_ids.*' => 'exists:warehouses,id',
         ]);
         unset($validated['warehouse_ids']);
+        $validated['can_manage_financial_adjustments'] = $validated['role'] === 'admin'
+            ? ($validated['can_manage_financial_adjustments'] ?? true)
+            : ($validated['role'] === 'manager' && ($validated['can_manage_financial_adjustments'] ?? false));
         $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
         $user = \App\Models\User::create($validated);
 
@@ -510,10 +524,31 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
             'password' => 'nullable|string|min:8|confirmed',
             'role' => 'sometimes|in:admin,manager,buyer,seller,cashier,assistant',
             'is_active' => 'sometimes|boolean',
+            'can_manage_financial_adjustments' => 'sometimes|boolean',
             'warehouse_ids' => 'nullable|array',
             'warehouse_ids.*' => 'exists:warehouses,id',
         ]);
         unset($validated['warehouse_ids']);
+        $effectiveRole = $validated['role'] ?? $user->role;
+        if (! in_array($effectiveRole, ['admin', 'manager'], true)) {
+            $validated['can_manage_financial_adjustments'] = false;
+        }
+        $willRemainAuthorizedAdmin = $effectiveRole === 'admin'
+            && ($validated['is_active'] ?? $user->is_active)
+            && ($validated['can_manage_financial_adjustments'] ?? $user->can_manage_financial_adjustments);
+        if ($user->role === 'admin' && $user->is_active && $user->can_manage_financial_adjustments && ! $willRemainAuthorizedAdmin) {
+            $hasOtherAuthorizedAdmin = \App\Models\User::query()
+                ->whereKeyNot($user->id)
+                ->where('role', 'admin')
+                ->where('is_active', true)
+                ->where('can_manage_financial_adjustments', true)
+                ->exists();
+            if (! $hasOtherAuthorizedAdmin) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'can_manage_financial_adjustments' => 'Debe existir al menos un administrador activo autorizado para ajustes financieros.',
+                ]);
+            }
+        }
         if (! empty($validated['password'])) {
             $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
         } else {
@@ -532,6 +567,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('users')->name('users.')->grou
         $user = \App\Models\User::findOrFail($id);
         if ($user->role === 'admin' && \App\Models\User::where('role', 'admin')->where('is_active', true)->count() <= 1) {
             return response()->json(['message' => 'No puedes desactivar al único administrador.'], 422);
+        }
+        if ($user->role === 'admin' && $user->can_manage_financial_adjustments && \App\Models\User::whereKeyNot($user->id)->where('role', 'admin')->where('is_active', true)->where('can_manage_financial_adjustments', true)->doesntExist()) {
+            return response()->json(['message' => 'Debe existir al menos un administrador autorizado para ajustes financieros.'], 422);
         }
         $user->update(['is_active' => false]);
 

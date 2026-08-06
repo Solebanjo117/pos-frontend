@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import {
     AlertCircle,
     BarChart3,
@@ -11,7 +11,6 @@ import {
 import { computed, onMounted, ref, watch } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import CapitalMovementModal from '@/components/Finance/CapitalMovementModal.vue';
-import FinanceAdjustmentModal from '@/components/Finance/FinanceAdjustmentModal.vue';
 import FinanceAdvancedAccountingPanel from '@/components/Finance/FinanceAdvancedAccountingPanel.vue';
 import FinanceBalanceSheet from '@/components/Finance/FinanceBalanceSheet.vue';
 import FinanceDailySummaryTable from '@/components/Finance/FinanceDailySummaryTable.vue';
@@ -19,18 +18,23 @@ import FinanceIncomeStatement from '@/components/Finance/FinanceIncomeStatement.
 import FinanceKpiRow from '@/components/Finance/FinanceKpiRow.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import FinancialDrilldownDrawer from '@/components/Finance/FinancialDrilldownDrawer.vue';
-import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import TraceableCell from '@/components/Traceability/TraceableCell.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
-import { useAuth } from '@/composables/useAuth';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import { Button } from '@/components/ui/button';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import type { ExpenseBreakdown, FinancialAdjustmentType } from '@/types/report';
 import type { CreditDocument } from '@/types/report';
 import type { TransactionTraceNode } from '@/types/transaction-trace';
+import {
+    buildFinancialReportUrl,
+    financialReportFilterKey,
+    financialReportRequestDecision,
+    validateFinancialReportDates,
+} from '@/utils/financialReport';
 import { formatCurrency } from '@/utils/formatters';
 
 type ReportTab = 'summary' | 'balance' | 'income' | 'credits' | 'investment';
@@ -55,7 +59,6 @@ const {
     balanceSheet,
     financialDrilldown,
     financialAdvancedStatus,
-    adjustments,
     capitalMovements,
     error,
     fetchIncomeStatement,
@@ -63,19 +66,14 @@ const {
     fetchBalanceSheet,
     fetchFinancialDrilldown,
     fetchFinancialAdvancedStatus,
-    storeAdjustment,
-    fetchAdjustments,
     storeCapitalMovement,
     fetchCapitalMovements,
 } = useReports();
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 const { fetchSettings: fetchStoreSettings } = useStoreSettings();
-const { isAdmin } = useAuth();
 
 const activeTab = ref<ReportTab>('summary');
 const activeMode = ref<ReportMode>('basic');
-const adjustmentOpen = ref(false);
-const adjustmentType = ref<FinancialAdjustmentType>('cash');
 const capitalMovementOpen = ref(false);
 const capitalMovementType = ref<'in' | 'out'>('in');
 const drilldownOpen = ref(false);
@@ -85,6 +83,8 @@ const drilldownLoading = ref(false);
 const drilldownPerPage = ref(25);
 const reportsLoading = ref(false);
 const reportReloadQueued = ref(false);
+const activeReportRequestKey = ref<string | null>(null);
+const dateValidationError = ref<string | null>(null);
 const selectedKpi = ref<{
     key: string;
     label: string;
@@ -118,7 +118,8 @@ const tabs: Array<{ key: ReportTab; label: string; icon: any }> = [
 ];
 const kpis = computed(() => {
     const totals = dailySummary.value?.totals ?? {};
-    const credits = incomeStatementReport.value?.credit_balances ?? {};
+    const credits = incomeStatementReport.value?.credit_balances;
+    const statement = incomeStatementReport.value?.reconciliation;
 
     return [
         {
@@ -126,66 +127,76 @@ const kpis = computed(() => {
             label: 'Inventario',
             value: totals.inventory ?? 0,
             metric: 'inventory',
+            detail: 'Saldo al cierre',
         },
         {
             key: 'sales',
             label: 'Ventas',
-            value: totals.sales_total ?? totals.sales ?? 0,
+            value: statement?.net_sales_ex_tax ?? 0,
             metric: 'sales',
+            detail: 'Periodo, sin ITBMS',
         },
         {
             key: 'sales_collected',
             label: 'Cobrado',
             value: totals.sales_collected ?? 0,
             metric: 'payments_received',
+            detail: 'Cobros del periodo',
         },
         {
             key: 'receivable',
             label: 'CxC',
             value:
                 totals.accounts_receivable ??
-                credits.accounts_receivable?.total_open_balance ??
+                credits?.accounts_receivable?.total_open_balance ??
                 0,
             metric: 'receivable',
+            detail: 'Saldo al cierre',
         },
         {
             key: 'cogs',
             label: 'Costo',
-            value: totals.cogs ?? 0,
+            value: statement?.net_cogs ?? 0,
             metric: 'cogs',
+            detail: 'Costo neto del periodo',
         },
         {
             key: 'purchase',
             label: 'Compras',
             value: totals.purchase ?? 0,
             metric: 'purchases',
+            detail: 'Compras del periodo',
         },
         {
             key: 'purchase_paid',
             label: 'Pagado',
             value: totals.purchase_paid ?? 0,
             metric: 'supplier_payments',
+            detail: 'Pagos del periodo',
         },
         {
             key: 'payable',
             label: 'CxP',
             value:
                 totals.accounts_payable ??
-                credits.accounts_payable?.total_open_balance ??
+                credits?.accounts_payable?.total_open_balance ??
                 0,
             metric: 'payable',
+            detail: 'Saldo al cierre',
         },
         {
             key: 'expenses',
             label: 'Gastos',
-            value: totals.expenses ?? 0,
+            value: statement?.operational_expenses ?? 0,
             metric: 'expenses',
+            detail: 'Gastos reconocidos',
         },
         {
             key: 'profit',
             label: 'Profit',
-            value: totals.net_profit ?? totals.profit ?? 0,
+            value: statement?.net_income ?? 0,
             metric: 'profit',
+            detail: 'Igual a Net Income',
         },
     ];
 });
@@ -199,12 +210,10 @@ const financeWarnings = computed(() =>
     [
         ...(dailySummary.value?.warnings ?? []),
         ...(balanceSheet.value?.warnings ?? []),
+        ...(incomeStatementReport.value?.warnings ?? []).map(
+            (warning) => warning.message,
+        ),
     ].filter((warning, index, all) => all.indexOf(warning) === index),
-);
-
-const incomeSummary = computed(() => incomeStatementReport.value?.summary);
-const expenseBreakdown = computed<ExpenseBreakdown | null>(
-    () => incomeStatementReport.value?.expense_breakdown ?? null,
 );
 
 const investmentTotals = computed(() => {
@@ -219,7 +228,7 @@ const investmentTotals = computed(() => {
 });
 
 const creditSections = computed(() => {
-    const credits = incomeStatementReport.value?.credit_balances ?? {};
+    const credits = incomeStatementReport.value?.credit_balances;
 
     return [
         {
@@ -227,9 +236,9 @@ const creditSections = computed(() => {
             title: 'Cuentas por cobrar',
             href: '/ar',
             description: 'Cobros y abonos se operan desde /ar.',
-            total: credits.accounts_receivable?.total_open_balance ?? 0,
-            count: credits.accounts_receivable?.open_documents_count ?? 0,
-            documents: credits.accounts_receivable?.documents ?? [],
+            total: credits?.accounts_receivable?.total_open_balance ?? 0,
+            count: credits?.accounts_receivable?.open_documents_count ?? 0,
+            documents: credits?.accounts_receivable?.documents ?? [],
         },
         {
             key: 'payable',
@@ -237,9 +246,9 @@ const creditSections = computed(() => {
             href: '/accounts-payable',
             description:
                 'Pagos a proveedores se operan desde /accounts-payable.',
-            total: credits.accounts_payable?.total_open_balance ?? 0,
-            count: credits.accounts_payable?.open_documents_count ?? 0,
-            documents: credits.accounts_payable?.documents ?? [],
+            total: credits?.accounts_payable?.total_open_balance ?? 0,
+            count: credits?.accounts_payable?.open_documents_count ?? 0,
+            documents: credits?.accounts_payable?.documents ?? [],
         },
     ];
 });
@@ -272,10 +281,27 @@ const inspectTransaction = (node: TransactionTraceNode): void => {
 };
 
 const loadReports = async (): Promise<void> => {
-    if (!filters.value.date_from || !filters.value.date_to) return;
+    const validationMessage = validateFinancialReportDates(
+        filters.value.date_from,
+        filters.value.date_to,
+    );
+    if (validationMessage) {
+        dateValidationError.value = validationMessage;
+        return;
+    }
+
+    dateValidationError.value = null;
+    const requestedKey = financialReportFilterKey(filters.value);
 
     if (reportsLoading.value) {
-        reportReloadQueued.value = true;
+        if (
+            financialReportRequestDecision(
+                activeReportRequestKey.value,
+                requestedKey,
+            ) === 'queue'
+        ) {
+            reportReloadQueued.value = true;
+        }
         return;
     }
 
@@ -285,6 +311,8 @@ const loadReports = async (): Promise<void> => {
         do {
             reportReloadQueued.value = false;
             const requestFilters = { ...filters.value };
+            activeReportRequestKey.value =
+                financialReportFilterKey(requestFilters);
             const requests: Array<() => Promise<unknown>> = [
                 () => fetchDailySummary(requestFilters),
                 () => fetchFinancialAdvancedStatus(),
@@ -295,7 +323,6 @@ const loadReports = async (): Promise<void> => {
                         compare: 'none',
                     }),
                 () => fetchBalanceSheet(requestFilters),
-                () => fetchAdjustments(requestFilters),
                 () => fetchCapitalMovements(requestFilters),
             ];
             const results: PromiseSettledResult<unknown>[] = [];
@@ -317,7 +344,27 @@ const loadReports = async (): Promise<void> => {
         } while (reportReloadQueued.value);
     } finally {
         reportsLoading.value = false;
+        activeReportRequestKey.value = null;
     }
+};
+
+const applyDateRange = async (): Promise<void> => {
+    const validationMessage = validateFinancialReportDates(
+        filters.value.date_from,
+        filters.value.date_to,
+    );
+    if (validationMessage) {
+        dateValidationError.value = validationMessage;
+        return;
+    }
+
+    dateValidationError.value = null;
+    window.history.replaceState(
+        window.history.state,
+        '',
+        buildFinancialReportUrl(window.location.href, filters.value),
+    );
+    await loadReports();
 };
 
 const openDrilldown = async (
@@ -423,37 +470,6 @@ const openDailySummaryDrilldown = (payload: {
     );
 };
 
-const openAdjustment = (type: FinancialAdjustmentType) => {
-    adjustmentType.value = type;
-    adjustmentOpen.value = true;
-};
-
-const submitAdjustment = async (payload: {
-    type: FinancialAdjustmentType;
-    amount: number;
-    reason: string;
-    adjustment_date: string;
-    notes: string;
-}) => {
-    await storeAdjustment({
-        ...payload,
-        warehouse_id: filters.value.warehouse_id,
-    });
-    await loadReports();
-};
-
-const updateAdjustmentBusinessDatetime = (
-    adjustmentId: number,
-    businessDatetime: string | null,
-): void => {
-    const adjustment = adjustments.value.find(
-        (item) => item.id === adjustmentId,
-    );
-    if (adjustment) {
-        adjustment.business_datetime = businessDatetime;
-    }
-};
-
 const openCapitalMovement = (type: 'in' | 'out') => {
     capitalMovementType.value = type;
     capitalMovementOpen.value = true;
@@ -520,24 +536,6 @@ watch(currentWarehouseId, (value) => {
                 :subtitle="`${filters.date_from} - ${filters.date_to}`"
                 :icon="BarChart3"
             >
-                <template #actions>
-                    <button
-                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-                        :disabled="
-                            reportsLoading ||
-                            !filters.date_from ||
-                            !filters.date_to
-                        "
-                        @click="loadReports"
-                    >
-                        <RefreshCw
-                            :size="16"
-                            :class="{ 'animate-spin': reportsLoading }"
-                        />
-                        {{ reportsLoading ? 'Actualizando...' : 'Actualizar' }}
-                    </button>
-                </template>
-
                 <div class="space-y-3">
                     <div
                         class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60"
@@ -549,21 +547,30 @@ watch(currentWarehouseId, (value) => {
                             class="min-w-0 flex-1 md:max-w-xl"
                         />
                         <button
-                            v-if="isAdmin"
                             type="button"
-                            class="h-10 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white transition hover:bg-indigo-500"
-                            @click="openAdjustment('cash')"
+                            class="inline-flex h-10 items-center gap-2 rounded-md bg-indigo-600 px-4 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="reportsLoading"
+                            @click="applyDateRange"
                         >
-                            Ajustar Cash
+                            <RefreshCw
+                                :size="15"
+                                :class="{ 'animate-spin': reportsLoading }"
+                            />
+                            {{
+                                reportsLoading
+                                    ? 'Actualizando...'
+                                    : 'Actualizar'
+                            }}
                         </button>
                     </div>
 
                     <div
-                        v-if="error"
+                        v-if="dateValidationError || error"
+                        role="alert"
                         class="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
                     >
                         <AlertCircle :size="18" />
-                        {{ error }}
+                        {{ dateValidationError || error }}
                     </div>
 
                     <div
@@ -615,10 +622,7 @@ watch(currentWarehouseId, (value) => {
                 @select="openKpiDrilldown"
             />
 
-            <div
-                v-if="activeMode === 'basic'"
-                class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px]"
-            >
+            <div v-if="activeMode === 'basic'" class="space-y-3">
                 <div class="space-y-3">
                     <nav class="flex flex-wrap gap-2">
                         <button
@@ -654,11 +658,9 @@ watch(currentWarehouseId, (value) => {
 
                     <FinanceIncomeStatement
                         v-if="activeTab === 'income'"
-                        :sales="incomeSummary?.total_revenue ?? 0"
-                        :cogs="incomeSummary?.total_cogs ?? 0"
-                        :net-income="incomeSummary?.net_profit ?? 0"
-                        :net-profit="incomeSummary?.net_profit ?? 0"
-                        :expense-breakdown="expenseBreakdown"
+                        :reconciliation="
+                            incomeStatementReport?.reconciliation ?? null
+                        "
                         :sections="incomeStatementReport?.sections ?? []"
                         :currency-formatter="formatCurrency"
                         @select="openKpiDrilldown"
@@ -1066,128 +1068,27 @@ watch(currentWarehouseId, (value) => {
                     </div>
 
                     <div
-                        v-if="activeTab === 'balance' && adjustments.length"
-                        class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                        v-if="activeTab === 'balance'"
+                        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950"
                     >
-                        <div
-                            class="border-b border-slate-200 px-3 py-2 dark:border-slate-800"
-                        >
-                            <h3
-                                class="text-xs font-semibold text-slate-900 dark:text-slate-100"
-                            >
-                                Historial de Ajustes
+                        <div>
+                            <h3 class="text-sm font-semibold">
+                                Historial de ajustes
                             </h3>
-                        </div>
-                        <table class="min-w-full text-xs tabular-nums">
-                            <thead class="bg-slate-50 dark:bg-slate-900">
-                                <tr>
-                                    <th
-                                        class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
-                                    >
-                                        Fecha
-                                    </th>
-                                    <th
-                                        class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
-                                    >
-                                        Tipo
-                                    </th>
-                                    <th
-                                        class="px-3 py-1.5 text-right font-semibold text-slate-500 uppercase dark:text-slate-400"
-                                    >
-                                        Monto
-                                    </th>
-                                    <th
-                                        class="px-3 py-1.5 text-left font-semibold text-slate-500 uppercase dark:text-slate-400"
-                                    >
-                                        Motivo
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody
-                                class="divide-y divide-slate-100 dark:divide-slate-800"
+                            <p
+                                class="mt-0.5 text-xs text-slate-500 dark:text-slate-400"
                             >
-                                <tr
-                                    v-for="adj in adjustments"
-                                    :key="adj.id"
-                                    class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
-                                >
-                                    <td
-                                        class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
-                                    >
-                                        {{ adj.adjustment_date }}
-                                        <BusinessDatetimeEditor
-                                            class="mt-1"
-                                            compact
-                                            record-type="financial_adjustment"
-                                            :record-id="adj.id"
-                                            :created-at="
-                                                adj.created_at ??
-                                                adj.adjustment_date
-                                            "
-                                            :business-datetime="
-                                                adj.business_datetime
-                                            "
-                                            @updated="
-                                                (value) =>
-                                                    updateAdjustmentBusinessDatetime(
-                                                        adj.id,
-                                                        value,
-                                                    )
-                                            "
-                                        />
-                                    </td>
-                                    <td
-                                        class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
-                                    >
-                                        {{ adj.type_label }}
-                                    </td>
-                                    <td
-                                        class="px-3 py-1.5 text-right font-semibold text-slate-900 dark:text-slate-100"
-                                        :class="{
-                                            'text-emerald-600 dark:text-emerald-400':
-                                                adj.amount > 0,
-                                            'text-rose-600 dark:text-rose-400':
-                                                adj.amount < 0,
-                                        }"
-                                    >
-                                        {{ formatCurrency(adj.amount) }}
-                                    </td>
-                                    <td
-                                        class="px-3 py-1.5 text-slate-600 dark:text-slate-400"
-                                    >
-                                        {{ adj.reason }}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                                Consulte folios, asientos, efectos operativos y
+                                reversiones en la fuente central.
+                            </p>
+                        </div>
+                        <Button as-child size="sm" variant="outline">
+                            <Link href="/finance/accounting/adjustments"
+                                >Abrir historial</Link
+                            >
+                        </Button>
                     </div>
                 </div>
-
-                <aside class="space-y-3">
-                    <div
-                        class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950"
-                    >
-                        <h3
-                            class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase dark:text-slate-400"
-                        >
-                            Ajustes
-                        </h3>
-                        <div class="space-y-1.5">
-                            <button
-                                class="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-                                @click="openAdjustment('bank')"
-                            >
-                                Ajustar Banco
-                            </button>
-                            <button
-                                class="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-                                @click="openAdjustment('inventory')"
-                            >
-                                Ajustar Inventario
-                            </button>
-                        </div>
-                    </div>
-                </aside>
             </div>
 
             <FinanceAdvancedAccountingPanel
@@ -1215,12 +1116,6 @@ watch(currentWarehouseId, (value) => {
             @close="transactionTraceOpen = false"
         />
 
-        <FinanceAdjustmentModal
-            v-model:open="adjustmentOpen"
-            :default-type="adjustmentType"
-            :warehouse-id="filters.warehouse_id"
-            @submit="submitAdjustment"
-        />
         <CapitalMovementModal
             v-model:open="capitalMovementOpen"
             :default-type="capitalMovementType"

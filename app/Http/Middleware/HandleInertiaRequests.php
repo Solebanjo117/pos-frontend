@@ -40,11 +40,12 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user() ? [
-                    'id'         => $request->user()->id,
-                    'name'       => $request->user()->name,
-                    'email'      => $request->user()->email,
-                    'role'       => $request->user()->role,
-                    'is_active'  => $request->user()->is_active,
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'email' => $request->user()->email,
+                    'role' => $request->user()->role,
+                    'is_active' => $request->user()->is_active,
+                    'can_manage_financial_adjustments' => (bool) $request->user()->can_manage_financial_adjustments,
                 ] : null,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

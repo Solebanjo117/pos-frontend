@@ -9,7 +9,6 @@ import {
     CreditCard,
     FileText,
     Globe2,
-    Image,
     Lock,
     Mail,
     MapPin,
@@ -733,9 +732,7 @@ const handleResetData = async () => {
                                 class="flex items-start gap-3 rounded-md border p-3"
                             >
                                 <input
-                                    v-model="
-                                        settings.regional_settings_active
-                                    "
+                                    v-model="settings.regional_settings_active"
                                     type="checkbox"
                                     class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                                 />
@@ -805,9 +802,7 @@ const handleResetData = async () => {
                                         <th class="px-3 py-2 text-left">
                                             Ref.
                                         </th>
-                                        <th class="px-3 py-2 text-left">
-                                            Uso
-                                        </th>
+                                        <th class="px-3 py-2 text-left">Uso</th>
                                         <th class="px-3 py-2 text-left">
                                             Estado
                                         </th>
@@ -929,9 +924,8 @@ const handleResetData = async () => {
                                                     <input
                                                         type="checkbox"
                                                         :checked="
-                                                            method[
-                                                                field.key
-                                                            ] ?? true
+                                                            method[field.key] ??
+                                                            true
                                                         "
                                                         class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary"
                                                         @change="
@@ -1069,6 +1063,23 @@ const handleResetData = async () => {
                                     step="1"
                                     class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
                                 />
+                            </div>
+                            <div v-if="isAdmin" class="max-w-xs space-y-1.5">
+                                <label
+                                    class="flex items-center gap-1 text-sm font-medium"
+                                >
+                                    <Lock class="h-3.5 w-3.5" />
+                                    Cierre contable hasta
+                                </label>
+                                <input
+                                    v-model="settings.accounting_lock_date"
+                                    type="date"
+                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
+                                />
+                                <p class="text-xs text-muted-foreground">
+                                    No se permitirán ajustes en esta fecha ni en
+                                    fechas anteriores.
+                                </p>
                             </div>
                         </div>
                     </section>
@@ -1233,9 +1244,7 @@ const handleResetData = async () => {
                                         >
                                             <input
                                                 v-model="
-                                                    newMethodContexts[
-                                                        field.key
-                                                    ]
+                                                    newMethodContexts[field.key]
                                                 "
                                                 type="checkbox"
                                                 class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary"

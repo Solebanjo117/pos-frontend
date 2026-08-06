@@ -16,6 +16,7 @@ export interface FinancialAccount {
     id: number;
     name: string;
     type: Exclude<FinancialAccountType, 'cash'>;
+    institution_name?: string | null;
     masked_number: string | null;
     currency: string;
     opening_balance: string | number;

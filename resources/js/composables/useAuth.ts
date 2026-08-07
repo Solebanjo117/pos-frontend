@@ -19,6 +19,7 @@ export function useAuth() {
                 email: string;
                 role: string;
                 is_active: boolean;
+                can_manage_financial_adjustments?: boolean;
             } | null) ?? null,
     );
 
@@ -36,6 +37,9 @@ export function useAuth() {
     const isSeller = computed(() => hasRole(['admin', 'manager', 'seller']));
     const isCashier = computed(() =>
         hasRole(['admin', 'manager', 'seller', 'cashier']),
+    );
+    const canManageFinancialAdjustments = computed(
+        () => currentUser.value?.can_manage_financial_adjustments === true,
     );
 
     const can = (permission: string): boolean => {
@@ -70,6 +74,7 @@ export function useAuth() {
         isBuyer,
         isSeller,
         isCashier,
+        canManageFinancialAdjustments,
         can,
     };
 }

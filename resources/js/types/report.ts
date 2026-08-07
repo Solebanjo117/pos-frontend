@@ -275,6 +275,7 @@ export interface StatementRow {
         | 'equity'
         | 'neutral';
     detail?: string | null;
+    included_in_section_total?: boolean;
 }
 
 export interface StatementSection {
@@ -282,6 +283,20 @@ export interface StatementSection {
     label: string;
     amount: number;
     rows: StatementRow[];
+}
+
+export interface IncomeStatementReconciliation {
+    gross_sales_ex_tax: number;
+    discounts: number;
+    returns_ex_tax: number;
+    net_sales_ex_tax: number;
+    tax_collected: number;
+    gross_cogs: number;
+    return_cogs: number;
+    net_cogs: number;
+    gross_profit: number;
+    operational_expenses: number;
+    net_income: number;
 }
 
 export interface IncomeStatementReport extends FinancialReport {
@@ -292,6 +307,8 @@ export interface IncomeStatementReport extends FinancialReport {
         warehouse_id?: number | null;
     };
     sections: StatementSection[];
+    reconciliation: IncomeStatementReconciliation;
+    expense_breakdown?: ExpenseBreakdown;
     comparison?: {
         previous_period: {
             date_from: string;
@@ -313,6 +330,11 @@ export interface IncomeStatementReport extends FinancialReport {
         by_category: Array<Record<string, any>>;
         by_warehouse: Array<Record<string, any>>;
     };
+    warnings?: Array<{
+        code: string;
+        message: string;
+        return_id?: number;
+    }>;
 }
 
 export interface FinancialPositionReport {
@@ -746,31 +768,6 @@ export interface ExpenseBreakdown {
     items: ExpenseBreakdownItem[];
     other: ExpenseBreakdownItem;
     total: number;
-}
-
-export type FinancialAdjustmentType =
-    | 'cash'
-    | 'bank'
-    | 'inventory'
-    | 'sales'
-    | 'purchases'
-    | 'expenses'
-    | 'investment'
-    | 'accounts_receivable'
-    | 'accounts_payable'
-    | 'manual_correction';
-
-export interface FinancialAdjustment {
-    id: number;
-    type: FinancialAdjustmentType;
-    type_label: string;
-    amount: number;
-    reason: string;
-    adjustment_date: string;
-    business_datetime?: string | null;
-    created_at?: string | null;
-    notes?: string | null;
-    warehouse_id?: number | null;
 }
 
 export interface CapitalMovement {

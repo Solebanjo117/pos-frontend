@@ -9,11 +9,12 @@ import {
 } from '@/navigation/modules';
 
 export function useModuleNavigation() {
-    const { role } = useAuth();
+    const { role, canManageFinancialAdjustments } = useAuth();
     const { settings, fetchSettings } = useStoreSettings();
 
     const features = computed(() => ({
         workOrdersEnabled: settings.value.modules_work_orders_enabled,
+        financialAdjustmentsEnabled: canManageFinancialAdjustments.value,
     }));
 
     const modules = computed(() =>

@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'role',
         'is_active',
+        'can_manage_financial_adjustments',
         'current_warehouse_id',
     ];
 
@@ -52,6 +53,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'is_active' => 'boolean',
+            'can_manage_financial_adjustments' => 'boolean',
         ];
     }
 
@@ -61,6 +63,7 @@ class User extends Authenticatable
     public function hasRole(string|array $roles): bool
     {
         $roles = is_array($roles) ? $roles : [$roles];
+
         return in_array($this->role, $roles);
     }
 

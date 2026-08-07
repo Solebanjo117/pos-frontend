@@ -25,6 +25,7 @@ const props = defineProps<{
         email: string;
         role: string;
         is_active: boolean;
+        can_manage_financial_adjustments?: boolean;
         warehouse_ids?: number[];
     };
     warehouses?: { id: number; name: string }[];
@@ -46,6 +47,9 @@ const pageTitle = computed(() =>
     isEditMode.value ? 'Editar usuario' : 'Nuevo usuario',
 );
 const isAdminRole = computed(() => form.value.role === 'admin');
+const canReceiveFinancialAdjustmentPermission = computed(() =>
+    ['admin', 'manager'].includes(form.value.role),
+);
 const selectedWarehouseCount = computed(() => form.value.warehouse_ids.length);
 
 const form = ref({
@@ -56,6 +60,9 @@ const form = ref({
     password_confirmation: '',
     role: props.userData?.role ?? 'cashier',
     is_active: props.userData?.is_active ?? true,
+    can_manage_financial_adjustments:
+        props.userData?.can_manage_financial_adjustments ??
+        props.userData?.role === 'admin',
     warehouse_ids: props.userData?.warehouse_ids ?? ([] as number[]),
 });
 
@@ -127,6 +134,8 @@ const submit = async () => {
                 email: form.value.email,
                 role: form.value.role,
                 is_active: form.value.is_active,
+                can_manage_financial_adjustments:
+                    form.value.can_manage_financial_adjustments,
                 warehouse_ids: form.value.warehouse_ids,
             };
 
@@ -146,6 +155,8 @@ const submit = async () => {
                 password: form.value.password,
                 password_confirmation: form.value.password_confirmation,
                 role: form.value.role,
+                can_manage_financial_adjustments:
+                    form.value.can_manage_financial_adjustments,
                 warehouse_ids: form.value.warehouse_ids,
             });
             toast.success('Usuario creado');
@@ -457,6 +468,29 @@ const submit = async () => {
                                 </p>
                             </div>
                         </div>
+                    </section>
+
+                    <section
+                        v-if="canReceiveFinancialAdjustmentPermission"
+                        class="rounded-lg border bg-card p-4"
+                    >
+                        <label class="flex items-start gap-3">
+                            <input
+                                id="can_manage_financial_adjustments"
+                                v-model="form.can_manage_financial_adjustments"
+                                type="checkbox"
+                                class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary"
+                            />
+                            <span>
+                                <span class="block text-sm font-medium">
+                                    Administrar ajustes financieros
+                                </span>
+                                <span class="text-sm text-muted-foreground">
+                                    Permite crear, consultar y revertir ajustes
+                                    contables trazables.
+                                </span>
+                            </span>
+                        </label>
                     </section>
 
                     <section

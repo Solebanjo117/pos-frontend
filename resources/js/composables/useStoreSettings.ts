@@ -43,6 +43,7 @@ export interface StoreSettings {
     require_stock_for_quotes: boolean; // Require available stock to create a quote
     store_tax_rate: number;
     modules_work_orders_enabled: boolean;
+    accounting_lock_date: string;
     regional_timezone: string;
     regional_date_format: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
     regional_time_format: '12h' | '24h';
@@ -70,6 +71,7 @@ const settings = ref<StoreSettings>({
     require_stock_for_quotes: false,
     store_tax_rate: 7,
     modules_work_orders_enabled: false,
+    accounting_lock_date: '',
     regional_timezone: 'America/Panama',
     regional_date_format: 'DD/MM/YYYY',
     regional_time_format: '24h',

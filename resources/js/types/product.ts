@@ -183,8 +183,10 @@ export interface AlternativeProduct extends Product {
 export interface Product {
     id: number;
     system_id?: string;
-    sku_base: string; // Base SKU (e.g., "ALT-12V-90A")
+    sku_base: string | null; // Compatibility alias for the primary commercial code
     alternate_code?: string | null; // Alternate identifier
+    primary_code?: string | null;
+    codes?: ProductCode[];
     name: string;
     description?: string;
     image_url?: string | null;
@@ -231,8 +233,10 @@ export interface ProductVariant {
     system_id?: string;
     product_id: number;
     brand_id: number;
-    sku: string;
-    upc?: string;
+    sku: string | null;
+    upc?: string | null;
+    primary_code?: string | null;
+    codes?: ProductCode[];
     is_default: boolean;
     brand?: Brand;
     pricing?: ProductPricing; // Variant-level pricing (overrides product pricing)
@@ -243,6 +247,15 @@ export interface ProductVariant {
     created_at: string;
     updated_at: string;
     inventory?: VariantInventory[];
+}
+
+export type ProductCodeType = 'sku' | 'upc' | 'alternate' | 'manual';
+
+export interface ProductCode {
+    id?: number;
+    code: string;
+    type: ProductCodeType;
+    is_primary: boolean;
 }
 
 export interface VariantFifoSummary {
@@ -370,7 +383,7 @@ export interface ProductVin {
 export interface ProductDetail extends Product {
     // Direct properties from the default variant (for convenience)
     sku?: string;
-    upc?: string;
+    upc?: string | null;
     brand?: Brand;
     pricing?: ProductPricing;
     total_stock?: number;
@@ -413,7 +426,8 @@ export interface ProductVehicleCompatibilityPayload {
 }
 
 export interface CreateProductRequest {
-    sku_base: string;
+    sku_base?: string | null;
+    codes?: ProductCode[];
     name: string;
     description?: string;
     product_line_id?: number;
@@ -426,8 +440,8 @@ export interface CreateProductRequest {
     pricing_formula?: string; // Excel-like pricing formula
     // Default variant fields
     brand_id?: number;
-    sku: string;
-    upc?: string;
+    sku?: string | null;
+    upc?: string | null;
     pricing: {
         base_price: number;
         msrp: number;
@@ -460,9 +474,10 @@ export interface CreateProductRequest {
 }
 
 export interface UpdateProductRequest {
-    sku_base?: string;
-    upc?: string;
+    sku_base?: string | null;
+    upc?: string | null;
     alternate_code?: string; // alternate identifier
+    codes?: ProductCode[];
     pricing_formula?: string; // Excel-like pricing formula
     product_line_id?: number;
     category_id?: number | null;

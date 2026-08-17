@@ -94,7 +94,7 @@ const filteredProducts = computed(() => {
                 p.name
                     .toLowerCase()
                     .includes(productSearch.value.toLowerCase()) ||
-                p.sku_base
+                (p.sku_base ?? '')
                     .toLowerCase()
                     .includes(productSearch.value.toLowerCase()),
         )

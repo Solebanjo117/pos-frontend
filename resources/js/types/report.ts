@@ -688,6 +688,10 @@ export interface DailyFinancialSummary {
 }
 
 export interface BalanceSheetReport {
+    status: 'ready' | 'unbalanced' | 'reconciliation_required';
+    is_official: boolean;
+    scope: 'consolidated';
+    period_start: string;
     assets: {
         cash: number;
         cash_initial: number;
@@ -696,17 +700,23 @@ export interface BalanceSheetReport {
         inventory: number;
         inventory_initial: number;
         accounts_receivable: number;
+        other_assets?: number;
+        items?: BalanceSheetAccountItem[];
     };
     liabilities: {
         accounts_payable: number;
         customer_credits: number;
         pending_refunds: number;
+        other_liabilities?: number;
+        items?: BalanceSheetAccountItem[];
     };
     equity: {
         contributed_capital: number;
         period_profit: number;
         retained_earnings: number;
+        other_equity?: number;
         total_equity: number;
+        items?: BalanceSheetAccountItem[];
     };
     totals: {
         total_assets: number;
@@ -718,7 +728,56 @@ export interface BalanceSheetReport {
     };
     as_of: string;
     warehouse_id?: number | null;
+    reconciliation: {
+        trial_balance: {
+            debit: number;
+            credit: number;
+            difference: number;
+        };
+        control_accounts: BalanceSheetControlAccount[];
+        control_difference: number;
+        source_coverage: Record<
+            string,
+            { source: number; posted: number; missing: number }
+        >;
+        missing_sources: number;
+        unclassified_accounts: number;
+        historical_inventory_verified: boolean;
+    };
+    bank_accounts: BalanceSheetBankAccount[];
     warnings?: string[];
+}
+
+export interface BalanceSheetAccountItem {
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+    system_key?: string | null;
+    report_group?: string | null;
+    debit: number;
+    credit: number;
+    balance: number;
+}
+
+export interface BalanceSheetControlAccount {
+    key: string;
+    label: string;
+    ledger_balance: number;
+    subledger_balance: number;
+    difference: number;
+    verified: boolean;
+}
+
+export interface BalanceSheetBankAccount {
+    id: number;
+    name: string;
+    institution_name?: string | null;
+    masked_number?: string | null;
+    allow_negative_balance: boolean;
+    is_legacy: boolean;
+    ledger_account_code?: string | null;
+    balance: number;
 }
 
 export interface FinancialDrilldownColumn {

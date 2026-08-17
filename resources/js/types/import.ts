@@ -7,6 +7,13 @@ export type ImportActionType =
     | 'conflict'
     | 'invalid';
 
+export type ProductImportResolutionType =
+    | 'existing'
+    | 'new_variant'
+    | 'new_product'
+    | 'review'
+    | 'conflict';
+
 export type ImportRunStatus =
     | 'pending'
     | 'running'
@@ -28,6 +35,7 @@ export interface ImportRow {
     __errors: string[];
     __warnings: string[];
     __action_type: ImportActionType;
+    __resolution_type?: ProductImportResolutionType;
     __change_preview: ChangePreviewItem[];
     __conflicts: ConflictItem[];
     __attributes: ImportAttribute[];
@@ -66,6 +74,7 @@ export interface VariantPreview {
 
 export interface ImportSummary {
     action_counts: Record<string, number>;
+    resolution_counts?: Partial<Record<ProductImportResolutionType, number>>;
     conflict_count: number;
     productos_estimados?: number;
     variantes_estimadas?: number;
@@ -250,6 +259,7 @@ export interface ImportRunRow {
     status: 'valid' | 'error' | 'warning' | 'conflict' | string;
     is_valid: boolean;
     action_type?: ImportActionType | string | null;
+    resolution_type?: ProductImportResolutionType | string | null;
     label?: string | null;
     data: Record<string, any>;
     errors: string[];

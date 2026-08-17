@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, Save, Plus, Trash2, Search } from 'lucide-vue-next';
+import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
 import SearchableSelect, {
     type SelectOption,
@@ -76,7 +76,7 @@ const filteredProducts = computed(() => {
                 p.name
                     .toLowerCase()
                     .includes(productSearch.value.toLowerCase()) ||
-                p.sku_base
+                (p.sku_base ?? '')
                     .toLowerCase()
                     .includes(productSearch.value.toLowerCase()),
         )

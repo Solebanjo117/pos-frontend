@@ -434,6 +434,9 @@ const actionCounts = computed<Record<string, number>>(
         previewSummary.value?.action_counts ??
         {},
 );
+const resolutionCounts = computed<Record<string, number>>(
+    () => previewSummary.value?.resolution_counts ?? {},
+);
 const conflictCount = computed(
     () =>
         Number(validationRowsServerMeta.value?.conflict_count ?? 0) ||
@@ -2493,6 +2496,8 @@ const previewRowToEditedRow = (row: any, index: number): ImportRow => ({
     __local_errors: [],
     __warnings: row.warnings ?? row.data?.__warnings ?? [],
     __action_type: row.action_type ?? row.data?.action_type ?? 'invalid',
+    __resolution_type:
+        row.resolution_type ?? row.data?.resolution_type ?? undefined,
     __change_preview: row.change_preview ?? row.data?.change_preview ?? [],
     __server_conflicts: row.conflicts ?? row.data?.conflicts ?? [],
     __conflicts: row.conflicts ?? row.data?.conflicts ?? [],
@@ -5562,6 +5567,41 @@ const formatFileSize = (bytes: number) => {
                                     : 'Ninguna'
                             }}
                         </p>
+                    </div>
+                </div>
+                <div
+                    v-if="Object.keys(resolutionCounts).length"
+                    class="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 sm:grid-cols-5 dark:border-border dark:bg-background dark:text-gray-300"
+                >
+                    <div>
+                        <strong class="block text-gray-900 dark:text-white">{{
+                            resolutionCounts.existing ?? 0
+                        }}</strong
+                        >existentes
+                    </div>
+                    <div>
+                        <strong class="block text-gray-900 dark:text-white">{{
+                            resolutionCounts.new_variant ?? 0
+                        }}</strong
+                        >nuevas variantes
+                    </div>
+                    <div>
+                        <strong class="block text-gray-900 dark:text-white">{{
+                            resolutionCounts.new_product ?? 0
+                        }}</strong
+                        >nuevos productos
+                    </div>
+                    <div>
+                        <strong class="block text-gray-900 dark:text-white">{{
+                            resolutionCounts.review ?? 0
+                        }}</strong
+                        >por revisar
+                    </div>
+                    <div>
+                        <strong class="block text-gray-900 dark:text-white">{{
+                            resolutionCounts.conflict ?? 0
+                        }}</strong
+                        >conflictos
                     </div>
                 </div>
 

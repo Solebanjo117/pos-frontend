@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+    buildBalanceSheetUrl,
     buildFinancialReportUrl,
     financialReportFilterKey,
     financialReportRequestDecision,
+    validateBalanceSheetDate,
     validateFinancialReportDates,
 } from './financialReport';
 
@@ -30,6 +32,19 @@ describe('financial report filters', () => {
             ),
         ).toBe(
             '/reports/financial?tab=income&date_from=2026-07-01&date_to=2026-07-22#statement',
+        );
+    });
+
+    it('stores one Balance Sheet cutoff without deleting report context', () => {
+        expect(validateBalanceSheetDate('2026-08-17')).toBeNull();
+        expect(validateBalanceSheetDate('2026-02-30')).toContain('válida');
+        expect(
+            buildBalanceSheetUrl(
+                'https://hermexpos.app/reports/financial?date_from=2026-08-01&date_to=2026-08-17',
+                '2026-08-15',
+            ),
+        ).toBe(
+            '/reports/financial?date_from=2026-08-01&date_to=2026-08-17&as_of=2026-08-15',
         );
     });
 

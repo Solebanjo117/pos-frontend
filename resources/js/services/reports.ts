@@ -264,6 +264,7 @@ export const ReportsApiService = {
     },
 
     async getBalanceSheet(filters: {
+        as_of?: string | null;
         date_from?: string | null;
         date_to?: string | null;
         warehouse_id?: number | null;

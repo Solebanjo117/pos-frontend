@@ -5,6 +5,7 @@ import { ref, onMounted, watch, computed } from 'vue';
 import AlternativeManager from '@/components/Products/AlternativeManager.vue';
 import AttributeManager from '@/components/Products/AttributeManager.vue';
 import OemReferenceManager from '@/components/Products/OemReferenceManager.vue';
+import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
@@ -84,6 +85,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const form = ref<UpdateProductRequest>({
     sku_base: '',
+    codes: [],
     upc: '',
     alternate_code: '',
     product_line_id: undefined,
@@ -91,6 +93,16 @@ const form = ref<UpdateProductRequest>({
     description: '',
     status: 'active',
     is_universal: false,
+});
+const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
+    null,
+);
+const primaryCommercialCode = computed(
+    () => form.value.codes?.find((code) => code.is_primary)?.code ?? '',
+);
+const productCodesModel = computed({
+    get: () => form.value.codes ?? [],
+    set: (codes) => (form.value.codes = codes),
 });
 
 const validationErrors = ref<Record<string, string[]>>({});
@@ -533,6 +545,17 @@ const initializeProductDraft = async () => {
 
     form.value = {
         sku_base: currentProduct.value.sku_base || '',
+        codes:
+            currentProduct.value.codes?.map((code) => ({ ...code })) ??
+            (currentProduct.value.sku_base
+                ? [
+                      {
+                          code: currentProduct.value.sku_base,
+                          type: 'sku' as const,
+                          is_primary: true,
+                      },
+                  ]
+                : []),
         upc: currentProduct.value.default_variant?.upc || '',
         alternate_code: (currentProduct.value as any).alternate_code || '',
         category_id: categoryId ?? undefined,
@@ -613,15 +636,25 @@ watch(extraCategoryIds, async () => {
     }
 });
 
-const metadataPayload = (): UpdateProductRequest => ({
-    ...form.value,
-    ...categoryPayload(),
-    is_universal: draftCompatibility.value.isUniversal,
-    attributes: normalizeProductAttributesPayload(draftAttributes.value),
-    oem_references: normalizeOemReferencesPayload(draftOemReferences.value),
-    alternatives: normalizeAlternativesPayload(draftAlternatives.value),
-    vehicle_compatibility: vehicleCompatibilityPayload(),
-});
+const metadataPayload = (): UpdateProductRequest => {
+    const primaryCode =
+        form.value.codes?.find((code) => code.is_primary)?.code ?? null;
+    const upcCode =
+        form.value.codes?.find((code) => code.type === 'upc')?.code ??
+        undefined;
+
+    return {
+        ...form.value,
+        sku_base: primaryCode,
+        upc: upcCode,
+        ...categoryPayload(),
+        is_universal: draftCompatibility.value.isUniversal,
+        attributes: normalizeProductAttributesPayload(draftAttributes.value),
+        oem_references: normalizeOemReferencesPayload(draftOemReferences.value),
+        alternatives: normalizeAlternativesPayload(draftAlternatives.value),
+        vehicle_compatibility: vehicleCompatibilityPayload(),
+    };
+};
 
 const vehicleCompatibilityPayload = () => {
     return normalizeVehicleCompatibilityPayload(
@@ -633,6 +666,12 @@ const vehicleCompatibilityPayload = () => {
 const handleSubmit = async () => {
     validationErrors.value = {};
     successMessage.value = '';
+
+    await productCodesRef.value?.validateAll();
+    if (productCodesRef.value?.hasConflicts()) {
+        toast.error('Corrige los códigos duplicados antes de guardar.');
+        return;
+    }
 
     try {
         await updateProduct(props.productId, metadataPayload());
@@ -831,8 +870,8 @@ const summaryMetrics = computed(() => [
     },
     {
         label: 'Codigo',
-        value: form.value.sku_base || 'Pendiente',
-        tone: form.value.sku_base ? 'gray' : 'amber',
+        value: primaryCommercialCode.value || 'Sin código',
+        tone: primaryCommercialCode.value ? 'gray' : 'amber',
     },
     {
         label: 'Variantes',
@@ -867,7 +906,7 @@ const readinessItems = computed(() => [
     },
     {
         label: 'Codigo',
-        ready: Boolean(form.value.sku_base),
+        ready: true,
     },
     {
         label: 'Variantes',
@@ -922,9 +961,9 @@ const validationErrorItems = computed(() =>
                         class="mt-1 font-mono text-sm break-words text-gray-500 dark:text-gray-400"
                     >
                         {{
-                            form.sku_base ||
-                            currentProduct?.sku_base ||
-                            'Codigo pendiente'
+                            primaryCommercialCode ||
+                            currentProduct?.primary_code ||
+                            'Sin código'
                         }}
                     </p>
                 </div>
@@ -1202,27 +1241,28 @@ const validationErrorItems = computed(() =>
                                 <div
                                     class="grid grid-cols-1 gap-4 md:grid-cols-2"
                                 >
-                                    <div>
+                                    <div class="md:col-span-2">
                                         <label
-                                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                         >
-                                            Código
+                                            Códigos comerciales
                                             <span
                                                 class="text-xs font-normal text-gray-400"
-                                                >(opcional)</span
+                                                >(opcionales)</span
                                             >
                                         </label>
-                                        <input
-                                            v-model="form.sku_base"
-                                            type="text"
-                                            class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
-                                            placeholder="Ej: ALT-0012"
+                                        <ProductCodesEditor
+                                            ref="productCodesRef"
+                                            v-model="productCodesModel"
+                                            :exclude-product-id="
+                                                props.productId
+                                            "
                                         />
                                         <p
-                                            v-if="validationErrors.sku_base"
+                                            v-if="validationErrors.codes"
                                             class="mt-1 text-sm text-red-600"
                                         >
-                                            {{ validationErrors.sku_base[0] }}
+                                            {{ validationErrors.codes[0] }}
                                         </p>
                                     </div>
 

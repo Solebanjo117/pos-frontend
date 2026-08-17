@@ -22,15 +22,6 @@ const isOpen = ref(false);
 const searchQuery = ref('');
 const containerRef = ref<HTMLElement | null>(null);
 
-// Helper to format variant name
-const formatVariantName = (variant: ProductVariant) => {
-    const parts = [];
-    if (variant.brand) parts.push(variant.brand.name);
-    // Add other attributes if available, currently just SKU/Brand is standard
-    // If we had attributes loaded on the variant object in list, we'd show them
-    return parts.join(' - ');
-};
-
 const selectedLabel = computed(() => {
     if (!props.modelValue) return '';
 
@@ -77,7 +68,7 @@ const filteredItems = computed(() => {
         // Match product itself
         const productMatches =
             product.name.toLowerCase().includes(query) ||
-            product.sku_base.toLowerCase().includes(query);
+            (product.sku_base ?? '').toLowerCase().includes(query);
 
         // If product has variants, check them (unless hidden)
         if (
@@ -87,7 +78,7 @@ const filteredItems = computed(() => {
         ) {
             product.variants.forEach((variant) => {
                 const variantMatches =
-                    variant.sku.toLowerCase().includes(query) ||
+                    (variant.sku ?? '').toLowerCase().includes(query) ||
                     variant.brand?.name?.toLowerCase().includes(query) ||
                     productMatches; // if parent matches, show variants too
 
@@ -207,7 +198,7 @@ onUnmounted(() => {
 
             <ul class="py-1">
                 <li
-                    v-for="(item, index) in filteredItems"
+                    v-for="item in filteredItems"
                     :key="`${item.type}-${item.id}`"
                     @click="selectItem(item)"
                     class="relative cursor-pointer px-2 py-1.5 text-sm text-gray-900 select-none hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-muted/50"

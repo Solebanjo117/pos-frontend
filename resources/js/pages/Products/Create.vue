@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { Plus, X, Globe, Wrench } from 'lucide-vue-next';
+import { Plus, Wrench, X } from 'lucide-vue-next';
 import { ref, onMounted, watch, computed } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
-import PricingFormula from '@/components/Products/PricingFormula.vue';
+import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import type { PendingImage } from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
@@ -62,6 +62,7 @@ const applyRounding = (price: number): number => {
 
 const form = ref<CreateProductRequest>({
     sku_base: '',
+    codes: [],
     name: '',
     description: '',
     product_line_id: undefined,
@@ -93,46 +94,23 @@ const form = ref<CreateProductRequest>({
     ],
 });
 
-const custom_total = ref<number | null>(null);
+const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
+    null,
+);
+const primaryCommercialCode = computed(
+    () => form.value.codes?.find((code) => code.is_primary)?.code ?? '',
+);
+const productCodesModel = computed({
+    get: () => form.value.codes ?? [],
+    set: (codes) => (form.value.codes = codes),
+});
 
 const computed_total = computed(() => {
-    if (custom_total.value !== null && custom_total.value !== undefined) {
-        return custom_total.value;
-    }
     const p = form.value.pricing;
     const base = Number(p.base_price) || 0;
     const rate = Number((p as any).sale_tax_rate ?? p.tax_rate) || 0;
     return Number((base * (1 + rate / 100)).toFixed(2));
 });
-
-const onFormulaTotalChange = (newTotal: number) => {
-    custom_total.value = newTotal;
-};
-
-watch(
-    () => form.value.pricing.base_price,
-    () => {
-        custom_total.value = null;
-    },
-);
-watch(
-    () => form.value.pricing.tax_rate,
-    () => {
-        custom_total.value = null;
-    },
-);
-watch(
-    () => (form.value.pricing as any).sale_tax_rate,
-    () => {
-        custom_total.value = null;
-    },
-);
-watch(
-    () => form.value.pricing_formula,
-    (v) => {
-        if (!v) custom_total.value = null;
-    },
-);
 
 const validationErrors = ref<Record<string, string[]>>({});
 const successMessage = ref('');
@@ -431,48 +409,6 @@ const categoryAppliesItbm = ref<boolean>(false);
 const categoryItbmPercent = ref<number | null>(null);
 const categoryMargin = ref<number | null>(null);
 const priceManuallyEdited = ref(false);
-const onBasePriceInput = () => {
-    priceManuallyEdited.value = true;
-};
-
-// R20: Duplicate checking
-const duplicates = ref<{ id: number; name: string; sku_base: string }[]>([]);
-const checkingDuplicates = ref(false);
-let duplicateCheckTimeout: ReturnType<typeof setTimeout> | null = null;
-
-const checkDuplicates = async () => {
-    const sku = form.value.sku_base?.trim();
-
-    if (!sku) {
-        duplicates.value = [];
-        return;
-    }
-
-    checkingDuplicates.value = true;
-    try {
-        const response = await apiClient.get('/products/check-duplicate', {
-            params: { sku },
-        });
-        duplicates.value = response.data.data || [];
-    } catch (e) {
-        console.error('Error checking duplicates:', e);
-        duplicates.value = [];
-    } finally {
-        checkingDuplicates.value = false;
-    }
-};
-
-watch(
-    () => form.value.sku_base,
-    () => {
-        if (duplicateCheckTimeout) {
-            clearTimeout(duplicateCheckTimeout);
-        }
-        duplicateCheckTimeout = setTimeout(() => {
-            checkDuplicates();
-        }, 600);
-    },
-);
 
 const nameManuallyEdited = ref(false);
 const onNameInput = () => {
@@ -531,23 +467,6 @@ const onChassisCreated = (chassis: any) => {
 };
 
 // === Name preview helpers ===
-type EngineCompatibilityEntry = {
-    engine_id: number;
-    make: string;
-    model: string;
-    engine: string;
-    year: string;
-    chassis: string;
-};
-
-type ChassisCompatibilityEntry = {
-    chassis_id: number;
-    make: string;
-    model: string;
-    year: string;
-    chassis: string;
-};
-
 const formatYearRange = (
     model?: {
         year_from?: number;
@@ -811,7 +730,7 @@ const addUpsale = () => {
     if (pendingUpsales.value.some((item) => item.id === selected.id)) return;
     pendingUpsales.value.push({
         id: selected.id,
-        sku_base: selected.sku_base,
+        sku_base: selected.sku_base ?? '',
         name: selected.name,
         relationship_type: upsaleRelationshipType.value,
     });
@@ -1000,6 +919,12 @@ const vehicleCompatibilityPayload = () => {
 const handleSubmit = async () => {
     validationErrors.value = {};
     successMessage.value = '';
+    await productCodesRef.value?.validateAll();
+    if (productCodesRef.value?.hasConflicts()) {
+        toast.error('Corrige los códigos duplicados antes de guardar.');
+        return;
+    }
+
     const normalizedInitialInventory = normalizeInitialInventoryPayload(
         form.value.initial_inventory,
     );
@@ -1023,8 +948,13 @@ const handleSubmit = async () => {
     }
 
     try {
+        const primaryCode =
+            form.value.codes?.find((code) => code.is_primary)?.code ?? null;
+        const upcCode =
+            form.value.codes?.find((code) => code.type === 'upc')?.code ?? null;
         const payload = {
             ...form.value,
+            sku_base: primaryCode,
             extra_category_ids: normalizeIdArray(
                 sortCategoryIdsByName(extraCategoryIds.value),
             ),
@@ -1033,7 +963,8 @@ const handleSubmit = async () => {
                 form.value.pricing as Record<string, unknown>,
                 defaultTaxRate(),
             ),
-            sku: form.value.sku || form.value.sku_base || '',
+            sku: primaryCode,
+            upc: upcCode,
             attributes: normalizeProductAttributesPayload(
                 productAttributes.value,
             ),
@@ -1173,7 +1104,6 @@ const handleSubmit = async () => {
 const cancel = () => {
     window.location.href = '/products';
 };
-const getError = (field: string) => validationErrors.value[field]?.[0] || '';
 
 const validationErrorItems = computed(() =>
     Object.entries(validationErrors.value).flatMap(([field, messages]) =>
@@ -1216,8 +1146,8 @@ const summaryMetrics = computed(() => [
     },
     {
         label: 'Codigo',
-        value: form.value.sku_base || 'Pendiente',
-        tone: form.value.sku_base ? 'gray' : 'amber',
+        value: primaryCommercialCode.value || 'Sin código',
+        tone: primaryCommercialCode.value ? 'gray' : 'amber',
     },
     {
         label: 'Variantes',
@@ -1255,7 +1185,7 @@ const readinessItems = computed(() => [
     },
     {
         label: 'Codigo',
-        ready: Boolean(form.value.sku_base),
+        ready: true,
     },
     {
         label: 'Precio',
@@ -1297,7 +1227,7 @@ const readinessItems = computed(() => [
                     <p
                         class="mt-1 font-mono text-sm break-words text-gray-500 dark:text-gray-400"
                     >
-                        {{ form.sku_base || 'Codigo pendiente' }}
+                        {{ primaryCommercialCode || 'Sin código' }}
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2 lg:justify-end">
@@ -1388,60 +1318,6 @@ const readinessItems = computed(() => [
                 class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
             >
                 {{ error }}
-            </div>
-
-            <!-- R20: Duplicate warning banner -->
-            <div
-                v-if="duplicates.length > 0"
-                class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/40 dark:bg-amber-900/20"
-            >
-                <div class="flex items-start gap-3">
-                    <svg
-                        class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                    </svg>
-                    <div class="flex-1">
-                        <h3
-                            class="text-sm font-semibold text-amber-800 dark:text-amber-300"
-                        >
-                            Productos similares encontrados
-                        </h3>
-                        <p
-                            class="mt-1 text-sm text-amber-700 dark:text-amber-400"
-                        >
-                            Productos con código similar encontrados. Verifica
-                            que no estés duplicando:
-                        </p>
-                        <ul class="mt-2 space-y-1">
-                            <li
-                                v-for="dup in duplicates"
-                                :key="dup.id"
-                                class="text-sm text-amber-700 dark:text-amber-400"
-                            >
-                                • <strong>{{ dup.name }}</strong>
-                                <span
-                                    class="text-xs text-amber-600 dark:text-amber-500"
-                                    >(SKU: {{ dup.sku_base }})</span
-                                >
-                            </li>
-                        </ul>
-                        <p
-                            class="mt-2 text-xs text-amber-600 dark:text-amber-500"
-                        >
-                            Puedes continuar y guardar si confirmas que es un
-                            producto diferente.
-                        </p>
-                    </div>
-                </div>
             </div>
 
             <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
@@ -1589,21 +1465,19 @@ const readinessItems = computed(() => [
                             Codigo y estado
                         </h2>
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
+                            <div class="md:col-span-2">
                                 <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >
-                                    Código
+                                    Códigos comerciales
                                     <span
                                         class="text-xs font-normal text-gray-400"
-                                        >(opcional)</span
+                                        >(opcionales)</span
                                     >
                                 </label>
-                                <input
-                                    v-model="form.sku_base"
-                                    type="text"
-                                    class="mt-0 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
-                                    placeholder="Ingresa manualmente el código"
+                                <ProductCodesEditor
+                                    ref="productCodesRef"
+                                    v-model="productCodesModel"
                                 />
                             </div>
                             <div>
@@ -1788,7 +1662,7 @@ const readinessItems = computed(() => [
                         <div class="px-5 pb-5">
                             <VariantManager
                                 :category-id="form.category_id ?? undefined"
-                                :sku-base="form.sku_base || undefined"
+                                :sku-base="primaryCommercialCode || undefined"
                                 :product-name="form.name"
                                 :category-formula="categoryFormula"
                                 :category-applies-itbm="categoryAppliesItbm"

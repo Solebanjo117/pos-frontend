@@ -2,6 +2,7 @@
 import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
+import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +17,7 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
+import type { ProductCode } from '@/types/product';
 
 type HeaderLotSyncState = {
     revision: number;
@@ -113,6 +115,7 @@ const form = ref({
     brand_id: 1,
     sku: '',
     upc: '',
+    codes: [] as ProductCode[],
     status: 'active',
     pricing_formula: '' as string,
     pricing: {
@@ -136,6 +139,9 @@ const form = ref({
         },
     ],
 });
+const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
+    null,
+);
 
 const toSafeNumber = (value: any, fallback = 0): number => {
     const parsed = Number(value);
@@ -147,6 +153,7 @@ const buildModalStateSnapshot = (): string => {
         form: {
             brand_id: form.value.brand_id ?? null,
             status: form.value.status ?? 'active',
+            codes: form.value.codes,
             pricing_formula: form.value.pricing_formula ?? '',
             pricing: {
                 base_price: toSafeNumber(form.value.pricing.base_price),
@@ -538,9 +545,6 @@ const onFormulaTotalChange = (newTotal: number) => {
 // Tracks whether the user manually typed a price in this modal session.
 // Only reset when a new modal session opens (not when price reaches 0).
 const priceManuallyEdited = ref(false);
-const onBasePriceInput = () => {
-    priceManuallyEdited.value = true;
-};
 
 const recalculatePriceFromCategory = async () => {
     const cost = getFormCostTotal();
@@ -652,6 +656,7 @@ const openCreateModal = () => {
         brand_id: brands.value[0]?.id ?? 1,
         sku: '',
         upc: '',
+        codes: [],
         status: 'active',
         pricing_formula: props.categoryFormula || '',
         pricing: {
@@ -708,6 +713,17 @@ const openEditModal = (variant: any) => {
         brand_id: variant.brand_id,
         sku: variant.sku,
         upc: variant.upc || '',
+        codes:
+            variant.codes?.map((code: ProductCode) => ({ ...code })) ??
+            (variant.sku
+                ? [
+                      {
+                          code: variant.sku,
+                          type: 'sku' as const,
+                          is_primary: true,
+                      },
+                  ]
+                : []),
         status: variant.status,
         pricing_formula: p?.pricing_formula || '',
         pricing: {
@@ -835,6 +851,8 @@ watch(
 );
 
 const handleSubmit = async () => {
+    await productCodesRef.value?.validateAll();
+    if (productCodesRef.value?.hasConflicts()) return;
     processing.value = true;
     try {
         const normalizedSaleTaxRate = toSafeTaxRate(
@@ -883,6 +901,11 @@ const handleSubmit = async () => {
         const payload = {
             brand_id: form.value.brand_id,
             status: form.value.status,
+            codes: form.value.codes,
+            sku: form.value.codes.find((code) => code.is_primary)?.code ?? null,
+            upc:
+                form.value.codes.find((code) => code.type === 'upc')?.code ??
+                null,
             pricing_formula: form.value.pricing_formula || null,
             pricing: pricingPayload,
             initial_inventory: form.value.initial_inventory,
@@ -1417,6 +1440,22 @@ onMounted(async () => {
                                 />
                             </div>
                         </div>
+                    </section>
+
+                    <section
+                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                    >
+                        <h4
+                            class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"
+                        >
+                            Códigos comerciales
+                        </h4>
+                        <ProductCodesEditor
+                            ref="productCodesRef"
+                            v-model="form.codes"
+                            :exclude-variant-id="editingVariant?.id"
+                            :disabled="processing"
+                        />
                     </section>
 
                     <section

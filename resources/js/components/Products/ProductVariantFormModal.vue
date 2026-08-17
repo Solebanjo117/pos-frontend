@@ -2,6 +2,7 @@
 import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, watch } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
+import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -14,6 +15,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
+import type { ProductCode } from '@/types/product';
 
 const props = defineProps<{
     open: boolean;
@@ -47,6 +49,9 @@ const applyRounding = (price: number): number => {
 const processing = ref(false);
 const loadingVariant = ref(false);
 const editingVariant = ref<any>(null);
+const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
+    null,
+);
 
 const brands = ref<{ id: number; name: string }[]>([]);
 const loadingBrands = ref(false);
@@ -144,6 +149,7 @@ const form = ref({
     brand_id: 1,
     sku: '',
     upc: '',
+    codes: [] as ProductCode[],
     status: 'active',
     pricing_formula: '' as string,
     pricing: {
@@ -239,6 +245,7 @@ const buildSnapshot = (): string =>
     JSON.stringify({
         brand_id: form.value.brand_id ?? null,
         sku: form.value.sku ?? '',
+        codes: form.value.codes,
         pricing: {
             base_price: toSafeNumber(form.value.pricing.base_price),
             cost_base: toSafeNumber((form.value.pricing as any).cost_base),
@@ -290,6 +297,17 @@ const loadAndPopulate = async () => {
             brand_id: variant.brand_id,
             sku: variant.sku,
             upc: variant.upc || '',
+            codes:
+                variant.codes?.map((code: ProductCode) => ({ ...code })) ??
+                (variant.sku
+                    ? [
+                          {
+                              code: variant.sku,
+                              type: 'sku' as const,
+                              is_primary: true,
+                          },
+                      ]
+                    : []),
             status: variant.status,
             pricing_formula: p?.pricing_formula || '',
             pricing: {
@@ -331,6 +349,8 @@ watch(
 
 const handleSubmit = async () => {
     if (!editingVariant.value) return;
+    await productCodesRef.value?.validateAll();
+    if (productCodesRef.value?.hasConflicts()) return;
     processing.value = true;
     try {
         const normalizedSaleTaxRate = toSafeTaxRate(
@@ -368,7 +388,10 @@ const handleSubmit = async () => {
         const payload = {
             ...form.value,
             pricing: pricingPayload,
-            sku: form.value.sku || '',
+            sku: form.value.codes.find((code) => code.is_primary)?.code ?? null,
+            upc:
+                form.value.codes.find((code) => code.type === 'upc')?.code ??
+                null,
         };
 
         const savedVariant = await updateVariant(
@@ -475,6 +498,20 @@ const handleSubmit = async () => {
                             <option value="pending">Pendiente</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-4 dark:border-border">
+                    <h4
+                        class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"
+                    >
+                        Códigos comerciales
+                    </h4>
+                    <ProductCodesEditor
+                        ref="productCodesRef"
+                        v-model="form.codes"
+                        :exclude-variant-id="editingVariant?.id"
+                        :disabled="processing"
+                    />
                 </div>
 
                 <!-- Pricing Section -->

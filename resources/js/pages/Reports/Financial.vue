@@ -20,8 +20,8 @@ import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import FinancialDrilldownDrawer from '@/components/Finance/FinancialDrilldownDrawer.vue';
 import TraceableCell from '@/components/Traceability/TraceableCell.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
-import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { Button } from '@/components/ui/button';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -30,9 +30,11 @@ import type { BreadcrumbItem } from '@/types';
 import type { CreditDocument } from '@/types/report';
 import type { TransactionTraceNode } from '@/types/transaction-trace';
 import {
+    buildBalanceSheetUrl,
     buildFinancialReportUrl,
     financialReportFilterKey,
     financialReportRequestDecision,
+    validateBalanceSheetDate,
     validateFinancialReportDates,
 } from '@/utils/financialReport';
 import { formatCurrency } from '@/utils/formatters';
@@ -72,7 +74,10 @@ const {
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 const { fetchSettings: fetchStoreSettings } = useStoreSettings();
 
-const activeTab = ref<ReportTab>('summary');
+const initialUrlParams = new URLSearchParams(window.location.search);
+const activeTab = ref<ReportTab>(
+    initialUrlParams.has('as_of') ? 'balance' : 'summary',
+);
 const activeMode = ref<ReportMode>('basic');
 const capitalMovementOpen = ref(false);
 const capitalMovementType = ref<'in' | 'out'>('in');
@@ -82,6 +87,7 @@ const transactionTraceNode = ref<TransactionTraceNode | null>(null);
 const drilldownLoading = ref(false);
 const drilldownPerPage = ref(25);
 const reportsLoading = ref(false);
+const balanceLoading = ref(false);
 const reportReloadQueued = ref(false);
 const activeReportRequestKey = ref<string | null>(null);
 const dateValidationError = ref<string | null>(null);
@@ -101,9 +107,11 @@ const panamaToday = new Intl.DateTimeFormat('en-CA', {
     month: '2-digit',
     day: '2-digit',
 }).format(new Date());
-const urlParams = new URLSearchParams(window.location.search);
-const initialDateFrom = urlParams.get('date_from') || panamaToday;
-const initialDateTo = urlParams.get('date_to') || panamaToday;
+const initialDateFrom = initialUrlParams.get('date_from') || panamaToday;
+const initialDateTo = initialUrlParams.get('date_to') || panamaToday;
+const balanceAsOf = ref(
+    initialUrlParams.get('as_of') || initialDateTo || panamaToday,
+);
 const filters = ref({
     date_from: initialDateFrom,
     date_to: initialDateTo,
@@ -208,8 +216,12 @@ const warningLabels: Record<string, string> = {
 
 const financeWarnings = computed(() =>
     [
-        ...(dailySummary.value?.warnings ?? []),
-        ...(balanceSheet.value?.warnings ?? []),
+        ...(activeTab.value === 'balance'
+            ? []
+            : (dailySummary.value?.warnings ?? [])),
+        ...(activeTab.value === 'balance'
+            ? (balanceSheet.value?.warnings ?? [])
+            : []),
         ...(incomeStatementReport.value?.warnings ?? []).map(
             (warning) => warning.message,
         ),
@@ -322,7 +334,7 @@ const loadReports = async (): Promise<void> => {
                         basis: 'accrual_operational',
                         compare: 'none',
                     }),
-                () => fetchBalanceSheet(requestFilters),
+                () => fetchBalanceSheet({ as_of: balanceAsOf.value }),
                 () => fetchCapitalMovements(requestFilters),
             ];
             const results: PromiseSettledResult<unknown>[] = [];
@@ -345,6 +357,27 @@ const loadReports = async (): Promise<void> => {
     } finally {
         reportsLoading.value = false;
         activeReportRequestKey.value = null;
+    }
+};
+
+const applyBalanceDate = async (): Promise<void> => {
+    const validationMessage = validateBalanceSheetDate(balanceAsOf.value);
+    if (validationMessage) {
+        dateValidationError.value = validationMessage;
+        return;
+    }
+
+    dateValidationError.value = null;
+    window.history.replaceState(
+        window.history.state,
+        '',
+        buildBalanceSheetUrl(window.location.href, balanceAsOf.value),
+    );
+    balanceLoading.value = true;
+    try {
+        await fetchBalanceSheet({ as_of: balanceAsOf.value });
+    } finally {
+        balanceLoading.value = false;
     }
 };
 
@@ -423,6 +456,7 @@ const openKpiDrilldown = (kpi: {
     expense_category?: string | null;
     expense_group?: string | null;
 }): void => {
+    const isBalanceMetric = kpi.metric?.startsWith('balance_') ?? false;
     void openDrilldown(
         {
             key: kpi.key ?? kpi.metric ?? kpi.label,
@@ -434,9 +468,13 @@ const openKpiDrilldown = (kpi: {
         },
         1,
         {
-            date_from: filters.value.date_from,
-            date_to: filters.value.date_to,
-            warehouse_id: filters.value.warehouse_id,
+            date_from: isBalanceMetric
+                ? balanceAsOf.value
+                : filters.value.date_from,
+            date_to: isBalanceMetric
+                ? balanceAsOf.value
+                : filters.value.date_to,
+            warehouse_id: isBalanceMetric ? null : filters.value.warehouse_id,
             expense_category: kpi.expense_category,
             expense_group: kpi.expense_group,
         },
@@ -533,11 +571,18 @@ watch(currentWarehouseId, (value) => {
             <FinanceReportShell
                 eyebrow="Reportes"
                 title="Finanzas y Rentabilidad"
-                :subtitle="`${filters.date_from} - ${filters.date_to}`"
+                :subtitle="
+                    activeMode === 'basic' && activeTab === 'balance'
+                        ? `Balance al ${balanceAsOf} · Consolidado`
+                        : `${filters.date_from} - ${filters.date_to}`
+                "
                 :icon="BarChart3"
             >
                 <div class="space-y-3">
                     <div
+                        v-if="
+                            !(activeMode === 'basic' && activeTab === 'balance')
+                        "
                         class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60"
                     >
                         <DateRangeInput
@@ -558,6 +603,45 @@ watch(currentWarehouseId, (value) => {
                             />
                             {{
                                 reportsLoading
+                                    ? 'Actualizando...'
+                                    : 'Actualizar'
+                            }}
+                        </button>
+                    </div>
+
+                    <div
+                        v-else
+                        class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60"
+                    >
+                        <label class="w-full sm:min-w-48 sm:flex-1 md:max-w-sm">
+                            <span
+                                class="mb-1 block text-xs font-semibold text-slate-600 uppercase dark:text-slate-300"
+                            >
+                                Balance al
+                            </span>
+                            <input
+                                v-model="balanceAsOf"
+                                type="date"
+                                class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-950"
+                            />
+                        </label>
+                        <div
+                            class="inline-flex h-10 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 sm:w-auto dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                        >
+                            Consolidado
+                        </div>
+                        <button
+                            type="button"
+                            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                            :disabled="balanceLoading"
+                            @click="applyBalanceDate"
+                        >
+                            <RefreshCw
+                                :size="15"
+                                :class="{ 'animate-spin': balanceLoading }"
+                            />
+                            {{
+                                balanceLoading
                                     ? 'Actualizando...'
                                     : 'Actualizar'
                             }}

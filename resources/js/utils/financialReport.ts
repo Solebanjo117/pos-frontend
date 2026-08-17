@@ -53,6 +53,24 @@ export const buildFinancialReportUrl = (
     const url = new URL(currentHref);
     url.searchParams.set('date_from', filters.date_from);
     url.searchParams.set('date_to', filters.date_to);
+    url.searchParams.delete('as_of');
+
+    return `${url.pathname}${url.search}${url.hash}`;
+};
+
+export const validateBalanceSheetDate = (asOf: string): string | null => {
+    if (!asOf) return 'Selecciona la fecha de corte del Balance.';
+    if (!isValidIsoDate(asOf)) return 'La fecha de corte no es válida.';
+
+    return null;
+};
+
+export const buildBalanceSheetUrl = (
+    currentHref: string,
+    asOf: string,
+): string => {
+    const url = new URL(currentHref);
+    url.searchParams.set('as_of', asOf);
 
     return `${url.pathname}${url.search}${url.hash}`;
 };

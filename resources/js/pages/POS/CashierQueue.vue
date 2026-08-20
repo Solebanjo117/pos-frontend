@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import {
-    Banknote,
     Clock3,
     Inbox,
     ReceiptText,
@@ -20,6 +19,7 @@ import { usePOS } from '@/composables/usePOS';
 import AppLayout from '@/layouts/AppLayout.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import apiClient from '@/services/api/client';
+import { queueEntryKind, type QueueEntryKind } from '@/utils/cashierQueue';
 import { formatCurrency, roundMoney } from '@/utils/formatters';
 
 defineOptions({ layout: AppLayout });
@@ -57,16 +57,29 @@ const paymentMethods = ref<
 >([]);
 let clockInterval: ReturnType<typeof setInterval> | null = null;
 
-const typeLabels: Record<CashierQueueEntry['entry_type'], string> = {
+const kindOf = (entry: CashierQueueEntry | null): QueueEntryKind | null =>
+    entry ? queueEntryKind(entry.entry_type) : null;
+
+const typeLabels: Record<QueueEntryKind, string> = {
     sale: 'Venta',
     expense: 'Gasto',
     return: 'Devolucion',
 };
 
-const typeIcons = {
+const typeIcons: Record<QueueEntryKind, typeof ShoppingCart> = {
     sale: ShoppingCart,
     expense: ReceiptText,
     return: RotateCcw,
+};
+
+const labelOf = (entry: CashierQueueEntry): string => {
+    const kind = kindOf(entry);
+    return kind ? typeLabels[kind] : entry.entry_type;
+};
+
+const iconOf = (entry: CashierQueueEntry): typeof ShoppingCart => {
+    const kind = kindOf(entry);
+    return kind ? typeIcons[kind] : ReceiptText;
 };
 
 const requiresReference = computed(
@@ -77,10 +90,7 @@ const requiresReference = computed(
 );
 
 const hasVariance = computed(() => {
-    if (
-        !settlementEntry.value ||
-        settlementEntry.value.entry_type !== 'expense'
-    )
+    if (!settlementEntry.value || kindOf(settlementEntry.value) !== 'expense')
         return false;
     return (
         roundMoney(settlement.value.final_amount) !==
@@ -104,7 +114,7 @@ async function loadPaymentMethods(context: 'supplier_payments' | 'returns') {
 }
 
 const isReturnSettlement = computed(
-    () => settlementEntry.value?.entry_type === 'return',
+    () => kindOf(settlementEntry.value) === 'return',
 );
 const returnNeedsMoney = computed(
     () =>
@@ -126,52 +136,73 @@ onUnmounted(() => {
     if (clockInterval) clearInterval(clockInterval);
 });
 
+function loadQuoteIntoPos(quote: any): void {
+    loadQuoteAsSession({
+        id: quote.id,
+        quote_number: quote.quote_number,
+        customer_id: quote.customer?.id ?? null,
+        seller_id: quote.user?.id ?? null,
+        notes: quote.notes ?? null,
+        items: (quote.items ?? []).map((item: any) => ({
+            id: item.id,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            product_sku: item.product_sku,
+            variant_id: item.variant_id ?? null,
+            warehouse_id: item.warehouse_id ?? null,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount_percent: item.discount_percent,
+            tax_percent: item.tax_percent,
+            subtotal: item.subtotal,
+            tax_amount: item.tax_amount,
+            total: item.total,
+            is_custom_line: item.is_custom_line ?? false,
+            custom_description: item.custom_description ?? null,
+            variant: item.variant ?? null,
+        })),
+    });
+    router.visit('/pos');
+}
+
 async function processEntry(entry: CashierQueueEntry) {
     processingId.value = entry.id;
     try {
         await openEntry(entry.id);
-        if (entry.entry_type === 'sale') {
-            const response = await apiClient.post(
-                `/sales-quotes/${entry.source.id}/open-at-cashier`,
-            );
-            const quote = response.data.data;
-            loadQuoteAsSession({
-                id: quote.id,
-                quote_number: quote.quote_number,
-                customer_id: quote.customer?.id ?? null,
-                items: (quote.items ?? []).map((item: any) => ({
-                    id: item.id,
-                    product_id: item.product_id,
-                    product_name: item.product_name,
-                    product_sku: item.product_sku,
-                    variant_id: item.variant_id ?? null,
-                    warehouse_id: item.warehouse_id ?? null,
-                    quantity: item.quantity,
-                    unit_price: item.unit_price,
-                    discount_percent: item.discount_percent,
-                    tax_percent: item.tax_percent,
-                    subtotal: item.subtotal,
-                    tax_amount: item.tax_amount,
-                    total: item.total,
-                    variant: item.variant ?? null,
-                })),
-            });
-            router.visit('/pos');
+        if (kindOf(entry) === 'sale') {
+            try {
+                const response = await apiClient.post(
+                    `/sales-quotes/${entry.source.id}/open-at-cashier`,
+                );
+                loadQuoteIntoPos(response.data.data);
+            } catch (exception: any) {
+                const data = exception.response?.data;
+                if (
+                    exception.response?.status === 422 &&
+                    data?.requires_session &&
+                    data?.data
+                ) {
+                    loadQuoteIntoPos(data.data);
+                } else {
+                    throw exception;
+                }
+            }
             return;
         }
 
+        const kind = kindOf(entry);
         await loadPaymentMethods(
-            entry.entry_type === 'return' ? 'returns' : 'supplier_payments',
+            kind === 'return' ? 'returns' : 'supplier_payments',
         );
         settlementEntry.value = entry;
         settlement.value = {
             final_amount: roundMoney(
-                entry.entry_type === 'return'
+                kind === 'return'
                     ? Number(entry.source.money_refund_amount ?? 0)
                     : entry.estimated_amount,
             ),
             payment_method:
-                (entry.entry_type === 'return'
+                (kind === 'return'
                     ? entry.source.refund_method
                     : entry.source.planned_payment_method) ||
                 paymentMethods.value[0]?.code ||
@@ -264,6 +295,11 @@ async function confirmRemove() {
     processingId.value = entry.id;
     try {
         await removeSaleFromQueue(entry.source.id);
+        notice.value = {
+            title: 'Cotizacion quitada de la cola',
+            message:
+                'La cotizacion sigue disponible y podra enviarse a Caja nuevamente.',
+        };
     } catch (exception: any) {
         notice.value = {
             title: 'No se pudo remover',
@@ -346,7 +382,7 @@ async function confirmRemove() {
                 >
                     <div class="flex min-w-0 items-center gap-2">
                         <component
-                            :is="typeIcons[entry.entry_type]"
+                            :is="iconOf(entry)"
                             class="h-4 w-4 shrink-0 text-sky-600"
                         />
                         <div class="min-w-0">
@@ -354,7 +390,7 @@ async function confirmRemove() {
                                 {{ entry.source.document_number }}
                             </p>
                             <p class="text-xs text-muted-foreground">
-                                {{ typeLabels[entry.entry_type] }}
+                                {{ labelOf(entry) }}
                             </p>
                         </div>
                     </div>
@@ -377,10 +413,10 @@ async function confirmRemove() {
                             <Route class="h-4 w-4" />
                         </button>
                         <button
-                            v-if="entry.entry_type === 'sale'"
+                            v-if="kindOf(entry) === 'sale'"
                             type="button"
                             class="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
-                            title="Remover de cola"
+                            title="Quitar de cola"
                             @click="removeEntry = entry"
                         >
                             <X class="h-4 w-4" />
@@ -394,6 +430,10 @@ async function confirmRemove() {
                             Cliente / beneficiario
                         </p>
                         <p class="font-medium">{{ entry.source.party }}</p>
+                    </div>
+                    <div v-if="entry.source.seller_name">
+                        <p class="text-xs text-muted-foreground">Vendedor</p>
+                        <p>{{ entry.source.seller_name }}</p>
                     </div>
                     <div>
                         <p class="text-xs text-muted-foreground">Concepto</p>
@@ -416,11 +456,11 @@ async function confirmRemove() {
                         :disabled="processingId === entry.id"
                         @click="processEntry(entry)"
                     >
-                        <Banknote class="h-4 w-4" />
+                        <component :is="iconOf(entry)" class="h-4 w-4" />
                         {{
-                            entry.entry_type === 'sale'
-                                ? 'Abrir y cobrar'
-                                : entry.entry_type === 'return'
+                            kindOf(entry) === 'sale'
+                                ? 'Atender en POS'
+                                : kindOf(entry) === 'return'
                                   ? 'Liquidar devolucion'
                                   : 'Pagar gasto'
                         }}
@@ -573,9 +613,10 @@ async function confirmRemove() {
     >
         <div class="w-full max-w-md rounded-md border bg-card shadow-xl">
             <div class="border-b px-5 py-4">
-                <h2 class="font-semibold">Remover de la cola</h2>
+                <h2 class="font-semibold">Quitar de cola</h2>
                 <p class="mt-1 text-sm text-muted-foreground">
-                    La cotizacion no se eliminara.
+                    La cotizacion no sera eliminada y podra enviarse nuevamente
+                    a Caja mas adelante.
                 </p>
             </div>
             <div class="px-5 py-4 text-sm">
@@ -594,7 +635,7 @@ async function confirmRemove() {
                     class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white"
                     @click="confirmRemove"
                 >
-                    Remover
+                    Quitar de cola
                 </button>
             </div>
         </div>

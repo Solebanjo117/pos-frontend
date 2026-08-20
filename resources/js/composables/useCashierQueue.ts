@@ -1,7 +1,9 @@
 import { computed, onUnmounted, ref } from 'vue';
 import apiClient from '@/services/api/client';
+import type { QueueEntryWireType } from '@/utils/cashierQueue';
+import { formatDuration } from '@/utils/formatters';
 
-export type CashierQueueType = 'sale' | 'expense' | 'return';
+export type CashierQueueType = QueueEntryWireType;
 
 export interface CashierQueueSource {
     id: number;
@@ -9,6 +11,8 @@ export interface CashierQueueSource {
     description: string;
     party: string;
     amount: number;
+    seller_name?: string | null;
+    notes?: string | null;
     planned_payment_method?: string | null;
     reference_number?: string | null;
     refund_method?: string | null;
@@ -98,15 +102,7 @@ export function useCashierQueue() {
 
     function timeAgo(dateString: string | null, nowMs: number): string {
         if (!dateString) return 'Ahora';
-        const seconds = Math.max(
-            0,
-            Math.floor((nowMs - new Date(dateString).getTime()) / 1000),
-        );
-        if (seconds < 60) return `${seconds}s`;
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes} min`;
-        const hours = Math.floor(minutes / 60);
-        return `${hours}h ${minutes % 60}m`;
+        return formatDuration(dateString, new Date(nowMs)) || 'Ahora';
     }
 
     const count = computed(() => entries.value.length);

@@ -10,7 +10,10 @@ import {
 import { ref, computed, watch, onMounted } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type { Customer } from '@/types/customer';
-import type { PaymentMethod, PaymentMethodContext } from '@/types/payment-method';
+import type {
+    PaymentMethod,
+    PaymentMethodContext,
+} from '@/types/payment-method';
 import { formatCurrency, roundMoney } from '@/utils/formatters';
 
 interface Payment {
@@ -433,9 +436,11 @@ const selectedDynamicMethod = computed<PaymentMethod | null>(() => {
         return null;
     }
 
-    return dynamicMethods.value.find(
-        (method) => method.code === activeMethod.value?.code,
-    ) ?? null;
+    return (
+        dynamicMethods.value.find(
+            (method) => method.code === activeMethod.value?.code,
+        ) ?? null
+    );
 });
 
 const methodBucketLabel = (method: PaymentMethod): string => {
@@ -503,7 +508,11 @@ const canFinish = computed(() => {
         return false;
     }
 
-    if (!isPurchaseMode.value && creditAmount.value > 0 && !creditCanBeUsed.value) {
+    if (
+        !isPurchaseMode.value &&
+        creditAmount.value > 0 &&
+        !creditCanBeUsed.value
+    ) {
         return false;
     }
 
@@ -668,7 +677,7 @@ const handleCancel = () => {
                                 ]"
                                 @click="
                                     !isMethodDisabled(method) &&
-                                        (activeMethodCode = method.code)
+                                    (activeMethodCode = method.code)
                                 "
                             >
                                 <span
@@ -698,9 +707,7 @@ const handleCancel = () => {
                                     {{
                                         getPaymentAmount(method.code) > 0
                                             ? formatCurrency(
-                                                  getPaymentAmount(
-                                                      method.code,
-                                                  ),
+                                                  getPaymentAmount(method.code),
                                               )
                                             : formatCurrency(0)
                                     }}
@@ -866,10 +873,7 @@ const handleCancel = () => {
                                 </button>
                             </div>
 
-                            <div
-                                v-if="creditCanBeUsed"
-                                class="mt-3"
-                            >
+                            <div v-if="creditCanBeUsed" class="mt-3">
                                 <label
                                     class="mb-1 block text-sm font-medium text-amber-700 dark:text-amber-300"
                                 >
@@ -968,9 +972,7 @@ const handleCancel = () => {
                                     class="ml-auto rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground"
                                 >
                                     {{
-                                        methodBucketLabel(
-                                            selectedDynamicMethod,
-                                        )
+                                        methodBucketLabel(selectedDynamicMethod)
                                     }}
                                 </span>
                             </div>
@@ -1019,7 +1021,11 @@ const handleCancel = () => {
                                     </button>
                                 </div>
 
-                                <div v-if="selectedDynamicMethod.requires_reference">
+                                <div
+                                    v-if="
+                                        selectedDynamicMethod.requires_reference
+                                    "
+                                >
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >
@@ -1045,7 +1051,11 @@ const handleCancel = () => {
                                     />
                                 </div>
 
-                                <div v-if="selectedDynamicMethod.code === 'other'">
+                                <div
+                                    v-if="
+                                        selectedDynamicMethod.code === 'other'
+                                    "
+                                >
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >

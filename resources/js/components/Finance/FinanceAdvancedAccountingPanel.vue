@@ -78,7 +78,9 @@ const loadAccounting = async (): Promise<void> => {
     }
 };
 
-const selectAccount = async (account: AccountingAccountSummary): Promise<void> => {
+const selectAccount = async (
+    account: AccountingAccountSummary,
+): Promise<void> => {
     selectedAccount.value = account;
     activeTab.value = 'ledger';
     loading.value = true;
@@ -200,111 +202,291 @@ onMounted(() => {
             </p>
         </div>
 
-        <div v-else-if="activeTab === 'journal'" class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div
+            v-else-if="activeTab === 'journal'"
+            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+        >
             <table class="min-w-full text-xs tabular-nums">
                 <thead class="bg-slate-50 dark:bg-slate-900">
                     <tr>
-                        <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase">Fecha/Hora</th>
-                        <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase">Origen</th>
-                        <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase">Memo</th>
-                        <th class="px-3 py-2 text-right font-semibold text-slate-500 uppercase">Debito</th>
-                        <th class="px-3 py-2 text-right font-semibold text-slate-500 uppercase">Credito</th>
+                        <th
+                            class="px-3 py-2 text-left font-semibold text-slate-500 uppercase"
+                        >
+                            Fecha/Hora
+                        </th>
+                        <th
+                            class="px-3 py-2 text-left font-semibold text-slate-500 uppercase"
+                        >
+                            Origen
+                        </th>
+                        <th
+                            class="px-3 py-2 text-left font-semibold text-slate-500 uppercase"
+                        >
+                            Memo
+                        </th>
+                        <th
+                            class="px-3 py-2 text-right font-semibold text-slate-500 uppercase"
+                        >
+                            Debito
+                        </th>
+                        <th
+                            class="px-3 py-2 text-right font-semibold text-slate-500 uppercase"
+                        >
+                            Credito
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                    <tr v-for="entry in journal?.data ?? []" :key="entry.id" class="hover:bg-slate-50 dark:hover:bg-slate-900/60">
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-400">{{ formatReportDateTime(entry.occurred_at) }}</td>
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-400">{{ entry.source_type }} #{{ entry.source_id ?? '-' }}</td>
-                        <td class="px-3 py-2 text-slate-700 dark:text-slate-300">{{ entry.memo || '-' }}</td>
-                        <td class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100">{{ currencyFormatter(entry.debit) }}</td>
-                        <td class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100">{{ currencyFormatter(entry.credit) }}</td>
+                    <tr
+                        v-for="entry in journal?.data ?? []"
+                        :key="entry.id"
+                        class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                    >
+                        <td
+                            class="px-3 py-2 text-slate-600 dark:text-slate-400"
+                        >
+                            {{ formatReportDateTime(entry.occurred_at) }}
+                        </td>
+                        <td
+                            class="px-3 py-2 text-slate-600 dark:text-slate-400"
+                        >
+                            {{ entry.source_type }} #{{
+                                entry.source_id ?? '-'
+                            }}
+                        </td>
+                        <td
+                            class="px-3 py-2 text-slate-700 dark:text-slate-300"
+                        >
+                            {{ entry.memo || '-' }}
+                        </td>
+                        <td
+                            class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100"
+                        >
+                            {{ currencyFormatter(entry.debit) }}
+                        </td>
+                        <td
+                            class="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100"
+                        >
+                            {{ currencyFormatter(entry.credit) }}
+                        </td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <div v-else-if="activeTab === 'accounts'" class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div
+            v-else-if="activeTab === 'accounts'"
+            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+        >
             <table class="min-w-full text-xs tabular-nums">
                 <thead class="bg-slate-50 dark:bg-slate-900">
                     <tr>
-                        <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase">Cuenta</th>
-                        <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase">Tipo</th>
-                        <th class="px-3 py-2 text-right font-semibold text-slate-500 uppercase">Debito</th>
-                        <th class="px-3 py-2 text-right font-semibold text-slate-500 uppercase">Credito</th>
-                        <th class="px-3 py-2 text-right font-semibold text-slate-500 uppercase">Saldo</th>
+                        <th
+                            class="px-3 py-2 text-left font-semibold text-slate-500 uppercase"
+                        >
+                            Cuenta
+                        </th>
+                        <th
+                            class="px-3 py-2 text-left font-semibold text-slate-500 uppercase"
+                        >
+                            Tipo
+                        </th>
+                        <th
+                            class="px-3 py-2 text-right font-semibold text-slate-500 uppercase"
+                        >
+                            Debito
+                        </th>
+                        <th
+                            class="px-3 py-2 text-right font-semibold text-slate-500 uppercase"
+                        >
+                            Credito
+                        </th>
+                        <th
+                            class="px-3 py-2 text-right font-semibold text-slate-500 uppercase"
+                        >
+                            Saldo
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                    <tr v-for="account in accounts?.data ?? []" :key="account.id" class="hover:bg-slate-50 dark:hover:bg-slate-900/60">
+                    <tr
+                        v-for="account in accounts?.data ?? []"
+                        :key="account.id"
+                        class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                    >
                         <td class="px-3 py-2">
-                            <button type="button" class="text-left font-semibold text-indigo-600 hover:underline dark:text-indigo-300" @click="selectAccount(account)">
+                            <button
+                                type="button"
+                                class="text-left font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                                @click="selectAccount(account)"
+                            >
                                 {{ account.code }} - {{ account.name }}
                             </button>
                         </td>
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-400">{{ account.type }}</td>
-                        <td class="px-3 py-2 text-right">{{ currencyFormatter(account.debit) }}</td>
-                        <td class="px-3 py-2 text-right">{{ currencyFormatter(account.credit) }}</td>
-                        <td class="px-3 py-2 text-right font-semibold">{{ currencyFormatter(account.balance) }}</td>
+                        <td
+                            class="px-3 py-2 text-slate-600 dark:text-slate-400"
+                        >
+                            {{ account.type }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                            {{ currencyFormatter(account.debit) }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                            {{ currencyFormatter(account.credit) }}
+                        </td>
+                        <td class="px-3 py-2 text-right font-semibold">
+                            {{ currencyFormatter(account.balance) }}
+                        </td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <div v-else-if="activeTab === 'ledger'" class="grid gap-3 xl:grid-cols-2">
-            <section class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-                <header class="border-b border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-100">
-                    Libro Mayor {{ selectedAccount ? `${selectedAccount.code} - ${selectedAccount.name}` : '' }}
+        <div
+            v-else-if="activeTab === 'ledger'"
+            class="grid gap-3 xl:grid-cols-2"
+        >
+            <section
+                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+            >
+                <header
+                    class="border-b border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-100"
+                >
+                    Libro Mayor
+                    {{
+                        selectedAccount
+                            ? `${selectedAccount.code} - ${selectedAccount.name}`
+                            : ''
+                    }}
                 </header>
                 <table class="min-w-full text-xs tabular-nums">
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                        <tr v-for="line in ledger?.data ?? []" :key="line.id" class="hover:bg-slate-50 dark:hover:bg-slate-900/60">
-                            <td class="px-3 py-2 text-slate-500">{{ formatReportDateTime(line.occurred_at) }}</td>
-                            <td class="px-3 py-2 text-slate-700 dark:text-slate-300">{{ line.memo || line.source_type }}</td>
-                            <td class="px-3 py-2 text-right">{{ currencyFormatter(line.debit) }}</td>
-                            <td class="px-3 py-2 text-right">{{ currencyFormatter(line.credit) }}</td>
+                    <tbody
+                        class="divide-y divide-slate-100 dark:divide-slate-800"
+                    >
+                        <tr
+                            v-for="line in ledger?.data ?? []"
+                            :key="line.id"
+                            class="hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                        >
+                            <td class="px-3 py-2 text-slate-500">
+                                {{ formatReportDateTime(line.occurred_at) }}
+                            </td>
+                            <td
+                                class="px-3 py-2 text-slate-700 dark:text-slate-300"
+                            >
+                                {{ line.memo || line.source_type }}
+                            </td>
+                            <td class="px-3 py-2 text-right">
+                                {{ currencyFormatter(line.debit) }}
+                            </td>
+                            <td class="px-3 py-2 text-right">
+                                {{ currencyFormatter(line.credit) }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </section>
-            <section class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-                <header class="border-b border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-100">
+            <section
+                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+            >
+                <header
+                    class="border-b border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-100"
+                >
                     Cuenta T
                 </header>
-                <div class="grid grid-cols-2 divide-x divide-slate-200 text-xs dark:divide-slate-800">
+                <div
+                    class="grid grid-cols-2 divide-x divide-slate-200 text-xs dark:divide-slate-800"
+                >
                     <div>
-                        <p class="bg-slate-50 px-3 py-2 font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">Debitos</p>
-                        <div v-for="line in tAccount?.debits ?? []" :key="`d-${line.id}`" class="flex justify-between gap-2 px-3 py-2">
-                            <span class="truncate">{{ line.memo || line.source_type }}</span>
-                            <span class="tabular-nums">{{ currencyFormatter(line.debit) }}</span>
+                        <p
+                            class="bg-slate-50 px-3 py-2 font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300"
+                        >
+                            Debitos
+                        </p>
+                        <div
+                            v-for="line in tAccount?.debits ?? []"
+                            :key="`d-${line.id}`"
+                            class="flex justify-between gap-2 px-3 py-2"
+                        >
+                            <span class="truncate">{{
+                                line.memo || line.source_type
+                            }}</span>
+                            <span class="tabular-nums">{{
+                                currencyFormatter(line.debit)
+                            }}</span>
                         </div>
                     </div>
                     <div>
-                        <p class="bg-slate-50 px-3 py-2 font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">Creditos</p>
-                        <div v-for="line in tAccount?.credits ?? []" :key="`c-${line.id}`" class="flex justify-between gap-2 px-3 py-2">
-                            <span class="truncate">{{ line.memo || line.source_type }}</span>
-                            <span class="tabular-nums">{{ currencyFormatter(line.credit) }}</span>
+                        <p
+                            class="bg-slate-50 px-3 py-2 font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300"
+                        >
+                            Creditos
+                        </p>
+                        <div
+                            v-for="line in tAccount?.credits ?? []"
+                            :key="`c-${line.id}`"
+                            class="flex justify-between gap-2 px-3 py-2"
+                        >
+                            <span class="truncate">{{
+                                line.memo || line.source_type
+                            }}</span>
+                            <span class="tabular-nums">{{
+                                currencyFormatter(line.credit)
+                            }}</span>
                         </div>
                     </div>
                 </div>
             </section>
         </div>
 
-        <div v-else class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div
+            v-else
+            class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+        >
             <table class="min-w-full text-xs tabular-nums">
                 <thead class="bg-slate-50 dark:bg-slate-900">
                     <tr>
-                        <th class="px-3 py-2 text-left font-semibold text-slate-500 uppercase">Cuenta</th>
-                        <th class="px-3 py-2 text-right font-semibold text-slate-500 uppercase">Debito</th>
-                        <th class="px-3 py-2 text-right font-semibold text-slate-500 uppercase">Credito</th>
-                        <th class="px-3 py-2 text-right font-semibold text-slate-500 uppercase">Diferencia</th>
+                        <th
+                            class="px-3 py-2 text-left font-semibold text-slate-500 uppercase"
+                        >
+                            Cuenta
+                        </th>
+                        <th
+                            class="px-3 py-2 text-right font-semibold text-slate-500 uppercase"
+                        >
+                            Debito
+                        </th>
+                        <th
+                            class="px-3 py-2 text-right font-semibold text-slate-500 uppercase"
+                        >
+                            Credito
+                        </th>
+                        <th
+                            class="px-3 py-2 text-right font-semibold text-slate-500 uppercase"
+                        >
+                            Diferencia
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                    <tr v-for="account in trialBalance?.data ?? []" :key="account.id">
-                        <td class="px-3 py-2 text-slate-700 dark:text-slate-300">{{ account.code }} - {{ account.name }}</td>
-                        <td class="px-3 py-2 text-right">{{ currencyFormatter(account.debit) }}</td>
-                        <td class="px-3 py-2 text-right">{{ currencyFormatter(account.credit) }}</td>
-                        <td class="px-3 py-2 text-right font-semibold">{{ currencyFormatter(account.balance) }}</td>
+                    <tr
+                        v-for="account in trialBalance?.data ?? []"
+                        :key="account.id"
+                    >
+                        <td
+                            class="px-3 py-2 text-slate-700 dark:text-slate-300"
+                        >
+                            {{ account.code }} - {{ account.name }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                            {{ currencyFormatter(account.debit) }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                            {{ currencyFormatter(account.credit) }}
+                        </td>
+                        <td class="px-3 py-2 text-right font-semibold">
+                            {{ currencyFormatter(account.balance) }}
+                        </td>
                     </tr>
                 </tbody>
             </table>

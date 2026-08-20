@@ -119,10 +119,7 @@ const dateOnlyParts = (value: string): DateParts | null => {
     };
 };
 
-const partsInTimezone = (
-    date: Date,
-    timezone: string,
-): DateParts | null => {
+const partsInTimezone = (date: Date, timezone: string): DateParts | null => {
     try {
         const formattedParts = new Intl.DateTimeFormat('en-US', {
             timeZone: timezone,
@@ -252,4 +249,66 @@ export const formatDateInputValue = (
 export const displayFormat = (str: string | null | undefined): string => {
     if (!str) return '';
     return str.replace(/-/g, ' ');
+};
+
+/**
+ * Format a duration between two timestamps into a human-readable Spanish string.
+ *
+ * Rules:
+ *   < 60 seconds  → "45s"
+ *   < 60 minutes  → "12m"
+ *   < 24 hours    → "3h"
+ *   < ~30 days    → "4d"
+ *   >= 30 days    → "1 mes", "2 meses", "1 año", etc.
+ *
+ * @param from  Start date (string, Date, or number)
+ * @param to    End date (defaults to now)
+ * @returns     Formatted duration string
+ */
+export const formatDuration = (
+    from: string | Date | number,
+    to: string | Date | number = new Date(),
+): string => {
+    const fromDate = from instanceof Date ? from : new Date(from);
+    const toDate = to instanceof Date ? to : new Date(to);
+
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+        return '';
+    }
+
+    const diffSeconds = Math.max(
+        0,
+        Math.floor((toDate.getTime() - fromDate.getTime()) / 1000),
+    );
+
+    if (diffSeconds < 60) {
+        return `${diffSeconds}s`;
+    }
+
+    const diffMinutes = Math.floor(diffSeconds / 60);
+
+    if (diffMinutes < 60) {
+        return `${diffMinutes}m`;
+    }
+
+    const diffHours = Math.floor(diffMinutes / 60);
+
+    if (diffHours < 24) {
+        return `${diffHours}h`;
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays < 30) {
+        return `${diffDays}d`;
+    }
+
+    const diffMonths = Math.floor(diffDays / 30);
+    const diffYears = Math.floor(diffDays / 365);
+
+    if (diffYears >= 1) {
+        return diffYears === 1 ? '1 año' : `${diffYears} años`;
+    }
+
+    return diffMonths === 1 ? '1 mes' : `${diffMonths} meses`;
 };

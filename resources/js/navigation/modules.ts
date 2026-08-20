@@ -241,13 +241,6 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         icon: ClipboardList,
                         roles: roles.sales,
                     },
-                    {
-                        title: 'Nueva orden',
-                        href: '/sales-orders/create',
-                        description: 'Crear una orden de venta manual.',
-                        icon: Plus,
-                        roles: roles.sales,
-                    },
                 ],
             },
             {

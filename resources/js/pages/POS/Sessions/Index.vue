@@ -43,6 +43,7 @@ import {
     type SessionSalesOrder,
 } from '@/services/posSessions';
 import { type BreadcrumbItem } from '@/types';
+import { formatDuration as fmtDuration } from '@/utils/formatters';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -153,21 +154,7 @@ const formatDuration = (
     closedAt: string | null | undefined,
 ): string => {
     if (!openedAt || !closedAt) return 'En curso';
-
-    const diffMinutes = Math.max(
-        0,
-        Math.round(
-            (new Date(closedAt).getTime() - new Date(openedAt).getTime()) /
-                60000,
-        ),
-    );
-    const hours = Math.floor(diffMinutes / 60);
-    const minutes = diffMinutes % 60;
-
-    if (hours === 0) return `${minutes} min`;
-    if (minutes === 0) return `${hours} h`;
-
-    return `${hours} h ${minutes} min`;
+    return fmtDuration(openedAt, closedAt);
 };
 
 const getSummary = (session: PosSessionRecord) =>

@@ -28,7 +28,13 @@ const emit = defineEmits<{
     submit: [
         payload: {
             type: 'in' | 'out';
-            subtype: 'cash_in' | 'cash_out' | 'deposit' | 'withdrawal' | 'adjustment_positive' | 'adjustment_negative';
+            subtype:
+                | 'cash_in'
+                | 'cash_out'
+                | 'deposit'
+                | 'withdrawal'
+                | 'adjustment_positive'
+                | 'adjustment_negative';
             amount: number;
             reason: string;
             reference_number: string;
@@ -38,7 +44,14 @@ const emit = defineEmits<{
 }>();
 
 const movementType = ref<'out' | 'in'>('out');
-const subtype = ref<'cash_in' | 'cash_out' | 'deposit' | 'withdrawal' | 'adjustment_positive' | 'adjustment_negative'>('cash_out');
+const subtype = ref<
+    | 'cash_in'
+    | 'cash_out'
+    | 'deposit'
+    | 'withdrawal'
+    | 'adjustment_positive'
+    | 'adjustment_negative'
+>('cash_out');
 const amount = ref<number | null>(null);
 const reason = ref('');
 const referenceNumber = ref('');
@@ -59,12 +72,22 @@ const operations = [
     { value: 'cash_out', label: 'Salida de efectivo', type: 'out' },
     { value: 'deposit', label: 'Deposito desde Caja', type: 'out' },
     { value: 'withdrawal', label: 'Retiro hacia Caja', type: 'in' },
-    { value: 'adjustment_positive', label: 'Ajuste positivo (admin)', type: 'in' },
-    { value: 'adjustment_negative', label: 'Ajuste negativo (admin)', type: 'out' },
+    {
+        value: 'adjustment_positive',
+        label: 'Ajuste positivo (admin)',
+        type: 'in',
+    },
+    {
+        value: 'adjustment_negative',
+        label: 'Ajuste negativo (admin)',
+        type: 'out',
+    },
 ] as const;
 
 watch(subtype, (value) => {
-    movementType.value = operations.find((operation) => operation.value === value)?.type ?? 'out';
+    movementType.value =
+        operations.find((operation) => operation.value === value)?.type ??
+        'out';
 });
 
 const isValid = computed(() => {
@@ -172,14 +195,20 @@ const handleClose = () => {
                 </div>
 
                 <div>
-                    <label class="mb-2 block text-xs font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                    <label
+                        class="mb-2 block text-xs font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                    >
                         Operacion
                     </label>
                     <select
                         v-model="subtype"
                         class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm dark:border-border dark:bg-muted"
                     >
-                        <option v-for="operation in operations" :key="operation.value" :value="operation.value">
+                        <option
+                            v-for="operation in operations"
+                            :key="operation.value"
+                            :value="operation.value"
+                        >
                             {{ operation.label }}
                         </option>
                     </select>
@@ -231,7 +260,9 @@ const handleClose = () => {
 
                 <!-- Notes -->
                 <div>
-                    <label class="mb-2 block text-xs font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                    <label
+                        class="mb-2 block text-xs font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                    >
                         Referencia (opcional)
                     </label>
                     <input

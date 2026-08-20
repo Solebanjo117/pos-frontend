@@ -288,17 +288,19 @@ const refundMethods = computed(() => {
 
     result.push(
         ...methods.value
-        .filter(
-            (m) =>
-                m.is_active &&
-                !['credit', 'store_credit', 'supplier_credit'].includes(m.code),
-        )
-        .map((m) => ({
-            value: m.code,
-            label: m.name,
-            icon: methodIcons[m.code] || Banknote,
-            color: methodColors[m.code] || 'gray',
-        })),
+            .filter(
+                (m) =>
+                    m.is_active &&
+                    !['credit', 'store_credit', 'supplier_credit'].includes(
+                        m.code,
+                    ),
+            )
+            .map((m) => ({
+                value: m.code,
+                label: m.name,
+                icon: methodIcons[m.code] || Banknote,
+                color: methodColors[m.code] || 'gray',
+            })),
     );
 
     // Add balance option if customer exists
@@ -407,29 +409,43 @@ const refundMethodColor = (method: string, color: string) => {
                             </div>
 
                             <div
-                                class="grid gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm dark:border-border dark:bg-background/50 sm:grid-cols-4"
+                                class="grid gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-4 dark:border-border dark:bg-background/50"
                             >
                                 <div>
                                     <p class="text-xs text-gray-500">Pagado</p>
-                                    <p class="font-semibold text-gray-900 dark:text-white">
+                                    <p
+                                        class="font-semibold text-gray-900 dark:text-white"
+                                    >
                                         {{ formatCurrency(totalPaid) }}
                                     </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Pendiente CxC</p>
-                                    <p class="font-semibold text-amber-700 dark:text-amber-300">
+                                    <p class="text-xs text-gray-500">
+                                        Pendiente CxC
+                                    </p>
+                                    <p
+                                        class="font-semibold text-amber-700 dark:text-amber-300"
+                                    >
                                         {{ formatCurrency(amountDue) }}
                                     </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Ya devuelto</p>
-                                    <p class="font-semibold text-gray-900 dark:text-white">
+                                    <p class="text-xs text-gray-500">
+                                        Ya devuelto
+                                    </p>
+                                    <p
+                                        class="font-semibold text-gray-900 dark:text-white"
+                                    >
                                         {{ formatCurrency(totalReturned) }}
                                     </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Devolvible</p>
-                                    <p class="font-semibold text-red-700 dark:text-red-300">
+                                    <p class="text-xs text-gray-500">
+                                        Devolvible
+                                    </p>
+                                    <p
+                                        class="font-semibold text-red-700 dark:text-red-300"
+                                    >
                                         {{ formatCurrency(returnableAmount) }}
                                     </p>
                                 </div>
@@ -868,9 +884,15 @@ const refundMethodColor = (method: string, color: string) => {
                                                         class="text-xs text-gray-500 dark:text-gray-400"
                                                     >
                                                         Vendido:
-                                                        {{ item.sold_quantity ?? item.quantity }}
+                                                        {{
+                                                            item.sold_quantity ??
+                                                            item.quantity
+                                                        }}
                                                         Â· Devuelto:
-                                                        {{ item.already_returned_quantity ?? 0 }}
+                                                        {{
+                                                            item.already_returned_quantity ??
+                                                            0
+                                                        }}
                                                         Â· Disponible:
                                                         {{ item.quantity }}
                                                         <span

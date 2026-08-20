@@ -59,6 +59,7 @@ import apiClient from '@/services/api/client';
 import { SalesOrderPaymentApiService } from '@/services/payments';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
+import { formatDuration } from '@/utils/formatters';
 
 defineOptions({ layout: AppLayout });
 
@@ -254,6 +255,16 @@ const cartSortOptions: {
     { key: 'price', label: 'Precio' },
 ];
 const seller_id = ref<number | undefined>((page.props.auth?.user as any)?.id);
+
+watch(
+    () => activeSession.value?.seller_id,
+    (sessionSellerId) => {
+        if (sessionSellerId) {
+            seller_id.value = sessionSellerId;
+        }
+    },
+    { immediate: true },
+);
 
 const handleClearCurrentCart = () => {
     if (!canClearCurrentCart.value) {
@@ -857,19 +868,10 @@ const orderDiff = computed(() => {
 const editOrderElapsedTime = computed(() => {
     if (!editOrderData.value?.created_at) return '';
     nowTick.value;
-    const created = new Date(editOrderData.value.created_at);
-    const now = new Date(nowTick.value);
-    const diffMs = now.getTime() - created.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffDays > 0) return `hace ${diffDays} día${diffDays > 1 ? 's' : ''}`;
-    if (diffHours > 0)
-        return `hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`;
-    if (diffMins > 0)
-        return `hace ${diffMins} minuto${diffMins > 1 ? 's' : ''}`;
-    return 'hace unos segundos';
+    return formatDuration(
+        editOrderData.value.created_at,
+        new Date(nowTick.value),
+    );
 });
 
 const amountToCharge = computed(() => {
@@ -1714,7 +1716,9 @@ const cashMovementLoading = ref(false);
 const cashMovementError = ref<string | null>(null);
 
 const requestedCashAction = (): CashAction | null => {
-    const action = new URL(window.location.href).searchParams.get('cash_action');
+    const action = new URL(window.location.href).searchParams.get(
+        'cash_action',
+    );
     return action === 'in' || action === 'out' ? action : null;
 };
 
@@ -1786,7 +1790,13 @@ const handleOpenSession = async (amount: number) => {
 
 const handleCashMovement = async (payload: {
     type: 'in' | 'out';
-    subtype: 'cash_in' | 'cash_out' | 'deposit' | 'withdrawal' | 'adjustment_positive' | 'adjustment_negative';
+    subtype:
+        | 'cash_in'
+        | 'cash_out'
+        | 'deposit'
+        | 'withdrawal'
+        | 'adjustment_positive'
+        | 'adjustment_negative';
     amount: number;
     reason: string;
     reference_number: string;
@@ -2408,27 +2418,38 @@ onUnmounted(() => {
                         @update-quantity="
                             (idx, qty) => handleUpdateQuantity(idx, qty)
                         "
-                        @remove="(idx) => !isStrictCashier && removeItem(cart[idx].id)"
+                        @remove="
+                            (idx) =>
+                                !isStrictCashier && removeItem(cart[idx].id)
+                        "
                         @update-item-tax="(id, tax) => updateItemTax(id, tax)"
                         @toggle-item-tax-exempt="
                             (id) => toggleItemTaxExempt(id)
                         "
                         @update-item-seller="
-                            (id, sellerId) => !isStrictCashier && updateItemSeller(id, sellerId)
+                            (id, sellerId) =>
+                                !isStrictCashier &&
+                                updateItemSeller(id, sellerId)
                         "
                         @update-item-notes="
-                            (id, noteText) => !isStrictCashier && updateItemNotes(id, noteText)
+                            (id, noteText) =>
+                                !isStrictCashier &&
+                                updateItemNotes(id, noteText)
                         "
                         @update-item-price="
-                            (id, price) => !isStrictCashier && updateItemPrice(id, price)
+                            (id, price) =>
+                                !isStrictCashier && updateItemPrice(id, price)
                         "
                         @update-item-discount="
-                            (id, discount) => !isStrictCashier && updateDiscount(id, discount)
+                            (id, discount) =>
+                                !isStrictCashier && updateDiscount(id, discount)
                         "
                         @view-details="
                             (productId) => openProductDetail(productId)
                         "
-                        @reorder="(items) => !isStrictCashier && reorderCart(items)"
+                        @reorder="
+                            (items) => !isStrictCashier && reorderCart(items)
+                        "
                         @reorder-success="handleReorderSuccess"
                     />
                 </div>

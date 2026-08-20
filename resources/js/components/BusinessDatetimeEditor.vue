@@ -148,15 +148,19 @@ async function save(): Promise<void> {
                       .flatMap((value) =>
                           Array.isArray(value) ? value : [value],
                       )
-                      .filter((value): value is string => typeof value === 'string')
+                      .filter(
+                          (value): value is string => typeof value === 'string',
+                      )
                       .join(' ')
-            : null;
+                : null;
         error.value =
             validationMessage ||
             err.response?.data?.message ||
             err.message ||
             'No se pudo actualizar la fecha/hora operativa.';
-        toast.error(error.value ?? 'No se pudo actualizar la fecha/hora operativa.');
+        toast.error(
+            error.value ?? 'No se pudo actualizar la fecha/hora operativa.',
+        );
     } finally {
         saving.value = false;
     }
@@ -173,7 +177,7 @@ async function save(): Promise<void> {
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
                 <p
-                    class="flex items-center gap-1 text-xs font-semibold uppercase text-gray-500"
+                    class="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase"
                 >
                     <Clock3 class="h-3.5 w-3.5" />
                     Fecha y hora
@@ -189,8 +193,9 @@ async function save(): Promise<void> {
                     class="mt-1 truncate text-xs text-gray-500"
                     :title="latestAudit.reason"
                 >
-                    Ultimo ajuste: {{ latestAudit.changed_by?.name || 'Admin' }}
-                    · {{ formatDateTime(latestAudit.changed_at) }}
+                    Ultimo ajuste:
+                    {{ latestAudit.changed_by?.name || 'Admin' }} ·
+                    {{ formatDateTime(latestAudit.changed_at) }}
                 </p>
             </div>
 
@@ -209,13 +214,13 @@ async function save(): Promise<void> {
             <input
                 v-model="form.business_datetime"
                 type="datetime-local"
-                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-border dark:bg-background dark:text-white"
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none dark:border-border dark:bg-background dark:text-white"
             />
             <textarea
                 v-model="form.reason"
                 rows="2"
                 placeholder="Motivo obligatorio"
-                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-border dark:bg-background dark:text-white"
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none dark:border-border dark:bg-background dark:text-white"
             />
             <p v-if="error" class="text-xs font-medium text-red-600">
                 {{ error }}

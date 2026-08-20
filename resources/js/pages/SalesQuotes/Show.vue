@@ -196,11 +196,6 @@ const handleTransition = async (
     try {
         await SalesQuotesApiService.transition(quote.value.id, action);
 
-        if (action === 'send-to-cashier') {
-            handleOpenInPOS();
-            return;
-        }
-
         await fetchDetail();
     } catch (e: any) {
         alert(e.response?.data?.message || 'Error al cambiar el estado');

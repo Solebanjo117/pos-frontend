@@ -1,5 +1,6 @@
 import { ref, onUnmounted, computed } from 'vue';
 import apiClient from '@/services/api/client';
+import { formatDuration } from '@/utils/formatters';
 
 export interface WarehouseOrder {
     id: number;
@@ -51,16 +52,7 @@ export function useWarehouseQueue() {
     }
 
     function timeAgo(dateString: string, nowMs: number): string {
-        const seconds = Math.floor(
-            (nowMs - new Date(dateString).getTime()) / 1000,
-        );
-        if (seconds < 0) return 'Ahora';
-        if (seconds < 60) return `${seconds}s`;
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes} min`;
-        const hours = Math.floor(minutes / 60);
-        const remainMin = minutes % 60;
-        return `${hours}h ${remainMin}m`;
+        return formatDuration(dateString, new Date(nowMs)) || 'Ahora';
     }
 
     async function markAsPrepared(orderId: number): Promise<boolean> {

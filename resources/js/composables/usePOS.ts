@@ -55,6 +55,7 @@ interface PosCartSession {
     name: string;
     cart: CartItem[];
     customer_id?: number;
+    seller_id?: number; // set when session was loaded from a SalesQuote with an assigned seller
     notes: string;
     source_quote_id?: number; // set when session was loaded from a SalesQuote
     sessionLogs: {
@@ -819,7 +820,8 @@ export function usePOS() {
             // Multi-tender check
             const totalPaid = roundMoney(
                 paymentsArray.reduce(
-                    (acc, p) => acc + roundMoney(Math.max(0, Number(p.amount) || 0)),
+                    (acc, p) =>
+                        acc + roundMoney(Math.max(0, Number(p.amount) || 0)),
                     0,
                 ),
             );
@@ -1039,6 +1041,8 @@ export function usePOS() {
         id: number;
         quote_number: string;
         customer_id?: number | null;
+        seller_id?: number | null;
+        notes?: string | null;
         items: Array<{
             id: number;
             product_id: number | null;
@@ -1066,6 +1070,8 @@ export function usePOS() {
 
         const newSession = activeSession.value;
         newSession.customer_id = quote.customer_id ?? undefined;
+        newSession.seller_id = quote.seller_id ?? undefined;
+        newSession.notes = quote.notes ?? '';
         newSession.source_quote_id = quote.id; // ← persisted so POS can update it later
 
         newSession.cart = quote.items.map((item, idx): CartItem => {
@@ -1088,6 +1094,7 @@ export function usePOS() {
                 tax_percent: normalizeTaxPercent(item.tax_percent),
                 default_tax_percent: normalizeTaxPercent(item.tax_percent),
                 is_tax_overridden: false,
+                seller_id: quote.seller_id ?? undefined,
                 warehouse_id: item.warehouse_id ?? undefined,
                 subtotal: 0,
                 tax_amount: 0,

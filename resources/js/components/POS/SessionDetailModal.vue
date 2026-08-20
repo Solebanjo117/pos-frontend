@@ -19,7 +19,10 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
-import { formatCurrency } from '@/utils/formatters';
+import {
+    formatCurrency,
+    formatDuration as fmtDuration,
+} from '@/utils/formatters';
 import type {
     AccountPaymentRecord,
     CashMovementRecord,
@@ -132,21 +135,7 @@ const formatDuration = (
     closedAt: string | null | undefined,
 ): string => {
     if (!openedAt || !closedAt) return 'En curso';
-
-    const diffMinutes = Math.max(
-        0,
-        Math.round(
-            (new Date(closedAt).getTime() - new Date(openedAt).getTime()) /
-                60000,
-        ),
-    );
-    const hours = Math.floor(diffMinutes / 60);
-    const minutes = diffMinutes % 60;
-
-    if (hours === 0) return `${minutes} min`;
-    if (minutes === 0) return `${hours} h`;
-
-    return `${hours} h ${minutes} min`;
+    return fmtDuration(openedAt, closedAt);
 };
 
 const summary = computed(() => props.session?.closing_details?.summary ?? null);

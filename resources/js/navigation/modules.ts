@@ -456,10 +456,10 @@ export const moduleDefinitions: ModuleDefinition[] = [
     {
         id: 'vehicles',
         title: 'Vehículos',
-        description: 'Catálogo automotriz, motores e importación.',
-        href: '/vehicles/overview',
+        description: 'Marcas, motores, modelos, vehículos e importación.',
+        href: '/vehicles',
         icon: Car,
-        activePaths: ['/vehicles/overview', '/vehicles'],
+        activePaths: ['/vehicles'],
         sections: [
             {
                 title: 'Catálogo automotriz',
@@ -467,12 +467,13 @@ export const moduleDefinitions: ModuleDefinition[] = [
                     {
                         title: 'Vehículos',
                         href: '/vehicles',
-                        description: 'Consultar marcas, modelos y chasis.',
+                        description:
+                            'Administrar marcas, motores, modelos, configuraciones y VIN.',
                         icon: Car,
                     },
                     {
                         title: 'Motores',
-                        href: '/vehicles/engines',
+                        href: '/vehicles?tab=engines',
                         description: 'Administrar motores y especificaciones.',
                         icon: Wrench,
                     },

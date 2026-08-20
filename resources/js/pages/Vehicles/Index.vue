@@ -1,1823 +1,1103 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import {
-    Plus,
-    Pencil,
-    Trash2,
-    ChevronRight,
-    ChevronDown,
-    Hash,
-    X,
+    ArrowDownAZ,
+    ArrowUpAZ,
     Car,
+    Download,
+    LoaderCircle,
+    Pencil,
+    Plus,
     Search,
+    Trash2,
     Upload,
 } from 'lucide-vue-next';
-import { ref, computed, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import Pagination from '@/components/Pagination.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
+import VehicleCatalogDialog from '@/components/Vehicles/VehicleCatalogDialog.vue';
+import { useAuth } from '@/composables/useAuth';
+import { useToast } from '@/composables/useToast';
+import {
+    useVehicleCatalog,
+    type VehicleCatalogFilters,
+    type VehicleCatalogMeta,
+    type VehicleCatalogRow,
+    type VehicleCatalogSummary,
+    type VehicleCatalogTab,
+    type VehicleConfigurationRow,
+    type VehicleEngineRow,
+    type VehicleMakeRow,
+    type VehicleModelRow,
+} from '@/composables/useVehicleCatalog';
 import { useVehicleChassis } from '@/composables/useVehicleChassis';
-import {
-    useVehicleEngines,
-    type VehicleEngine,
-} from '@/composables/useVehicleEngines';
-import {
-    useVehicleMakes,
-    type VehicleMake,
-} from '@/composables/useVehicleMakes';
-import {
-    useVehicleModels,
-    type VehicleModel,
-} from '@/composables/useVehicleModels';
-import { useVehicleVins, type VehicleVin } from '@/composables/useVehicleVins';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
+import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
     { title: 'Vehículos', href: '/vehicles' },
 ];
 
-const FUEL_TYPE_OPTIONS = [
-    { value: 'Gasoline', label: 'Gasolina' },
-    { value: 'Diesel', label: 'Diesel' },
-    { value: 'Hybrid', label: 'Hibrido' },
-    { value: 'Electric', label: 'Electrico' },
-] as const;
+const tabs: Array<{ id: VehicleCatalogTab; label: string }> = [
+    { id: 'makes', label: 'Marcas' },
+    { id: 'engines', label: 'Motores' },
+    { id: 'models', label: 'Modelos' },
+    { id: 'vehicles', label: 'Vehículos' },
+];
+const defaultSort: Record<VehicleCatalogTab, string> = {
+    makes: 'name',
+    engines: 'code',
+    models: 'name',
+    vehicles: 'make',
+};
+const singularLabel: Record<VehicleCatalogTab, string> = {
+    makes: 'marca',
+    engines: 'motor',
+    models: 'modelo',
+    vehicles: 'vehículo',
+};
 
-// ── Composables ──────────────────────────────────────────────────────────────
-const { makes, fetchMakes, createMake, updateMake, deleteMake } =
-    useVehicleMakes();
-const { models, fetchModels, createModel, updateModel, deleteModel } =
-    useVehicleModels();
-const { engines, fetchEngines, createEngine, updateEngine, deleteEngine } =
-    useVehicleEngines();
+const { hasRole } = useAuth();
+const canManage = computed(() => hasRole(['admin', 'manager']));
+const toast = useToast();
+const catalog = useVehicleCatalog();
 const { chassisList, fetchChassis } = useVehicleChassis();
 
-// ── UI state ─────────────────────────────────────────────────────────────────
-const search = ref('');
-const expandedMakes = ref<Set<number>>(new Set());
-const expandedModels = ref<Set<number>>(new Set());
-const expandedEngines = ref<Set<number>>(new Set());
-const loadingModels = ref<Record<number, boolean>>({});
-const loadingEngines = ref<Record<number, boolean>>({});
-
-// Store models/engines per make/model locally for the tree
-const modelsByMake = ref<Record<number, VehicleModel[]>>({});
-const enginesByModel = ref<Record<number, VehicleEngine[]>>({});
-const treeEngineVins = ref<Record<string, VehicleVin[]>>({});
-const treeEngineVinsLoading = ref<Record<string, boolean>>({});
-const treeEngineVinDraft = ref<Record<string, string>>({});
-const treeEngineVinAdding = ref<Record<string, boolean>>({});
-const treeEngineVinError = ref<Record<string, string | null>>({});
-const treeEngineVinApis: Record<string, ReturnType<typeof useVehicleVins>> = {};
-
-const treeEngineVinKey = (modelId: number, engineId: number): string =>
-    `${modelId}:${engineId}`;
-
-const clearRecordsForEngine = <T,>(
-    source: Record<string, T>,
-    engineId: number,
-): Record<string, T> => {
-    return Object.fromEntries(
-        Object.entries(source).filter(([key]) => !key.endsWith(`:${engineId}`)),
-    );
-};
-
-const setTreeEngineVinError = (key: string, message: string | null) => {
-    treeEngineVinError.value = {
-        ...treeEngineVinError.value,
-        [key]: message,
+const isTab = (value: string | null): value is VehicleCatalogTab =>
+    tabs.some((tab) => tab.id === value);
+const stateFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = isTab(params.get('tab')) ? params.get('tab') : 'makes';
+    return {
+        tab: tab as VehicleCatalogTab,
+        filters: {
+            page: Math.max(Number(params.get('page')) || 1, 1),
+            per_page: 20,
+            search: params.get('search') ?? '',
+            sort: params.get('sort') ?? defaultSort[tab as VehicleCatalogTab],
+            direction: params.get('direction') === 'desc' ? 'desc' : 'asc',
+        } satisfies VehicleCatalogFilters,
     };
 };
 
-const getTreeEngineVinApi = (modelId: number, engineId: number) => {
-    const key = treeEngineVinKey(modelId, engineId);
+const initial = stateFromUrl();
+const activeTab = ref<VehicleCatalogTab>(initial.tab);
+const filters = ref<VehicleCatalogFilters>(initial.filters);
+const summary = ref<VehicleCatalogSummary>({
+    makes: 0,
+    engines: 0,
+    models: 0,
+    vehicles: 0,
+});
+const meta = ref<VehicleCatalogMeta>({
+    current_page: 1,
+    last_page: 1,
+    per_page: 20,
+    total: 0,
+});
+const rows = ref<VehicleCatalogRow[]>([]);
+const loading = ref(false);
+const pageError = ref<string | null>(null);
+const selected = ref<Set<string>>(new Set());
+const deleting = ref(false);
+const exporting = ref(false);
 
-    if (!treeEngineVinApis[key]) {
-        treeEngineVinApis[key] = useVehicleVins({
-            modelId,
-            engineId,
-        });
+const dialogOpen = ref(false);
+const dialogRow = ref<VehicleCatalogRow | null>(null);
+const dialogProcessing = ref(false);
+const dialogError = ref<string | null>(null);
+const optionMakes = ref<VehicleMakeRow[]>([]);
+const optionModels = ref<VehicleModelRow[]>([]);
+const optionEngines = ref<VehicleEngineRow[]>([]);
+const optionsLoaded = ref(false);
+
+const rowKey = (row: VehicleCatalogRow): string =>
+    activeTab.value === 'vehicles'
+        ? (row as VehicleConfigurationRow).key
+        : String((row as { id: number }).id);
+const selectedRows = computed(() =>
+    rows.value.filter((row) => selected.value.has(rowKey(row))),
+);
+const selectableRows = computed(() =>
+    rows.value.filter((row) => row.can_delete),
+);
+const allSelected = computed(
+    () =>
+        selectableRows.value.length > 0 &&
+        selectableRows.value.every((row) => selected.value.has(rowKey(row))),
+);
+
+const setUrl = (mode: 'push' | 'replace' = 'push') => {
+    const params = new URLSearchParams();
+    params.set('tab', activeTab.value);
+    if (filters.value.search) params.set('search', filters.value.search);
+    if (filters.value.page > 1) params.set('page', String(filters.value.page));
+    if (filters.value.sort !== defaultSort[activeTab.value]) {
+        params.set('sort', filters.value.sort);
     }
-
-    return treeEngineVinApis[key];
+    if (filters.value.direction === 'desc') params.set('direction', 'desc');
+    const url = window.location.pathname + '?' + params.toString();
+    window.history[mode === 'push' ? 'pushState' : 'replaceState']({}, '', url);
 };
 
-const loadTreeEngineVins = async (
-    modelId: number,
-    engineId: number,
-    force = false,
-) => {
-    const key = treeEngineVinKey(modelId, engineId);
+const errorMessage = (error: any): string => {
+    const errors = error?.response?.data?.errors;
+    const first = errors ? Object.values(errors).flat()[0] : null;
+    return typeof first === 'string'
+        ? first
+        : error?.response?.data?.message ||
+              'No se pudo completar la operación.';
+};
 
-    if (!force && treeEngineVins.value[key]) {
+let requestId = 0;
+const loadRows = async () => {
+    const currentRequest = ++requestId;
+    loading.value = true;
+    pageError.value = null;
+    try {
+        const response = await catalog.fetchRows(
+            activeTab.value,
+            filters.value,
+        );
+        if (currentRequest !== requestId) return;
+        rows.value = response.data;
+        meta.value = response.meta;
+        selected.value = new Set();
+    } catch (error: any) {
+        if (currentRequest === requestId) {
+            pageError.value = errorMessage(error);
+            rows.value = [];
+        }
+    } finally {
+        if (currentRequest === requestId) loading.value = false;
+    }
+};
+const loadSummary = async () => {
+    try {
+        summary.value = await catalog.fetchSummary();
+    } catch {
+        // The table can remain available if only the counters fail.
+    }
+};
+const refresh = () => Promise.all([loadRows(), loadSummary()]);
+
+const selectTab = (tab: VehicleCatalogTab) => {
+    if (tab === activeTab.value) return;
+    activeTab.value = tab;
+    filters.value = {
+        page: 1,
+        per_page: 20,
+        search: '',
+        sort: defaultSort[tab],
+        direction: 'asc',
+    };
+    setUrl();
+    void loadRows();
+};
+
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+const searchChanged = () => {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        filters.value.page = 1;
+        setUrl('replace');
+        void loadRows();
+    }, 300);
+};
+const changePage = (page: number) => {
+    filters.value.page = page;
+    setUrl();
+    void loadRows();
+};
+const changeSort = (sort: string) => {
+    if (filters.value.sort === sort) {
+        filters.value.direction =
+            filters.value.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        filters.value.sort = sort;
+        filters.value.direction = 'asc';
+    }
+    filters.value.page = 1;
+    setUrl();
+    void loadRows();
+};
+const sortIcon = (sort: string) =>
+    filters.value.sort === sort && filters.value.direction === 'desc'
+        ? ArrowDownAZ
+        : ArrowUpAZ;
+
+const toggleRow = (row: VehicleCatalogRow) => {
+    if (!row.can_delete) return;
+    const next = new Set(selected.value);
+    const key = rowKey(row);
+    if (next.has(key)) {
+        next.delete(key);
+    } else {
+        next.add(key);
+    }
+    selected.value = next;
+};
+const toggleAll = () => {
+    selected.value = allSelected.value
+        ? new Set()
+        : new Set(selectableRows.value.map(rowKey));
+};
+
+const loadOptions = async () => {
+    if (optionsLoaded.value) return;
+    const common: VehicleCatalogFilters = {
+        page: 1,
+        per_page: 500,
+        search: '',
+        sort: 'name',
+        direction: 'asc',
+    };
+    const [makes, models, engines] = await Promise.all([
+        catalog.fetchRows<VehicleMakeRow>('makes', common),
+        catalog.fetchRows<VehicleModelRow>('models', common),
+        catalog.fetchRows<VehicleEngineRow>('engines', {
+            ...common,
+            sort: 'code',
+        }),
+        fetchChassis({ per_page: 500 }),
+    ]);
+    optionMakes.value = makes.data;
+    optionModels.value = models.data;
+    optionEngines.value = engines.data;
+    optionsLoaded.value = true;
+};
+const openCreate = async () => {
+    dialogRow.value = null;
+    dialogError.value = null;
+    try {
+        await loadOptions();
+        dialogOpen.value = true;
+    } catch (error: any) {
+        toast.error(errorMessage(error));
+    }
+};
+const openEdit = async (row: VehicleCatalogRow) => {
+    dialogRow.value = row;
+    dialogError.value = null;
+    try {
+        await loadOptions();
+        dialogOpen.value = true;
+    } catch (error: any) {
+        toast.error(errorMessage(error));
+    }
+};
+const closeDialog = () => {
+    if (dialogProcessing.value) return;
+    dialogOpen.value = false;
+    dialogRow.value = null;
+    dialogError.value = null;
+    const params = new URLSearchParams(window.location.search);
+    params.delete('action');
+    params.delete('edit');
+    window.history.replaceState(
+        {},
+        '',
+        window.location.pathname + '?' + params.toString(),
+    );
+};
+
+const saveDialog = async (payload: Record<string, unknown>) => {
+    dialogProcessing.value = true;
+    dialogError.value = null;
+    try {
+        if (activeTab.value === 'makes') {
+            const row = dialogRow.value as VehicleMakeRow | null;
+            if (row) {
+                await catalog.updateMake(row.id, String(payload.name));
+            } else {
+                await catalog.createMake(String(payload.name));
+            }
+        } else if (activeTab.value === 'models') {
+            const row = dialogRow.value as VehicleModelRow | null;
+            if (row) {
+                await catalog.updateModel(row.id, payload);
+            } else {
+                await catalog.createModel(payload);
+            }
+        } else if (activeTab.value === 'engines') {
+            const row = dialogRow.value as VehicleEngineRow | null;
+            if (row) {
+                await catalog.updateEngine(row.id, payload);
+            } else {
+                await catalog.createEngine(payload);
+            }
+        } else {
+            const row = dialogRow.value as VehicleConfigurationRow | null;
+            if (row) {
+                await catalog.updateConfiguration(
+                    row.model.id,
+                    row.engine.id,
+                    payload,
+                );
+            } else {
+                await catalog.createConfiguration(payload);
+            }
+        }
+        toast.success('Catálogo actualizado correctamente.');
+        optionsLoaded.value = false;
+        dialogOpen.value = false;
+        dialogRow.value = null;
+        await refresh();
+    } catch (error: any) {
+        dialogError.value = errorMessage(error);
+    } finally {
+        dialogProcessing.value = false;
+    }
+};
+
+const removeRow = async (row: VehicleCatalogRow) => {
+    if (!row.can_delete) {
+        toast.error(
+            row.delete_block_reason || 'Este registro no puede eliminarse.',
+        );
+        return;
+    }
+    if (!window.confirm('¿Eliminar este registro del catálogo?')) return;
+    deleting.value = true;
+    try {
+        await catalog.deleteRow(activeTab.value, row);
+        toast.success('Registro eliminado correctamente.');
+        optionsLoaded.value = false;
+        await refresh();
+    } catch (error: any) {
+        toast.error(errorMessage(error));
+    } finally {
+        deleting.value = false;
+    }
+};
+const removeSelected = async () => {
+    if (
+        selectedRows.value.length === 0 ||
+        !window.confirm(
+            '¿Eliminar ' +
+                selectedRows.value.length +
+                ' registro(s) seleccionados?',
+        )
+    ) {
+        return;
+    }
+    deleting.value = true;
+    try {
+        await catalog.bulkDelete(activeTab.value, selectedRows.value);
+        toast.success('Selección eliminada correctamente.');
+        optionsLoaded.value = false;
+        await refresh();
+    } catch (error: any) {
+        toast.error(errorMessage(error));
+    } finally {
+        deleting.value = false;
+    }
+};
+const exportCatalog = async () => {
+    exporting.value = true;
+    try {
+        await catalog.exportCatalog();
+        toast.success('Exportación generada correctamente.');
+    } catch (error: any) {
+        toast.error(errorMessage(error));
+    } finally {
+        exporting.value = false;
+    }
+};
+
+const yearLabel = (row: VehicleModelRow | VehicleConfigurationRow['model']) =>
+    row.year_from === row.year_to
+        ? String(row.year_from)
+        : row.year_from + '-' + row.year_to;
+const engineSpecs = (
+    engine: VehicleEngineRow | VehicleConfigurationRow['engine'],
+) =>
+    [engine.displacement, engine.fuel_type, engine.aspiration]
+        .filter(Boolean)
+        .join(' • ') || 'Sin especificaciones';
+const popState = () => {
+    const state = stateFromUrl();
+    activeTab.value = state.tab;
+    filters.value = state.filters;
+    void loadRows();
+};
+
+const openUrlAction = async () => {
+    if (!canManage.value || activeTab.value === 'vehicles') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'create') {
+        await openCreate();
         return;
     }
 
-    const api = getTreeEngineVinApi(modelId, engineId);
-    treeEngineVinsLoading.value = {
-        ...treeEngineVinsLoading.value,
-        [key]: true,
-    };
-    setTreeEngineVinError(key, null);
-
-    try {
-        await api.fetchVins();
-        treeEngineVins.value = {
-            ...treeEngineVins.value,
-            [key]: [...api.vins.value],
-        };
-    } catch (e: any) {
-        setTreeEngineVinError(
-            key,
-            e.response?.data?.message ||
-                api.error.value ||
-                'No se pudieron cargar los VINs',
-        );
-    } finally {
-        treeEngineVinsLoading.value = {
-            ...treeEngineVinsLoading.value,
-            [key]: false,
-        };
-    }
-};
-
-const clearTreeEngineVinState = (engineId: number) => {
-    expandedEngines.value.delete(engineId);
-    expandedEngines.value = new Set(expandedEngines.value);
-    treeEngineVins.value = clearRecordsForEngine(
-        treeEngineVins.value,
-        engineId,
-    );
-    treeEngineVinsLoading.value = clearRecordsForEngine(
-        treeEngineVinsLoading.value,
-        engineId,
-    );
-    treeEngineVinDraft.value = clearRecordsForEngine(
-        treeEngineVinDraft.value,
-        engineId,
-    );
-    treeEngineVinAdding.value = clearRecordsForEngine(
-        treeEngineVinAdding.value,
-        engineId,
-    );
-    treeEngineVinError.value = clearRecordsForEngine(
-        treeEngineVinError.value,
-        engineId,
-    );
-    for (const key of Object.keys(treeEngineVinApis)) {
-        if (key.endsWith(`:${engineId}`)) {
-            delete treeEngineVinApis[key];
+    const editId = Number(params.get('edit'));
+    if (editId > 0) {
+        try {
+            const row = await catalog.fetchRow(activeTab.value, editId);
+            await openEdit(row);
+        } catch (error: any) {
+            toast.error(errorMessage(error));
         }
     }
 };
-
-// ── Search filter ─────────────────────────────────────────────────────────────
-const filteredMakes = computed(() => {
-    if (!search.value.trim()) return makes.value;
-    const q = search.value.toLowerCase();
-    return makes.value.filter(
-        (m) =>
-            m.name.toLowerCase().includes(q) ||
-            (modelsByMake.value[m.id] ?? []).some((mod) =>
-                mod.name.toLowerCase().includes(q),
-            ),
-    );
-});
 
 onMounted(async () => {
-    await Promise.all([fetchMakes({ per_page: 200 }), loadAllChassis()]);
+    window.addEventListener('popstate', popState);
+    await refresh();
+    await openUrlAction();
 });
-
-// ── Tree toggle ───────────────────────────────────────────────────────────────
-const toggleMake = async (makeId: number) => {
-    if (expandedMakes.value.has(makeId)) {
-        expandedMakes.value.delete(makeId);
-    } else {
-        expandedMakes.value.add(makeId);
-        if (!modelsByMake.value[makeId]) {
-            loadingModels.value[makeId] = true;
-            const res = await fetchModels({ make_id: makeId, per_page: 200 });
-            modelsByMake.value[makeId] =
-                res?.data ?? models.value.filter((m) => m.make_id === makeId);
-            loadingModels.value[makeId] = false;
-        }
-    }
-    expandedMakes.value = new Set(expandedMakes.value); // trigger reactivity
-};
-
-const toggleModel = async (modelId: number) => {
-    if (expandedModels.value.has(modelId)) {
-        expandedModels.value.delete(modelId);
-    } else {
-        expandedModels.value.add(modelId);
-        if (!enginesByModel.value[modelId]) {
-            loadingEngines.value[modelId] = true;
-            const res = await fetchEngines({
-                model_id: modelId,
-                per_page: 200,
-            });
-            enginesByModel.value[modelId] =
-                res?.data ??
-                engines.value.filter((e) => e.model_id === modelId);
-            loadingEngines.value[modelId] = false;
-        }
-    }
-    expandedModels.value = new Set(expandedModels.value);
-};
-
-const toggleEngine = async (modelId: number, engineId: number) => {
-    if (expandedEngines.value.has(engineId)) {
-        expandedEngines.value.delete(engineId);
-    } else {
-        expandedEngines.value.add(engineId);
-        await loadTreeEngineVins(modelId, engineId);
-    }
-
-    expandedEngines.value = new Set(expandedEngines.value);
-};
-
-// ── Modals ────────────────────────────────────────────────────────────────────
-type ModalType = 'make' | 'model' | 'engine' | 'quickEngine' | null;
-const modalType = ref<ModalType>(null);
-const processing = ref(false);
-const modalError = ref<string | null>(null);
-
-// Context
-const activeMakeId = ref<number | null>(null);
-const activeModelId = ref<number | null>(null);
-const editingId = ref<number | null>(null);
-
-// Forms
-const makeForm = ref({ name: '' });
-const modelForm = ref({
-    name: '',
-    year_from: new Date().getFullYear(),
-    year_to: new Date().getFullYear(),
-    generation: '',
+onBeforeUnmount(() => {
+    window.removeEventListener('popstate', popState);
+    if (searchTimer) clearTimeout(searchTimer);
 });
-const engineForm = ref({
-    engine_code: '',
-    displacement: '',
-    fuel_type: 'Gasoline',
-});
-
-// ── All engines for SearchableSelect ──────────────────────────────────────────
-const allEngines = ref<VehicleEngine[]>([]);
-const allEnginesLoading = ref(false);
-const selectedEngineId = ref<number | null>(null);
-
-// ── All chassis for model modal SearchableSelect ─────────────────────────────
-const allChassisLoading = ref(false);
-const selectedModelChassisId = ref<number | null>(null);
-
-const loadAllChassis = async () => {
-    allChassisLoading.value = true;
-    try {
-        await fetchChassis({ per_page: 500 });
-    } finally {
-        allChassisLoading.value = false;
-    }
-};
-
-const loadAllEngines = async () => {
-    allEnginesLoading.value = true;
-    try {
-        const res = await fetchEngines({ per_page: 500 });
-        allEngines.value = res?.data ?? engines.value;
-    } finally {
-        allEnginesLoading.value = false;
-    }
-};
-
-// Options for SearchableSelect (excluding already assigned to this model)
-const engineSelectOptions = computed<SelectOption[]>(() => {
-    const assignedIds = new Set(
-        (enginesByModel.value[activeModelId.value ?? 0] ?? []).map((e) => e.id),
-    );
-    const makeId = resolveModelMakeId(activeModelId.value);
-
-    return allEngines.value
-        .filter(
-            (e) =>
-                !assignedIds.has(e.id) &&
-                (makeId === null || getEngineMakeIds(e).includes(makeId)),
-        )
-        .map((e) => ({
-            value: e.id,
-            label: e.engine_code,
-            sublabel:
-                [e.displacement, e.fuel_type].filter(Boolean).join(' • ') ||
-                undefined,
-        }));
-});
-
-const chassisSelectOptions = computed<SelectOption[]>(() => {
-    return [...chassisList.value]
-        .sort((a, b) => a.code.localeCompare(b.code))
-        .map((chassis) => {
-            const yearLabel =
-                chassis.year_from || chassis.year_to
-                    ? `${chassis.year_from || '?'}-${chassis.year_to || '?'}`
-                    : '';
-
-            const vehicleLabel = [
-                chassis.model?.make?.name,
-                chassis.model?.name,
-            ]
-                .filter(Boolean)
-                .join(' ');
-
-            const sublabel = [chassis.name, vehicleLabel, yearLabel]
-                .filter((part) => Boolean(part && String(part).trim()))
-                .join(' • ');
-
-            return {
-                value: chassis.id,
-                label: chassis.code,
-                sublabel: sublabel || undefined,
-            };
-        });
-});
-
-const syncSelectedChassisFromGeneration = () => {
-    const generationCode = modelForm.value.generation?.trim();
-    if (!generationCode) {
-        selectedModelChassisId.value = null;
-        return;
-    }
-
-    const match = chassisList.value.find(
-        (chassis) =>
-            chassis.code.toLowerCase() === generationCode.toLowerCase(),
-    );
-    selectedModelChassisId.value = match?.id ?? null;
-};
-
-const handleModelChassisChange = (value: number | string | null) => {
-    const chassisId = typeof value === 'number' ? value : null;
-    selectedModelChassisId.value = chassisId;
-
-    if (!chassisId) {
-        modelForm.value.generation = '';
-        return;
-    }
-
-    const selected = chassisList.value.find(
-        (chassis) => chassis.id === chassisId,
-    );
-    modelForm.value.generation = selected?.code ?? '';
-};
-
-const handleModelGenerationInput = () => {
-    const generationCode = modelForm.value.generation?.trim();
-    if (!generationCode) {
-        selectedModelChassisId.value = null;
-        return;
-    }
-
-    const match = chassisList.value.find(
-        (chassis) =>
-            chassis.code.toLowerCase() === generationCode.toLowerCase(),
-    );
-    selectedModelChassisId.value = match?.id ?? null;
-};
-
-const openMakeCreate = () => {
-    editingId.value = null;
-    makeForm.value = { name: '' };
-    modalType.value = 'make';
-    modalError.value = null;
-};
-const openMakeEdit = (m: VehicleMake) => {
-    editingId.value = m.id;
-    makeForm.value = { name: m.name };
-    modalType.value = 'make';
-    modalError.value = null;
-};
-
-const openModelCreate = (makeId: number) => {
-    activeMakeId.value = makeId;
-    editingId.value = null;
-    modelForm.value = {
-        name: '',
-        year_from: new Date().getFullYear(),
-        year_to: new Date().getFullYear(),
-        generation: '',
-    };
-    selectedModelChassisId.value = null;
-    if (chassisList.value.length === 0) {
-        void loadAllChassis();
-    }
-    modalType.value = 'model';
-    modalError.value = null;
-};
-const openModelEdit = async (model: VehicleModel) => {
-    activeMakeId.value = model.make_id;
-    editingId.value = model.id;
-    modelForm.value = {
-        name: model.name,
-        year_from: model.year_from ?? new Date().getFullYear(),
-        year_to: model.year_to ?? new Date().getFullYear(),
-        generation: model.generation ?? '',
-    };
-    if (chassisList.value.length === 0) {
-        await loadAllChassis();
-    }
-    // Prefer the authoritative chassis relation from the API over generation-based lookup
-    if (model.chassis && model.chassis.length > 0) {
-        selectedModelChassisId.value = model.chassis[0].id;
-    } else {
-        syncSelectedChassisFromGeneration();
-    }
-    modalType.value = 'model';
-    modalError.value = null;
-};
-
-const openEngineCreate = async (modelId: number) => {
-    activeModelId.value = modelId;
-    editingId.value = null;
-    selectedEngineId.value = null;
-    duplicateConfirmed.value = false;
-    modalType.value = 'engine';
-    modalError.value = null;
-    // Load all available engines
-    await loadAllEngines();
-};
-const openEngineEdit = async (engine: VehicleEngine, modelId?: number) => {
-    activeModelId.value = modelId ?? engine.model_id;
-    editingId.value = engine.id;
-    engineForm.value = {
-        engine_code: engine.engine_code,
-        displacement: engine.displacement,
-        fuel_type: engine.fuel_type || 'Gasoline',
-    };
-    duplicateConfirmed.value = false;
-    modalType.value = 'engine';
-    modalError.value = null;
-};
-
-// Quick Add Engine Modal
-const openQuickEngineCreate = () => {
-    engineForm.value = {
-        engine_code: '',
-        displacement: '',
-        fuel_type: 'Gasoline',
-    };
-    duplicateConfirmed.value = false;
-    modalType.value = 'quickEngine';
-    modalError.value = null;
-};
-
-const closeModal = () => {
-    modalType.value = null;
-    selectedEngineId.value = null;
-    duplicateConfirmed.value = false;
-};
-
-// R20: Check for duplicates helper
-const duplicateConfirmed = ref(false);
-
-const checkMakeDuplicate = (name: string): boolean => {
-    return makes.value.some(
-        (m) =>
-            m.name.toLowerCase().trim() === name.toLowerCase().trim() &&
-            m.id !== editingId.value,
-    );
-};
-
-const checkModelDuplicate = (name: string, makeId: number): boolean => {
-    const modelsInMake = modelsByMake.value[makeId] ?? [];
-    return modelsInMake.some(
-        (m) =>
-            m.name.toLowerCase().trim() === name.toLowerCase().trim() &&
-            m.id !== editingId.value,
-    );
-};
-
-const getEngineModelIds = (engine: VehicleEngine): number[] => {
-    if (Array.isArray(engine.model_ids) && engine.model_ids.length > 0) {
-        return Array.from(
-            new Set(
-                engine.model_ids
-                    .map((id) => Number(id))
-                    .filter((id) => Number.isInteger(id) && id > 0),
-            ),
-        );
-    }
-
-    if (engine.model_id !== null) {
-        return [engine.model_id];
-    }
-
-    return [];
-};
-
-const resolveModelMakeId = (modelId: number | null): number | null => {
-    if (!modelId) return null;
-
-    for (const [makeId, models] of Object.entries(modelsByMake.value)) {
-        if (models.some((model) => model.id === modelId)) {
-            return Number(makeId);
-        }
-    }
-
-    const model = models.value.find((item) => item.id === modelId);
-    return model?.make_id ?? null;
-};
-
-const getEngineMakeIds = (engine: VehicleEngine): number[] => {
-    const makeIds = new Set<number>();
-
-    if (engine.make_id) makeIds.add(engine.make_id);
-    if (engine.make?.id) makeIds.add(engine.make.id);
-    if (engine.model?.make?.id) makeIds.add(engine.model.make.id);
-
-    engine.models?.forEach((model) => {
-        if (model.make?.id) makeIds.add(model.make.id);
-    });
-
-    return Array.from(makeIds);
-};
-
-const checkEngineDuplicate = (
-    code: string,
-    modelId: number | null,
-): boolean => {
-    const normalizedCode = code.toLowerCase().trim();
-    const makeId = resolveModelMakeId(modelId);
-
-    return allEngines.value.some(
-        (e) =>
-            e.engine_code.toLowerCase().trim() === normalizedCode &&
-            e.id !== editingId.value &&
-            (makeId === null || getEngineMakeIds(e).includes(makeId)),
-    );
-};
-
-// Make submit
-const submitMake = async () => {
-    // R20: Check for duplicate
-    if (
-        !editingId.value &&
-        !duplicateConfirmed.value &&
-        checkMakeDuplicate(makeForm.value.name)
-    ) {
-        const confirm = window.confirm(
-            `⚠️ Ya existe una marca con el nombre "${makeForm.value.name}".\n\n¿Desea crear una marca duplicada?`,
-        );
-        if (!confirm) return;
-        duplicateConfirmed.value = true;
-    }
-
-    processing.value = true;
-    modalError.value = null;
-    try {
-        if (editingId.value) {
-            const updated = await updateMake(editingId.value, makeForm.value);
-            const idx = makes.value.findIndex((m) => m.id === editingId.value);
-            if (idx !== -1) makes.value[idx] = updated;
-        } else {
-            await createMake(makeForm.value);
-            // makes array is automatically updated by the composable
-        }
-        closeModal();
-        duplicateConfirmed.value = false;
-    } catch (e: any) {
-        modalError.value = e.response?.data?.message || 'Error';
-    } finally {
-        processing.value = false;
-    }
-};
-
-// Model submit
-const submitModel = async () => {
-    // R20: Check for duplicate
-    if (
-        !editingId.value &&
-        !duplicateConfirmed.value &&
-        checkModelDuplicate(modelForm.value.name, activeMakeId.value!)
-    ) {
-        const makeName =
-            makes.value.find((m) => m.id === activeMakeId.value)?.name || '';
-        const confirm = window.confirm(
-            `⚠️ Ya existe un modelo "${modelForm.value.name}" en la marca ${makeName}.\n\n¿Desea crear un modelo duplicado?`,
-        );
-        if (!confirm) return;
-        duplicateConfirmed.value = true;
-    }
-
-    processing.value = true;
-    modalError.value = null;
-    try {
-        const payload = {
-            ...modelForm.value,
-            make_id: activeMakeId.value!,
-            chassis_id: selectedModelChassisId.value,
-        };
-        if (editingId.value) {
-            const updated = await updateModel(editingId.value, payload);
-            const list = modelsByMake.value[activeMakeId.value!] ?? [];
-            const idx = list.findIndex((m) => m.id === editingId.value);
-            if (idx !== -1) list[idx] = updated;
-        } else {
-            const created = await createModel(payload);
-            if (!modelsByMake.value[activeMakeId.value!])
-                modelsByMake.value[activeMakeId.value!] = [];
-            // Prevent duplicate pushes if composable is also tracking it
-            if (
-                !modelsByMake.value[activeMakeId.value!].find(
-                    (m) => m.id === created.id,
-                )
-            ) {
-                modelsByMake.value[activeMakeId.value!].push(created);
-            }
-        }
-        closeModal();
-        duplicateConfirmed.value = false;
-    } catch (e: any) {
-        modalError.value = e.response?.data?.message || 'Error';
-    } finally {
-        processing.value = false;
-    }
-};
-
-// Assign existing engine to model (update engine's model_id)
-const assignEngineToModel = async () => {
-    if (!selectedEngineId.value || !activeModelId.value) return;
-    processing.value = true;
-    modalError.value = null;
-    try {
-        const selectedEngine = allEngines.value.find(
-            (engine) => engine.id === selectedEngineId.value,
-        );
-        const existingModelIds = selectedEngine
-            ? getEngineModelIds(selectedEngine)
-            : [];
-        const nextModelIds = Array.from(
-            new Set([...existingModelIds, activeModelId.value]),
-        );
-        const makeId = resolveModelMakeId(activeModelId.value);
-
-        const updated = await updateEngine(selectedEngineId.value, {
-            make_id: makeId,
-            model_id: nextModelIds[0] ?? activeModelId.value,
-            model_ids: nextModelIds,
-        });
-
-        // Add to local tree
-        if (!enginesByModel.value[activeModelId.value])
-            enginesByModel.value[activeModelId.value] = [];
-        if (
-            !enginesByModel.value[activeModelId.value].find(
-                (e) => e.id === updated.id,
-            )
-        ) {
-            enginesByModel.value[activeModelId.value].push(updated);
-        }
-
-        const allEnginesIndex = allEngines.value.findIndex(
-            (engine) => engine.id === updated.id,
-        );
-        if (allEnginesIndex !== -1) {
-            allEngines.value[allEnginesIndex] = updated;
-        }
-
-        selectedEngineId.value = null;
-        await loadAllEngines();
-        closeModal();
-    } catch (e: any) {
-        modalError.value = e.response?.data?.message || 'Error';
-    } finally {
-        processing.value = false;
-    }
-};
-
-// Engine submit (edit mode only, or quick-create)
-const submitEngine = async () => {
-    const normalizedEngineCode = engineForm.value.engine_code.trim();
-    if (!normalizedEngineCode) {
-        modalError.value = 'El codigo del motor es obligatorio.';
-        return;
-    }
-
-    // R20: Check for duplicate engine code
-    if (
-        !editingId.value &&
-        !duplicateConfirmed.value &&
-        checkEngineDuplicate(normalizedEngineCode, activeModelId.value)
-    ) {
-        const modelName = models.value.find(
-            (model) => model.id === activeModelId.value,
-        )?.name;
-        const confirm = window.confirm(
-            `⚠️ Ya existe un motor con el código "${normalizedEngineCode}"${modelName ? ` en el modelo ${modelName}` : ''}.\n\n¿Desea crear un motor duplicado?`,
-        );
-        if (!confirm) return;
-        duplicateConfirmed.value = true;
-    }
-
-    processing.value = true;
-    modalError.value = null;
-    try {
-        const normalizedDisplacement = engineForm.value.displacement.trim();
-        const normalizedFuelType = engineForm.value.fuel_type || 'Gasoline';
-        const modelIds = activeModelId.value ? [activeModelId.value] : [];
-        const makeId = resolveModelMakeId(activeModelId.value);
-
-        const payload = {
-            make_id: makeId,
-            model_id: activeModelId.value,
-            model_ids: modelIds,
-            engine_code: normalizedEngineCode,
-            displacement: normalizedDisplacement || undefined,
-            fuel_type: normalizedFuelType,
-            aspiration: 'N/A',
-        };
-        if (editingId.value) {
-            // Editing existing engine
-            const updated = await updateEngine(editingId.value, payload);
-            const list = enginesByModel.value[activeModelId.value!] ?? [];
-            const idx = list.findIndex((e) => e.id === editingId.value);
-            if (idx !== -1) list[idx] = updated;
-        } else {
-            // Quick create new engine
-            const created = await createEngine(payload);
-
-            // Add to allEngines so it appears in future searches
-            if (!allEngines.value.find((e) => e.id === created.id)) {
-                allEngines.value.push(created);
-            }
-
-            if (activeModelId.value) {
-                // Add to model's engine list
-                if (!enginesByModel.value[activeModelId.value])
-                    enginesByModel.value[activeModelId.value] = [];
-                if (
-                    !enginesByModel.value[activeModelId.value].find(
-                        (e) => e.id === created.id,
-                    )
-                ) {
-                    enginesByModel.value[activeModelId.value].push(created);
-                }
-            }
-        }
-        closeModal();
-        duplicateConfirmed.value = false;
-    } catch (e: any) {
-        modalError.value = e.response?.data?.message || 'Error';
-    } finally {
-        processing.value = false;
-    }
-};
-
-// Delete helpers
-const handleDeleteMake = async (make: VehicleMake) => {
-    if (
-        !confirm(
-            `¿Eliminar marca "${make.name}"? Se eliminarán sus modelos y motores.`,
-        )
-    )
-        return;
-    try {
-        await deleteMake(make.id);
-        makes.value = makes.value.filter((m) => m.id !== make.id);
-    } catch {
-        alert('No se pudo eliminar.');
-    }
-};
-const handleDeleteModel = async (model: VehicleModel) => {
-    if (!confirm(`¿Eliminar modelo "${model.name}"?`)) return;
-    try {
-        await deleteModel(model.id);
-        if (modelsByMake.value[model.make_id]) {
-            modelsByMake.value[model.make_id] = modelsByMake.value[
-                model.make_id
-            ].filter((m) => m.id !== model.id);
-        }
-    } catch {
-        alert('No se pudo eliminar.');
-    }
-};
-const handleDeleteEngine = async (engine: VehicleEngine) => {
-    if (!confirm(`¿Eliminar motor "${engine.engine_code}"?`)) return;
-    try {
-        await deleteEngine(engine.id);
-        if (engine.model_id !== null && enginesByModel.value[engine.model_id]) {
-            enginesByModel.value[engine.model_id] = enginesByModel.value[
-                engine.model_id
-            ].filter((e) => e.id !== engine.id);
-        }
-        clearTreeEngineVinState(engine.id);
-    } catch {
-        alert('No se pudo eliminar.');
-    }
-};
-
-const handleAddTreeEngineVin = async (modelId: number, engineId: number) => {
-    const key = treeEngineVinKey(modelId, engineId);
-    const normalized = (treeEngineVinDraft.value[key] ?? '').trim();
-    if (normalized.length < 1 || normalized.length > 40) return;
-
-    const api = getTreeEngineVinApi(modelId, engineId);
-    treeEngineVinAdding.value = {
-        ...treeEngineVinAdding.value,
-        [key]: true,
-    };
-    setTreeEngineVinError(key, null);
-
-    try {
-        await api.addVin(normalized.toUpperCase());
-        treeEngineVins.value = {
-            ...treeEngineVins.value,
-            [key]: [...api.vins.value],
-        };
-        treeEngineVinDraft.value = {
-            ...treeEngineVinDraft.value,
-            [key]: '',
-        };
-    } catch (e: any) {
-        setTreeEngineVinError(
-            key,
-            e.response?.data?.message ||
-                api.error.value ||
-                'VIN invalido o duplicado',
-        );
-    } finally {
-        treeEngineVinAdding.value = {
-            ...treeEngineVinAdding.value,
-            [key]: false,
-        };
-    }
-};
-
-const handleRemoveTreeEngineVin = async (
-    modelId: number,
-    engineId: number,
-    vinId: number,
-) => {
-    const key = treeEngineVinKey(modelId, engineId);
-    const api = getTreeEngineVinApi(modelId, engineId);
-    setTreeEngineVinError(key, null);
-
-    try {
-        await api.removeVin(vinId);
-        treeEngineVins.value = {
-            ...treeEngineVins.value,
-            [key]: [...api.vins.value],
-        };
-    } catch (e: any) {
-        setTreeEngineVinError(
-            key,
-            e.response?.data?.message ||
-                api.error.value ||
-                'No se pudo eliminar el VIN',
-        );
-    }
-};
 </script>
 
 <template>
-    <Head title="Gestión de Vehículos" />
+    <Head title="Administración de Vehículos" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-5xl space-y-6 p-6">
-            <!-- Page Header -->
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1
-                        class="text-2xl font-semibold text-gray-900 dark:text-white"
-                    >
-                        Gestión de Vehículos
-                    </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Marcas → Carros/Modelos → Motores → VINs
-                    </p>
-                </div>
-                <Button @click="openMakeCreate">
-                    <Plus class="mr-2 h-4 w-4" /> Nueva Marca
-                </Button>
-                <a href="/vehicles/import">
-                    <Button variant="outline">
-                        <Upload class="mr-2 h-4 w-4" /> Importar
-                    </Button>
-                </a>
-            </div>
-
-            <!-- Search -->
-            <div class="relative max-w-sm">
-                <Search
-                    class="absolute top-2.5 left-2.5 h-4 w-4 text-gray-400"
-                />
-                <Input
-                    v-model="search"
-                    placeholder="Buscar marca o modelo..."
-                    class="pl-9"
-                />
-            </div>
-
-            <!-- Vehicle Tree -->
-            <div
-                class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-background"
+        <div class="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+            <header
+                class="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-center lg:justify-between"
             >
-                <!-- Empty state -->
-                <div
-                    v-if="filteredMakes.length === 0"
-                    class="flex flex-col items-center justify-center py-16 text-center text-gray-400"
-                >
-                    <Car class="mb-3 h-10 w-10" />
-                    <p class="text-sm">
-                        No hay marcas de vehículos registradas.
+                <div>
+                    <h1 class="text-2xl font-semibold tracking-tight">
+                        Administración de Vehículos
+                    </h1>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Marcas, motores, modelos, configuraciones y VIN en un
+                        solo lugar.
                     </p>
-                    <Button class="mt-4" @click="openMakeCreate"
-                        ><Plus class="mr-2 h-4 w-4" />Agregar Marca</Button
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <Link
+                        v-if="canManage"
+                        :href="
+                            '/vehicles/import?return=' +
+                            encodeURIComponent('/vehicles?tab=' + activeTab)
+                        "
                     >
+                        <Button variant="outline">
+                            <Upload class="mr-2 h-4 w-4" />Importar
+                        </Button>
+                    </Link>
+                    <Button
+                        variant="outline"
+                        :disabled="exporting"
+                        @click="exportCatalog"
+                    >
+                        <LoaderCircle
+                            v-if="exporting"
+                            class="mr-2 h-4 w-4 animate-spin"
+                        />
+                        <Download v-else class="mr-2 h-4 w-4" />Exportar
+                    </Button>
+                    <Button v-if="canManage" @click="openCreate">
+                        <Plus class="mr-2 h-4 w-4" />Nuevo
+                        {{ singularLabel[activeTab] }}
+                    </Button>
+                </div>
+            </header>
+
+            <nav
+                class="flex gap-1 overflow-x-auto rounded-lg border bg-muted/30 p-1"
+                aria-label="Catálogo de vehículos"
+            >
+                <button
+                    v-for="tab in tabs"
+                    :key="tab.id"
+                    type="button"
+                    class="flex min-w-max items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+                    :class="
+                        activeTab === tab.id
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'
+                    "
+                    :aria-current="activeTab === tab.id ? 'page' : undefined"
+                    @click="selectTab(tab.id)"
+                >
+                    {{ tab.label }}
+                    <Badge variant="secondary" class="tabular-nums">
+                        {{ summary[tab.id] }}
+                    </Badge>
+                </button>
+            </nav>
+
+            <section class="overflow-hidden rounded-xl border bg-card">
+                <div
+                    class="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div class="relative w-full sm:max-w-md">
+                        <Search
+                            class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <Input
+                            v-model="filters.search"
+                            class="pl-9"
+                            :placeholder="
+                                'Buscar ' + singularLabel[activeTab] + '…'
+                            "
+                            @input="searchChanged"
+                        />
+                    </div>
+                    <Button
+                        v-if="canManage && selectedRows.length"
+                        variant="destructive"
+                        :disabled="deleting"
+                        @click="removeSelected"
+                    >
+                        <Trash2 class="mr-2 h-4 w-4" />Eliminar selección ({{
+                            selectedRows.length
+                        }})
+                    </Button>
                 </div>
 
-                <!-- Makes list -->
                 <div
-                    v-for="(make, makeIdx) in filteredMakes"
-                    :key="make.id"
-                    :class="
-                        makeIdx > 0
-                            ? 'border-t border-gray-200 dark:border-border'
-                            : ''
-                    "
+                    v-if="pageError"
+                    class="m-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+                    role="alert"
                 >
-                    <!-- Make row -->
-                    <div
-                        class="flex cursor-pointer items-center gap-2 px-4 py-3 hover:bg-gray-50 dark:hover:bg-card/50"
-                        @click="toggleMake(make.id)"
+                    {{ pageError }}
+                    <Button
+                        variant="link"
+                        class="ml-2 h-auto p-0"
+                        @click="loadRows"
                     >
-                        <button class="text-gray-400">
-                            <ChevronDown
-                                v-if="expandedMakes.has(make.id)"
-                                class="h-4 w-4"
-                            />
-                            <ChevronRight v-else class="h-4 w-4" />
-                        </button>
-                        <span
-                            class="flex-1 font-semibold text-gray-900 dark:text-white"
-                            >{{ make.name }}</span
-                        >
-                        <div class="flex items-center gap-1" @click.stop>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                class="h-7 w-7"
-                                @click="openModelCreate(make.id)"
-                                title="Nuevo Modelo"
-                            >
-                                <Plus class="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                class="h-7 w-7"
-                                @click="openMakeEdit(make)"
-                            >
-                                <Pencil class="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                class="h-7 w-7 text-red-500 hover:bg-red-50 hover:text-red-700"
-                                @click="handleDeleteMake(make)"
-                            >
-                                <Trash2 class="h-3.5 w-3.5" />
-                            </Button>
-                        </div>
-                    </div>
+                        Reintentar
+                    </Button>
+                </div>
+                <div
+                    v-else-if="loading"
+                    class="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground"
+                >
+                    <LoaderCircle class="h-5 w-5 animate-spin" />Cargando
+                    catálogo…
+                </div>
+                <div
+                    v-else-if="rows.length === 0"
+                    class="flex min-h-64 flex-col items-center justify-center p-6 text-center"
+                >
+                    <Car class="mb-3 h-10 w-10 text-muted-foreground" />
+                    <p class="font-medium">No hay resultados</p>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Ajusta la búsqueda o registra un nuevo elemento.
+                    </p>
+                </div>
 
-                    <!-- Models -->
-                    <div v-if="expandedMakes.has(make.id)">
-                        <div
-                            v-if="loadingModels[make.id]"
-                            class="py-3 pl-12 text-sm text-gray-400"
-                        >
-                            Cargando modelos...
-                        </div>
-
-                        <div
-                            v-else-if="
-                                (modelsByMake[make.id] ?? []).length === 0
-                            "
-                            class="py-3 pl-12 text-sm text-gray-400"
-                        >
-                            Sin modelos.
-                            <button
-                                class="text-blue-500 underline"
-                                @click="openModelCreate(make.id)"
-                            >
-                                Agregar
-                            </button>
-                        </div>
-
-                        <div
-                            v-for="model in modelsByMake[make.id] ?? []"
-                            :key="model.id"
-                            :class="[
-                                'border-t border-gray-100 dark:border-border',
-                            ]"
-                        >
-                            <!-- Model row -->
-                            <div
-                                class="flex cursor-pointer items-center gap-2 py-2.5 pr-4 pl-10 hover:bg-gray-50 dark:hover:bg-card/50"
-                                @click="toggleModel(model.id)"
-                            >
-                                <button class="text-gray-400">
-                                    <ChevronDown
-                                        v-if="expandedModels.has(model.id)"
-                                        class="h-4 w-4"
-                                    />
-                                    <ChevronRight v-else class="h-4 w-4" />
-                                </button>
-                                <span
-                                    class="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200"
+                <template v-else>
+                    <div class="hidden overflow-x-auto md:block">
+                        <table class="w-full text-sm">
+                            <thead class="border-b bg-muted/40 text-left">
+                                <tr>
+                                    <th v-if="canManage" class="w-12 px-4 py-3">
+                                        <input
+                                            type="checkbox"
+                                            :checked="allSelected"
+                                            aria-label="Seleccionar registros eliminables"
+                                            @change="toggleAll"
+                                        />
+                                    </th>
+                                    <template v-if="activeTab === 'makes'">
+                                        <th class="px-4 py-3">
+                                            <button
+                                                class="inline-flex items-center gap-1"
+                                                @click="changeSort('name')"
+                                            >
+                                                Marca
+                                                <component
+                                                    :is="sortIcon('name')"
+                                                    class="h-3.5 w-3.5"
+                                                />
+                                            </button>
+                                        </th>
+                                        <th class="px-4 py-3">Modelos</th>
+                                        <th class="px-4 py-3">Motores</th>
+                                        <th class="px-4 py-3">Vehículos</th>
+                                    </template>
+                                    <template
+                                        v-else-if="activeTab === 'engines'"
+                                    >
+                                        <th class="px-4 py-3">
+                                            <button @click="changeSort('make')">
+                                                Marca
+                                            </button>
+                                        </th>
+                                        <th class="px-4 py-3">
+                                            <button @click="changeSort('code')">
+                                                Código
+                                            </button>
+                                        </th>
+                                        <th class="px-4 py-3">
+                                            Especificaciones
+                                        </th>
+                                        <th class="px-4 py-3">Vehículos</th>
+                                    </template>
+                                    <template
+                                        v-else-if="activeTab === 'models'"
+                                    >
+                                        <th class="px-4 py-3">
+                                            <button @click="changeSort('make')">
+                                                Marca
+                                            </button>
+                                        </th>
+                                        <th class="px-4 py-3">
+                                            <button @click="changeSort('name')">
+                                                Modelo
+                                            </button>
+                                        </th>
+                                        <th class="px-4 py-3">
+                                            <button
+                                                @click="changeSort('years')"
+                                            >
+                                                Años / Generación
+                                            </button>
+                                        </th>
+                                        <th class="px-4 py-3">Vehículos</th>
+                                    </template>
+                                    <template v-else>
+                                        <th class="px-4 py-3">
+                                            <button @click="changeSort('make')">
+                                                Marca / Modelo / Años
+                                            </button>
+                                        </th>
+                                        <th class="px-4 py-3">
+                                            <button
+                                                @click="changeSort('engine')"
+                                            >
+                                                Motor / Especificaciones
+                                            </button>
+                                        </th>
+                                        <th class="px-4 py-3">
+                                            VIN registrados
+                                        </th>
+                                    </template>
+                                    <th
+                                        v-if="canManage"
+                                        class="px-4 py-3 text-right"
+                                    >
+                                        Acciones
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr
+                                    v-for="row in rows"
+                                    :key="rowKey(row)"
+                                    class="hover:bg-muted/30"
                                 >
-                                    {{ model.name }}
-                                    <span
-                                        v-if="model.generation"
-                                        class="ml-1 font-mono text-xs text-indigo-500 dark:text-indigo-400"
-                                        >{{ model.generation }}</span
+                                    <td v-if="canManage" class="px-4 py-3">
+                                        <input
+                                            type="checkbox"
+                                            :checked="selected.has(rowKey(row))"
+                                            :disabled="!row.can_delete"
+                                            :title="
+                                                row.delete_block_reason ??
+                                                undefined
+                                            "
+                                            @change="toggleRow(row)"
+                                        />
+                                    </td>
+                                    <template v-if="activeTab === 'makes'">
+                                        <td class="px-4 py-3 font-medium">
+                                            {{ (row as VehicleMakeRow).name }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            {{
+                                                (row as VehicleMakeRow)
+                                                    .models_count
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            {{
+                                                (row as VehicleMakeRow)
+                                                    .engines_count
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            {{
+                                                (row as VehicleMakeRow)
+                                                    .vehicles_count
+                                            }}
+                                        </td>
+                                    </template>
+                                    <template
+                                        v-else-if="activeTab === 'engines'"
                                     >
-                                    <span
-                                        v-if="model.year_from"
-                                        class="ml-1 text-xs text-gray-400"
-                                        >({{ model.year_from }}–{{
-                                            model.year_to ?? 'Pres.'
-                                        }})</span
+                                        <td class="px-4 py-3">
+                                            {{
+                                                (row as VehicleEngineRow).make
+                                                    ?.name ?? 'Sin marca'
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 font-mono font-medium"
+                                        >
+                                            {{
+                                                (row as VehicleEngineRow)
+                                                    .engine_code
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 text-muted-foreground"
+                                        >
+                                            {{
+                                                engineSpecs(
+                                                    row as VehicleEngineRow,
+                                                )
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            {{
+                                                (row as VehicleEngineRow)
+                                                    .vehicles_count
+                                            }}
+                                        </td>
+                                    </template>
+                                    <template
+                                        v-else-if="activeTab === 'models'"
                                     >
-                                </span>
-                                <div
-                                    class="flex items-center gap-1"
-                                    @click.stop
-                                >
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        class="h-7 w-7"
-                                        @click="openEngineCreate(model.id)"
-                                        title="Nuevo Motor"
-                                    >
-                                        <Plus class="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        class="h-7 w-7"
-                                        @click="openModelEdit(model)"
-                                    >
-                                        <Pencil class="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        class="h-7 w-7 text-red-500 hover:bg-red-50 hover:text-red-700"
-                                        @click="handleDeleteModel(model)"
-                                    >
-                                        <Trash2 class="h-3.5 w-3.5" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <!-- Engines -->
-                            <div v-if="expandedModels.has(model.id)">
-                                <div
-                                    v-if="loadingEngines[model.id]"
-                                    class="py-2 pl-20 text-xs text-gray-400"
-                                >
-                                    Cargando motores...
-                                </div>
-
-                                <div
-                                    v-else-if="
-                                        (enginesByModel[model.id] ?? [])
-                                            .length === 0
-                                    "
-                                    class="py-2 pl-20 text-xs text-gray-400"
-                                >
-                                    Sin motores.
-                                    <button
-                                        class="text-blue-500 underline"
-                                        @click="openEngineCreate(model.id)"
-                                    >
-                                        Agregar
-                                    </button>
-                                </div>
-
-                                <div
-                                    v-for="engine in enginesByModel[model.id] ??
-                                    []"
-                                    :key="engine.id"
-                                    class="border-t border-gray-100 dark:border-border"
-                                >
-                                    <div
-                                        class="flex cursor-pointer items-center gap-2 py-2 pr-4 pl-20 hover:bg-gray-50/50 dark:hover:bg-card/30"
-                                        @click="
-                                            toggleEngine(model.id, engine.id)
-                                        "
-                                    >
-                                        <button class="text-gray-400">
-                                            <ChevronDown
+                                        <td class="px-4 py-3">
+                                            {{
+                                                (row as VehicleModelRow).make
+                                                    ?.name
+                                            }}
+                                        </td>
+                                        <td class="px-4 py-3 font-medium">
+                                            {{ (row as VehicleModelRow).name }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            {{
+                                                yearLabel(
+                                                    row as VehicleModelRow,
+                                                )
+                                            }}
+                                            <Badge
                                                 v-if="
-                                                    expandedEngines.has(
-                                                        engine.id,
-                                                    )
+                                                    (row as VehicleModelRow)
+                                                        .generation
                                                 "
-                                                class="h-4 w-4"
-                                            />
-                                            <ChevronRight
-                                                v-else
-                                                class="h-4 w-4"
-                                            />
-                                        </button>
-                                        <div class="flex-1">
-                                            <span
-                                                class="font-mono text-xs font-semibold text-gray-800 dark:text-gray-200"
-                                                >{{ engine.engine_code }}</span
+                                                variant="outline"
+                                                class="ml-2"
                                             >
-                                            <span
-                                                v-if="engine.displacement"
-                                                class="ml-2 text-xs text-gray-500"
-                                                >{{ engine.displacement }}</span
-                                            >
-                                        </div>
-                                        <div
-                                            class="flex items-center gap-1"
-                                            @click.stop
-                                        >
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                class="h-7 w-7"
-                                                @click="
-                                                    openEngineEdit(
-                                                        engine,
-                                                        model.id,
-                                                    )
-                                                "
-                                                title="Editar motor"
-                                            >
-                                                <Pencil class="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                class="h-7 w-7 text-red-500 hover:bg-red-50 hover:text-red-700"
-                                                @click="
-                                                    handleDeleteEngine(engine)
-                                                "
-                                            >
-                                                <Trash2 class="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        v-if="expandedEngines.has(engine.id)"
-                                        class="space-y-2 border-t border-gray-100 bg-gray-50/60 py-3 pr-4 pl-28 dark:border-border dark:bg-card/20"
-                                    >
-                                        <div class="flex items-center gap-2">
-                                            <Hash
-                                                class="h-3.5 w-3.5 text-gray-400"
-                                            />
-                                            <span
-                                                class="text-xs font-semibold text-gray-700 dark:text-gray-200"
-                                                >VINs de configuración</span
-                                            >
-                                            <span
-                                                class="ml-auto text-[11px] text-gray-400"
-                                                >Modelo + Motor</span
-                                            >
-                                        </div>
-
-                                        <div class="flex gap-2">
-                                            <Input
-                                                v-model="
-                                                    treeEngineVinDraft[
-                                                        treeEngineVinKey(
-                                                            model.id,
-                                                            engine.id,
-                                                        )
-                                                    ]
-                                                "
-                                                maxlength="40"
-                                                placeholder="VIN (hasta 40 caracteres)"
-                                                class="font-mono text-xs uppercase"
-                                                @keyup.enter="
-                                                    handleAddTreeEngineVin(
-                                                        model.id,
-                                                        engine.id,
-                                                    )
-                                                "
-                                            />
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                :disabled="
-                                                    (
-                                                        treeEngineVinDraft[
-                                                            treeEngineVinKey(
-                                                                model.id,
-                                                                engine.id,
-                                                            )
-                                                        ] ?? ''
-                                                    ).trim().length < 1 ||
-                                                    (
-                                                        treeEngineVinDraft[
-                                                            treeEngineVinKey(
-                                                                model.id,
-                                                                engine.id,
-                                                            )
-                                                        ] ?? ''
-                                                    ).trim().length > 40 ||
-                                                    treeEngineVinAdding[
-                                                        treeEngineVinKey(
-                                                            model.id,
-                                                            engine.id,
-                                                        )
-                                                    ]
-                                                "
-                                                @click="
-                                                    handleAddTreeEngineVin(
-                                                        model.id,
-                                                        engine.id,
-                                                    )
-                                                "
-                                            >
-                                                <Plus class="h-4 w-4" />
-                                            </Button>
-                                        </div>
-
-                                        <p
-                                            v-if="
-                                                (
-                                                    treeEngineVinDraft[
-                                                        treeEngineVinKey(
-                                                            model.id,
-                                                            engine.id,
-                                                        )
-                                                    ] ?? ''
-                                                ).length > 0
-                                            "
-                                            class="text-[11px] text-gray-500"
-                                        >
+                                                {{
+                                                    (row as VehicleModelRow)
+                                                        .generation
+                                                }}
+                                            </Badge>
+                                        </td>
+                                        <td class="px-4 py-3">
                                             {{
-                                                (
-                                                    treeEngineVinDraft[
-                                                        treeEngineVinKey(
-                                                            model.id,
-                                                            engine.id,
-                                                        )
-                                                    ] ?? ''
-                                                ).length
+                                                (row as VehicleModelRow)
+                                                    .vehicles_count
                                             }}
-                                            / 40 caracteres
-                                        </p>
-                                        <p
-                                            v-if="
-                                                treeEngineVinError[
-                                                    treeEngineVinKey(
-                                                        model.id,
-                                                        engine.id,
-                                                    )
-                                                ]
-                                            "
-                                            class="text-[11px] text-red-600"
-                                        >
-                                            {{
-                                                treeEngineVinError[
-                                                    treeEngineVinKey(
-                                                        model.id,
-                                                        engine.id,
-                                                    )
-                                                ]
-                                            }}
-                                        </p>
-
-                                        <div
-                                            v-if="
-                                                treeEngineVinsLoading[
-                                                    treeEngineVinKey(
-                                                        model.id,
-                                                        engine.id,
-                                                    )
-                                                ]
-                                            "
-                                            class="py-1 text-xs text-gray-400"
-                                        >
-                                            Cargando VINs...
-                                        </div>
-                                        <div
-                                            v-else-if="
-                                                (
-                                                    treeEngineVins[
-                                                        treeEngineVinKey(
-                                                            model.id,
-                                                            engine.id,
-                                                        )
-                                                    ] ?? []
-                                                ).length === 0
-                                            "
-                                            class="py-1 text-xs text-gray-400"
-                                        >
-                                            Sin VINs registrados para esta
-                                            configuración.
-                                        </div>
-                                        <ul
-                                            v-else
-                                            class="max-h-40 divide-y divide-gray-100 overflow-y-auto rounded-md border border-gray-200 bg-white dark:divide-border dark:border-border dark:bg-background"
-                                        >
-                                            <li
-                                                v-for="v in treeEngineVins[
-                                                    treeEngineVinKey(
-                                                        model.id,
-                                                        engine.id,
-                                                    )
-                                                ] ?? []"
-                                                :key="v.id"
-                                                class="flex items-center justify-between px-3 py-1.5 text-xs"
+                                        </td>
+                                    </template>
+                                    <template v-else>
+                                        <td class="px-4 py-3">
+                                            <p class="font-medium">
+                                                {{
+                                                    (
+                                                        row as VehicleConfigurationRow
+                                                    ).make.name
+                                                }}
+                                                {{
+                                                    (
+                                                        row as VehicleConfigurationRow
+                                                    ).model.name
+                                                }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-muted-foreground"
                                             >
-                                                <div
-                                                    class="min-w-0 flex-1 truncate"
-                                                >
-                                                    <span
-                                                        class="font-mono tracking-wide text-gray-800 dark:text-gray-200"
-                                                        >{{ v.vin }}</span
-                                                    >
-                                                    <span
-                                                        v-if="v.notes"
-                                                        class="ml-2 text-gray-500 dark:text-gray-400"
-                                                        >{{ v.notes }}</span
-                                                    >
-                                                    <span
-                                                        v-if="
-                                                            v.is_customer_linked &&
-                                                            !v.linked_customers
-                                                                ?.length
-                                                        "
-                                                        class="ml-2 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-                                                        title="Este VIN se elimina desde la ficha del cliente"
-                                                        >Cliente</span
-                                                    >
-                                                    <span
-                                                        v-else-if="
-                                                            v.linked_customers
-                                                                ?.length
-                                                        "
-                                                        class="ml-2 inline-flex items-center gap-1 align-middle"
-                                                    >
-                                                        <Link
-                                                            :href="`/customers/${v.linked_customers[0].id}`"
-                                                            class="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 underline-offset-2 hover:border-amber-300 hover:bg-amber-100 hover:underline"
-                                                            title="Abrir ficha del cliente"
-                                                        >
-                                                            {{
-                                                                v
-                                                                    .linked_customers[0]
-                                                                    .name
-                                                            }}
-                                                        </Link>
-                                                        <span
-                                                            v-if="
-                                                                v
-                                                                    .linked_customers
-                                                                    .length > 1
-                                                            "
-                                                            class="rounded-full border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600"
-                                                            :title="`${v.linked_customers.length} clientes activos con este VIN`"
-                                                        >
-                                                            +{{
-                                                                v
-                                                                    .linked_customers
-                                                                    .length - 1
-                                                            }}
-                                                        </span>
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    v-if="!v.is_customer_linked"
-                                                    type="button"
-                                                    class="ml-2 text-red-500 hover:text-red-700"
-                                                    @click="
-                                                        handleRemoveTreeEngineVin(
-                                                            model.id,
-                                                            engine.id,
-                                                            v.id,
-                                                        )
+                                                {{
+                                                    yearLabel(
+                                                        (
+                                                            row as VehicleConfigurationRow
+                                                        ).model,
+                                                    )
+                                                }}
+                                                <span
+                                                    v-if="
+                                                        (
+                                                            row as VehicleConfigurationRow
+                                                        ).model.generation
                                                     "
                                                 >
-                                                    <X class="h-3.5 w-3.5" />
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </div>
+                                                    •
+                                                    {{
+                                                        (
+                                                            row as VehicleConfigurationRow
+                                                        ).model.generation
+                                                    }}
+                                                </span>
+                                            </p>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <p class="font-mono font-medium">
+                                                {{
+                                                    (
+                                                        row as VehicleConfigurationRow
+                                                    ).engine.engine_code
+                                                }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-muted-foreground"
+                                            >
+                                                {{
+                                                    engineSpecs(
+                                                        (
+                                                            row as VehicleConfigurationRow
+                                                        ).engine,
+                                                    )
+                                                }}
+                                            </p>
+                                        </td>
+                                        <td class="max-w-md px-4 py-3">
+                                            <div
+                                                v-if="
+                                                    (
+                                                        row as VehicleConfigurationRow
+                                                    ).vins.length
+                                                "
+                                                class="flex flex-wrap gap-1"
+                                            >
+                                                <Badge
+                                                    v-for="vin in (
+                                                        row as VehicleConfigurationRow
+                                                    ).vins"
+                                                    :key="vin.id ?? vin.vin"
+                                                    variant="outline"
+                                                    class="font-mono"
+                                                >
+                                                    {{ vin.vin }}
+                                                </Badge>
+                                            </div>
+                                            <span
+                                                v-else
+                                                class="text-muted-foreground"
+                                                >Sin VIN</span
+                                            >
+                                        </td>
+                                    </template>
+                                    <td v-if="canManage" class="px-4 py-3">
+                                        <div class="flex justify-end gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                title="Editar"
+                                                @click="openEdit(row)"
+                                            >
+                                                <Pencil class="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                :disabled="
+                                                    !row.can_delete || deleting
+                                                "
+                                                :title="
+                                                    row.delete_block_reason ||
+                                                    'Eliminar'
+                                                "
+                                                @click="removeRow(row)"
+                                            >
+                                                <Trash2
+                                                    class="h-4 w-4 text-destructive"
+                                                />
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="divide-y md:hidden">
+                        <article
+                            v-for="row in rows"
+                            :key="rowKey(row)"
+                            class="space-y-3 p-4"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <template v-if="activeTab === 'makes'">
+                                        <p class="font-medium">
+                                            {{ (row as VehicleMakeRow).name }}
+                                        </p>
+                                        <p
+                                            class="text-sm text-muted-foreground"
+                                        >
+                                            {{
+                                                (row as VehicleMakeRow)
+                                                    .models_count
+                                            }}
+                                            modelos •
+                                            {{
+                                                (row as VehicleMakeRow)
+                                                    .engines_count
+                                            }}
+                                            motores •
+                                            {{
+                                                (row as VehicleMakeRow)
+                                                    .vehicles_count
+                                            }}
+                                            vehículos
+                                        </p>
+                                    </template>
+                                    <template
+                                        v-else-if="activeTab === 'engines'"
+                                    >
+                                        <p class="font-mono font-medium">
+                                            {{
+                                                (row as VehicleEngineRow)
+                                                    .engine_code
+                                            }}
+                                        </p>
+                                        <p
+                                            class="text-sm text-muted-foreground"
+                                        >
+                                            {{
+                                                (row as VehicleEngineRow).make
+                                                    ?.name
+                                            }}
+                                            •
+                                            {{
+                                                engineSpecs(
+                                                    row as VehicleEngineRow,
+                                                )
+                                            }}
+                                        </p>
+                                    </template>
+                                    <template
+                                        v-else-if="activeTab === 'models'"
+                                    >
+                                        <p class="font-medium">
+                                            {{
+                                                (row as VehicleModelRow).make
+                                                    ?.name
+                                            }}
+                                            {{ (row as VehicleModelRow).name }}
+                                        </p>
+                                        <p
+                                            class="text-sm text-muted-foreground"
+                                        >
+                                            {{
+                                                yearLabel(
+                                                    row as VehicleModelRow,
+                                                )
+                                            }}
+                                        </p>
+                                    </template>
+                                    <template v-else>
+                                        <p class="font-medium">
+                                            {{
+                                                (row as VehicleConfigurationRow)
+                                                    .make.name
+                                            }}
+                                            {{
+                                                (row as VehicleConfigurationRow)
+                                                    .model.name
+                                            }}
+                                        </p>
+                                        <p
+                                            class="font-mono text-sm text-muted-foreground"
+                                        >
+                                            {{
+                                                (row as VehicleConfigurationRow)
+                                                    .engine.engine_code
+                                            }}
+                                            •
+                                            {{
+                                                engineSpecs(
+                                                    (
+                                                        row as VehicleConfigurationRow
+                                                    ).engine,
+                                                )
+                                            }}
+                                        </p>
+                                    </template>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Modal: Make ── -->
-        <Dialog
-            :open="modalType === 'make'"
-            @update:open="
-                (v) => {
-                    if (!v) closeModal();
-                }
-            "
-        >
-            <DialogContent class="sm:max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>{{
-                        editingId ? 'Editar Marca' : 'Nueva Marca'
-                    }}</DialogTitle>
-                </DialogHeader>
-                <form
-                    @submit.prevent="submitMake"
-                    @keydown.enter="
-                        (e: KeyboardEvent) => {
-                            if ((e.target as HTMLElement)?.tagName === 'INPUT')
-                                e.preventDefault();
-                        }
-                    "
-                    class="space-y-4 py-2"
-                >
-                    <div class="space-y-2">
-                        <Label>Nombre</Label>
-                        <Input
-                            v-model="makeForm.name"
-                            required
-                            placeholder="Ej: Toyota, Honda"
-                        />
-                    </div>
-                    <div v-if="modalError" class="text-sm text-red-600">
-                        {{ modalError }}
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="closeModal"
-                            >Cancelar</Button
-                        >
-                        <Button type="submit" :disabled="processing">{{
-                            processing ? 'Guardando...' : 'Guardar'
-                        }}</Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-
-        <!-- ── Modal: Model ── -->
-        <Dialog
-            :open="modalType === 'model'"
-            @update:open="
-                (v) => {
-                    if (!v) closeModal();
-                }
-            "
-        >
-            <DialogContent class="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>{{
-                        editingId ? 'Editar Modelo' : 'Nuevo Modelo'
-                    }}</DialogTitle>
-                </DialogHeader>
-                <form
-                    @submit.prevent="submitModel"
-                    @keydown.enter="
-                        (e: KeyboardEvent) => {
-                            if ((e.target as HTMLElement)?.tagName === 'INPUT')
-                                e.preventDefault();
-                        }
-                    "
-                    class="space-y-4 py-2"
-                >
-                    <div class="space-y-2">
-                        <Label>Nombre del Modelo</Label>
-                        <Input
-                            v-model="modelForm.name"
-                            required
-                            placeholder="Ej: Corolla, Civic, Hilux"
-                        />
-                    </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="space-y-2">
-                            <Label>Año Desde</Label>
-                            <Input
-                                v-model.number="modelForm.year_from"
-                                type="number"
-                                placeholder="2005"
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Año Hasta</Label>
-                            <Input
-                                v-model.number="modelForm.year_to"
-                                type="number"
-                                placeholder="2024"
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Chasis</Label>
-                            <SearchableSelect
-                                :model-value="selectedModelChassisId"
-                                :options="chassisSelectOptions"
-                                :loading="allChassisLoading"
-                                :clearable="true"
-                                placeholder="Selecciona chasis"
-                                search-placeholder="Buscar por código o descripción..."
-                                loading-text="Cargando chasis..."
-                                @update:model-value="handleModelChassisChange"
-                            />
-                            <Input
-                                v-model="modelForm.generation"
-                                placeholder="O escribe codigo de chasis (ej: E170)"
-                                maxlength="20"
-                                @input="handleModelGenerationInput"
-                            />
-                        </div>
-                    </div>
-                    <p class="text-xs text-gray-500">
-                        El chasis se sincroniza automáticamente con la
-                        generación del modelo.
-                    </p>
-                    <div v-if="modalError" class="text-sm text-red-600">
-                        {{ modalError }}
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="closeModal"
-                            >Cancelar</Button
-                        >
-                        <Button type="submit" :disabled="processing">{{
-                            processing ? 'Guardando...' : 'Guardar'
-                        }}</Button>
-                    </div>
-                </form>
-
-                <div v-if="editingId" class="border-t pt-4">
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                        Los VINs se registran desde el árbol, bajo cada motor,
-                        cuando el modelo tiene chasis asignado.
-                    </p>
-                </div>
-            </DialogContent>
-        </Dialog>
-
-        <!-- ── Modal: Engine (Select existing + Quick Add) ── -->
-        <Dialog
-            :open="modalType === 'engine'"
-            @update:open="
-                (v) => {
-                    if (!v) closeModal();
-                }
-            "
-        >
-            <DialogContent class="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>{{
-                        editingId ? 'Editar Motor' : 'Asignar Motor'
-                    }}</DialogTitle>
-                    <DialogDescription>{{
-                        editingId
-                            ? 'Editar datos del motor'
-                            : 'Selecciona un motor existente o crea uno nuevo'
-                    }}</DialogDescription>
-                </DialogHeader>
-
-                <!-- Mode: Assign existing engine (when not editing) -->
-                <div v-if="!editingId" class="space-y-4 py-2">
-                    <div class="space-y-2">
-                        <Label>Motor</Label>
-                        <div class="flex gap-2">
-                            <div class="flex-1">
-                                <SearchableSelect
-                                    v-model="selectedEngineId"
-                                    :options="engineSelectOptions"
-                                    :loading="allEnginesLoading"
-                                    placeholder="Buscar motor..."
-                                    loadingText="Cargando motores..."
+                                <input
+                                    v-if="canManage"
+                                    type="checkbox"
+                                    :checked="selected.has(rowKey(row))"
+                                    :disabled="!row.can_delete"
+                                    @change="toggleRow(row)"
                                 />
                             </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                @click="openQuickEngineCreate"
-                                title="Crear motor nuevo"
+                            <div
+                                v-if="activeTab === 'vehicles'"
+                                class="flex flex-wrap gap-1"
                             >
-                                <Plus class="h-4 w-4" />
-                            </Button>
-                        </div>
-                        <p
-                            v-if="
-                                engineSelectOptions.length === 0 &&
-                                !allEnginesLoading
-                            "
-                            class="text-xs text-gray-500"
-                        >
-                            No hay motores disponibles.
-                            <button
-                                type="button"
-                                class="text-blue-500 underline"
-                                @click="openQuickEngineCreate"
-                            >
-                                Crear uno nuevo
-                            </button>
-                        </p>
-                    </div>
-                    <div v-if="modalError" class="text-sm text-red-600">
-                        {{ modalError }}
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="closeModal"
-                            >Cancelar</Button
-                        >
-                        <Button
-                            type="button"
-                            :disabled="!selectedEngineId || processing"
-                            @click="assignEngineToModel"
-                        >
-                            {{ processing ? 'Asignando...' : 'Asignar Motor' }}
-                        </Button>
-                    </div>
-                </div>
-
-                <!-- Mode: Edit existing engine -->
-                <form
-                    v-else
-                    @submit.prevent="submitEngine"
-                    @keydown.enter="
-                        (e: KeyboardEvent) => {
-                            if ((e.target as HTMLElement)?.tagName === 'INPUT')
-                                e.preventDefault();
-                        }
-                    "
-                    class="space-y-4 py-2"
-                >
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <Label>Motor</Label>
-                            <Input
-                                v-model="engineForm.engine_code"
-                                required
-                                placeholder="Ej: 2AZ-FE, K20A"
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Desplazamiento</Label>
-                            <Input
-                                v-model="engineForm.displacement"
-                                placeholder="Ej: 2.4L"
-                            />
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <Label>Combustible</Label>
-                        <Input
-                            v-model="engineForm.fuel_type"
-                            placeholder="Ej: Gasolina, Diesel"
-                        />
-                    </div>
-
-                    <div class="border-t pt-4">
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                            Los VINs se registran desde el árbol principal, bajo
-                            cada motor, cuando el modelo tiene chasis asignado.
-                        </p>
-                    </div>
-
-                    <div v-if="modalError" class="text-sm text-red-600">
-                        {{ modalError }}
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="closeModal"
-                            >Cancelar</Button
-                        >
-                        <Button type="submit" :disabled="processing">{{
-                            processing ? 'Guardando...' : 'Actualizar'
-                        }}</Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-
-        <!-- ── Modal: Quick Add Engine ── -->
-        <Dialog
-            :open="modalType === 'quickEngine'"
-            @update:open="
-                (v) => {
-                    if (!v) {
-                        modalType = 'engine';
-                        duplicateConfirmed = false;
-                        modalError = null;
-                    }
-                }
-            "
-        >
-            <DialogContent class="sm:max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>Crear Motor Rápido</DialogTitle>
-                    <DialogDescription
-                        >El motor se creará y asignará al
-                        modelo</DialogDescription
-                    >
-                </DialogHeader>
-                <form
-                    @submit.prevent="submitEngine"
-                    @keydown.enter="
-                        (e: KeyboardEvent) => {
-                            if ((e.target as HTMLElement)?.tagName === 'INPUT')
-                                e.preventDefault();
-                        }
-                    "
-                    class="space-y-4 py-2"
-                >
-                    <div class="space-y-2">
-                        <Label
-                            >Código Motor
-                            <span class="text-red-500">*</span></Label
-                        >
-                        <Input
-                            v-model="engineForm.engine_code"
-                            required
-                            placeholder="Ej: 2AZ-FE, K20A"
-                        />
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <Label>Desplazamiento</Label>
-                            <Input
-                                v-model="engineForm.displacement"
-                                placeholder="Ej: 2.4L"
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Combustible</Label>
-                            <select
-                                v-model="engineForm.fuel_type"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option
-                                    v-for="option in FUEL_TYPE_OPTIONS"
-                                    :key="`quick-fuel-${option.value}`"
-                                    :value="option.value"
+                                <Badge
+                                    v-for="vin in (
+                                        row as VehicleConfigurationRow
+                                    ).vins"
+                                    :key="vin.id ?? vin.vin"
+                                    variant="outline"
+                                    class="font-mono"
                                 >
-                                    {{ option.label }}
-                                </option>
-                            </select>
-                        </div>
+                                    {{ vin.vin }}
+                                </Badge>
+                                <span
+                                    v-if="
+                                        (row as VehicleConfigurationRow).vins
+                                            .length === 0
+                                    "
+                                    class="text-sm text-muted-foreground"
+                                    >Sin VIN</span
+                                >
+                            </div>
+                            <div
+                                v-if="canManage"
+                                class="flex justify-end gap-2 border-t pt-3"
+                            >
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    @click="openEdit(row)"
+                                >
+                                    <Pencil class="mr-2 h-4 w-4" />Editar
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    :disabled="!row.can_delete || deleting"
+                                    :title="
+                                        row.delete_block_reason ?? undefined
+                                    "
+                                    @click="removeRow(row)"
+                                >
+                                    <Trash2
+                                        class="mr-2 h-4 w-4 text-destructive"
+                                    />Eliminar
+                                </Button>
+                            </div>
+                        </article>
                     </div>
-                    <div v-if="modalError" class="text-sm text-red-600">
-                        {{ modalError }}
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="
-                                () => {
-                                    modalType = 'engine';
-                                    duplicateConfirmed = false;
-                                    modalError = null;
-                                }
-                            "
-                            >Cancelar</Button
-                        >
-                        <Button
-                            type="submit"
-                            :disabled="
-                                processing || !engineForm.engine_code.trim()
-                            "
-                        >
-                            {{ processing ? 'Creando...' : 'Crear Motor' }}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
+
+                    <Pagination
+                        :pagination="meta"
+                        :loading="loading"
+                        @page-change="changePage"
+                    />
+                </template>
+            </section>
+        </div>
+
+        <VehicleCatalogDialog
+            :open="dialogOpen"
+            :tab="activeTab"
+            :row="dialogRow"
+            :makes="optionMakes"
+            :models="optionModels"
+            :engines="optionEngines"
+            :chassis="chassisList"
+            :processing="dialogProcessing"
+            :error="dialogError"
+            @close="closeDialog"
+            @save="saveDialog"
+        />
     </AppLayout>
 </template>

@@ -286,22 +286,33 @@ Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/returns/orders/
 // Vehicle Management Routes
 Route::middleware(['auth'])->prefix('vehicles')->name('vehicles.')->group(function () {
     Route::get('/overview', function () {
-        return Inertia::render('Vehicles/Overview');
+        return redirect('/vehicles');
     })->name('overview');
 
     Route::get('/', function () {
         return Inertia::render('Vehicles/Index');
     })->name('index');
 
-    // Engines (R21)
+    Route::get('/makes', fn () => redirect('/vehicles?tab=makes'))->name('makes.index');
+    Route::get('/makes/create', fn () => redirect('/vehicles?tab=makes&action=create'))
+        ->name('makes.create')->middleware('role:admin,manager');
+    Route::get('/makes/{id}/edit', fn ($id) => redirect('/vehicles?tab=makes&edit='.(int) $id))
+        ->name('makes.edit')->middleware('role:admin,manager');
+
+    Route::get('/models', fn () => redirect('/vehicles?tab=models'))->name('models.index');
+    Route::get('/models/create', fn () => redirect('/vehicles?tab=models&action=create'))
+        ->name('models.create')->middleware('role:admin,manager');
+    Route::get('/models/{id}/edit', fn ($id) => redirect('/vehicles?tab=models&edit='.(int) $id))
+        ->name('models.edit')->middleware('role:admin,manager');
+
     Route::get('/engines', function () {
-        return Inertia::render('Vehicles/Engines/Index');
+        return redirect('/vehicles?tab=engines');
     })->name('engines.index');
     Route::get('/engines/create', function () {
-        return Inertia::render('Vehicles/Engines/Create');
+        return redirect('/vehicles?tab=engines&action=create');
     })->name('engines.create')->middleware('role:admin,manager');
     Route::get('/engines/{id}/edit', function ($id) {
-        return Inertia::render('Vehicles/Engines/Edit', ['engineId' => (int) $id]);
+        return redirect('/vehicles?tab=engines&edit='.(int) $id);
     })->name('engines.edit')->middleware('role:admin,manager');
 
     // Chassis

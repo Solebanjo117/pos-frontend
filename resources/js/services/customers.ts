@@ -9,10 +9,57 @@ import type {
     CustomerVehicleFormData,
     CustomerSalesHistory,
     CustomerSalesHistoryFilters,
+    CustomerType,
 } from '@/types/customer';
 import apiClient from './api/client';
 
 export const CustomersApiService = {
+    async bulkCustomers(action: 'delete' | 'deactivate', ids: number[]) {
+        return await apiClient.post('/customers/bulk-action', { action, ids });
+    },
+
+    async bulkCustomerTypes(action: 'delete' | 'deactivate', ids: number[]) {
+        return await apiClient.post('/customer-types/bulk-action', {
+            action,
+            ids,
+        });
+    },
+
+    async exportCustomers() {
+        const response = await apiClient.get('/customers/export', {
+            responseType: 'blob',
+        });
+        const href = URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = 'clientes.xlsx';
+        link.click();
+        URL.revokeObjectURL(href);
+    },
+    async getCustomerTypes() {
+        return await apiClient.get<{ data: CustomerType[] }>('/customer-types');
+    },
+
+    async createCustomerType(data: Pick<CustomerType, 'name' | 'base_kind'>) {
+        return await apiClient.post<{ data: CustomerType }>(
+            '/customer-types',
+            data,
+        );
+    },
+
+    async updateCustomerType(
+        id: number,
+        data: Partial<Pick<CustomerType, 'name' | 'base_kind' | 'is_active'>>,
+    ) {
+        return await apiClient.put<{ data: CustomerType }>(
+            `/customer-types/${id}`,
+            data,
+        );
+    },
+
+    async deleteCustomerType(id: number) {
+        return await apiClient.delete(`/customer-types/${id}`);
+    },
     /**
      * Get paginated customers list
      */

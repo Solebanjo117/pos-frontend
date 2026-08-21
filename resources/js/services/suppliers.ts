@@ -3,7 +3,6 @@ import type {
     SupplierFilters,
     CreateSupplierData,
     UpdateSupplierData,
-    SupplierProduct,
     SupplierVariantPayload,
     SupplierPurchaseHistoryFilters,
     SupplierPurchaseHistory,
@@ -15,6 +14,39 @@ import apiClient from './api/client';
 const BASE_URL = '/suppliers';
 
 export const suppliersService = {
+    async getCatalogSummary(): Promise<{
+        categories: number;
+        brands: number;
+        suppliers: number;
+        active_suppliers: number;
+    }> {
+        const { data } = await apiClient.get('/supplier-catalog/summary');
+        return data.data;
+    },
+
+    async bulkCatalogAction(
+        entity: 'category' | 'brand' | 'supplier',
+        action: 'delete' | 'deactivate',
+        ids: number[],
+    ) {
+        return await apiClient.post('/supplier-catalog/bulk-action', {
+            entity,
+            action,
+            ids,
+        });
+    },
+
+    async exportCatalog() {
+        const response = await apiClient.get('/supplier-catalog/export', {
+            responseType: 'blob',
+        });
+        const href = URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = 'catalogo_proveedores.xlsx';
+        link.click();
+        URL.revokeObjectURL(href);
+    },
     /**
      * Get all suppliers with filters
      */

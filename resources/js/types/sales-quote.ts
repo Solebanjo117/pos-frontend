@@ -55,6 +55,17 @@ export interface SalesQuote {
     id: number;
     quote_number: string;
     customer: SalesQuoteCustomer | null;
+    customer_vehicle_id?: number | null;
+    customer_vehicle?: {
+        id: number;
+        display_name: string;
+        year?: number | null;
+        vin?: string | null;
+        plate_number?: string | null;
+        model?: { id: number; name: string } | null;
+        engine?: { id: number; engine_code: string } | null;
+        chassis?: { id: number; code: string } | null;
+    } | null;
     user: SalesQuoteUser | null;
     warehouse?: SalesQuoteWarehouse | null;
     date: string;

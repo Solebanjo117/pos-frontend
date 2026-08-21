@@ -12,7 +12,7 @@ it('redirects guests from every module hub', function (string $routeName) {
     'sales' => 'sales.index',
     'purchases' => 'purchases.index',
     'inventory' => 'inventory.overview',
-    'vehicles' => 'vehicles.overview',
+    'vehicles' => 'vehicles.index',
     'customers' => 'customers.overview',
     'finance' => 'finance.index',
     'records' => 'records.index',
@@ -37,7 +37,7 @@ it('renders every module hub for an administrator', function (string $routeName,
     ['sales.index', 'Sales/Index'],
     ['purchases.index', 'Purchases/Index'],
     ['inventory.overview', 'Inventory/Overview'],
-    ['vehicles.overview', 'Vehicles/Overview'],
+    ['vehicles.index', 'Vehicles/Index'],
     ['customers.overview', 'Customers/Overview'],
     ['finance.index', 'Finance/Index'],
     ['records.index', 'Records/Index'],
@@ -61,17 +61,17 @@ it('applies the approved role matrix to restricted hubs', function (string $role
 })->with([
     'cashier' => [
         'cashier',
-        ['cash.index', 'queues.index', 'inventory.overview', 'vehicles.overview', 'customers.overview', 'finance.index', 'settings.overview'],
+        ['cash.index', 'queues.index', 'inventory.overview', 'vehicles.index', 'customers.overview', 'finance.index', 'settings.overview'],
         ['sales.index', 'purchases.index', 'records.index', 'reports.index'],
     ],
     'buyer' => [
         'buyer',
-        ['queues.index', 'sales.index', 'purchases.index', 'inventory.overview', 'vehicles.overview', 'customers.overview', 'finance.index', 'settings.overview'],
+        ['queues.index', 'sales.index', 'purchases.index', 'inventory.overview', 'vehicles.index', 'customers.overview', 'finance.index', 'settings.overview'],
         ['cash.index', 'records.index', 'reports.index'],
     ],
     'seller' => [
         'seller',
-        ['queues.index', 'sales.index', 'inventory.overview', 'vehicles.overview', 'customers.overview', 'finance.index', 'settings.overview'],
+        ['queues.index', 'sales.index', 'inventory.overview', 'vehicles.index', 'customers.overview', 'finance.index', 'settings.overview'],
         ['cash.index', 'purchases.index', 'records.index', 'reports.index'],
     ],
 ]);

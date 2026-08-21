@@ -111,7 +111,6 @@ const dialogError = ref<string | null>(null);
 const optionMakes = ref<VehicleMakeRow[]>([]);
 const optionModels = ref<VehicleModelRow[]>([]);
 const optionEngines = ref<VehicleEngineRow[]>([]);
-const optionsLoaded = ref(false);
 
 const rowKey = (row: VehicleCatalogRow): string =>
     activeTab.value === 'vehicles'
@@ -245,8 +244,9 @@ const toggleAll = () => {
         : new Set(selectableRows.value.map(rowKey));
 };
 
-const loadOptions = async () => {
-    if (optionsLoaded.value) return;
+const loadOptions = async (tab: VehicleCatalogTab) => {
+    if (tab === 'makes') return;
+
     const common: VehicleCatalogFilters = {
         page: 1,
         per_page: 500,
@@ -254,25 +254,20 @@ const loadOptions = async () => {
         sort: 'name',
         direction: 'asc',
     };
-    const [makes, models, engines] = await Promise.all([
-        catalog.fetchRows<VehicleMakeRow>('makes', common),
-        catalog.fetchRows<VehicleModelRow>('models', common),
-        catalog.fetchRows<VehicleEngineRow>('engines', {
-            ...common,
-            sort: 'code',
-        }),
-        fetchChassis({ per_page: 500 }),
+
+    const [options] = await Promise.all([
+        catalog.fetchDialogOptions(tab, common),
+        ...(tab === 'models' ? [fetchChassis({ per_page: 500 })] : []),
     ]);
-    optionMakes.value = makes.data;
-    optionModels.value = models.data;
-    optionEngines.value = engines.data;
-    optionsLoaded.value = true;
+    optionMakes.value = options.makes;
+    optionModels.value = options.models;
+    optionEngines.value = options.engines;
 };
 const openCreate = async () => {
     dialogRow.value = null;
     dialogError.value = null;
     try {
-        await loadOptions();
+        await loadOptions(activeTab.value);
         dialogOpen.value = true;
     } catch (error: any) {
         toast.error(errorMessage(error));
@@ -282,7 +277,7 @@ const openEdit = async (row: VehicleCatalogRow) => {
     dialogRow.value = row;
     dialogError.value = null;
     try {
-        await loadOptions();
+        await loadOptions(activeTab.value);
         dialogOpen.value = true;
     } catch (error: any) {
         toast.error(errorMessage(error));
@@ -341,7 +336,6 @@ const saveDialog = async (payload: Record<string, unknown>) => {
             }
         }
         toast.success('Catálogo actualizado correctamente.');
-        optionsLoaded.value = false;
         dialogOpen.value = false;
         dialogRow.value = null;
         await refresh();
@@ -364,7 +358,6 @@ const removeRow = async (row: VehicleCatalogRow) => {
     try {
         await catalog.deleteRow(activeTab.value, row);
         toast.success('Registro eliminado correctamente.');
-        optionsLoaded.value = false;
         await refresh();
     } catch (error: any) {
         toast.error(errorMessage(error));
@@ -387,7 +380,6 @@ const removeSelected = async () => {
     try {
         await catalog.bulkDelete(activeTab.value, selectedRows.value);
         toast.success('Selección eliminada correctamente.');
-        optionsLoaded.value = false;
         await refresh();
     } catch (error: any) {
         toast.error(errorMessage(error));

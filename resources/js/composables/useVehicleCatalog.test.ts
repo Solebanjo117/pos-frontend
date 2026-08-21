@@ -42,6 +42,66 @@ describe('useVehicleCatalog', () => {
         });
     });
 
+    it('loads every backend page required by dependent selectors', async () => {
+        get.mockResolvedValueOnce({
+            data: {
+                data: [{ id: 1 }],
+                meta: { current_page: 1, last_page: 2 },
+            },
+        });
+        get.mockResolvedValueOnce({
+            data: {
+                data: [{ id: 2 }],
+                meta: { current_page: 2, last_page: 2 },
+            },
+        });
+        const filters = {
+            page: 1,
+            per_page: 500,
+            search: '',
+            sort: 'name',
+            direction: 'asc' as const,
+        };
+
+        const rows = await useVehicleCatalog().fetchAllRows('models', filters);
+
+        expect(rows).toEqual([{ id: 1 }, { id: 2 }]);
+        expect(get).toHaveBeenNthCalledWith(1, '/vehicle-models', {
+            params: { ...filters, page: 1 },
+        });
+        expect(get).toHaveBeenNthCalledWith(2, '/vehicle-models', {
+            params: { ...filters, page: 2 },
+        });
+    });
+
+    it.each([
+        ['makes', []],
+        ['models', ['/vehicle-makes']],
+        ['engines', ['/vehicle-makes', '/vehicle-models']],
+        ['vehicles', ['/vehicle-models', '/vehicle-engines']],
+    ] as const)(
+        'loads only the catalogs required by the %s modal',
+        async (tab, endpoints) => {
+            get.mockResolvedValue({
+                data: { data: [], meta: { current_page: 1, last_page: 1 } },
+            });
+            const filters = {
+                page: 1,
+                per_page: 500,
+                search: '',
+                sort: 'name',
+                direction: 'asc' as const,
+            };
+
+            await useVehicleCatalog().fetchDialogOptions(tab, filters);
+
+            expect(get).toHaveBeenCalledTimes(endpoints.length);
+            expect(
+                get.mock.calls.map((call) => String(call[0])).sort(),
+            ).toEqual([...endpoints].sort());
+        },
+    );
+
     it('sends model and engine pairs for atomic bulk deletion', async () => {
         const catalog = useVehicleCatalog();
         await catalog.bulkDelete('vehicles', [

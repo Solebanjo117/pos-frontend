@@ -1,28 +1,39 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
-    Search,
-    Plus,
-    Edit,
-    Trash2,
+    Download,
     Eye,
-    DollarSign,
-    Building2,
-    User,
-    FilterX,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    Upload,
 } from 'lucide-vue-next';
-import { ref, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import CustomerDialog from '@/components/Customers/CustomerDialog.vue';
 import Pagination from '@/components/Pagination.vue';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { useCustomers } from '@/composables/useCustomers';
+import {
+    useVehicleCatalog,
+    type VehicleConfigurationRow,
+    type VehicleCatalogSummary,
+} from '@/composables/useVehicleCatalog';
 import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem } from '@/types';
-import type { Customer } from '@/types/customer';
+import { CustomersApiService } from '@/services/customers';
+import type { Customer, CustomerType } from '@/types/customer';
+import { canManageCatalog } from '@/utils/catalogPermissions';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Clientes', href: '/customers' },
-];
-
+const page = usePage();
+const currentRole = computed(() => (page.props.auth?.user as any)?.role);
+const canManageCustomers = computed(() => canManageCatalog(currentRole.value));
+const canManageTypes = computed(() => canManageCatalog(currentRole.value));
 const {
     customers,
     loading,
@@ -35,540 +46,712 @@ const {
     fetchCustomers,
     deleteCustomer,
     applyFilters,
-    clearFilters,
 } = useCustomers();
-
-// Confirmation dialog
-const showDeleteDialog = ref(false);
-const customerToDelete = ref<Customer | null>(null);
-
-onMounted(() => {
-    fetchCustomers();
+const activeTab = ref<'customers' | 'vehicles' | 'types'>('customers');
+const vehicleCatalog = useVehicleCatalog();
+const vehicleSummary = ref<VehicleCatalogSummary>({
+    makes: 0,
+    engines: 0,
+    models: 0,
+    vehicles: 0,
 });
+const vehicleRows = ref<VehicleConfigurationRow[]>([]);
+const vehicleLoading = ref(false);
+const customerTypes = ref<CustomerType[]>([]);
+const customerDialogOpen = ref(false);
+const editingCustomer = ref<Customer | null>(null);
+const typeDialogOpen = ref(false);
+const editingType = ref<CustomerType | null>(null);
+const selectedCustomers = ref<number[]>([]);
+const selectedTypes = ref<number[]>([]);
+const typeForm = ref({
+    name: '',
+    base_kind: 'individual' as 'individual' | 'business',
+    is_active: true,
+});
+const typeError = ref<string | null>(null);
+const typeSaving = ref(false);
+const pagination = computed(() => ({
+    current_page: currentPage.value,
+    last_page: lastPage.value,
+    per_page: perPage.value,
+    total: total.value,
+}));
+const money = (value: number) => `$${Number(value || 0).toFixed(2)}`;
 
-const confirmDelete = (customer: Customer) => {
-    customerToDelete.value = customer;
-    showDeleteDialog.value = true;
-};
+async function loadTypes() {
+    const response = await CustomersApiService.getCustomerTypes();
+    customerTypes.value = response.data.data;
+}
 
-const handleDelete = async () => {
-    if (customerToDelete.value) {
-        try {
-            await deleteCustomer(customerToDelete.value.id);
-            showDeleteDialog.value = false;
-            customerToDelete.value = null;
-        } catch (err) {
-            // Error is handled in composable
-        }
+function setUrl(action?: string, id?: number) {
+    const url = new URL(window.location.href);
+    if (action) url.searchParams.set('action', action);
+    else url.searchParams.delete('action');
+    if (id) url.searchParams.set('id', String(id));
+    else url.searchParams.delete('id');
+    window.history.replaceState({}, '', url);
+}
+function selectTab(tab: 'customers' | 'vehicles' | 'types') {
+    activeTab.value = tab;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.pushState({}, '', url);
+    if (tab === 'vehicles' && vehicleRows.value.length === 0) loadVehicles();
+}
+async function loadVehicles() {
+    vehicleLoading.value = true;
+    try {
+        const [summary, rows] = await Promise.all([
+            vehicleCatalog.fetchSummary(),
+            vehicleCatalog.fetchRows<VehicleConfigurationRow>('vehicles', {
+                page: 1,
+                per_page: 15,
+                search: '',
+                sort: 'model',
+                direction: 'asc',
+            }),
+        ]);
+        vehicleSummary.value = summary;
+        vehicleRows.value = rows.data;
+    } finally {
+        vehicleLoading.value = false;
     }
-};
-
-const getStatusBadgeClass = (status: string) => {
-    return (
-        {
-            active: 'bg-green-100 text-green-800 border-green-200',
-            inactive: 'bg-gray-100 text-gray-800 border-gray-200',
-            blocked: 'bg-red-100 text-red-800 border-red-200',
-        }[status] || 'bg-gray-100 text-gray-800'
-    );
-};
-
-const getTypeBadgeClass = (type: string) => {
-    return type === 'business'
-        ? 'bg-blue-100 text-blue-800 border-blue-200'
-        : 'bg-purple-100 text-purple-800 border-purple-200';
-};
-
-const filterByType = (type: string) => {
-    filters.value.type = type as any;
-    applyFilters();
-};
-
-const filterByStatus = (status: string) => {
-    filters.value.status = status as any;
-    applyFilters();
-};
-
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN',
-    }).format(value);
-};
+}
+function openCreate() {
+    editingCustomer.value = null;
+    customerDialogOpen.value = true;
+    setUrl('create');
+}
+function openEdit(customer: Customer) {
+    editingCustomer.value = customer;
+    customerDialogOpen.value = true;
+    setUrl('edit', customer.id);
+}
+function closeCustomerDialog(value: boolean) {
+    customerDialogOpen.value = value;
+    if (!value) setUrl();
+}
+async function customerSaved() {
+    await Promise.all([fetchCustomers(currentPage.value), loadTypes()]);
+}
+async function bulkCustomers(action: 'delete' | 'deactivate') {
+    if (
+        !canManageCustomers.value ||
+        selectedCustomers.value.length === 0 ||
+        !confirm(
+            `¿Aplicar la acción a ${selectedCustomers.value.length} cliente(s)?`,
+        )
+    )
+        return;
+    try {
+        await CustomersApiService.bulkCustomers(
+            action,
+            selectedCustomers.value,
+        );
+        selectedCustomers.value = [];
+        await customerSaved();
+    } catch (exception: any) {
+        alert(
+            exception.response?.data?.message ?? 'No se aplicó ningún cambio.',
+        );
+    }
+}
+async function bulkTypes(action: 'delete' | 'deactivate') {
+    if (
+        !canManageTypes.value ||
+        selectedTypes.value.length === 0 ||
+        !confirm(`¿Aplicar la acción a ${selectedTypes.value.length} tipo(s)?`)
+    )
+        return;
+    try {
+        await CustomersApiService.bulkCustomerTypes(
+            action,
+            selectedTypes.value,
+        );
+        selectedTypes.value = [];
+        await loadTypes();
+    } catch (exception: any) {
+        alert(
+            exception.response?.data?.message ?? 'No se aplicó ningún cambio.',
+        );
+    }
+}
+async function removeCustomer(customer: Customer) {
+    if (!canManageCustomers.value) return;
+    if (!customer.can_delete) {
+        alert(
+            customer.delete_block_reason ??
+                'Desactiva este cliente para conservar su historial.',
+        );
+        return;
+    }
+    if (confirm(`¿Eliminar a ${customer.name}?`))
+        await deleteCustomer(customer.id);
+}
+function openType(type?: CustomerType) {
+    editingType.value = type ?? null;
+    typeForm.value = {
+        name: type?.name ?? '',
+        base_kind: type?.base_kind ?? 'individual',
+        is_active: type?.is_active ?? true,
+    };
+    typeError.value = null;
+    typeDialogOpen.value = true;
+}
+async function saveType() {
+    typeSaving.value = true;
+    typeError.value = null;
+    try {
+        if (editingType.value)
+            await CustomersApiService.updateCustomerType(
+                editingType.value.id,
+                typeForm.value,
+            );
+        else await CustomersApiService.createCustomerType(typeForm.value);
+        typeDialogOpen.value = false;
+        await loadTypes();
+    } catch (exception: any) {
+        typeError.value =
+            exception.response?.data?.errors?.name?.[0] ??
+            exception.response?.data?.message ??
+            'No se pudo guardar.';
+    } finally {
+        typeSaving.value = false;
+    }
+}
+async function removeType(type: CustomerType) {
+    if (!confirm(`¿Eliminar el tipo ${type.name}?`)) return;
+    try {
+        await CustomersApiService.deleteCustomerType(type.id);
+        await loadTypes();
+    } catch (exception: any) {
+        alert(
+            exception.response?.data?.message ??
+                'No se puede eliminar este tipo.',
+        );
+    }
+}
+onMounted(async () => {
+    await Promise.all([fetchCustomers(), loadTypes()]);
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get('tab');
+    if (requestedTab === 'vehicles' || requestedTab === 'types')
+        selectTab(requestedTab);
+    const action = params.get('action');
+    const id = Number(params.get('id'));
+    if (action === 'create') openCreate();
+    if (action === 'edit' && id) {
+        let customer = customers.value.find((item) => item.id === id) ?? null;
+        if (!customer)
+            customer = (await CustomersApiService.getCustomer(id)).data
+                .customer;
+        openEdit(customer);
+    }
+});
 </script>
 
 <template>
     <Head title="Clientes" />
-
-    <AppLayout :breadcrumbs="breadcrumbs">
-        <!-- Header -->
-        <div class="mb-6 flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    Clientes
-                </h1>
-                <p class="mt-1 text-gray-600 dark:text-gray-400">
-                    Gestiona tu cartera de clientes
-                </p>
-            </div>
-            <Link
-                href="/customers/create"
-                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+    <AppLayout :breadcrumbs="[{ title: 'Clientes', href: '/customers' }]">
+        <div class="space-y-5 p-1">
+            <header
+                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
-                <Plus :size="20" />
-                Nuevo Cliente
-            </Link>
-        </div>
-
-        <!-- Filters -->
-        <div class="mb-6 rounded-lg bg-white p-4 shadow-sm dark:bg-card">
-            <div class="grid gap-4 md:grid-cols-5">
-                <!-- Search -->
-                <div class="md:col-span-2">
-                    <label
-                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >Buscar</label
-                    >
-                    <div class="relative">
-                        <Search
-                            class="absolute top-2.5 left-3 text-gray-400"
-                            :size="20"
-                        />
-                        <input
-                            v-model="filters.search"
-                            type="text"
-                            placeholder="Código, nombre, email, teléfono..."
-                            class="w-full rounded-lg border border-gray-300 py-2 pr-4 pl-10 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-border dark:bg-muted dark:text-gray-100"
-                            @keyup.enter="applyFilters"
-                        />
-                    </div>
-                </div>
-
-                <!-- Type -->
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700"
-                        >Tipo</label
-                    >
-                    <select
-                        v-model="filters.type"
-                        class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-border dark:bg-muted dark:text-gray-100"
-                    >
-                        <option :value="undefined">Todos</option>
-                        <option value="individual">Individual</option>
-                        <option value="business">Empresa</option>
-                    </select>
+                    <h1 class="text-2xl font-bold">Clientes</h1>
+                    <p class="text-sm text-muted-foreground">
+                        Clientes, crédito y vehículos asociados.
+                    </p>
                 </div>
-
-                <!-- Status -->
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700"
-                        >Estado</label
-                    >
-                    <select
-                        v-model="filters.status"
-                        class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-border dark:bg-muted dark:text-gray-100"
-                    >
-                        <option :value="undefined">Todos</option>
-                        <option value="active">Activo</option>
-                        <option value="inactive">Inactivo</option>
-                        <option value="blocked">Bloqueado</option>
-                    </select>
-                </div>
-
-                <!-- Actions -->
-                <div class="flex items-end gap-2">
-                    <button
-                        @click="applyFilters"
-                        class="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                        :disabled="loading"
-                    >
-                        Filtrar
-                    </button>
-                    <button
-                        @click="clearFilters"
-                        class="rounded-lg bg-gray-200 px-4 py-2 text-gray-700 transition hover:bg-gray-300"
-                        title="Limpiar filtros"
-                    >
-                        <FilterX :size="20" />
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Summary Cards -->
-        <div class="mb-6 grid gap-4 md:grid-cols-4">
-            <div class="rounded-lg bg-white p-4 shadow-sm dark:bg-card">
-                <div class="flex items-center gap-3">
-                    <div
-                        class="rounded-lg bg-indigo-100 p-3 dark:bg-indigo-900/30"
-                    >
-                        <User
-                            :size="24"
-                            class="text-indigo-600 dark:text-indigo-400 dark:text-primary"
-                        />
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                            Total Clientes
-                        </p>
-                        <p
-                            class="text-2xl font-bold text-gray-900 dark:text-gray-100"
-                        >
-                            {{ total }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="rounded-lg bg-white p-4 shadow-sm dark:bg-card">
-                <div class="flex items-center gap-3">
-                    <div
-                        class="rounded-lg bg-green-100 p-3 dark:bg-green-900/30"
-                    >
-                        <User
-                            :size="24"
-                            class="text-green-600 dark:text-green-400"
-                        />
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                            Activos
-                        </p>
-                        <p
-                            class="text-2xl font-bold text-gray-900 dark:text-gray-100"
-                        >
-                            {{
-                                customers.filter((c) => c.status === 'active')
-                                    .length
-                            }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="rounded-lg bg-white p-4 shadow-sm dark:bg-card">
-                <div class="flex items-center gap-3">
-                    <div class="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
-                        <Building2
-                            :size="24"
-                            class="text-blue-600 dark:text-blue-400 dark:text-primary"
-                        />
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                            Empresas
-                        </p>
-                        <p
-                            class="text-2xl font-bold text-gray-900 dark:text-gray-100"
-                        >
-                            {{
-                                customers.filter((c) => c.type === 'business')
-                                    .length
-                            }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="rounded-lg bg-white p-4 shadow-sm dark:bg-card">
-                <div class="flex items-center gap-3">
-                    <div
-                        class="rounded-lg bg-yellow-100 p-3 dark:bg-yellow-900/30"
-                    >
-                        <DollarSign
-                            :size="24"
-                            class="text-yellow-600 dark:text-yellow-400"
-                        />
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                            Con Crédito
-                        </p>
-                        <p
-                            class="text-2xl font-bold text-gray-900 dark:text-gray-100"
-                        >
-                            {{
-                                customers.filter((c) => c.credit_limit > 0)
-                                    .length
-                            }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Error message -->
-        <div
-            v-if="error"
-            class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-700 dark:bg-red-900 dark:text-red-200"
-        >
-            {{ error }}
-        </div>
-
-        <!-- Table -->
-        <div class="overflow-hidden rounded-lg bg-white shadow-sm dark:bg-card">
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead
-                        class="border-b border-gray-200 bg-gray-50 dark:border-border dark:bg-muted"
-                    >
-                        <tr>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                            >
-                                Código
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-                            >
-                                Cliente
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-                            >
-                                Tipo
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-                            >
-                                Contacto
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-                            >
-                                Saldo
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-                            >
-                                L. Crédito
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-                            >
-                                Estado
-                            </th>
-                            <th
-                                class="px-6 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase"
-                            >
-                                Acciones
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody
-                        class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
-                    >
-                        <tr v-if="loading">
-                            <td
-                                colspan="8"
-                                class="px-6 py-12 text-center text-gray-500 dark:text-gray-400"
-                            >
-                                Cargando clientes...
-                            </td>
-                        </tr>
-                        <tr v-else-if="customers.length === 0">
-                            <td
-                                colspan="8"
-                                class="px-6 py-12 text-center text-gray-500 dark:text-gray-400"
-                            >
-                                No se encontraron clientes
-                            </td>
-                        </tr>
-                        <tr
-                            v-else
-                            v-for="customer in customers"
-                            :key="customer.id"
-                            class="hover:bg-gray-50 dark:hover:bg-muted/50"
-                        >
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <Link
-                                    :href="`/customers/${customer.id}`"
-                                    class="text-sm font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-primary"
-                                    title="Ver cliente"
-                                >
-                                    {{ customer.code }}
-                                </Link>
-                            </td>
-                            <td class="px-6 py-4">
-                                <div>
-                                    <Link
-                                        :href="`/customers/${customer.id}`"
-                                        class="text-sm font-medium text-gray-900 underline-offset-2 hover:text-indigo-600 hover:underline dark:text-gray-100 dark:hover:text-primary"
-                                        title="Ver cliente"
-                                    >
-                                        {{ customer.name }}
-                                    </Link>
-                                    <div
-                                        v-if="customer.tax_id"
-                                        class="text-sm text-gray-500 dark:text-gray-400"
-                                    >
-                                        {{ customer.tax_id }}
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                                    :class="getTypeBadgeClass(customer.type)"
-                                    title="Filtrar por tipo"
-                                    @click="filterByType(customer.type)"
-                                >
-                                    <Building2
-                                        v-if="customer.type === 'business'"
-                                        :size="14"
-                                    />
-                                    <User v-else :size="14" />
-                                    {{
-                                        customer.type === 'business'
-                                            ? 'Empresa'
-                                            : 'Individual'
-                                    }}
-                                </button>
-                            </td>
-                            <td class="px-6 py-4">
-                                <div
-                                    class="text-sm text-gray-900 dark:text-gray-100"
-                                >
-                                    {{ customer.email || '-' }}
-                                </div>
-                                <div
-                                    class="text-sm text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ customer.phone || '-' }}
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <Link
-                                    v-if="customer.current_balance > 0"
-                                    :href="`/ar?customer_id=${customer.id}`"
-                                    class="text-sm font-medium"
-                                    :class="'text-red-600 underline-offset-2 hover:underline'"
-                                    title="Ver cuenta por cobrar"
-                                >
-                                    {{
-                                        formatCurrency(customer.current_balance)
-                                    }}
-                                </Link>
-                                <span
-                                    v-else
-                                    class="text-sm font-medium text-gray-900"
-                                >
-                                    {{
-                                        formatCurrency(customer.current_balance)
-                                    }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span
-                                    class="text-sm text-gray-900 dark:text-gray-100"
-                                >
-                                    {{ formatCurrency(customer.credit_limit) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <button
-                                    type="button"
-                                    class="inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                                    :class="
-                                        getStatusBadgeClass(customer.status)
-                                    "
-                                    title="Filtrar por estado"
-                                    @click="filterByStatus(customer.status)"
-                                >
-                                    {{
-                                        customer.status === 'active'
-                                            ? 'Activo'
-                                            : customer.status === 'inactive'
-                                              ? 'Inactivo'
-                                              : 'Bloqueado'
-                                    }}
-                                </button>
-                            </td>
-                            <td
-                                class="px-6 py-4 text-right text-sm font-medium whitespace-nowrap"
-                            >
-                                <div
-                                    class="flex items-center justify-end gap-2"
-                                >
-                                    <Link
-                                        :href="`/customers/${customer.id}`"
-                                        class="text-blue-600 hover:text-blue-900 dark:text-primary"
-                                        title="Ver detalles"
-                                    >
-                                        <Eye :size="18" />
-                                    </Link>
-                                    <Link
-                                        :href="`/customers/${customer.id}/edit`"
-                                        class="text-indigo-600 hover:text-indigo-900 dark:text-primary"
-                                        title="Editar"
-                                    >
-                                        <Edit :size="18" />
-                                    </Link>
-                                    <button
-                                        @click="confirmDelete(customer)"
-                                        class="text-red-600 hover:text-red-900"
-                                        title="Eliminar"
-                                    >
-                                        <Trash2 :size="18" />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            <Pagination
-                v-if="lastPage > 1"
-                :pagination="{
-                    current_page: currentPage,
-                    last_page: lastPage,
-                    per_page: perPage,
-                    total: total,
-                }"
-                :loading="loading"
-                @page-change="fetchCustomers"
-            />
-        </div>
-
-        <!-- Delete Confirmation Dialog -->
-        <div
-            v-if="showDeleteDialog"
-            class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4"
-            @click.self="showDeleteDialog = false"
-        >
-            <div
-                class="w-full max-w-md rounded-lg border bg-white p-6 shadow-xl dark:border-border dark:bg-card"
-            >
-                <h3
-                    class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100"
+                <div
+                    class="flex flex-wrap gap-2"
+                    v-if="activeTab === 'customers'"
                 >
-                    Confirmar eliminación
-                </h3>
-                <p class="mb-6 text-gray-600 dark:text-gray-400">
-                    ¿Estás seguro de que deseas eliminar al cliente
-                    <span class="font-semibold">{{
-                        customerToDelete?.name
-                    }}</span
-                    >? Esta acción no se puede deshacer.
-                </p>
-                <div class="flex justify-end gap-3">
-                    <button
-                        @click="showDeleteDialog = false"
-                        class="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted"
+                    <Link
+                        v-if="canManageCustomers"
+                        href="/customers/import"
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
+                        ><Upload :size="17" /> Importar</Link
                     >
-                        Cancelar
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
+                        @click="CustomersApiService.exportCustomers()"
+                    >
+                        <Download :size="17" /> Exportar
                     </button>
                     <button
-                        @click="handleDelete"
-                        class="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                        class="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground"
+                        @click="openCreate"
+                    >
+                        <Plus :size="18" /> Nuevo cliente
+                    </button>
+                </div>
+                <button
+                    v-else-if="canManageTypes"
+                    class="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground"
+                    @click="openType()"
+                >
+                    <Plus :size="18" /> Nuevo tipo
+                </button>
+            </header>
+            <div class="flex gap-1 rounded-lg border bg-muted/30 p-1">
+                <button
+                    class="rounded-md px-4 py-2 text-sm"
+                    :class="
+                        activeTab === 'customers'
+                            ? 'bg-background shadow-sm'
+                            : ''
+                    "
+                    @click="selectTab('customers')"
+                >
+                    Clientes
+                    <span class="ml-1 text-muted-foreground">{{ total }}</span>
+                </button>
+                <button
+                    class="rounded-md px-4 py-2 text-sm"
+                    :class="
+                        activeTab === 'vehicles'
+                            ? 'bg-background shadow-sm'
+                            : ''
+                    "
+                    @click="selectTab('vehicles')"
+                >
+                    Vehículos
+                    <span class="ml-1 text-muted-foreground">{{
+                        vehicleSummary.vehicles
+                    }}</span>
+                </button>
+                <button
+                    class="rounded-md px-4 py-2 text-sm"
+                    :class="
+                        activeTab === 'types' ? 'bg-background shadow-sm' : ''
+                    "
+                    @click="selectTab('types')"
+                >
+                    Tipos
+                    <span class="ml-1 text-muted-foreground">{{
+                        customerTypes.length
+                    }}</span>
+                </button>
+            </div>
+            <template v-if="activeTab === 'customers'">
+                <div
+                    v-if="canManageCustomers && selectedCustomers.length"
+                    class="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm"
+                >
+                    <span>{{ selectedCustomers.length }} seleccionado(s)</span>
+                    <button
+                        class="rounded-md border px-3 py-1.5"
+                        @click="bulkCustomers('deactivate')"
+                    >
+                        Desactivar
+                    </button>
+                    <button
+                        class="rounded-md border border-destructive/40 px-3 py-1.5 text-destructive"
+                        @click="bulkCustomers('delete')"
                     >
                         Eliminar
                     </button>
                 </div>
+                <div
+                    class="flex flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row"
+                >
+                    <div class="relative flex-1">
+                        <Search
+                            class="absolute top-2.5 left-3 text-muted-foreground"
+                            :size="18"
+                        /><input
+                            v-model="filters.search"
+                            class="w-full rounded-md border bg-background py-2 pr-3 pl-10"
+                            placeholder="Nombre, empresa, RUC, VIN o placa"
+                            @keyup.enter="applyFilters"
+                        />
+                    </div>
+                    <select
+                        v-model="filters.customer_type_id"
+                        class="rounded-md border bg-background px-3 py-2"
+                        @change="applyFilters"
+                    >
+                        <option :value="undefined">Todos los tipos</option>
+                        <option
+                            v-for="type in customerTypes"
+                            :key="type.id"
+                            :value="type.id"
+                        >
+                            {{ type.name }}
+                        </option>
+                    </select>
+                    <button
+                        class="rounded-md border px-4 py-2"
+                        :disabled="loading"
+                        @click="applyFilters"
+                    >
+                        Buscar
+                    </button>
+                </div>
+                <div
+                    v-if="error"
+                    class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive"
+                >
+                    {{ error }}
+                </div>
+                <div class="overflow-hidden rounded-lg border bg-card">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead
+                                class="border-b bg-muted/40 text-left text-xs text-muted-foreground uppercase"
+                            >
+                                <tr>
+                                    <th
+                                        v-if="canManageCustomers"
+                                        class="w-10 px-4 py-3"
+                                    >
+                                        <span class="sr-only">Seleccionar</span>
+                                    </th>
+                                    <th class="px-4 py-3">Cliente</th>
+                                    <th class="px-4 py-3">Tipo</th>
+                                    <th class="px-4 py-3">Contacto</th>
+                                    <th class="px-4 py-3">Vehículos</th>
+                                    <th class="px-4 py-3 text-right">Saldo</th>
+                                    <th class="px-4 py-3 text-right">
+                                        Acciones
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr v-if="loading">
+                                    <td
+                                        :colspan="canManageCustomers ? 7 : 6"
+                                        class="px-4 py-10 text-center text-muted-foreground"
+                                    >
+                                        Cargando...
+                                    </td>
+                                </tr>
+                                <tr v-else-if="customers.length === 0">
+                                    <td
+                                        :colspan="canManageCustomers ? 7 : 6"
+                                        class="px-4 py-10 text-center text-muted-foreground"
+                                    >
+                                        No se encontraron clientes.
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-for="customer in customers"
+                                    v-else
+                                    :key="customer.id"
+                                    class="hover:bg-muted/30"
+                                >
+                                    <td
+                                        v-if="canManageCustomers"
+                                        class="px-4 py-3"
+                                    >
+                                        <input
+                                            v-model="selectedCustomers"
+                                            type="checkbox"
+                                            :value="customer.id"
+                                            :aria-label="`Seleccionar ${customer.name}`"
+                                        />
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <Link
+                                            :href="`/customers/${customer.id}`"
+                                            class="font-semibold hover:underline"
+                                            >{{ customer.name }}</Link
+                                        >
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            {{
+                                                customer.tax_name ||
+                                                customer.tax_id ||
+                                                customer.code
+                                            }}
+                                        </p>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        {{
+                                            customer.customer_type?.name ||
+                                            (customer.type === 'business'
+                                                ? 'Empresa'
+                                                : 'Individual')
+                                        }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p>{{ customer.phone || '-' }}</p>
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            {{ customer.email || '-' }}
+                                        </p>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        {{
+                                            customer.vehicles?.filter(
+                                                (v) => v.status === 'active',
+                                            ).length || 0
+                                        }}
+                                        asociado(s)
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right font-mono"
+                                        :class="
+                                            customer.current_balance > 0
+                                                ? 'text-destructive'
+                                                : ''
+                                        "
+                                    >
+                                        {{ money(customer.current_balance) }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex justify-end gap-1">
+                                            <Link
+                                                :href="`/customers/${customer.id}`"
+                                                class="rounded-md p-2 hover:bg-muted"
+                                                ><Eye :size="16" /></Link
+                                            ><button
+                                                class="rounded-md p-2 hover:bg-muted"
+                                                @click="openEdit(customer)"
+                                            >
+                                                <Pencil :size="16" /></button
+                                            ><button
+                                                v-if="canManageCustomers"
+                                                class="rounded-md p-2 text-destructive hover:bg-destructive/10"
+                                                :title="
+                                                    customer.delete_block_reason ||
+                                                    'Eliminar'
+                                                "
+                                                @click="
+                                                    removeCustomer(customer)
+                                                "
+                                            >
+                                                <Trash2 :size="16" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <Pagination
+                        v-if="lastPage > 1"
+                        :pagination="pagination"
+                        :loading="loading"
+                        @page-change="fetchCustomers"
+                    />
+                </div>
+            </template>
+            <div
+                v-else-if="activeTab === 'vehicles'"
+                class="overflow-hidden rounded-lg border bg-card"
+            >
+                <div class="flex items-center justify-between border-b p-4">
+                    <div>
+                        <h2 class="font-semibold">
+                            Catálogo compartido de vehículos
+                        </h2>
+                        <p class="text-sm text-muted-foreground">
+                            Configuraciones reales usadas por clientes, ventas y
+                            compatibilidades.
+                        </p>
+                    </div>
+                    <Link
+                        href="/vehicles"
+                        class="rounded-md border px-3 py-2 text-sm"
+                        >Abrir administrador</Link
+                    >
+                </div>
+                <div
+                    v-if="vehicleLoading"
+                    class="p-10 text-center text-muted-foreground"
+                >
+                    Cargando vehículos...
+                </div>
+                <div v-else class="divide-y">
+                    <div
+                        v-for="row in vehicleRows"
+                        :key="row.key"
+                        class="grid gap-2 p-4 sm:grid-cols-[1fr_1fr_auto]"
+                    >
+                        <div>
+                            <p class="font-medium">
+                                {{ row.make.name }} · {{ row.model.name }}
+                            </p>
+                            <p class="text-xs text-muted-foreground">
+                                {{ row.model.year_from }}–{{
+                                    row.model.year_to
+                                }}
+                                {{ row.model.generation || '' }}
+                            </p>
+                        </div>
+                        <div>
+                            <p>{{ row.engine.engine_code }}</p>
+                            <p class="text-xs text-muted-foreground">
+                                {{
+                                    row.engine.displacement || 'Sin cilindrada'
+                                }}
+                            </p>
+                        </div>
+                        <span class="text-sm text-muted-foreground"
+                            >{{ row.vins_count }} VIN</span
+                        >
+                    </div>
+                    <p
+                        v-if="vehicleRows.length === 0"
+                        class="p-10 text-center text-muted-foreground"
+                    >
+                        No hay configuraciones registradas.
+                    </p>
+                </div>
+            </div>
+            <div v-else class="space-y-3">
+                <div
+                    v-if="canManageTypes && selectedTypes.length"
+                    class="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm"
+                >
+                    <span>{{ selectedTypes.length }} seleccionado(s)</span>
+                    <button
+                        class="rounded-md border px-3 py-1.5"
+                        @click="bulkTypes('deactivate')"
+                    >
+                        Desactivar
+                    </button>
+                    <button
+                        class="rounded-md border border-destructive/40 px-3 py-1.5 text-destructive"
+                        @click="bulkTypes('delete')"
+                    >
+                        Eliminar
+                    </button>
+                </div>
+                <div class="overflow-hidden rounded-lg border bg-card">
+                    <table class="w-full text-sm">
+                        <thead
+                            class="border-b bg-muted/40 text-left text-xs text-muted-foreground uppercase"
+                        >
+                            <tr>
+                                <th
+                                    v-if="canManageTypes"
+                                    class="w-10 px-4 py-3"
+                                >
+                                    <span class="sr-only">Seleccionar</span>
+                                </th>
+                                <th class="px-4 py-3">Tipo</th>
+                                <th class="px-4 py-3">Clasificación</th>
+                                <th class="px-4 py-3">Clientes</th>
+                                <th class="px-4 py-3">Estado</th>
+                                <th class="px-4 py-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr v-for="type in customerTypes" :key="type.id">
+                                <td v-if="canManageTypes" class="px-4 py-3">
+                                    <input
+                                        v-model="selectedTypes"
+                                        type="checkbox"
+                                        :value="type.id"
+                                        :aria-label="`Seleccionar ${type.name}`"
+                                    />
+                                </td>
+                                <td class="px-4 py-3 font-medium">
+                                    {{ type.name }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{
+                                        type.base_kind === 'business'
+                                            ? 'Empresa'
+                                            : 'Persona'
+                                    }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ type.customers_count || 0 }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ type.is_active ? 'Activo' : 'Inactivo' }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div
+                                        v-if="canManageTypes"
+                                        class="flex justify-end gap-1"
+                                    >
+                                        <button
+                                            class="rounded-md p-2 hover:bg-muted"
+                                            @click="openType(type)"
+                                        >
+                                            <Pencil :size="16" /></button
+                                        ><button
+                                            class="rounded-md p-2 text-destructive"
+                                            @click="removeType(type)"
+                                        >
+                                            <Trash2 :size="16" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
+        <CustomerDialog
+            :open="customerDialogOpen"
+            :customer="editingCustomer"
+            :customer-types="customerTypes"
+            @update:open="closeCustomerDialog"
+            @saved="customerSaved"
+        />
+        <Dialog v-model:open="typeDialogOpen"
+            ><DialogContent
+                ><DialogHeader
+                    ><DialogTitle>{{
+                        editingType ? 'Editar tipo' : 'Nuevo tipo'
+                    }}</DialogTitle></DialogHeader
+                >
+                <form class="space-y-4" @submit.prevent="saveType">
+                    <div v-if="typeError" class="text-sm text-destructive">
+                        {{ typeError }}
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Nombre</label
+                        ><input
+                            v-model="typeForm.name"
+                            required
+                            class="w-full rounded-md border bg-background px-3 py-2"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium"
+                            >Clasificación base</label
+                        ><select
+                            v-model="typeForm.base_kind"
+                            class="w-full rounded-md border bg-background px-3 py-2"
+                        >
+                            <option value="individual">Persona</option>
+                            <option value="business">Empresa</option>
+                        </select>
+                    </div>
+                    <label
+                        v-if="editingType"
+                        class="flex items-center gap-2 text-sm"
+                        ><input v-model="typeForm.is_active" type="checkbox" />
+                        Activo</label
+                    ><DialogFooter
+                        ><button
+                            type="button"
+                            class="rounded-md border px-4 py-2"
+                            @click="typeDialogOpen = false"
+                        >
+                            Cancelar</button
+                        ><button
+                            type="submit"
+                            class="rounded-md bg-primary px-4 py-2 text-primary-foreground"
+                            :disabled="typeSaving"
+                        >
+                            {{ typeSaving ? 'Guardando...' : 'Guardar' }}
+                        </button></DialogFooter
+                    >
+                </form></DialogContent
+            ></Dialog
+        >
     </AppLayout>
 </template>

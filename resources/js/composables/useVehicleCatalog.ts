@@ -122,6 +122,58 @@ export function useVehicleCatalog() {
         return response.data;
     };
 
+    const fetchAllRows = async <T extends VehicleCatalogRow>(
+        tab: VehicleCatalogTab,
+        filters: VehicleCatalogFilters,
+    ): Promise<T[]> => {
+        const data: T[] = [];
+        let page = 1;
+        let lastPage = 1;
+
+        do {
+            const response = await fetchRows<T>(tab, { ...filters, page });
+            data.push(...response.data);
+            lastPage = Math.max(Number(response.meta.last_page) || 1, 1);
+            page += 1;
+        } while (page <= lastPage);
+
+        return data;
+    };
+
+    const fetchDialogOptions = async (
+        tab: VehicleCatalogTab,
+        filters: VehicleCatalogFilters,
+    ): Promise<{
+        makes: VehicleMakeRow[];
+        models: VehicleModelRow[];
+        engines: VehicleEngineRow[];
+    }> => {
+        if (tab === 'makes') return { makes: [], models: [], engines: [] };
+        if (tab === 'models') {
+            return {
+                makes: await fetchAllRows<VehicleMakeRow>('makes', filters),
+                models: [],
+                engines: [],
+            };
+        }
+        if (tab === 'engines') {
+            const [makes, models] = await Promise.all([
+                fetchAllRows<VehicleMakeRow>('makes', filters),
+                fetchAllRows<VehicleModelRow>('models', filters),
+            ]);
+            return { makes, models, engines: [] };
+        }
+
+        const [models, engines] = await Promise.all([
+            fetchAllRows<VehicleModelRow>('models', filters),
+            fetchAllRows<VehicleEngineRow>('engines', {
+                ...filters,
+                sort: 'code',
+            }),
+        ]);
+        return { makes: [], models, engines };
+    };
+
     const fetchRow = async <T extends VehicleCatalogRow>(
         tab: Exclude<VehicleCatalogTab, 'vehicles'>,
         id: number,
@@ -245,6 +297,8 @@ export function useVehicleCatalog() {
     return {
         fetchSummary,
         fetchRows,
+        fetchAllRows,
+        fetchDialogOptions,
         fetchRow,
         createMake,
         updateMake,

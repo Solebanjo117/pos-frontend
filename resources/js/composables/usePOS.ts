@@ -55,6 +55,7 @@ interface PosCartSession {
     name: string;
     cart: CartItem[];
     customer_id?: number;
+    customer_vehicle_id?: number;
     seller_id?: number; // set when session was loaded from a SalesQuote with an assigned seller
     notes: string;
     source_quote_id?: number; // set when session was loaded from a SalesQuote
@@ -200,6 +201,13 @@ const customer_id = computed({
     get: () => activeSession.value.customer_id,
     set: (val) => {
         activeSession.value.customer_id = val;
+    },
+});
+
+const customer_vehicle_id = computed({
+    get: () => activeSession.value.customer_vehicle_id,
+    set: (val) => {
+        activeSession.value.customer_vehicle_id = val;
     },
 });
 
@@ -690,6 +698,7 @@ export function usePOS() {
             if (confirm('¿Limpiar todo el carrito?')) {
                 activeSession.value.cart = [];
                 activeSession.value.customer_id = undefined;
+                activeSession.value.customer_vehicle_id = undefined;
                 activeSession.value.notes = '';
                 paymentMethod.value = 'cash';
                 amountReceived.value = 0;
@@ -842,6 +851,7 @@ export function usePOS() {
             const orderData: CreateSalesOrderData = {
                 user_id: currentUser?.id, // Pass user_id from Inertia auth dynamically
                 customer_id: customer_id.value,
+                customer_vehicle_id: customer_vehicle_id.value,
                 date: new Date().toISOString().split('T')[0],
                 status: 'confirmed', // POS sales must be confirmed immediately so they appear in session summary
                 warehouse_id: currentWarehouseId.value || 1,
@@ -979,6 +989,7 @@ export function usePOS() {
             const orderData: CreateSalesOrderData = {
                 user_id: currentUser?.id, // Pass user_id from Inertia auth
                 customer_id: customer_id.value,
+                customer_vehicle_id: customer_vehicle_id.value,
                 date: new Date().toISOString().split('T')[0],
                 notes: notes.value,
                 payment_method: undefined,
@@ -1041,6 +1052,7 @@ export function usePOS() {
         id: number;
         quote_number: string;
         customer_id?: number | null;
+        customer_vehicle_id?: number | null;
         seller_id?: number | null;
         notes?: string | null;
         items: Array<{
@@ -1070,6 +1082,7 @@ export function usePOS() {
 
         const newSession = activeSession.value;
         newSession.customer_id = quote.customer_id ?? undefined;
+        newSession.customer_vehicle_id = quote.customer_vehicle_id ?? undefined;
         newSession.seller_id = quote.seller_id ?? undefined;
         newSession.notes = quote.notes ?? '';
         newSession.source_quote_id = quote.id; // ← persisted so POS can update it later
@@ -1118,6 +1131,7 @@ export function usePOS() {
         // State
         cart,
         customer_id,
+        customer_vehicle_id,
         notes,
         loading,
         error,

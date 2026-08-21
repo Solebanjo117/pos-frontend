@@ -226,15 +226,19 @@ Route::middleware(['auth'])->group(function () {
     })->name('customers.overview');
 
     Route::get('/customers/create', function () {
-        return Inertia::render('Customers/Create');
+        return redirect('/customers?action=create');
     })->name('customers.create');
+
+    Route::get('/customers/import', function () {
+        return Inertia::render('Customers/Import');
+    })->name('customers.import')->middleware('role:admin,manager');
 
     Route::get('/customers/{id}', function ($id) {
         return Inertia::render('Customers/Show', ['customerId' => (int) $id]);
     })->name('customers.show');
 
     Route::get('/customers/{id}/edit', function ($id) {
-        return Inertia::render('Customers/Edit', ['customerId' => $id]);
+        return redirect('/customers?action=edit&id='.(int) $id);
     })->name('customers.edit');
 });
 
@@ -356,7 +360,7 @@ Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
     })->name('suppliers.index');
 
     Route::get('/suppliers/create', function () {
-        return Inertia::render('Suppliers/Create');
+        return redirect('/suppliers?action=create');
     })->name('suppliers.create');
 
     Route::get('/suppliers/import', function () {
@@ -368,7 +372,7 @@ Route::middleware(['auth', 'role:admin,manager,buyer'])->group(function () {
     })->name('suppliers.show');
 
     Route::get('/suppliers/{id}/edit', function ($id) {
-        return Inertia::render('Suppliers/Edit', ['supplierId' => (int) $id]);
+        return redirect('/suppliers?action=edit&id='.(int) $id);
     })->name('suppliers.edit');
 
     // ==================== SUPPLY LIST (R29) ====================

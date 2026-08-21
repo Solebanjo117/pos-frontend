@@ -1,8 +1,19 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import UniversalImporter from '@/components/Import/UniversalImporter.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { ImporterConfig } from '@/services/import';
+import type { BreadcrumbItem } from '@/types';
+
+const returnUrl = computed(() => {
+    const requested = new URLSearchParams(window.location.search).get('return');
+    return requested?.startsWith('/vehicles') ? requested : '/vehicles';
+});
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { title: 'Vehículos', href: returnUrl.value },
+    { title: 'Importar', href: '/vehicles/import' },
+]);
 
 const importConfig: ImporterConfig = {
     entity: 'vehicles',
@@ -74,7 +85,7 @@ const importConfig: ImporterConfig = {
 
 <template>
     <Head title="Importar Vehículos" />
-    <AppLayout>
+    <AppLayout :breadcrumbs="breadcrumbs">
         <UniversalImporter :config="importConfig" />
     </AppLayout>
 </template>

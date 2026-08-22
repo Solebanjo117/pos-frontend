@@ -157,6 +157,7 @@ const handleOpenInPOS = (): void => {
         id: detail.value.quote.id,
         quote_number: detail.value.quote.quote_number,
         customer_id: detail.value.quote.customer?.id ?? null,
+        customer_vehicle_id: detail.value.quote.customer_vehicle_id ?? null,
         items: detail.value.items.map((item) => ({
             id: item.id,
             product_id: item.product?.id ?? null,
@@ -624,6 +625,21 @@ onMounted(fetchDetail);
                         </p>
                         <p class="mt-1 text-sm">
                             {{ quote.customer.email || '-' }}
+                        </p>
+                    </div>
+                    <div v-if="quote.customer_vehicle">
+                        <p class="text-xs font-bold text-slate-500 uppercase">
+                            Vehículo
+                        </p>
+                        <p class="mt-1 text-sm font-medium">
+                            {{ quote.customer_vehicle.display_name }}
+                        </p>
+                        <p class="text-xs text-slate-500">
+                            {{
+                                quote.customer_vehicle.plate_number ||
+                                quote.customer_vehicle.vin ||
+                                'Sin placa/VIN'
+                            }}
                         </p>
                     </div>
                 </div>

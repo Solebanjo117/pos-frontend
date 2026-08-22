@@ -97,6 +97,7 @@ const { defaultTaxRate } = useStoreSettings();
 const {
     cart,
     customer_id,
+    customer_vehicle_id,
     notes,
     loading,
     error,
@@ -153,7 +154,7 @@ const {
     hasNextPage,
     loading: productsLoading,
 } = useProducts();
-const { customers, fetchCustomers } = useCustomers();
+const { customers, fetchCustomers, perPage: customerPerPage } = useCustomers();
 const { warehouses, fetchWarehouses } = useWarehouses();
 
 const {
@@ -1102,6 +1103,9 @@ const buildFilters = () => ({
     min_price: modalMinPrice.value,
     max_price: modalMaxPrice.value,
     in_stock: modalInStock.value || undefined,
+    vehicle_engine_id: selectedCustomerVehicle.value?.vehicle_engine_id,
+    vehicle_chassis_id:
+        selectedCustomerVehicle.value?.vehicle_chassis_id ?? undefined,
     sort: modalSort.value || undefined,
     per_page: 20,
 });
@@ -1110,6 +1114,29 @@ const buildFilters = () => ({
 const selectedCustomer = computed(() => {
     if (!customer_id.value) return null;
     return customers.value.find((c) => c.id === customer_id.value);
+});
+
+const customerVehicles = computed(() =>
+    (selectedCustomer.value?.vehicles ?? []).filter(
+        (vehicle) => vehicle.status === 'active',
+    ),
+);
+
+const selectedCustomerVehicle = computed(() =>
+    customerVehicles.value.find(
+        (vehicle) => vehicle.id === customer_vehicle_id.value,
+    ),
+);
+
+watch(customer_id, () => {
+    if (
+        customer_vehicle_id.value &&
+        !customerVehicles.value.some(
+            (vehicle) => vehicle.id === customer_vehicle_id.value,
+        )
+    ) {
+        customer_vehicle_id.value = undefined;
+    }
 });
 
 const canCheckout = computed(() => cart.value.length > 0 && !loading.value);
@@ -1583,6 +1610,7 @@ const handleSaveQuoteChanges = async () => {
 
         const res = await apiClient.put(`/sales-quotes/${quoteId}`, {
             customer_id: customer_id.value ?? null,
+            customer_vehicle_id: customer_vehicle_id.value ?? null,
             warehouse_id: currentWarehouseId.value ?? null,
             items,
         });
@@ -1644,6 +1672,7 @@ const handleSaveQuote = async () => {
 
         const res = await apiClient.post('/sales-quotes/from-pos', {
             customer_id: customer_id.value ?? null,
+            customer_vehicle_id: customer_vehicle_id.value ?? null,
             warehouse_id: currentWarehouseId.value ?? null,
             items,
         });
@@ -1882,10 +1911,11 @@ onMounted(async () => {
         }
     }
 
+    customerPerPage.value = 50;
     await Promise.all([
         fetchCategories(),
         fetchBrands(),
-        fetchCustomers({ per_page: 50 } as any),
+        fetchCustomers(1),
         fetchUsers(),
         fetchWarehouses({} as any),
     ]);
@@ -1939,6 +1969,7 @@ onMounted(async () => {
                 id: q.id,
                 quote_number: q.quote_number,
                 customer_id: q.customer?.id ?? null,
+                customer_vehicle_id: q.customer_vehicle_id ?? null,
                 items: (q.items ?? []).map((item: any) => ({
                     product_id: item.product_id ?? null,
                     product_name: item.product_name,
@@ -2474,6 +2505,42 @@ onUnmounted(() => {
                         @update:sellerId="(v) => (seller_id = v)"
                         @open-quick-customer="showQuickCustomerModal = true"
                     />
+                    <div
+                        v-if="selectedCustomer && customerVehicles.length > 0"
+                        class="mt-3 space-y-1.5"
+                    >
+                        <label
+                            for="customer-vehicle"
+                            class="text-xs font-medium text-muted-foreground"
+                        >
+                            Vehículo del cliente
+                        </label>
+                        <select
+                            id="customer-vehicle"
+                            v-model.number="customer_vehicle_id"
+                            class="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                            <option :value="undefined">
+                                Sin vehículo relacionado
+                            </option>
+                            <option
+                                v-for="vehicle in customerVehicles"
+                                :key="vehicle.id"
+                                :value="vehicle.id"
+                            >
+                                {{ vehicle.display_name }}
+                                {{
+                                    vehicle.plate_number
+                                        ? `· ${vehicle.plate_number}`
+                                        : ''
+                                }}
+                            </option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">
+                            La búsqueda de repuestos usará el motor y chasis de
+                            este vehículo.
+                        </p>
+                    </div>
                 </div>
                 <div
                     v-if="error && !props.returnMode && !props.editMode"

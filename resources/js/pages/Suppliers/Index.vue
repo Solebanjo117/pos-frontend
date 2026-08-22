@@ -1,524 +1,539 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
-    Search,
-    Plus,
+    Download,
+    Eye,
     Pencil,
+    Plus,
+    Search,
     Trash2,
-    AlertTriangle,
-    Building2,
-    Package,
     Upload,
 } from 'lucide-vue-next';
-import { computed, ref, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import Pagination from '@/components/Pagination.vue';
-import { useSuppliers } from '@/composables/useSuppliers';
+import SupplierDialog from '@/components/Suppliers/SupplierDialog.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { brandsService } from '@/services/brands';
+import { categoriesService } from '@/services/categories';
 import { suppliersService } from '@/services/suppliers';
-import type {
-    SupplierCommercialDashboard,
-    SupplierFilters,
-} from '@/types/supplier';
+import type { Brand } from '@/types/brand';
+import type { Category } from '@/types/category';
+import type { Supplier } from '@/types/supplier';
+import { canManageCatalog as hasCatalogManagementRole } from '@/utils/catalogPermissions';
 
-const {
-    suppliers,
-    loading,
-    error,
-    pagination,
-    fetchSuppliers,
-    deleteSupplier,
-} = useSuppliers();
-
-const filters = ref<SupplierFilters>({
-    search: '',
-    status: undefined,
-    per_page: 15,
-});
-const commercialDashboard = ref<SupplierCommercialDashboard | null>(null);
-const commercialDashboardLoading = ref(false);
-const commercialDashboardError = ref<string | null>(null);
-const onlyLowStockWithoutSupplier = ref(true);
-
-const productsWithoutSupplier = computed(
-    () => commercialDashboard.value?.products_without_supplier ?? [],
+type Tab = 'categories' | 'brands' | 'suppliers';
+const page = usePage();
+const canManageCatalog = computed(() =>
+    hasCatalogManagementRole((page.props.auth?.user as any)?.role),
 );
+const activeTab = ref<Tab>('categories');
+const search = ref('');
+const loading = ref(false);
+const error = ref<string | null>(null);
+const categories = ref<Category[]>([]);
+const brands = ref<Brand[]>([]);
+const suppliers = ref<Supplier[]>([]);
+const summary = ref({
+    categories: 0,
+    brands: 0,
+    suppliers: 0,
+    active_suppliers: 0,
+});
+const pagination = ref({
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+    total: 0,
+});
+const supplierDialogOpen = ref(false);
+const editingSupplier = ref<Supplier | null>(null);
+const selectedIds = ref<number[]>([]);
 
-const statusOptions = [
-    { value: '', label: 'Todos' },
-    { value: 'active', label: 'Activo' },
-    { value: 'inactive', label: 'Inactivo' },
-];
+const visibleCategories = computed(() => {
+    const term = search.value.trim().toLocaleLowerCase();
+    return term
+        ? categories.value.filter((item) =>
+              item.name.toLocaleLowerCase().includes(term),
+          )
+        : categories.value;
+});
+const importHref = computed(() => `/${activeTab.value}/import`);
 
-async function loadSuppliers(page: number = 1) {
-    const cleanFilters = { ...filters.value, page };
-    if (!cleanFilters.status) delete cleanFilters.status;
-    if (!cleanFilters.search) delete cleanFilters.search;
-    await fetchSuppliers(cleanFilters);
+function updateUrl(push = true) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', activeTab.value);
+    if (search.value) url.searchParams.set('search', search.value);
+    else url.searchParams.delete('search');
+    if (push) window.history.pushState({}, '', url);
+    else window.history.replaceState({}, '', url);
 }
 
-async function loadCommercialDashboard() {
-    commercialDashboardLoading.value = true;
-    commercialDashboardError.value = null;
-
+async function load(page = 1) {
+    loading.value = true;
+    error.value = null;
     try {
-        commercialDashboard.value =
-            await suppliersService.getCommercialDashboard({
-                only_low_stock: onlyLowStockWithoutSupplier.value,
-                per_page: 25,
+        summary.value = await suppliersService.getCatalogSummary();
+        if (activeTab.value === 'categories') {
+            categories.value = await categoriesService.getAllWithParent();
+            pagination.value = {
+                current_page: 1,
+                last_page: 1,
+                per_page: categories.value.length,
+                total: categories.value.length,
+            };
+        } else if (activeTab.value === 'brands') {
+            const response = await brandsService.getAll({
+                search: search.value || undefined,
+                page,
+                per_page: 15,
+            } as any);
+            brands.value = response.data;
+            pagination.value = {
+                current_page: response.current_page,
+                last_page: response.last_page,
+                per_page: response.per_page,
+                total: response.total,
+            };
+        } else {
+            const response = await suppliersService.getAll({
+                search: search.value || undefined,
+                page,
+                per_page: 15,
             });
-    } catch (e: any) {
-        commercialDashboardError.value =
-            e.response?.data?.message ||
-            'Error al cargar tablero comercial de proveedores';
+            suppliers.value = response.data;
+            pagination.value = {
+                current_page: response.current_page,
+                last_page: response.last_page,
+                per_page: response.per_page,
+                total: response.total,
+            };
+        }
+    } catch (exception: any) {
+        error.value =
+            exception.response?.data?.message ??
+            'No se pudo cargar el catálogo.';
     } finally {
-        commercialDashboardLoading.value = false;
+        loading.value = false;
     }
 }
 
-async function handlePageChange(page: number) {
-    await loadSuppliers(page);
+async function selectTab(tab: Tab, push = true) {
+    activeTab.value = tab;
+    search.value = '';
+    selectedIds.value = [];
+    updateUrl(push);
+    await load();
 }
-
-async function handleDelete(id: number) {
-    if (!confirm('¿Estás seguro de eliminar este proveedor?')) return;
+async function applySearch() {
+    updateUrl(false);
+    await load();
+}
+function openSupplier(supplier?: Supplier) {
+    editingSupplier.value = supplier ?? null;
+    supplierDialogOpen.value = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set('action', supplier ? 'edit' : 'create');
+    if (supplier) url.searchParams.set('id', String(supplier.id));
+    else url.searchParams.delete('id');
+    window.history.replaceState({}, '', url);
+}
+function closeSupplier(value: boolean) {
+    supplierDialogOpen.value = value;
+    if (!value) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('action');
+        url.searchParams.delete('id');
+        window.history.replaceState({}, '', url);
+    }
+}
+async function remove(
+    entity: 'category' | 'brand' | 'supplier',
+    item: { id: number; name: string },
+) {
+    if (entity !== 'supplier' && !canManageCatalog.value) return;
+    if (!confirm(`¿Eliminar ${item.name}?`)) return;
     try {
-        await deleteSupplier(id);
-        await loadSuppliers();
-    } catch (e) {
-        // Error handled in composable
+        if (entity === 'supplier') await suppliersService.delete(item.id);
+        else
+            await suppliersService.bulkCatalogAction(entity, 'delete', [
+                item.id,
+            ]);
+        await load(pagination.value.current_page);
+    } catch (exception: any) {
+        const blocked = exception.response?.data?.blocked;
+        alert(
+            blocked?.[item.id] ??
+                exception.response?.data?.message ??
+                'No se puede eliminar este registro.',
+        );
     }
+}
+async function bulk(action: 'delete' | 'deactivate') {
+    if (
+        !canManageCatalog.value ||
+        !selectedIds.value.length ||
+        !confirm(
+            `¿Aplicar la acción a ${selectedIds.value.length} registro(s)?`,
+        )
+    )
+        return;
+    const entity =
+        activeTab.value === 'categories'
+            ? 'category'
+            : activeTab.value === 'brands'
+              ? 'brand'
+              : 'supplier';
+    try {
+        await suppliersService.bulkCatalogAction(
+            entity,
+            action,
+            selectedIds.value,
+        );
+        selectedIds.value = [];
+        await load(pagination.value.current_page);
+    } catch (exception: any) {
+        alert(
+            exception.response?.data?.message ?? 'No se aplicó ningún cambio.',
+        );
+    }
+}
+async function saved() {
+    await load(pagination.value.current_page);
 }
 
 onMounted(async () => {
-    await Promise.all([loadSuppliers(), loadCommercialDashboard()]);
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    activeTab.value =
+        tab === 'brands' || tab === 'suppliers' ? tab : 'categories';
+    search.value = params.get('search') ?? '';
+    await load();
+    const action = params.get('action');
+    const id = Number(params.get('id'));
+    if (activeTab.value === 'suppliers' && action === 'create') openSupplier();
+    if (activeTab.value === 'suppliers' && action === 'edit' && id)
+        openSupplier(
+            suppliers.value.find((item) => item.id === id) ??
+                (await suppliersService.getById(id)).data,
+        );
+    window.addEventListener('popstate', () => {
+        const current = new URLSearchParams(window.location.search).get('tab');
+        selectTab(
+            current === 'brands' || current === 'suppliers'
+                ? current
+                : 'categories',
+            false,
+        );
+    });
 });
 </script>
 
 <template>
-    <Head title="Proveedores" />
-    <AppLayout>
-        <div class="space-y-6">
-            <!-- Header -->
-            <div
-                class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+    <Head title="Catálogo de proveedores" />
+    <AppLayout
+        :breadcrumbs="[
+            { title: 'Compras', href: '/purchases' },
+            { title: 'Catálogo de proveedores', href: '/suppliers' },
+        ]"
+    >
+        <div class="space-y-5">
+            <header
+                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
                 <div>
-                    <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
-                    >
-                        Proveedores
+                    <h1 class="text-2xl font-bold">
+                        Categorías, marcas y proveedores
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Gestiona tus proveedores y su información de contacto
+                    <p class="text-sm text-muted-foreground">
+                        Relaciones reales de abastecimiento, productos y
+                        compras.
                     </p>
                 </div>
-                <Link
-                    href="/suppliers/create"
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                >
-                    <Plus :size="20" />
-                    Nuevo Proveedor
-                </Link>
-                <Link
-                    href="/suppliers/import"
-                    class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
-                >
-                    <Upload :size="20" />
-                    Importar
-                </Link>
-            </div>
-
-            <div
-                v-if="commercialDashboard"
-                class="grid grid-cols-2 gap-3 lg:grid-cols-4"
-            >
-                <div
-                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                >
-                    <p class="text-xs font-semibold text-gray-500 uppercase">
-                        Proveedores activos
-                    </p>
-                    <p
-                        class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                <div class="flex flex-wrap gap-2">
+                    <Link
+                        v-if="canManageCatalog"
+                        :href="importHref"
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
+                        ><Upload :size="17" /> Importar</Link
                     >
-                        {{ commercialDashboard.summary.suppliers_count }}
-                    </p>
-                </div>
-                <div
-                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                >
-                    <p class="text-xs font-semibold text-gray-500 uppercase">
-                        Vinculos producto
-                    </p>
-                    <p
-                        class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
+                        @click="suppliersService.exportCatalog()"
                     >
-                        {{
-                            commercialDashboard.summary.supplied_variants_count
-                        }}
-                    </p>
-                </div>
-                <div
-                    class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
-                >
-                    <p class="text-xs font-semibold text-amber-700 uppercase">
-                        Sin proveedor
-                    </p>
-                    <p class="mt-2 text-2xl font-bold text-amber-700">
-                        {{
-                            commercialDashboard.summary
-                                .products_without_supplier_count
-                        }}
-                    </p>
-                </div>
-                <div
-                    class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20"
-                >
-                    <p class="text-xs font-semibold text-red-700 uppercase">
-                        Bajo stock sin proveedor
-                    </p>
-                    <p class="mt-2 text-2xl font-bold text-red-700">
-                        {{
-                            commercialDashboard.summary
-                                .low_stock_without_supplier_count
-                        }}
-                    </p>
-                </div>
-            </div>
-
-            <div
-                v-if="commercialDashboardError"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300"
-            >
-                {{ commercialDashboardError }}
-            </div>
-
-            <section
-                class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
-            >
-                <div
-                    class="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between dark:border-border"
-                >
-                    <div>
-                        <h2
-                            class="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white"
-                        >
-                            <AlertTriangle :size="18" class="text-amber-500" />
-                            Productos sin proveedor
-                        </h2>
-                        <p class="text-xs text-gray-500">
-                            Variantes sin relacion comercial para abastecer.
-                        </p>
-                    </div>
-                    <label
-                        class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"
+                        <Download :size="17" /> Exportar
+                    </button>
+                    <Link
+                        v-if="canManageCatalog && activeTab === 'categories'"
+                        href="/categories/create"
+                        class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-primary-foreground"
+                        ><Plus :size="17" /> Nueva categoría</Link
                     >
-                        <input
-                            v-model="onlyLowStockWithoutSupplier"
-                            type="checkbox"
-                            class="rounded border-gray-300"
-                            @change="loadCommercialDashboard"
-                        />
-                        Solo bajo stock
-                    </label>
+                    <Link
+                        v-else-if="canManageCatalog && activeTab === 'brands'"
+                        href="/brands/create"
+                        class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-primary-foreground"
+                        ><Plus :size="17" /> Nueva marca</Link
+                    >
+                    <button
+                        v-else-if="activeTab === 'suppliers'"
+                        class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-primary-foreground"
+                        @click="openSupplier()"
+                    >
+                        <Plus :size="17" /> Nuevo proveedor
+                    </button>
                 </div>
-                <div
-                    v-if="commercialDashboardLoading"
-                    class="p-6 text-sm text-gray-500"
-                >
-                    Cargando tablero comercial...
-                </div>
-                <div v-else class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead
-                            class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
-                        >
-                            <tr>
-                                <th class="px-3 py-2 text-left">Producto</th>
-                                <th class="px-3 py-2 text-left">Marca</th>
-                                <th class="px-3 py-2 text-left">Sucursal</th>
-                                <th class="px-3 py-2 text-right">Stock</th>
-                                <th class="px-3 py-2 text-right">Reorden</th>
-                                <th class="px-3 py-2 text-right">Accion</th>
-                            </tr>
-                        </thead>
-                        <tbody
-                            class="divide-y divide-gray-100 dark:divide-border"
-                        >
-                            <tr v-if="productsWithoutSupplier.length === 0">
-                                <td
-                                    colspan="6"
-                                    class="px-3 py-6 text-center text-gray-500"
-                                >
-                                    Sin productos pendientes bajo el filtro
-                                    actual.
-                                </td>
-                            </tr>
-                            <tr
-                                v-for="item in productsWithoutSupplier"
-                                :key="`${item.product_id}-${item.variant_id}-${item.warehouse?.id}`"
-                                class="hover:bg-gray-50 dark:hover:bg-muted/40"
-                            >
-                                <td class="px-3 py-2">
-                                    <Link
-                                        :href="`/products/${item.product_id}`"
-                                        class="font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
-                                    >
-                                        {{ item.product_name }}
-                                    </Link>
-                                    <p class="font-mono text-xs text-gray-500">
-                                        {{
-                                            item.variant_sku ||
-                                            item.product_sku ||
-                                            '-'
-                                        }}
-                                    </p>
-                                </td>
-                                <td class="px-3 py-2 text-gray-600">
-                                    {{ item.brand_name || '-' }}
-                                </td>
-                                <td class="px-3 py-2 text-gray-600">
-                                    {{ item.warehouse?.name || '-' }}
-                                </td>
-                                <td
-                                    class="px-3 py-2 text-right font-mono font-semibold"
-                                    :class="
-                                        item.needs_reorder
-                                            ? 'text-red-600'
-                                            : 'text-gray-700'
-                                    "
-                                >
-                                    {{ item.quantity_available }}
-                                </td>
-                                <td class="px-3 py-2 text-right font-mono">
-                                    {{ item.reorder_point }} /
-                                    {{ item.reorder_quantity }}
-                                </td>
-                                <td class="px-3 py-2 text-right">
-                                    <Link
-                                        :href="`/products/${item.product_id}`"
-                                        class="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200"
-                                    >
-                                        <Package :size="13" />
-                                        Ver producto
-                                    </Link>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Filters -->
-            <div
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
+            </header>
+            <nav
+                class="flex gap-1 rounded-lg border bg-muted/30 p-1"
+                aria-label="Catálogo de proveedores"
             >
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div>
-                        <label
-                            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >Buscar</label
-                        >
-                        <div class="relative">
-                            <Search
-                                class="absolute top-2.5 left-3 text-gray-400"
-                                :size="18"
-                            />
-                            <input
-                                v-model="filters.search"
-                                type="text"
-                                placeholder="Nombre, contacto, email..."
-                                class="w-full rounded-lg border border-gray-300 bg-white py-2 pr-4 pl-10 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                @input="() => loadSuppliers(1)"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label
-                            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >Estado</label
-                        >
-                        <select
-                            v-model="filters.status"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                            @change="() => loadSuppliers(1)"
-                        >
-                            <option
-                                v-for="opt in statusOptions"
-                                :key="opt.value"
-                                :value="opt.value"
-                            >
-                                {{ opt.label }}
-                            </option>
-                        </select>
-                    </div>
+                <button
+                    v-for="tab in [
+                        ['categories', 'Categorías', summary.categories],
+                        ['brands', 'Marcas', summary.brands],
+                        ['suppliers', 'Proveedores', summary.suppliers],
+                    ] as const"
+                    :key="tab[0]"
+                    class="rounded-md px-4 py-2 text-sm"
+                    :class="
+                        activeTab === tab[0] ? 'bg-background shadow-sm' : ''
+                    "
+                    @click="selectTab(tab[0])"
+                >
+                    {{ tab[1] }}
+                    <span class="ml-1 text-muted-foreground">{{ tab[2] }}</span>
+                </button>
+            </nav>
+            <div class="rounded-lg border bg-card p-4">
+                <div class="relative max-w-xl">
+                    <Search
+                        class="absolute top-2.5 left-3 text-muted-foreground"
+                        :size="18"
+                    /><input
+                        v-model="search"
+                        class="w-full rounded-md border bg-background py-2 pr-3 pl-10"
+                        placeholder="Buscar..."
+                        @keyup.enter="applySearch"
+                    />
                 </div>
             </div>
-
-            <!-- Error -->
             <div
                 v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
+                class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive"
             >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
+                {{ error }}
             </div>
-
-            <!-- Table -->
             <div
-                class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                v-if="canManageCatalog && selectedIds.length"
+                class="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm"
             >
-                <div class="overflow-x-auto">
-                    <table
-                        class="min-w-full divide-y divide-gray-200 dark:divide-border"
+                <span>{{ selectedIds.length }} seleccionado(s)</span>
+                <button
+                    v-if="activeTab !== 'categories'"
+                    class="rounded-md border px-3 py-1.5"
+                    @click="bulk('deactivate')"
+                >
+                    Desactivar
+                </button>
+                <button
+                    class="rounded-md border border-destructive/40 px-3 py-1.5 text-destructive"
+                    @click="bulk('delete')"
+                >
+                    Eliminar
+                </button>
+            </div>
+            <div class="overflow-hidden rounded-lg border bg-card">
+                <div
+                    v-if="loading"
+                    class="p-12 text-center text-muted-foreground"
+                >
+                    Cargando...
+                </div>
+                <table v-else class="w-full text-sm">
+                    <thead
+                        class="border-b bg-muted/40 text-left text-xs text-muted-foreground uppercase"
                     >
-                        <thead class="bg-gray-50 dark:bg-background">
-                            <tr>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Proveedor
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Contacto
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Teléfono
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-center text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Productos
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-center text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Estado
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                                >
-                                    Acciones
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody
-                            class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
-                        >
-                            <tr v-if="loading">
-                                <td
-                                    colspan="6"
-                                    class="px-6 py-12 text-center text-gray-500"
-                                >
-                                    <div
-                                        class="flex items-center justify-center gap-2"
-                                    >
-                                        <div
-                                            class="h-5 w-5 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                                        ></div>
-                                        Cargando...
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr v-else-if="suppliers.length === 0">
-                                <td
-                                    colspan="6"
-                                    class="px-6 py-12 text-center text-gray-500 dark:text-gray-400"
-                                >
-                                    <Building2
-                                        class="mx-auto mb-3 text-gray-300"
-                                        :size="48"
-                                    />
-                                    <p>No se encontraron proveedores</p>
-                                </td>
-                            </tr>
+                        <tr v-if="activeTab === 'categories'">
+                            <th v-if="canManageCatalog" class="w-10 p-3">
+                                <span class="sr-only">Seleccionar</span>
+                            </th>
+                            <th class="p-3">Categoría</th>
+                            <th class="p-3">Padres</th>
+                            <th class="p-3 text-right">Acciones</th>
+                        </tr>
+                        <tr v-else-if="activeTab === 'brands'">
+                            <th v-if="canManageCatalog" class="w-10 p-3">
+                                <span class="sr-only">Seleccionar</span>
+                            </th>
+                            <th class="p-3">Marca</th>
+                            <th class="p-3">Proveedores</th>
+                            <th class="p-3">Variantes</th>
+                            <th class="p-3 text-right">Acciones</th>
+                        </tr>
+                        <tr v-else>
+                            <th v-if="canManageCatalog" class="w-10 p-3">
+                                <span class="sr-only">Seleccionar</span>
+                            </th>
+                            <th class="p-3">Proveedor</th>
+                            <th class="p-3">Marcas</th>
+                            <th class="p-3">Productos</th>
+                            <th class="p-3">Estado</th>
+                            <th class="p-3 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <template v-if="activeTab === 'categories'">
                             <tr
-                                v-for="s in suppliers"
-                                :key="s.id"
-                                class="dark:hover:bg-muted/50/50 transition hover:bg-gray-50"
+                                v-for="item in visibleCategories"
+                                :key="item.id"
                             >
-                                <td class="px-6 py-4">
-                                    <Link
-                                        :href="`/suppliers/${s.id}`"
-                                        class="font-medium text-indigo-600 hover:underline dark:text-indigo-400 dark:text-primary"
-                                    >
-                                        {{ s.name }}
-                                    </Link>
-                                    <p
-                                        v-if="s.email"
-                                        class="text-sm text-gray-500 dark:text-gray-400"
-                                    >
-                                        {{ s.email }}
-                                    </p>
+                                <td v-if="canManageCatalog" class="p-3">
+                                    <input
+                                        v-model="selectedIds"
+                                        type="checkbox"
+                                        :value="item.id"
+                                        :aria-label="`Seleccionar ${item.name}`"
+                                    />
                                 </td>
-                                <td
-                                    class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
-                                >
-                                    {{ s.contact_name || '—' }}
+                                <td class="p-3 font-medium">{{ item.name }}</td>
+                                <td class="p-3 text-muted-foreground">
+                                    {{
+                                        item.parents
+                                            ?.map((p: any) => p.name)
+                                            .join(', ') || 'Raíz'
+                                    }}
                                 </td>
-                                <td
-                                    class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
-                                >
-                                    {{ s.phone || '—' }}
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <span
-                                        class="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400"
-                                    >
-                                        <Package :size="14" />
-                                        {{ s.products_count || 0 }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <span
-                                        :class="[
-                                            'rounded-full px-2 py-1 text-xs font-semibold',
-                                            s.status === 'active'
-                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                                : 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-gray-400',
-                                        ]"
-                                    >
-                                        {{
-                                            s.status === 'active'
-                                                ? 'Activo'
-                                                : 'Inactivo'
-                                        }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="p-3">
                                     <div
-                                        class="flex items-center justify-end gap-2"
+                                        v-if="canManageCatalog"
+                                        class="flex justify-end gap-1"
                                     >
                                         <Link
-                                            :href="`/suppliers/${s.id}/edit`"
-                                            class="p-2 text-gray-400 transition hover:text-indigo-600 dark:text-primary"
-                                        >
-                                            <Pencil :size="16" />
-                                        </Link>
-                                        <button
-                                            @click="handleDelete(s.id)"
-                                            class="p-2 text-gray-400 transition hover:text-red-600"
+                                            :href="`/categories/${item.id}/edit`"
+                                            class="p-2"
+                                            ><Pencil :size="16" /></Link
+                                        ><button
+                                            class="p-2 text-destructive"
+                                            @click="remove('category', item)"
                                         >
                                             <Trash2 :size="16" />
                                         </button>
                                     </div>
                                 </td>
                             </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Pagination -->
+                        </template>
+                        <template v-else-if="activeTab === 'brands'">
+                            <tr v-for="item in brands" :key="item.id">
+                                <td v-if="canManageCatalog" class="p-3">
+                                    <input
+                                        v-model="selectedIds"
+                                        type="checkbox"
+                                        :value="item.id"
+                                        :aria-label="`Seleccionar ${item.name}`"
+                                    />
+                                </td>
+                                <td class="p-3 font-medium">{{ item.name }}</td>
+                                <td class="p-3">
+                                    {{ (item as any).suppliers_count || 0 }}
+                                </td>
+                                <td class="p-3">
+                                    {{
+                                        (item as any).product_variants_count ||
+                                        0
+                                    }}
+                                </td>
+                                <td class="p-3">
+                                    <div
+                                        v-if="canManageCatalog"
+                                        class="flex justify-end gap-1"
+                                    >
+                                        <Link
+                                            :href="`/brands/${item.id}/edit`"
+                                            class="p-2"
+                                            ><Pencil :size="16" /></Link
+                                        ><button
+                                            class="p-2 text-destructive"
+                                            @click="remove('brand', item)"
+                                        >
+                                            <Trash2 :size="16" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <template v-else>
+                            <tr v-for="item in suppliers" :key="item.id">
+                                <td v-if="canManageCatalog" class="p-3">
+                                    <input
+                                        v-model="selectedIds"
+                                        type="checkbox"
+                                        :value="item.id"
+                                        :aria-label="`Seleccionar ${item.name}`"
+                                    />
+                                </td>
+                                <td class="p-3">
+                                    <Link
+                                        :href="`/suppliers/${item.id}`"
+                                        class="font-medium hover:underline"
+                                        >{{ item.name }}</Link
+                                    >
+                                    <p class="text-xs text-muted-foreground">
+                                        {{
+                                            item.contact_name ||
+                                            item.email ||
+                                            'Sin contacto'
+                                        }}
+                                    </p>
+                                </td>
+                                <td class="p-3">
+                                    {{ (item as any).brands_count || 0 }}
+                                </td>
+                                <td class="p-3">
+                                    {{ item.products_count || 0 }}
+                                </td>
+                                <td class="p-3">
+                                    {{
+                                        item.status === 'active'
+                                            ? 'Activo'
+                                            : 'Inactivo'
+                                    }}
+                                </td>
+                                <td class="p-3">
+                                    <div class="flex justify-end gap-1">
+                                        <Link
+                                            :href="`/suppliers/${item.id}`"
+                                            class="p-2"
+                                            ><Eye :size="16" /></Link
+                                        ><button
+                                            class="p-2"
+                                            @click="openSupplier(item)"
+                                        >
+                                            <Pencil :size="16" /></button
+                                        ><button
+                                            class="p-2 text-destructive"
+                                            @click="remove('supplier', item)"
+                                        >
+                                            <Trash2 :size="16" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
                 <Pagination
-                    v-if="pagination && pagination.last_page > 1"
+                    v-if="pagination.last_page > 1"
                     :pagination="pagination"
                     :loading="loading"
-                    @page-change="handlePageChange"
+                    @page-change="load"
                 />
             </div>
         </div>
+        <SupplierDialog
+            :open="supplierDialogOpen"
+            :supplier="editingSupplier"
+            @update:open="closeSupplier"
+            @saved="saved"
+        />
     </AppLayout>
 </template>

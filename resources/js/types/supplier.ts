@@ -13,6 +13,9 @@ export interface Supplier {
     status: 'active' | 'inactive';
     products_count?: number;
     brands?: Pick<Brand, 'id' | 'name'>[];
+    can_edit?: boolean;
+    can_delete?: boolean;
+    delete_block_reason?: string | null;
     created_at: string;
     updated_at: string;
     deleted_at?: string;
@@ -44,9 +47,25 @@ export interface CreateSupplierData {
     lead_time_days?: number;
     notes?: string;
     status?: 'active' | 'inactive';
+    brand_ids?: number[];
 }
 
-export interface UpdateSupplierData extends Partial<CreateSupplierData> {}
+export interface SupplierRelationshipItem {
+    id: number;
+    name: string;
+    source: 'configured' | 'purchased' | 'both';
+}
+
+export interface SupplierRelationships {
+    brands: SupplierRelationshipItem[];
+    categories: SupplierRelationshipItem[];
+    configured_products_count: number;
+    purchased_products_count: number;
+    purchase_orders_count: number;
+    accounts_payable_orders_count: number;
+}
+
+export type UpdateSupplierData = Partial<CreateSupplierData>;
 
 export interface SupplierProduct {
     id: number;

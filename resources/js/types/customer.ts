@@ -2,6 +2,8 @@ export interface Customer {
     id: number;
     code: string;
     type: 'individual' | 'business';
+    customer_type_id: number | null;
+    customer_type?: CustomerType | null;
     name: string;
     email: string | null;
     phone: string | null;
@@ -22,8 +24,20 @@ export interface Customer {
     notes: string | null;
     status: 'active' | 'inactive' | 'blocked';
     vehicles?: CustomerVehicle[];
+    can_edit?: boolean;
+    can_delete?: boolean;
+    delete_block_reason?: string | null;
     created_at: string;
     updated_at: string;
+}
+
+export interface CustomerType {
+    id: number;
+    name: string;
+    normalized_name: string;
+    base_kind: 'individual' | 'business';
+    is_active: boolean;
+    customers_count?: number;
 }
 
 export interface CustomerVehicle {
@@ -32,7 +46,10 @@ export interface CustomerVehicle {
     vehicle_model_id: number;
     vehicle_chassis_id: number | null;
     vehicle_engine_id: number;
+    vehicle_vin_id: number | null;
     vin: string | null;
+    year: number | null;
+    plate_number: string | null;
     label: string | null;
     notes: string | null;
     status: 'active' | 'inactive';
@@ -57,10 +74,14 @@ export interface CustomerVehicle {
 }
 
 export interface CustomerVehicleFormData {
+    id?: number;
     vehicle_model_id: number;
     vehicle_chassis_id: number | null;
     vehicle_engine_id: number;
+    vehicle_vin_id?: number | null;
     vin: string | null;
+    year?: number | null;
+    plate_number?: string | null;
     label?: string | null;
     notes?: string | null;
     status?: 'active' | 'inactive';
@@ -230,6 +251,7 @@ export interface CustomerSalesHistoryFilters {
 export interface CustomerFilters {
     search?: string;
     type?: 'individual' | 'business';
+    customer_type_id?: number;
     status?: 'active' | 'inactive' | 'blocked';
     has_credit?: boolean;
     order_by?: string;
@@ -238,7 +260,8 @@ export interface CustomerFilters {
 
 export interface CustomerFormData {
     code?: string;
-    type: 'individual' | 'business';
+    type?: 'individual' | 'business';
+    customer_type_id?: number;
     name: string;
     email?: string;
     phone?: string;
@@ -256,4 +279,6 @@ export interface CustomerFormData {
     notes?: string;
     status?: 'active' | 'inactive' | 'blocked';
     initial_balance?: number;
+    sync_vehicles?: boolean;
+    vehicles?: CustomerVehicleFormData[];
 }

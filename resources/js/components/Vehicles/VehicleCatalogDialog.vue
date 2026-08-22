@@ -137,6 +137,59 @@ const modelsForEngine = computed(() =>
 const pairLocked = computed(
     () => props.tab === 'vehicles' && Boolean(props.row?.delete_block_reason),
 );
+const canSubmit = computed(() => {
+    if (props.tab === 'makes') return form.name.trim().length > 0;
+    if (props.tab === 'models') {
+        return (
+            form.make_id !== null &&
+            form.name.trim().length > 0 &&
+            Number.isInteger(Number(form.year_from)) &&
+            Number.isInteger(Number(form.year_to)) &&
+            Number(form.year_from) >= 1900 &&
+            Number(form.year_to) >= Number(form.year_from) &&
+            Number(form.year_to) <= currentYear + 2
+        );
+    }
+    if (props.tab === 'engines') {
+        return (
+            form.make_id !== null &&
+            form.engine_code.trim().length > 0 &&
+            form.fuel_type.length > 0
+        );
+    }
+
+    const model = props.models.find((item) => item.id === form.model_id);
+    const engine = props.engines.find((item) => item.id === form.engine_id);
+    return Boolean(model && engine && model.make_id === engine.make_id);
+});
+
+const normalizeSelectId = (value: string | number | null): number | null => {
+    if (value === null || value === '') return null;
+    const normalized = Number(value);
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+};
+
+const handleMakeChange = (value: string | number | null) => {
+    const makeId = normalizeSelectId(value);
+    if (makeId === form.make_id) return;
+    form.make_id = makeId;
+    form.model_id = null;
+    form.engine_id = null;
+    form.model_ids = [];
+};
+
+const handleModelChange = (value: string | number | null) => {
+    const modelId = normalizeSelectId(value);
+    if (modelId === form.model_id) return;
+    form.model_id = modelId;
+    form.engine_id = null;
+    const model = props.models.find((item) => item.id === modelId);
+    form.make_id = model?.make_id ?? null;
+};
+
+const handleEngineChange = (value: string | number | null) => {
+    form.engine_id = normalizeSelectId(value);
+};
 
 const resetForm = () => {
     Object.assign(form, {
@@ -198,48 +251,6 @@ watch(
     { immediate: true },
 );
 
-watch(
-    () => form.make_id,
-    () => {
-        if (!props.open) return;
-        if (
-            form.model_id &&
-            !props.models.some(
-                (model) =>
-                    model.id === Number(form.model_id) &&
-                    model.make_id === Number(form.make_id),
-            )
-        ) {
-            form.model_id = null;
-        }
-        if (
-            form.engine_id &&
-            !props.engines.some(
-                (engine) =>
-                    engine.id === Number(form.engine_id) &&
-                    engine.make_id === Number(form.make_id),
-            )
-        ) {
-            form.engine_id = null;
-        }
-        form.model_ids = form.model_ids.filter((modelId) =>
-            props.models.some(
-                (model) =>
-                    model.id === modelId &&
-                    model.make_id === Number(form.make_id),
-            ),
-        );
-    },
-);
-
-watch(
-    () => form.model_id,
-    (modelId) => {
-        const model = props.models.find((item) => item.id === Number(modelId));
-        if (model) form.make_id = model.make_id;
-    },
-);
-
 const toggleModel = (modelId: number) => {
     form.model_ids = form.model_ids.includes(modelId)
         ? form.model_ids.filter((id) => id !== modelId)
@@ -256,6 +267,7 @@ const removeVin = (index: number) => {
 };
 
 const submit = () => {
+    if (!canSubmit.value) return;
     if (props.tab === 'makes') {
         emit('save', { name: form.name.trim() });
         return;
@@ -319,9 +331,10 @@ const submit = () => {
                     <div class="space-y-2">
                         <Label>Marca</Label>
                         <SearchableSelect
-                            v-model="form.make_id"
+                            :model-value="form.make_id"
                             :options="makeOptions"
                             placeholder="Selecciona una marca"
+                            @update:model-value="handleMakeChange"
                         />
                     </div>
                     <div class="space-y-2">
@@ -383,9 +396,10 @@ const submit = () => {
                     <div class="space-y-2">
                         <Label>Marca</Label>
                         <SearchableSelect
-                            v-model="form.make_id"
+                            :model-value="form.make_id"
                             :options="makeOptions"
                             placeholder="Selecciona una marca"
+                            @update:model-value="handleMakeChange"
                         />
                     </div>
                     <div class="grid gap-4 sm:grid-cols-2">
@@ -480,19 +494,21 @@ const submit = () => {
                         <div class="space-y-2">
                             <Label>Modelo</Label>
                             <SearchableSelect
-                                v-model="form.model_id"
+                                :model-value="form.model_id"
                                 :options="modelOptions"
                                 :disabled="pairLocked"
                                 placeholder="Selecciona un modelo"
+                                @update:model-value="handleModelChange"
                             />
                         </div>
                         <div class="space-y-2">
                             <Label>Motor</Label>
                             <SearchableSelect
-                                v-model="form.engine_id"
+                                :model-value="form.engine_id"
                                 :options="engineOptions"
                                 :disabled="pairLocked || !form.model_id"
                                 placeholder="Selecciona un motor"
+                                @update:model-value="handleEngineChange"
                             />
                         </div>
                     </div>
@@ -561,7 +577,7 @@ const submit = () => {
                     >
                         Cancelar
                     </Button>
-                    <Button type="submit" :disabled="processing">
+                    <Button type="submit" :disabled="processing || !canSubmit">
                         {{ processing ? 'Guardando…' : 'Guardar' }}
                     </Button>
                 </DialogFooter>

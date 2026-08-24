@@ -19,12 +19,18 @@ import { suppliersService } from '@/services/suppliers';
 import type { Brand } from '@/types/brand';
 import type { Category } from '@/types/category';
 import type { Supplier } from '@/types/supplier';
-import { canManageCatalog as hasCatalogManagementRole } from '@/utils/catalogPermissions';
+import {
+    canManageCatalog as hasCatalogManagementRole,
+    canManagePurchasingRecords,
+} from '@/utils/catalogPermissions';
 
 type Tab = 'categories' | 'brands' | 'suppliers';
 const page = usePage();
 const canManageCatalog = computed(() =>
     hasCatalogManagementRole((page.props.auth?.user as any)?.role),
+);
+const canManageSuppliers = computed(() =>
+    canManagePurchasingRecords((page.props.auth?.user as any)?.role),
 );
 const activeTab = ref<Tab>('categories');
 const search = ref('');
@@ -129,6 +135,7 @@ async function applySearch() {
     await load();
 }
 function openSupplier(supplier?: Supplier) {
+    if (!canManageSuppliers.value) return;
     editingSupplier.value = supplier ?? null;
     supplierDialogOpen.value = true;
     const url = new URL(window.location.href);
@@ -150,7 +157,7 @@ async function remove(
     entity: 'category' | 'brand' | 'supplier',
     item: { id: number; name: string },
 ) {
-    if (entity !== 'supplier' && !canManageCatalog.value) return;
+    if (!canManageCatalog.value) return;
     if (!confirm(`¿Eliminar ${item.name}?`)) return;
     try {
         if (entity === 'supplier') await suppliersService.delete(item.id);
@@ -275,7 +282,9 @@ onMounted(async () => {
                         ><Plus :size="17" /> Nueva marca</Link
                     >
                     <button
-                        v-else-if="activeTab === 'suppliers'"
+                        v-else-if="
+                            canManageSuppliers && activeTab === 'suppliers'
+                        "
                         class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-primary-foreground"
                         @click="openSupplier()"
                     >
@@ -505,11 +514,13 @@ onMounted(async () => {
                                             class="p-2"
                                             ><Eye :size="16" /></Link
                                         ><button
+                                            v-if="canManageSuppliers"
                                             class="p-2"
                                             @click="openSupplier(item)"
                                         >
                                             <Pencil :size="16" /></button
                                         ><button
+                                            v-if="canManageCatalog"
                                             class="p-2 text-destructive"
                                             @click="remove('supplier', item)"
                                         >

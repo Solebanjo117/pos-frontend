@@ -60,6 +60,7 @@ import { SalesOrderPaymentApiService } from '@/services/payments';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
 import { formatDuration } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 defineOptions({ layout: AppLayout });
 
@@ -1577,6 +1578,7 @@ const handleTicketClose = () => {
 const saveQuoteChangesLoading = ref(false);
 
 const handleSaveQuoteChanges = async () => {
+    if (saveQuoteChangesLoading.value) return;
     if (isStrictCashier.value) return;
     const quoteId = activeSession.value?.source_quote_id;
     if (!quoteId) return;
@@ -1642,6 +1644,7 @@ const handleSaveQuoteChanges = async () => {
 const saveQuoteLoading = ref(false);
 
 const handleSaveQuote = async () => {
+    if (saveQuoteLoading.value) return;
     if (cart.value.length === 0) {
         alert('Agrega productos al carrito antes de guardar una cotización.');
         return;
@@ -1671,6 +1674,7 @@ const handleSaveQuote = async () => {
         }));
 
         const res = await apiClient.post('/sales-quotes/from-pos', {
+            idempotency_key: createIdempotencyKey(),
             customer_id: customer_id.value ?? null,
             customer_vehicle_id: customer_vehicle_id.value ?? null,
             warehouse_id: currentWarehouseId.value ?? null,
@@ -2745,6 +2749,9 @@ onUnmounted(() => {
                         :quoteMode="props.quoteMode"
                         :can-clear="canClearCurrentCart"
                         :cashier-mode="isStrictCashier"
+                        :saving-quote="
+                            saveQuoteLoading || saveQuoteChangesLoading
+                        "
                         @clear="handleClearCurrentCart"
                         @save-quote="handleSaveQuote"
                         @save-quote-changes="handleSaveQuoteChanges"

@@ -3,9 +3,10 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { salesOrdersService } from '@/services/sales-orders';
 import type { Product } from '@/types/product';
 import type { CreateSalesOrderData } from '@/types/sales-order';
+import { roundMoney } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 import { usePosSettings } from './usePosSettings';
 import { useStoreSettings } from './useStoreSettings';
-import { roundMoney } from '@/utils/formatters';
 
 interface CartItem {
     id: string; // temporal ID for cart
@@ -804,6 +805,7 @@ export function usePOS() {
             notes?: string | null;
         }>,
     ) => {
+        if (loading.value) return false;
         if (cart.value.length === 0) {
             error.value = 'El carrito está vacío';
             return false;
@@ -849,6 +851,7 @@ export function usePOS() {
 
             const currentUser = page.props.auth?.user as any;
             const orderData: CreateSalesOrderData = {
+                idempotency_key: createIdempotencyKey(),
                 user_id: currentUser?.id, // Pass user_id from Inertia auth dynamically
                 customer_id: customer_id.value,
                 customer_vehicle_id: customer_vehicle_id.value,
@@ -972,6 +975,7 @@ export function usePOS() {
 
     // Save as draft
     const saveDraft = async () => {
+        if (loading.value) return false;
         if (cart.value.length === 0) {
             error.value = 'El carrito está vacío';
             return false;

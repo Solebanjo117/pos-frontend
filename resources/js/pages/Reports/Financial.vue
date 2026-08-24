@@ -5,6 +5,7 @@ import {
     BarChart3,
     Clock,
     FileText,
+    PiggyBank,
     RefreshCw,
     Scale,
 } from 'lucide-vue-next';
@@ -81,6 +82,8 @@ const activeTab = ref<ReportTab>(
 const activeMode = ref<ReportMode>('basic');
 const capitalMovementOpen = ref(false);
 const capitalMovementType = ref<'in' | 'out'>('in');
+const capitalMovementSubmitting = ref(false);
+const capitalMovementError = ref<string | null>(null);
 const drilldownOpen = ref(false);
 const transactionTraceOpen = ref(false);
 const transactionTraceNode = ref<TransactionTraceNode | null>(null);
@@ -123,6 +126,7 @@ const tabs: Array<{ key: ReportTab; label: string; icon: any }> = [
     { key: 'balance', label: 'Balance Sheet', icon: Scale },
     { key: 'income', label: 'Income Statement', icon: FileText },
     { key: 'credits', label: 'Creditos', icon: Clock },
+    { key: 'investment', label: 'Capital', icon: PiggyBank },
 ];
 const kpis = computed(() => {
     const totals = dailySummary.value?.totals ?? {};
@@ -510,6 +514,7 @@ const openDailySummaryDrilldown = (payload: {
 
 const openCapitalMovement = (type: 'in' | 'out') => {
     capitalMovementType.value = type;
+    capitalMovementError.value = null;
     capitalMovementOpen.value = true;
 };
 
@@ -519,12 +524,25 @@ const submitCapitalMovement = async (payload: {
     reason: string;
     movement_date: string;
     notes: string;
+    idempotency_key: string;
 }) => {
-    await storeCapitalMovement({
-        ...payload,
-        warehouse_id: filters.value.warehouse_id,
-    });
-    await loadReports();
+    if (capitalMovementSubmitting.value) return;
+    capitalMovementSubmitting.value = true;
+    capitalMovementError.value = null;
+    try {
+        await storeCapitalMovement({
+            ...payload,
+            warehouse_id: filters.value.warehouse_id,
+        });
+        await loadReports();
+        capitalMovementOpen.value = false;
+    } catch (err: any) {
+        capitalMovementError.value =
+            err.response?.data?.message ||
+            'No se pudo registrar el movimiento de capital.';
+    } finally {
+        capitalMovementSubmitting.value = false;
+    }
 };
 
 const updateCapitalMovementBusinessDatetime = (
@@ -1204,6 +1222,8 @@ watch(currentWarehouseId, (value) => {
             v-model:open="capitalMovementOpen"
             :default-type="capitalMovementType"
             :warehouse-id="filters.warehouse_id"
+            :loading="capitalMovementSubmitting"
+            :error="capitalMovementError"
             @submit="submitCapitalMovement"
         />
     </AppLayout>

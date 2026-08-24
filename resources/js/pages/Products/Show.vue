@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -32,10 +32,15 @@ import type {
     ProductPricing,
     ProductVariant,
 } from '@/types/product';
+import { canManagePurchasingRecords } from '@/utils/catalogPermissions';
 
 const props = defineProps<{
     productId: number;
 }>();
+const page = usePage();
+const canManageProducts = computed(() =>
+    canManagePurchasingRecords((page.props.auth?.user as any)?.role),
+);
 
 const {
     fetchSettings,
@@ -508,6 +513,7 @@ watch(effectiveImages, () => {
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button
+                            v-if="canManageProducts"
                             type="button"
                             :disabled="duplicating"
                             class="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-60 dark:border-border dark:bg-card dark:text-gray-200 dark:hover:bg-muted"
@@ -517,6 +523,7 @@ watch(effectiveImages, () => {
                             {{ duplicating ? 'Duplicando...' : 'Duplicar' }}
                         </button>
                         <Link
+                            v-if="canManageProducts"
                             :href="`/products/${productId}/edit`"
                             class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
                         >

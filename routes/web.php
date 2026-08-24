@@ -216,7 +216,7 @@ Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/pos-sessions', 
 })->name('pos-sessions.index');
 
 // Customers routes
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'role:admin,manager,seller,cashier'])->group(function () {
     Route::get('/customers', function () {
         return Inertia::render('Customers/Index');
     })->name('customers.index');
@@ -227,7 +227,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/customers/create', function () {
         return redirect('/customers?action=create');
-    })->name('customers.create');
+    })->name('customers.create')->middleware('role:admin,manager');
 
     Route::get('/customers/import', function () {
         return Inertia::render('Customers/Import');
@@ -239,7 +239,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/customers/{id}/edit', function ($id) {
         return redirect('/customers?action=edit&id='.(int) $id);
-    })->name('customers.edit');
+    })->name('customers.edit')->middleware('role:admin,manager');
 });
 
 // Accounts Receivable (Cuentas por Cobrar)

@@ -169,15 +169,4 @@ export const CustomersApiService = {
             last_page: number;
         }>(`/customers/${id}/transactions`, { params: { page } });
     },
-
-    /**
-     * Adjust customer balance
-     */
-    async adjustBalance(id: number, amount: number, reason: string) {
-        return await apiClient.post<{
-            message: string;
-            transaction: CustomerTransaction;
-            new_balance: number;
-        }>(`/customers/${id}/adjust-balance`, { amount, reason });
-    },
 };

@@ -19,6 +19,7 @@ import SearchableSelect, {
 } from '@/components/ui/SearchableSelect.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 defineOptions({ layout: AppLayout });
 
@@ -276,6 +277,7 @@ const fetchWarehouse = async () => {
 };
 
 const handleSave = async () => {
+    if (saving.value) return;
     if (cart.value.length === 0) {
         alert('Agrega al menos un producto a la cotización.');
         return;
@@ -284,6 +286,7 @@ const handleSave = async () => {
     saving.value = true;
     try {
         const payload = {
+            idempotency_key: createIdempotencyKey(),
             customer_id: selectedCustomerId.value || null,
             warehouse_id: warehouseId.value,
             valid_until: validUntil.value || null,

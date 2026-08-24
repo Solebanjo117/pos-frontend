@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Eye, Plus, RefreshCw, Search } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { nextTick, onMounted, ref } from 'vue';
 import FinanceAdjustmentModal from '@/components/Finance/FinanceAdjustmentModal.vue';
 import PageShell from '@/components/PageShell.vue';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,8 @@ const rows = ref<FinancialAdjustment[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const modalOpen = ref(false);
+const initialType = ref<FinancialAdjustment['type'] | null>(null);
+const initialCustomerId = ref<number | null>(null);
 const page = ref(1);
 const lastPage = ref(1);
 const total = ref(0);
@@ -73,7 +75,36 @@ function accountName(row: FinancialAdjustment): string {
 function submitted(adjustment: FinancialAdjustment): void {
     router.visit(`/finance/accounting/adjustments/${adjustment.id}`);
 }
-onMounted(load);
+onMounted(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedType = params.get('type');
+    const allowedTypes: FinancialAdjustment['type'][] = [
+        'cash',
+        'bank',
+        'inventory',
+        'sales',
+        'purchases',
+        'expenses',
+        'investment',
+        'accounts_receivable',
+        'accounts_payable',
+        'manual_correction',
+    ];
+    if (
+        requestedType &&
+        allowedTypes.includes(requestedType as FinancialAdjustment['type'])
+    ) {
+        initialType.value = requestedType as FinancialAdjustment['type'];
+    }
+    const customerId = Number(params.get('customer_id'));
+    initialCustomerId.value =
+        Number.isInteger(customerId) && customerId > 0 ? customerId : null;
+    if (params.get('create') === '1') {
+        await nextTick();
+        modalOpen.value = true;
+    }
+    void load();
+});
 </script>
 
 <template>
@@ -363,6 +394,8 @@ onMounted(load);
         </PageShell>
         <FinanceAdjustmentModal
             v-model:open="modalOpen"
+            :initial-type="initialType"
+            :initial-customer-id="initialCustomerId"
             @submitted="submitted"
         />
     </AppLayout>

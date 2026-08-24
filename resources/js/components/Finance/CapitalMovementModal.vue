@@ -9,11 +9,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 const props = defineProps<{
     open: boolean;
     defaultType?: 'in' | 'out';
     warehouseId?: number | null;
+    loading?: boolean;
+    error?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -26,6 +29,7 @@ const emit = defineEmits<{
             reason: string;
             movement_date: string;
             notes: string;
+            idempotency_key: string;
         },
     ): void;
 }>();
@@ -35,6 +39,8 @@ const amount = ref<number>(0);
 const reason = ref('');
 const movementDate = ref(new Date().toISOString().split('T')[0]);
 const notes = ref('');
+const idempotencyKey = ref('');
+const submitted = ref(false);
 
 watch(
     () => props.open,
@@ -45,20 +51,36 @@ watch(
             reason.value = '';
             movementDate.value = new Date().toISOString().split('T')[0];
             notes.value = '';
+            idempotencyKey.value = createIdempotencyKey();
+            submitted.value = false;
         }
+    },
+    { immediate: true },
+);
+watch(
+    () => props.loading,
+    (loading) => {
+        if (!loading) submitted.value = false;
     },
 );
 
 const submit = () => {
-    if (!reason.value.trim() || amount.value <= 0) return;
+    if (
+        props.loading ||
+        submitted.value ||
+        !reason.value.trim() ||
+        amount.value <= 0
+    )
+        return;
+    submitted.value = true;
     emit('submit', {
         movement_type: movementType.value,
         amount: amount.value,
         reason: reason.value,
         movement_date: movementDate.value,
         notes: notes.value,
+        idempotency_key: idempotencyKey.value,
     });
-    emit('update:open', false);
 };
 </script>
 
@@ -68,6 +90,13 @@ const submit = () => {
             <DialogHeader>
                 <DialogTitle>Movimiento de inversion</DialogTitle>
             </DialogHeader>
+            <div
+                v-if="error"
+                role="alert"
+                class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+            >
+                {{ error }}
+            </div>
             <div class="space-y-3 py-2">
                 <div class="flex gap-2">
                     <button
@@ -79,6 +108,7 @@ const submit = () => {
                                 : 'border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-400'
                         "
                         @click="movementType = 'in'"
+                        :disabled="loading"
                     >
                         Aporte
                     </button>
@@ -91,6 +121,7 @@ const submit = () => {
                                 : 'border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-400'
                         "
                         @click="movementType = 'out'"
+                        :disabled="loading"
                     >
                         Retiro
                     </button>
@@ -131,10 +162,18 @@ const submit = () => {
                 <Button
                     variant="outline"
                     size="sm"
+                    :disabled="loading"
                     @click="emit('update:open', false)"
                     >Cancelar</Button
                 >
-                <Button size="sm" @click="submit">Guardar</Button>
+                <Button
+                    size="sm"
+                    :disabled="
+                        loading || submitted || !reason.trim() || amount <= 0
+                    "
+                    @click="submit"
+                    >{{ loading ? 'Guardando…' : 'Guardar' }}</Button
+                >
             </div>
         </DialogContent>
     </Dialog>

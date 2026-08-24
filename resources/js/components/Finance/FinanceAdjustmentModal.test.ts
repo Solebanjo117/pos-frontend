@@ -18,6 +18,7 @@ const options = {
     types: [
         { value: 'cash', label: 'Efectivo' },
         { value: 'bank', label: 'Banco' },
+        { value: 'accounts_receivable', label: 'Cuentas por cobrar' },
         { value: 'manual_correction', label: 'Ajuste contable manual' },
     ],
     directions: [
@@ -40,7 +41,7 @@ const options = {
         { value: 4, label: '3999 · Contrapartida' },
     ],
     warehouses: [],
-    customers: [],
+    customers: [{ value: 7, label: 'Cliente protegido' }],
     suppliers: [],
     sales_orders: [],
     purchase_orders: [],
@@ -126,5 +127,24 @@ describe('FinanceAdjustmentModal', () => {
         expect(createMock).toHaveBeenCalledTimes(1);
         expect(createMock.mock.calls[0][0].amount).toBe(10);
         expect(createMock.mock.calls[0][0].direction).toBe('increase');
+    });
+
+    it('opens the formal receivable flow with the customer preselected', async () => {
+        const wrapper = mount(FinanceAdjustmentModal, {
+            props: {
+                open: false,
+                initialType: 'accounts_receivable',
+                initialCustomerId: 7,
+            },
+            global: { stubs },
+        });
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+
+        const vm = wrapper.vm as any;
+        expect(vm.form.type).toBe('accounts_receivable');
+        expect(vm.form.customer_id).toBe(7);
+        expect(wrapper.text()).toContain('Cliente');
+        expect(wrapper.text()).toContain('Venta relacionada');
     });
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
 import { ShoppingCart, Check, Info, Filter, Download } from 'lucide-vue-next';
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import ProductCatalogView from '@/components/Products/ProductCatalogView.vue';
@@ -20,7 +20,12 @@ import { productsApi } from '@/services/api/products';
 import { ReportsApiService } from '@/services/reports';
 import { type BreadcrumbItem } from '@/types';
 import type { Product, ProductFilters } from '@/types/product';
+import { canManagePurchasingRecords } from '@/utils/catalogPermissions';
 
+const page = usePage();
+const canManageProducts = computed(() =>
+    canManagePurchasingRecords((page.props.auth?.user as any)?.role),
+);
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 const { warehouses } = useWarehouses();
 const { categories, fetchCategories } = useCategories();
@@ -512,7 +517,9 @@ const handleInventoryExport = async (template = false) => {
         });
         downloadBlob(
             blob,
-            template ? 'inventory-items-template.xlsx' : 'inventory-items-export.xlsx',
+            template
+                ? 'inventory-items-template.xlsx'
+                : 'inventory-items-export.xlsx',
         );
     } finally {
         exportingInventory.value = null;
@@ -1487,13 +1494,18 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                         Ver Detalle
                                                     </button>
                                                     <a
+                                                        v-if="canManageProducts"
                                                         :href="`/products/${product.id}/edit`"
                                                         class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
                                                     >
                                                         Editar
                                                     </a>
                                                 </template>
-                                                <template v-else>
+                                                <template
+                                                    v-else-if="
+                                                        canManageProducts
+                                                    "
+                                                >
                                                     <button
                                                         @click="
                                                             handleRestore(
@@ -1711,6 +1723,9 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                             />
                                                                         </button>
                                                                         <a
+                                                                            v-if="
+                                                                                canManageProducts
+                                                                            "
                                                                             :href="`/products/${product.id}/edit?variant=${variant.id}`"
                                                                             class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
                                                                         >

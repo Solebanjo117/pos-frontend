@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CheckCircle2, LoaderCircle } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -25,8 +25,13 @@ import type {
     FinancialAdjustmentType,
 } from '@/types/financial-adjustment';
 import { formatCurrency } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
-const props = defineProps<{ open: boolean }>();
+const props = defineProps<{
+    open: boolean;
+    initialType?: FinancialAdjustmentType | null;
+    initialCustomerId?: number | null;
+}>();
 const emit = defineEmits<{
     (event: 'update:open', value: boolean): void;
     (event: 'submitted', adjustment: FinancialAdjustment): void;
@@ -81,6 +86,7 @@ const saving = ref(false);
 const confirmation = ref(false);
 const error = ref<string | null>(null);
 const idempotencyKey = ref('');
+const applyingInitialValues = ref(false);
 
 const asSelect = (items: AdjustmentOption[]): SelectOption[] =>
     items.map((item) => ({
@@ -228,17 +234,30 @@ watch(
     async (open) => {
         if (!open) return;
         form.value = emptyForm();
+        applyingInitialValues.value = true;
+        form.value.type = props.initialType ?? 'cash';
         confirmation.value = false;
         error.value = null;
-        idempotencyKey.value = crypto.randomUUID();
+        idempotencyKey.value = createIdempotencyKey();
         loading.value = true;
         try {
             options.value = await financialAdjustmentsService.options();
+            await nextTick();
+            if (
+                form.value.type === 'accounts_receivable' &&
+                props.initialCustomerId &&
+                options.value.customers.some(
+                    (customer) => customer.value === props.initialCustomerId,
+                )
+            ) {
+                form.value.customer_id = props.initialCustomerId;
+            }
         } catch (err: any) {
             error.value =
                 err.response?.data?.message ||
                 'No se pudieron cargar las opciones del ajuste.';
         } finally {
+            applyingInitialValues.value = false;
             loading.value = false;
         }
     },
@@ -247,6 +266,7 @@ watch(
 watch(
     () => form.value.type,
     () => {
+        if (applyingInitialValues.value) return;
         confirmation.value = false;
         form.value.pos_session_id = null;
         form.value.financial_account_id = null;

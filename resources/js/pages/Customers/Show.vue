@@ -26,7 +26,6 @@ import {
     Trash2,
     UserCircle2,
     Wrench,
-    X,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import CustomerProfileMetric from '@/components/Customers/CustomerProfileMetric.vue';
@@ -55,9 +54,26 @@ const props = defineProps<{
 
 const customerIdNumber = computed(() => Number(props.customerId));
 
-type TabKey = 'invoices' | 'items' | 'vehicles' | 'work_orders' | 'payments' | 'history' | 'expenses';
+type TabKey =
+    | 'invoices'
+    | 'items'
+    | 'vehicles'
+    | 'work_orders'
+    | 'payments'
+    | 'history'
+    | 'expenses';
 const page = usePage();
-const canViewExpenses = computed(() => ['admin', 'manager'].includes((page.props.auth?.user as any)?.role));
+const canViewExpenses = computed(() =>
+    ['admin', 'manager'].includes((page.props.auth?.user as any)?.role),
+);
+const canManageCustomer = computed(() =>
+    ['admin', 'manager'].includes((page.props.auth?.user as any)?.role),
+);
+const canManageFinancialAdjustments = computed(
+    () =>
+        (page.props.auth?.user as any)?.can_manage_financial_adjustments ===
+        true,
+);
 const tabs = computed(() => [
     { key: 'invoices' as TabKey, label: 'Facturas' },
     { key: 'items' as TabKey, label: 'Items Comprados' },
@@ -65,7 +81,9 @@ const tabs = computed(() => [
     { key: 'work_orders' as TabKey, label: 'Ordenes de Trabajo' },
     { key: 'payments' as TabKey, label: 'Pagos' },
     { key: 'history' as TabKey, label: 'Historial' },
-    ...(canViewExpenses.value ? [{ key: 'expenses' as TabKey, label: 'Gastos' }] : []),
+    ...(canViewExpenses.value
+        ? [{ key: 'expenses' as TabKey, label: 'Gastos' }]
+        : []),
 ]);
 type PurchasedHistoryItem = CustomerPurchasedItem & {
     order: CustomerSalesHistoryOrder;
@@ -98,10 +116,6 @@ const historyFilters = ref<CustomerSalesHistoryFilters>({
     page: 1,
     per_page: 15,
 });
-
-const showAdjustModal = ref(false);
-const adjustForm = ref({ amount: 0, reason: '' });
-const adjustLoading = ref(false);
 
 const vehicleSaving = ref(false);
 const vehicleError = ref<string | null>(null);
@@ -622,23 +636,6 @@ const createWorkOrderUrl = (vehicle?: CustomerVehicle): string => {
     return `/work-orders/create?${params.toString()}`;
 };
 
-const handleAdjustBalance = async (): Promise<void> => {
-    adjustLoading.value = true;
-
-    try {
-        await CustomersApiService.adjustBalance(
-            customerIdNumber.value,
-            adjustForm.value.amount,
-            adjustForm.value.reason,
-        );
-        showAdjustModal.value = false;
-        adjustForm.value = { amount: 0, reason: '' };
-        await Promise.all([fetchCustomer(), loadTransactions()]);
-    } finally {
-        adjustLoading.value = false;
-    }
-};
-
 onMounted(async () => {
     await Promise.all([
         fetchCustomer(),
@@ -751,20 +748,21 @@ onMounted(async () => {
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <Link
+                                    v-if="canManageCustomer"
                                     :href="`/customers/${customerIdNumber}/edit`"
                                     class="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
                                 >
                                     <Edit :size="15" />
                                     Editar
                                 </Link>
-                                <button
-                                    type="button"
+                                <Link
+                                    v-if="canManageFinancialAdjustments"
+                                    :href="`/finance/accounting/adjustments?create=1&type=accounts_receivable&customer_id=${customerIdNumber}`"
                                     class="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-                                    @click="showAdjustModal = true"
                                 >
                                     <CreditCard :size="15" />
                                     Ajustar Saldo
-                                </button>
+                                </Link>
                                 <Link
                                     :href="`/sales-orders/create?customer_id=${customerIdNumber}`"
                                     class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
@@ -1892,6 +1890,7 @@ onMounted(async () => {
                                                         Nueva orden
                                                     </Link>
                                                     <button
+                                                        v-if="canManageCustomer"
                                                         type="button"
                                                         class="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
                                                         @click="
@@ -1902,6 +1901,7 @@ onMounted(async () => {
                                                         Editar
                                                     </button>
                                                     <button
+                                                        v-if="canManageCustomer"
                                                         type="button"
                                                         class="inline-flex items-center justify-center rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:bg-slate-950 dark:hover:bg-rose-500/10"
                                                         @click="
@@ -1926,6 +1926,7 @@ onMounted(async () => {
                                         </div>
 
                                         <aside
+                                            v-if="canManageCustomer"
                                             class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
                                         >
                                             <div
@@ -2073,7 +2074,10 @@ onMounted(async () => {
                                     </div>
                                 </template>
 
-                                <div v-if="activeTab === 'expenses'" class="p-4">
+                                <div
+                                    v-if="activeTab === 'expenses'"
+                                    class="p-4"
+                                >
                                     <OperationalExpenseHistoryPanel
                                         party-type="customer"
                                         :party-id="customerIdNumber"
@@ -2336,88 +2340,6 @@ onMounted(async () => {
                         </aside>
                     </div>
                 </template>
-            </div>
-        </div>
-
-        <div
-            v-if="showAdjustModal"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            @click.self="showAdjustModal = false"
-        >
-            <div
-                class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl dark:bg-slate-950"
-            >
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <h3
-                            class="text-lg font-bold text-slate-900 dark:text-slate-100"
-                        >
-                            Ajustar saldo
-                        </h3>
-                        <p class="mt-1 text-sm text-slate-500">
-                            Registra un ajuste manual en la cuenta del cliente.
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900"
-                        @click="showAdjustModal = false"
-                    >
-                        <X :size="18" />
-                    </button>
-                </div>
-                <form
-                    class="mt-4 space-y-4"
-                    @submit.prevent="handleAdjustBalance"
-                >
-                    <div>
-                        <label
-                            class="mb-1 block text-xs font-semibold tracking-wide text-slate-500 uppercase"
-                        >
-                            Monto
-                        </label>
-                        <input
-                            v-model.number="adjustForm.amount"
-                            type="number"
-                            step="0.01"
-                            class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label
-                            class="mb-1 block text-xs font-semibold tracking-wide text-slate-500 uppercase"
-                        >
-                            Motivo
-                        </label>
-                        <textarea
-                            v-model="adjustForm.reason"
-                            rows="3"
-                            class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            required
-                        />
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <button
-                            type="button"
-                            class="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-                            @click="showAdjustModal = false"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                            :disabled="adjustLoading"
-                        >
-                            {{
-                                adjustLoading
-                                    ? 'Guardando...'
-                                    : 'Guardar ajuste'
-                            }}
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </AppLayout>

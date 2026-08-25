@@ -12,6 +12,7 @@ import type {
 } from '@/types/financial-document';
 import type { MoneyAccountOption } from '@/types/financial-transfer';
 import { formatCurrency } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 const props = defineProps<{
     open: boolean;
@@ -32,6 +33,7 @@ const emit = defineEmits<{
             paid_at?: string;
             pos_session_id?: number;
             financial_account_id?: number;
+            idempotency_key: string;
             applications: Array<{ document_id: number; amount: number }>;
         },
     ];
@@ -46,6 +48,7 @@ const reference = ref('');
 const notes = ref('');
 const paidAt = ref(new Date().toISOString().slice(0, 10));
 const localError = ref<string | null>(null);
+const idempotencyKey = ref(createIdempotencyKey());
 
 const title = computed(() =>
     props.mode === 'payable' ? 'Registrar pago' : 'Registrar cobro',
@@ -91,6 +94,7 @@ const reset = (): void => {
     notes.value = '';
     paidAt.value = new Date().toISOString().slice(0, 10);
     localError.value = null;
+    idempotencyKey.value = createIdempotencyKey();
 };
 
 const loadOptions = async (): Promise<void> => {
@@ -156,6 +160,7 @@ const submit = (): void => {
     }
 
     emit('submit', {
+        idempotency_key: idempotencyKey.value,
         amount: Number(amount.value),
         method: method.value,
         reference_number: reference.value || undefined,

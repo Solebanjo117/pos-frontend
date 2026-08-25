@@ -375,6 +375,7 @@ export const ReportsApiService = {
         movement_date: string;
         warehouse_id?: number | null;
         notes?: string | null;
+        idempotency_key: string;
     }): Promise<CapitalMovement> {
         const response = await apiClient.post(
             '/reports/capital-movements',

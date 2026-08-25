@@ -3,9 +3,10 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { salesOrdersService } from '@/services/sales-orders';
 import type { Product } from '@/types/product';
 import type { CreateSalesOrderData } from '@/types/sales-order';
+import { roundMoney } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 import { usePosSettings } from './usePosSettings';
 import { useStoreSettings } from './useStoreSettings';
-import { roundMoney } from '@/utils/formatters';
 
 interface CartItem {
     id: string; // temporal ID for cart
@@ -248,6 +249,8 @@ export function usePOS() {
     const shippingMethod = ref<'pickup' | 'delivery'>('pickup');
     const loading = ref(false);
     const error = ref<string | null>(null);
+    const pendingCheckoutKey = ref<string | null>(null);
+    const pendingCheckoutFingerprint = ref<string | null>(null);
     const connectionStatus = ref<'online' | 'offline' | 'error'>('online');
 
     // Watch activeSessionId to clear errors when switching sessions
@@ -802,8 +805,10 @@ export function usePOS() {
             amount: number;
             reference_number?: string | null;
             notes?: string | null;
+            financial_account_id?: number | null;
         }>,
     ) => {
+        if (loading.value) return false;
         if (cart.value.length === 0) {
             error.value = 'El carrito está vacío';
             return false;
@@ -894,8 +899,18 @@ export function usePOS() {
                 })),
             };
 
+            const checkoutFingerprint = JSON.stringify(orderData);
+            if (pendingCheckoutFingerprint.value !== checkoutFingerprint) {
+                pendingCheckoutFingerprint.value = checkoutFingerprint;
+                pendingCheckoutKey.value = createIdempotencyKey();
+            }
+            orderData.idempotency_key =
+                pendingCheckoutKey.value ?? createIdempotencyKey();
+
             const createdOrderResult =
                 await salesOrdersService.create(orderData);
+            pendingCheckoutFingerprint.value = null;
+            pendingCheckoutKey.value = null;
 
             // Show stock warnings from API as visible alert
             const apiWarnings = createdOrderResult?.warnings;
@@ -972,6 +987,7 @@ export function usePOS() {
 
     // Save as draft
     const saveDraft = async () => {
+        if (loading.value) return false;
         if (cart.value.length === 0) {
             error.value = 'El carrito está vacío';
             return false;

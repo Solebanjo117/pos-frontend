@@ -329,6 +329,7 @@ export interface SalesOrderStatistics {
 }
 
 export interface CreateSalesOrderData {
+    idempotency_key?: string;
     user_id?: number;
     customer_id?: number;
     customer_vehicle_id?: number | null;
@@ -347,6 +348,7 @@ export interface CreateSalesOrderData {
         method: string;
         reference_number?: string | null;
         notes?: string | null;
+        financial_account_id?: number | null;
     }>;
     notes?: string;
     audit_logs?: Array<{

@@ -159,38 +159,6 @@ export function useCustomers() {
     };
 
     /**
-     * Adjust customer balance
-     */
-    const adjustBalance = async (
-        id: number,
-        amount: number,
-        reason: string,
-    ) => {
-        loading.value = true;
-        error.value = null;
-
-        try {
-            const response = await CustomersApiService.adjustBalance(
-                id,
-                amount,
-                reason,
-            );
-            if (currentCustomer.value && currentCustomer.value.id === id) {
-                currentCustomer.value.current_balance =
-                    response.data.new_balance;
-            }
-            return response;
-        } catch (err: any) {
-            error.value =
-                err.response?.data?.message || 'Error al ajustar saldo';
-            console.error('Error adjusting balance:', err);
-            throw err;
-        } finally {
-            loading.value = false;
-        }
-    };
-
-    /**
      * Apply filters and fetch
      */
     const applyFilters = async () => {
@@ -235,7 +203,6 @@ export function useCustomers() {
         createCustomer,
         updateCustomer,
         deleteCustomer,
-        adjustBalance,
         applyFilters,
         clearFilters,
     };

@@ -20,6 +20,7 @@ import { financialAdjustmentsService } from '@/services/financial-adjustments';
 import type { BreadcrumbItem } from '@/types';
 import type { FinancialAdjustment } from '@/types/financial-adjustment';
 import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 const props = defineProps<{ adjustmentId: number }>();
 const adjustment = ref<FinancialAdjustment | null>(null);
@@ -75,7 +76,7 @@ async function reverse(): Promise<void> {
         const reversal = await financialAdjustmentsService.reverse(
             props.adjustmentId,
             {
-                idempotency_key: crypto.randomUUID(),
+                idempotency_key: createIdempotencyKey(),
                 reason: reverseReason.value.trim(),
                 business_datetime: new Date().toISOString(),
             },

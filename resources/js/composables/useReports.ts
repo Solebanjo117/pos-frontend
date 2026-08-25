@@ -388,6 +388,7 @@ export function useReports() {
         movement_date: string;
         warehouse_id?: number | null;
         notes?: string | null;
+        idempotency_key: string;
     }) => {
         loading.value = true;
         error.value = null;

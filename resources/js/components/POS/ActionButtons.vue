@@ -10,6 +10,7 @@ const props = defineProps<{
     quoteMode?: boolean;
     canClear?: boolean;
     cashierMode?: boolean;
+    savingQuote?: boolean;
 }>();
 
 const emit = defineEmits([
@@ -42,8 +43,9 @@ const canManageCashRegister = computed(() =>
             <!-- Quote session: save changes -->
             <button
                 v-if="props.isQuoteSession"
+                :disabled="props.savingQuote"
                 @click="emit('save-quote-changes')"
-                class="flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40"
+                class="flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500/30 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40"
             >
                 <Save class="h-3.5 w-3.5" />
                 Guardar Cambios
@@ -52,8 +54,9 @@ const canManageCashRegister = computed(() =>
             <!-- Cotizar: hidden when in a quote session (but always shown in quoteMode) -->
             <button
                 v-if="!props.isQuoteSession || props.quoteMode"
+                :disabled="props.savingQuote"
                 @click="emit('save-quote')"
-                class="flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40"
+                class="flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40"
             >
                 <FileText class="h-3.5 w-3.5" />
                 Cotizar

@@ -12,6 +12,7 @@ export interface CashierQueueSource {
     party: string;
     amount: number;
     seller_name?: string | null;
+    created_at?: string | null;
     notes?: string | null;
     planned_payment_method?: string | null;
     reference_number?: string | null;

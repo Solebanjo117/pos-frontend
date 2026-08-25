@@ -9,6 +9,7 @@ import {
     Loader2,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 interface Props {
     show: boolean;
@@ -39,6 +40,7 @@ const emit = defineEmits<{
             reason: string;
             reference_number: string;
             notes: string;
+            idempotency_key: string;
         },
     ];
 }>();
@@ -56,6 +58,8 @@ const amount = ref<number | null>(null);
 const reason = ref('');
 const referenceNumber = ref('');
 const notes = ref('');
+const idempotencyKey = ref('');
+const submitted = ref(false);
 
 const reasons = [
     'Pago de agua',
@@ -95,7 +99,9 @@ const isValid = computed(() => {
 });
 
 const handleSubmit = () => {
-    if (!isValid.value) return;
+    if (!isValid.value || props.loading || submitted.value) return;
+
+    submitted.value = true;
     emit('submit', {
         type: movementType.value,
         subtype: subtype.value,
@@ -103,6 +109,7 @@ const handleSubmit = () => {
         reason: reason.value,
         reference_number: referenceNumber.value,
         notes: notes.value,
+        idempotency_key: idempotencyKey.value,
     });
 };
 
@@ -113,17 +120,27 @@ const resetForm = () => {
     reason.value = '';
     referenceNumber.value = '';
     notes.value = '';
+    idempotencyKey.value = createIdempotencyKey();
+    submitted.value = false;
 };
 
 watch(
     () => [props.show, props.initialType] as const,
     ([show, initialType]) => {
         if (show) {
+            resetForm();
             movementType.value = initialType;
             subtype.value = initialType === 'in' ? 'cash_in' : 'cash_out';
         }
     },
     { immediate: true },
+);
+
+watch(
+    () => props.loading,
+    (loading) => {
+        if (!loading) submitted.value = false;
+    },
 );
 
 const handleClose = () => {
@@ -356,7 +373,7 @@ const handleClose = () => {
                 </button>
                 <button
                     @click="handleSubmit"
-                    :disabled="!isValid || loading"
+                    :disabled="!isValid || loading || submitted"
                     class="flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white shadow-sm transition-colors disabled:opacity-40"
                     :class="
                         movementType === 'out'

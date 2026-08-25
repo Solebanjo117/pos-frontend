@@ -441,6 +441,8 @@ const handleCloseSession = async (
     notes?: string,
     closingDetails?: Record<string, any>,
 ) => {
+    if (closeSessionLoading.value) return;
+
     closeSessionLoading.value = true;
     const success = await closeSession(
         amount,

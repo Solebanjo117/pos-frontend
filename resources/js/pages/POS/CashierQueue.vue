@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import {
+    Banknote,
     Clock3,
+    Eye,
     Inbox,
     ReceiptText,
     RefreshCw,
@@ -11,16 +13,23 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue';
+import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import {
     useCashierQueue,
     type CashierQueueEntry,
 } from '@/composables/useCashierQueue';
 import { usePOS } from '@/composables/usePOS';
 import AppLayout from '@/layouts/AppLayout.vue';
-import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import apiClient from '@/services/api/client';
+import { salesOrdersService } from '@/services/sales-orders';
 import { queueEntryKind, type QueueEntryKind } from '@/utils/cashierQueue';
-import { formatCurrency, roundMoney } from '@/utils/formatters';
+import {
+    formatCurrency,
+    formatReportDateTime,
+    roundMoney,
+} from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 defineOptions({ layout: AppLayout });
 
@@ -46,6 +55,57 @@ const removeEntry = ref<CashierQueueEntry | null>(null);
 const settlementEntry = ref<CashierQueueEntry | null>(null);
 const traceEntryId = ref<number | null>(null);
 const traceOpen = ref(false);
+
+// ── Sales split into a table; expenses/returns keep their existing cards ──
+const saleEntries = computed(() =>
+    entries.value
+        .filter((entry) => kindOf(entry) === 'sale')
+        .slice()
+        .sort((a, b) => {
+            const aTime = a.scheduled_for
+                ? new Date(a.scheduled_for).getTime()
+                : 0;
+            const bTime = b.scheduled_for
+                ? new Date(b.scheduled_for).getTime()
+                : 0;
+            return aTime - bTime; // oldest first (priority)
+        }),
+);
+const otherEntries = computed(() =>
+    entries.value.filter((entry) => kindOf(entry) !== 'sale'),
+);
+
+// ── "Ver factura" summary modal ──
+interface QuoteSummary {
+    id: number;
+    quote_number: string;
+    customer_name: string;
+    seller_name?: string | null;
+    notes?: string | null;
+    subtotal: number;
+    tax_amount: number;
+    discount_amount: number;
+    total: number;
+    created_at?: string | null;
+    items: Array<{
+        id: number;
+        product_name: string;
+        sku?: string | null;
+        brand?: string | null;
+        quantity: number;
+        unit_price: number;
+        subtotal: number;
+        total: number;
+    }>;
+}
+const summaryEntry = ref<QuoteSummary | null>(null);
+const summaryLoading = ref(false);
+
+// ── "Cobrar" payment popup (reuses UnifiedPaymentPanel) ──
+const payEntry = ref<CashierQueueEntry | null>(null);
+const payQuote = ref<any>(null);
+const paymentOpen = ref(false);
+const paymentProcessing = ref(false);
 const settlement = ref({
     final_amount: 0,
     payment_method: 'cash',
@@ -222,6 +282,109 @@ async function processEntry(entry: CashierQueueEntry) {
     }
 }
 
+async function viewInvoice(entry: CashierQueueEntry) {
+    summaryLoading.value = true;
+    summaryEntry.value = null;
+    try {
+        const response = await apiClient.get(
+            `/sales-quotes/${entry.source.id}/summary`,
+        );
+        summaryEntry.value = response.data.data;
+    } catch (exception: any) {
+        notice.value = {
+            title: 'No se pudo cargar la factura',
+            message:
+                exception.response?.data?.message ||
+                'Intenta nuevamente en unos segundos.',
+        };
+    } finally {
+        summaryLoading.value = false;
+    }
+}
+
+async function startCharge(entry: CashierQueueEntry) {
+    processingId.value = entry.id;
+    try {
+        await openEntry(entry.id);
+        const response = await apiClient.post(
+            `/sales-quotes/${entry.source.id}/open-at-cashier`,
+        );
+        payQuote.value = response.data.data;
+        payEntry.value = entry;
+        paymentOpen.value = true;
+    } catch (exception: any) {
+        const data = exception.response?.data;
+        if (
+            exception.response?.status === 422 &&
+            data?.requires_session &&
+            data?.data
+        ) {
+            // No open register: fall back to the POS so the cashier can open Caja.
+            loadQuoteIntoPos(data.data);
+            return;
+        }
+        notice.value = {
+            title: 'No se pudo abrir la venta',
+            message:
+                data?.message || 'El registro ya no esta disponible en Caja.',
+        };
+    } finally {
+        processingId.value = null;
+    }
+}
+
+async function handlePaymentFinish(
+    payments: Array<{
+        method: string;
+        amount: number;
+        reference_number?: string | null;
+        notes?: string | null;
+    }>,
+) {
+    if (!payQuote.value || paymentProcessing.value) return;
+    paymentProcessing.value = true;
+    try {
+        const quote = payQuote.value;
+        await salesOrdersService.create({
+            idempotency_key: createIdempotencyKey(),
+            source_quote_id: quote.id,
+            status: 'confirmed',
+            warehouse_id: quote.warehouse_id ?? undefined,
+            payments,
+            payment_method: 'multiple' as any,
+            items: (quote.items ?? []).map((item: any) => ({
+                source_quote_item_id: item.id,
+                product_id: item.is_custom_line ? null : item.product_id,
+                variant_id: item.variant_id ?? undefined,
+                warehouse_id: item.warehouse_id ?? undefined,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                discount_percent: item.discount_percent ?? 0,
+                tax_percent: item.tax_percent ?? 0,
+                is_custom_line: !!item.is_custom_line,
+                custom_description: item.custom_description ?? undefined,
+            })),
+        });
+        paymentOpen.value = false;
+        payEntry.value = null;
+        payQuote.value = null;
+        await fetchPending();
+        notice.value = {
+            title: 'Venta cobrada',
+            message: 'La venta fue registrada y salio de la cola.',
+        };
+    } catch (exception: any) {
+        notice.value = {
+            title: 'No se pudo cobrar',
+            message:
+                exception.response?.data?.message ||
+                'Revise el pago y la sesion de Caja.',
+        };
+    } finally {
+        paymentProcessing.value = false;
+    }
+}
+
 async function settleExpense() {
     if (!settlementEntry.value) return;
     if (hasVariance.value && !settlement.value.variance_reason.trim()) {
@@ -371,103 +534,221 @@ async function confirmRemove() {
             </p>
         </div>
 
-        <div v-else class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <article
-                v-for="entry in entries"
-                :key="entry.id"
-                class="flex min-h-60 flex-col rounded-md border bg-card"
+        <template v-else>
+            <!-- Ventas: tabla -->
+            <div
+                v-if="saleEntries.length"
+                class="overflow-hidden rounded-md border bg-card"
             >
-                <div
-                    class="flex items-start justify-between border-b px-4 py-3"
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead
+                            class="border-b bg-muted/40 text-xs text-muted-foreground"
+                        >
+                            <tr>
+                                <th class="px-4 py-2 text-left font-medium">
+                                    Fecha / Hora
+                                </th>
+                                <th class="px-4 py-2 text-left font-medium">
+                                    N.o factura
+                                </th>
+                                <th class="px-4 py-2 text-left font-medium">
+                                    Cliente
+                                </th>
+                                <th class="px-4 py-2 text-right font-medium">
+                                    Monto
+                                </th>
+                                <th class="px-4 py-2 text-left font-medium">
+                                    Vendedor
+                                </th>
+                                <th class="px-4 py-2 text-left font-medium">
+                                    Timer
+                                </th>
+                                <th class="px-4 py-2 text-right font-medium">
+                                    Acciones
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="entry in saleEntries"
+                                :key="entry.id"
+                                class="border-b last:border-0 hover:bg-muted/20"
+                            >
+                                <td
+                                    class="px-4 py-2 whitespace-nowrap text-muted-foreground"
+                                >
+                                    {{
+                                        formatReportDateTime(
+                                            entry.source.created_at ??
+                                                entry.scheduled_for,
+                                        )
+                                    }}
+                                </td>
+                                <td class="px-4 py-2 font-medium">
+                                    {{ entry.source.document_number }}
+                                </td>
+                                <td class="px-4 py-2">
+                                    {{ entry.source.party }}
+                                </td>
+                                <td
+                                    class="px-4 py-2 text-right font-mono font-semibold"
+                                >
+                                    {{ formatCurrency(entry.estimated_amount) }}
+                                </td>
+                                <td class="px-4 py-2 text-muted-foreground">
+                                    {{ entry.source.seller_name || '—' }}
+                                </td>
+                                <td class="px-4 py-2">
+                                    <span
+                                        class="flex items-center gap-1 text-xs font-semibold text-amber-600 tabular-nums"
+                                    >
+                                        <Clock3 class="h-3.5 w-3.5" />
+                                        {{ timeAgo(entry.scheduled_for, now) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-2">
+                                    <div
+                                        class="flex items-center justify-end gap-1"
+                                    >
+                                        <button
+                                            type="button"
+                                            class="rounded-md border px-2 py-1 text-xs font-medium text-slate-600 hover:bg-muted dark:text-slate-300"
+                                            title="Ver factura"
+                                            @click="viewInvoice(entry)"
+                                        >
+                                            <Eye class="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                                            :disabled="
+                                                processingId === entry.id
+                                            "
+                                            title="Cobrar"
+                                            @click="startCharge(entry)"
+                                        >
+                                            <Banknote class="h-4 w-4" />
+                                            Cobrar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="rounded-md border p-1 text-muted-foreground hover:bg-sky-50 hover:text-sky-700"
+                                            title="Ver trazabilidad"
+                                            @click="
+                                                traceEntryId = entry.id;
+                                                traceOpen = true;
+                                            "
+                                        >
+                                            <Route class="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="rounded-md border p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                                            title="Quitar de cola"
+                                            @click="removeEntry = entry"
+                                        >
+                                            <X class="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Gastos y devoluciones: tarjetas (sin cambios funcionales) -->
+            <div
+                v-if="otherEntries.length"
+                class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+            >
+                <article
+                    v-for="entry in otherEntries"
+                    :key="entry.id"
+                    class="flex min-h-60 flex-col rounded-md border bg-card"
                 >
-                    <div class="flex min-w-0 items-center gap-2">
-                        <component
-                            :is="iconOf(entry)"
-                            class="h-4 w-4 shrink-0 text-sky-600"
-                        />
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-semibold">
-                                {{ entry.source.document_number }}
-                            </p>
-                            <p class="text-xs text-muted-foreground">
-                                {{ labelOf(entry) }}
-                            </p>
+                    <div
+                        class="flex items-start justify-between border-b px-4 py-3"
+                    >
+                        <div class="flex min-w-0 items-center gap-2">
+                            <component
+                                :is="iconOf(entry)"
+                                class="h-4 w-4 shrink-0 text-sky-600"
+                            />
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold">
+                                    {{ entry.source.document_number }}
+                                </p>
+                                <p class="text-xs text-muted-foreground">
+                                    {{ labelOf(entry) }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span
+                                class="flex items-center gap-1 text-xs text-amber-600"
+                            >
+                                <Clock3 class="h-3.5 w-3.5" />
+                                {{ timeAgo(entry.scheduled_for, now) }}
+                            </span>
+                            <button
+                                type="button"
+                                class="rounded p-1 text-muted-foreground hover:bg-sky-50 hover:text-sky-700"
+                                title="Ver trazabilidad"
+                                @click="
+                                    traceEntryId = entry.id;
+                                    traceOpen = true;
+                                "
+                            >
+                                <Route class="h-4 w-4" />
+                            </button>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span
-                            class="flex items-center gap-1 text-xs text-amber-600"
+
+                    <div class="flex-1 space-y-3 px-4 py-3 text-sm">
+                        <div>
+                            <p class="text-xs text-muted-foreground">
+                                Cliente / beneficiario
+                            </p>
+                            <p class="font-medium">{{ entry.source.party }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-muted-foreground">
+                                Concepto
+                            </p>
+                            <p>{{ entry.source.description }}</p>
+                        </div>
+                        <div
+                            class="flex items-end justify-between border-t pt-3"
                         >
-                            <Clock3 class="h-3.5 w-3.5" />
-                            {{ timeAgo(entry.scheduled_for, now) }}
-                        </span>
+                            <span class="text-xs text-muted-foreground"
+                                >Monto estimado</span
+                            >
+                            <strong class="font-mono text-lg">{{
+                                formatCurrency(entry.estimated_amount)
+                            }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="border-t bg-muted/30 px-4 py-3">
                         <button
                             type="button"
-                            class="rounded p-1 text-muted-foreground hover:bg-sky-50 hover:text-sky-700"
-                            title="Ver trazabilidad"
-                            @click="
-                                traceEntryId = entry.id;
-                                traceOpen = true;
-                            "
+                            class="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                            :disabled="processingId === entry.id"
+                            @click="processEntry(entry)"
                         >
-                            <Route class="h-4 w-4" />
-                        </button>
-                        <button
-                            v-if="kindOf(entry) === 'sale'"
-                            type="button"
-                            class="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
-                            title="Quitar de cola"
-                            @click="removeEntry = entry"
-                        >
-                            <X class="h-4 w-4" />
+                            <component :is="iconOf(entry)" class="h-4 w-4" />
+                            {{
+                                kindOf(entry) === 'return'
+                                    ? 'Liquidar devolucion'
+                                    : 'Pagar gasto'
+                            }}
                         </button>
                     </div>
-                </div>
-
-                <div class="flex-1 space-y-3 px-4 py-3 text-sm">
-                    <div>
-                        <p class="text-xs text-muted-foreground">
-                            Cliente / beneficiario
-                        </p>
-                        <p class="font-medium">{{ entry.source.party }}</p>
-                    </div>
-                    <div v-if="entry.source.seller_name">
-                        <p class="text-xs text-muted-foreground">Vendedor</p>
-                        <p>{{ entry.source.seller_name }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-muted-foreground">Concepto</p>
-                        <p>{{ entry.source.description }}</p>
-                    </div>
-                    <div class="flex items-end justify-between border-t pt-3">
-                        <span class="text-xs text-muted-foreground"
-                            >Monto estimado</span
-                        >
-                        <strong class="font-mono text-lg">{{
-                            formatCurrency(entry.estimated_amount)
-                        }}</strong>
-                    </div>
-                </div>
-
-                <div class="border-t bg-muted/30 px-4 py-3">
-                    <button
-                        type="button"
-                        class="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-                        :disabled="processingId === entry.id"
-                        @click="processEntry(entry)"
-                    >
-                        <component :is="iconOf(entry)" class="h-4 w-4" />
-                        {{
-                            kindOf(entry) === 'sale'
-                                ? 'Atender en POS'
-                                : kindOf(entry) === 'return'
-                                  ? 'Liquidar devolucion'
-                                  : 'Pagar gasto'
-                        }}
-                    </button>
-                </div>
-            </article>
-        </div>
+                </article>
+            </div>
+        </template>
     </div>
 
     <TransactionTraceDrawer
@@ -640,6 +921,137 @@ async function confirmRemove() {
             </div>
         </div>
     </div>
+
+    <!-- Ver factura (resumen de solo lectura) -->
+    <div
+        v-if="summaryEntry || summaryLoading"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+    >
+        <div
+            class="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-md border bg-card shadow-xl"
+        >
+            <div class="flex items-start justify-between border-b px-5 py-4">
+                <div>
+                    <h2 class="font-semibold">
+                        Factura {{ summaryEntry?.quote_number ?? '' }}
+                    </h2>
+                    <p
+                        v-if="summaryEntry"
+                        class="mt-1 text-sm text-muted-foreground"
+                    >
+                        {{ summaryEntry.customer_name }}
+                        <span v-if="summaryEntry.seller_name">
+                            · Vendedor: {{ summaryEntry.seller_name }}</span
+                        >
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    class="rounded p-1 text-muted-foreground hover:bg-muted"
+                    @click="summaryEntry = null"
+                >
+                    <X class="h-4 w-4" />
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-5 py-4">
+                <div
+                    v-if="summaryLoading"
+                    class="py-10 text-center text-sm text-muted-foreground"
+                >
+                    Cargando factura...
+                </div>
+                <table v-else-if="summaryEntry" class="w-full text-sm">
+                    <thead class="border-b text-xs text-muted-foreground">
+                        <tr>
+                            <th class="py-2 text-left font-medium">Producto</th>
+                            <th class="py-2 text-left font-medium">SKU</th>
+                            <th class="py-2 text-right font-medium">Cant.</th>
+                            <th class="py-2 text-right font-medium">Precio</th>
+                            <th class="py-2 text-right font-medium">
+                                Subtotal
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="item in summaryEntry.items"
+                            :key="item.id"
+                            class="border-b last:border-0"
+                        >
+                            <td class="py-2">
+                                {{ item.product_name }}
+                                <span
+                                    v-if="item.brand"
+                                    class="text-xs text-muted-foreground"
+                                    >· {{ item.brand }}</span
+                                >
+                            </td>
+                            <td class="py-2 text-muted-foreground">
+                                {{ item.sku || '—' }}
+                            </td>
+                            <td class="py-2 text-right">{{ item.quantity }}</td>
+                            <td class="py-2 text-right font-mono">
+                                {{ formatCurrency(item.unit_price) }}
+                            </td>
+                            <td class="py-2 text-right font-mono">
+                                {{ formatCurrency(item.subtotal) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div
+                v-if="summaryEntry"
+                class="space-y-1 border-t px-5 py-4 text-sm"
+            >
+                <div class="flex justify-between text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span class="font-mono">{{
+                        formatCurrency(summaryEntry.subtotal)
+                    }}</span>
+                </div>
+                <div
+                    v-if="summaryEntry.discount_amount > 0"
+                    class="flex justify-between text-muted-foreground"
+                >
+                    <span>Descuento</span>
+                    <span class="font-mono"
+                        >-{{
+                            formatCurrency(summaryEntry.discount_amount)
+                        }}</span
+                    >
+                </div>
+                <div class="flex justify-between text-muted-foreground">
+                    <span>ITBMS</span>
+                    <span class="font-mono">{{
+                        formatCurrency(summaryEntry.tax_amount)
+                    }}</span>
+                </div>
+                <div class="flex justify-between pt-1 text-base font-bold">
+                    <span>Total</span>
+                    <span class="font-mono">{{
+                        formatCurrency(summaryEntry.total)
+                    }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cobrar: reutiliza el Payment Popup existente -->
+    <UnifiedPaymentPanel
+        v-if="paymentOpen && payQuote"
+        :show="paymentOpen"
+        :amount-to-charge="Number(payQuote.total ?? 0)"
+        :subtotal="Number(payQuote.subtotal ?? 0)"
+        :tax-amount="Number(payQuote.tax_amount ?? 0)"
+        :discount-amount="Number(payQuote.discount_amount ?? 0)"
+        @finish="handlePaymentFinish"
+        @cancel="
+            paymentOpen = false;
+            payEntry = null;
+            payQuote = null;
+        "
+    />
 
     <div
         v-if="notice"

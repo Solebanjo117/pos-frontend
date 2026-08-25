@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AlertCircle, Banknote, LogIn } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = defineProps<{
     show: boolean;
@@ -13,10 +13,31 @@ const emit = defineEmits<{
 }>();
 
 const openingAmount = ref<number>(0);
+const submitted = ref(false);
 
 const handleSubmit = () => {
+    if (props.loading || submitted.value || openingAmount.value < 0) return;
+
+    submitted.value = true;
     emit('submit', Number(openingAmount.value));
 };
+
+watch(
+    () => props.show,
+    (show) => {
+        if (!show) {
+            openingAmount.value = 0;
+            submitted.value = false;
+        }
+    },
+);
+
+watch(
+    () => props.loading,
+    (loading) => {
+        if (!loading) submitted.value = false;
+    },
+);
 </script>
 
 <template>
@@ -79,7 +100,7 @@ const handleSubmit = () => {
                     </div>
                     <button
                         type="submit"
-                        :disabled="loading || openingAmount < 0"
+                        :disabled="loading || submitted || openingAmount < 0"
                         class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold whitespace-nowrap text-white transition-colors hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
                     >
                         {{ loading ? 'Abriendo...' : 'Abrir Caja' }}

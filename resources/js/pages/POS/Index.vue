@@ -60,6 +60,7 @@ import { SalesOrderPaymentApiService } from '@/services/payments';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
 import { formatDuration } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 defineOptions({ layout: AppLayout });
 
@@ -85,6 +86,9 @@ const currentRole = computed(() => (page.props.auth?.user as any)?.role);
 const isStrictCashier = computed(() => currentRole.value === 'cashier');
 const canEditSeller = computed(() => !isStrictCashier.value);
 const canUseProductSearch = computed(() => !isStrictCashier.value);
+const canManagePurchases = computed(
+    () => currentRole.value === 'admin' || currentRole.value === 'manager',
+);
 const canClearCurrentCart = computed(
     () =>
         !isStrictCashier.value &&
@@ -351,7 +355,12 @@ const attemptAddToCartWithStockFallback = (
 
     const stock = getNumericStock(product, variant);
     if (stock !== null && stock <= 0) {
-        openAutoQuickPurchaseForNoStock(product, variant, qty, warehouseId);
+        if (canManagePurchases.value) {
+            openAutoQuickPurchaseForNoStock(product, variant, qty, warehouseId);
+        } else {
+            error.value =
+                'Sin existencias. Solicita abastecimiento a un administrador o gerente.';
+        }
     }
 
     return false;
@@ -1456,6 +1465,7 @@ const handleUnifiedPaymentFinish = async (
         amount: number;
         reference_number?: string | null;
         notes?: string | null;
+        financial_account_id?: number | null;
     }>,
 ) => {
     if (props.editMode) {
@@ -1472,6 +1482,7 @@ const handleUnifiedPaymentFinish = async (
                     : p.method === 'credit'
                       ? 'Cobrado a crédito del cliente'
                       : undefined),
+            financial_account_id: p.financial_account_id ?? undefined,
         }));
 
         // Temporarily store payments for confirmEditOrder
@@ -1529,6 +1540,7 @@ const handleUnifiedPaymentFinish = async (
                 : p.method === 'credit'
                   ? 'Cobrado a crédito del cliente'
                   : undefined),
+        financial_account_id: p.financial_account_id ?? undefined,
     }));
 
     const result = await processSale(paymentsArray);
@@ -1577,6 +1589,7 @@ const handleTicketClose = () => {
 const saveQuoteChangesLoading = ref(false);
 
 const handleSaveQuoteChanges = async () => {
+    if (saveQuoteChangesLoading.value) return;
     if (isStrictCashier.value) return;
     const quoteId = activeSession.value?.source_quote_id;
     if (!quoteId) return;
@@ -1642,6 +1655,7 @@ const handleSaveQuoteChanges = async () => {
 const saveQuoteLoading = ref(false);
 
 const handleSaveQuote = async () => {
+    if (saveQuoteLoading.value) return;
     if (cart.value.length === 0) {
         alert('Agrega productos al carrito antes de guardar una cotización.');
         return;
@@ -1671,6 +1685,7 @@ const handleSaveQuote = async () => {
         }));
 
         const res = await apiClient.post('/sales-quotes/from-pos', {
+            idempotency_key: createIdempotencyKey(),
             customer_id: customer_id.value ?? null,
             customer_vehicle_id: customer_vehicle_id.value ?? null,
             warehouse_id: currentWarehouseId.value ?? null,
@@ -1796,6 +1811,8 @@ const closeCashMovement = (): void => {
 
 // Session Handlers
 const handleOpenSession = async (amount: number) => {
+    if (sessionActionLoading.value) return;
+
     sessionActionLoading.value = true;
     const success = await openSession(
         amount,
@@ -1830,10 +1847,16 @@ const handleCashMovement = async (payload: {
     reason: string;
     reference_number: string;
     notes: string;
+    idempotency_key: string;
 }) => {
+    if (cashMovementLoading.value) return;
+
     cashMovementLoading.value = true;
     cashMovementError.value = null;
-    const success = await addCashMovement(payload);
+    const success = await addCashMovement(
+        payload,
+        currentWarehouseId.value ?? undefined,
+    );
     cashMovementLoading.value = false;
     if (success) {
         showCashMovementModal.value = false;
@@ -2446,6 +2469,7 @@ onUnmounted(() => {
                         :return-mode="returnMode"
                         :can-edit-seller="canEditSeller"
                         :can-edit-commercial="!isStrictCashier"
+                        :can-manage-purchases="canManagePurchases"
                         @update-quantity="
                             (idx, qty) => handleUpdateQuantity(idx, qty)
                         "
@@ -2745,6 +2769,9 @@ onUnmounted(() => {
                         :quoteMode="props.quoteMode"
                         :can-clear="canClearCurrentCart"
                         :cashier-mode="isStrictCashier"
+                        :saving-quote="
+                            saveQuoteLoading || saveQuoteChangesLoading
+                        "
                         @clear="handleClearCurrentCart"
                         @save-quote="handleSaveQuote"
                         @save-quote-changes="handleSaveQuoteChanges"
@@ -2798,6 +2825,8 @@ onUnmounted(() => {
                     0,
                 )
             "
+            :loading="loading"
+            :error="error"
             @finish="handleUnifiedPaymentFinish"
             @cancel="closePaymentModal"
         />
@@ -2879,12 +2908,13 @@ onUnmounted(() => {
         <VariantSelectModal
             :show="showVariantModal && pendingProduct !== null"
             :product="pendingProduct"
+            :can-manage-purchases="canManagePurchases"
             @select-multiple="onVariantsSelected"
             @close="closeVariantModal"
         />
 
         <QuickPurchaseModal
-            v-if="autoQuickPurchaseProduct"
+            v-if="canManagePurchases && autoQuickPurchaseProduct"
             :is-open="showAutoQuickPurchaseModal"
             :product="autoQuickPurchaseProduct"
             :initial-variant-id="autoQuickPurchaseVariantId"

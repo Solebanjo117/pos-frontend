@@ -79,6 +79,7 @@ export function usePosSession() {
     const openSession = async (amount: number, warehouseId?: number) => {
         if (!userId) return false;
 
+        error.value = null;
         try {
             const { data } = await PosSessionApiService.openSession({
                 user_id: userId,
@@ -102,6 +103,7 @@ export function usePosSession() {
     ) => {
         if (!userId) return false;
 
+        error.value = null;
         try {
             const { data } = await PosSessionApiService.closeSession({
                 user_id: userId,
@@ -123,16 +125,19 @@ export function usePosSession() {
 
     const addCashMovement = async (
         payload: Omit<CashMovementPayload, 'user_id'>,
+        warehouseId?: number,
     ) => {
         if (!userId) return false;
 
+        error.value = null;
         try {
             await PosSessionApiService.createCashMovement({
                 ...payload,
                 user_id: userId,
+                warehouse_id: warehouseId,
             });
             // Refresh movements and session summary
-            await fetchCashMovements();
+            await fetchCashMovements(warehouseId);
             return true;
         } catch (e: any) {
             error.value =
@@ -142,12 +147,14 @@ export function usePosSession() {
         }
     };
 
-    const fetchCashMovements = async () => {
+    const fetchCashMovements = async (warehouseId?: number) => {
         if (!userId) return;
 
         try {
-            const { data } =
-                await PosSessionApiService.getCashMovements(userId);
+            const { data } = await PosSessionApiService.getCashMovements(
+                userId,
+                warehouseId,
+            );
             cashMovements.value = data;
         } catch (e: any) {
             console.error('Error fetching cash movements:', e);

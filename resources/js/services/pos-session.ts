@@ -16,6 +16,8 @@ export interface CashMovementPayload {
     reference_number?: string;
     business_datetime?: string;
     notes?: string;
+    warehouse_id?: number;
+    idempotency_key?: string;
 }
 
 export interface CashMovementRecord {
@@ -94,9 +96,11 @@ export const PosSessionApiService = {
      */
     async getCashMovements(
         userId?: number,
+        warehouseId?: number,
     ): Promise<{ data: CashMovementRecord[] }> {
         const params: Record<string, any> = {};
         if (userId) params.user_id = userId;
+        if (warehouseId) params.warehouse_id = warehouseId;
         const response = await apiClient.get(
             '/pos-sessions/current/movements',
             { params },

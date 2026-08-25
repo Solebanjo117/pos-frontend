@@ -10,9 +10,16 @@ export interface WarehouseOrder {
     sent_to_warehouse_at: string;
     items: Array<{
         id: number;
-        product_id: number;
-        product: { id: number; name: string };
+        product_id: number | null;
+        product: { id: number; name: string; sku_base?: string | null } | null;
+        variant?: {
+            id: number;
+            sku?: string | null;
+            brand?: { name: string } | null;
+        } | null;
         quantity: number;
+        custom_description?: string | null;
+        is_custom_line?: boolean;
     }>;
 }
 

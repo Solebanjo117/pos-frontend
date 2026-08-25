@@ -8,6 +8,7 @@ import type { Product, ProductVariant } from '@/types/product';
 const props = defineProps<{
     show: boolean;
     product: Product | null;
+    canManagePurchases?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -141,7 +142,7 @@ const variantForPurchase = ref<ProductVariant | null>(null);
 
 const openQuickPurchase = (variant: ProductVariant, e: Event) => {
     e.stopPropagation();
-    if (!props.product) return;
+    if (!props.product || !props.canManagePurchases) return;
     variantForPurchase.value = variant;
     showQuickPurchase.value = true;
 };
@@ -419,6 +420,7 @@ const handlePurchaseSuccess = (result: {
                                                 </span>
                                                 <button
                                                     v-if="
+                                                        canManagePurchases &&
                                                         getStock(variant) <= 0
                                                     "
                                                     @click="
@@ -546,7 +548,7 @@ const handlePurchaseSuccess = (result: {
 
         <!-- Quick Purchase Modal -->
         <QuickPurchaseModal
-            v-if="variantForPurchase && product"
+            v-if="canManagePurchases && variantForPurchase && product"
             :is-open="showQuickPurchase"
             :product="product"
             :initial-variant-id="variantForPurchase.id"

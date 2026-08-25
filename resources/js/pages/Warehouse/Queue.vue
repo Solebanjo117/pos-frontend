@@ -6,13 +6,16 @@ import {
     Package,
     User,
     CheckCircle,
+    X,
 } from 'lucide-vue-next';
 import { ref, onMounted, onUnmounted } from 'vue';
+import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import {
     useWarehouseQueue,
     type WarehouseOrder,
 } from '@/composables/useWarehouseQueue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import apiClient from '@/services/api/client';
 
 defineOptions({ layout: AppLayout });
 
@@ -26,6 +29,32 @@ const {
     stopPolling,
     markAsPrepared,
 } = useWarehouseQueue();
+
+// ── Order detail preview (does NOT mark as prepared) ──
+const detailOrder = ref<WarehouseOrder | null>(null);
+const detailTab = ref<'summary' | 'products'>('summary');
+
+const openOrderDetail = (order: WarehouseOrder) => {
+    detailOrder.value = order;
+    detailTab.value = 'summary';
+};
+
+const closeOrderDetail = () => {
+    detailOrder.value = null;
+};
+
+// ── Reuse existing ProductDetailModal (loaded by id) ──
+const selectedProductForModal = ref<any>(null);
+
+const openProductDetail = async (productId: number | null) => {
+    if (!productId) return;
+    try {
+        const { data } = await apiClient.get(`/products/${productId}`);
+        selectedProductForModal.value = data.data ?? data;
+    } catch {
+        /* silent */
+    }
+};
 
 // Reactive clock: ticks every second so timeAgo re-renders
 const now = ref(Date.now());
@@ -183,8 +212,12 @@ const summarizedProducts = (items: WarehouseOrder['items']) => {
                     </div>
                 </div>
 
-                <!-- Card Body -->
-                <div class="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                <!-- Card Body (click to preview full order) -->
+                <div
+                    class="flex-1 cursor-pointer space-y-3 overflow-y-auto px-5 py-4"
+                    title="Ver detalle del encargo"
+                    @click="openOrderDetail(order)"
+                >
                     <!-- Customer -->
                     <div class="flex items-center gap-2">
                         <span
@@ -260,4 +293,168 @@ const summarizedProducts = (items: WarehouseOrder['items']) => {
             </div>
         </div>
     </div>
+
+    <!-- Order detail preview (Resumen | Productos) — does NOT mark as prepared -->
+    <div
+        v-if="detailOrder"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        @click.self="closeOrderDetail"
+    >
+        <div
+            class="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-border dark:bg-card"
+        >
+            <div
+                class="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-border"
+            >
+                <div>
+                    <h2
+                        class="text-lg font-bold text-gray-900 uppercase dark:text-white"
+                    >
+                        {{ detailOrder.order_number }}
+                    </h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ detailOrder.customer?.name || 'Público General' }}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-muted"
+                    @click="closeOrderDetail"
+                >
+                    <X :size="18" />
+                </button>
+            </div>
+
+            <!-- Local tabs -->
+            <div
+                class="flex gap-1 border-b border-gray-100 px-5 dark:border-border"
+            >
+                <button
+                    type="button"
+                    class="border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+                    :class="
+                        detailTab === 'summary'
+                            ? 'border-indigo-600 text-indigo-700 dark:text-indigo-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                    "
+                    @click="detailTab = 'summary'"
+                >
+                    Resumen
+                </button>
+                <button
+                    type="button"
+                    class="border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+                    :class="
+                        detailTab === 'products'
+                            ? 'border-indigo-600 text-indigo-700 dark:text-indigo-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                    "
+                    @click="detailTab = 'products'"
+                >
+                    Productos ({{ detailOrder.items.length }})
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-5 py-4">
+                <!-- Resumen -->
+                <div v-if="detailTab === 'summary'" class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400"
+                            >Cliente</span
+                        >
+                        <span class="font-medium">{{
+                            detailOrder.customer?.name || 'Público General'
+                        }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400"
+                            >Responsable</span
+                        >
+                        <span class="font-medium">{{
+                            detailOrder.user?.name ?? 'Sistema'
+                        }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400"
+                            >En espera</span
+                        >
+                        <span class="font-medium">{{
+                            timeAgo(detailOrder.sent_to_warehouse_at, now)
+                        }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400"
+                            >Productos</span
+                        >
+                        <span class="font-medium">{{
+                            detailOrder.items.length
+                        }}</span>
+                    </div>
+                </div>
+
+                <!-- Productos -->
+                <div v-else class="space-y-1.5">
+                    <button
+                        v-for="item in detailOrder.items"
+                        :key="item.id"
+                        type="button"
+                        class="flex w-full items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2 text-left text-sm transition hover:bg-gray-50 disabled:cursor-default dark:border-border dark:hover:bg-muted/30"
+                        :disabled="item.is_custom_line || !item.product_id"
+                        @click="openProductDetail(item.product_id)"
+                    >
+                        <div class="flex min-w-0 items-start gap-2">
+                            <Package
+                                :size="16"
+                                class="mt-0.5 shrink-0 text-gray-400"
+                            />
+                            <div class="min-w-0">
+                                <p
+                                    class="font-medium text-gray-800 dark:text-gray-200"
+                                >
+                                    {{
+                                        item.is_custom_line
+                                            ? item.custom_description ||
+                                              'Línea personalizada'
+                                            : item.product?.name || 'Producto'
+                                    }}
+                                </p>
+                                <p
+                                    class="text-xs text-gray-500 dark:text-gray-400"
+                                >
+                                    <span
+                                        v-if="
+                                            item.variant?.sku ||
+                                            item.product?.sku_base
+                                        "
+                                    >
+                                        SKU:
+                                        {{
+                                            item.variant?.sku ||
+                                            item.product?.sku_base
+                                        }}
+                                    </span>
+                                    <span v-if="item.variant?.brand?.name">
+                                        · {{ item.variant.brand.name }}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                        <span
+                            class="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+                        >
+                            x{{ item.quantity }}
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reuse existing product detail modal -->
+    <ProductDetailModal
+        v-if="selectedProductForModal"
+        :product="selectedProductForModal"
+        @close="selectedProductForModal = null"
+        @view-alternative="(p: any) => (selectedProductForModal = p)"
+    />
 </template>

@@ -16,12 +16,16 @@ import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolb
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { formatCurrency } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
+import { purchaseReceiptSignature } from '@/utils/purchaseReceipt';
 
 const props = defineProps<{ purchaseOrderId: number }>();
 const { purchaseOrder, loading, error, fetchPurchaseOrderById, receiveItems } =
     usePurchaseOrders();
 
 const receiveData = ref<{ item_id: number; quantity_received: number }[]>([]);
+const receiptIdempotencyKey = ref(createIdempotencyKey());
+const receiptPayloadSignature = ref<string | null>(null);
 
 const tabs = [
     { key: 'summary', label: 'Resumen', icon: FileText },
@@ -205,8 +209,24 @@ async function handleSubmit() {
         alert('Ingresa cantidades a recibir');
         return;
     }
-    await receiveItems(props.purchaseOrderId, { items: itemsToReceive });
-    router.visit(`/purchase-orders/${props.purchaseOrderId}`);
+    const signature = purchaseReceiptSignature(itemsToReceive);
+    if (
+        receiptPayloadSignature.value !== null &&
+        receiptPayloadSignature.value !== signature
+    ) {
+        receiptIdempotencyKey.value = createIdempotencyKey();
+    }
+    receiptPayloadSignature.value = signature;
+
+    try {
+        await receiveItems(props.purchaseOrderId, {
+            idempotency_key: receiptIdempotencyKey.value,
+            items: itemsToReceive,
+        });
+        router.visit(`/purchase-orders/${props.purchaseOrderId}`);
+    } catch (cause) {
+        console.error('Error al registrar la recepción:', cause);
+    }
 }
 </script>
 

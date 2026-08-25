@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import apiClient from '@/services/api/client';
 import type { Customer } from '@/types/customer';
 import type {
     PaymentMethod,
@@ -21,6 +22,13 @@ interface Payment {
     amount: number;
     reference_number?: string | null;
     notes?: string | null;
+    financial_account_id?: number | null;
+}
+
+interface FinancialAccountOption {
+    endpoint_id: number;
+    name: string;
+    masked_number?: string | null;
 }
 
 interface PaymentFinishMeta {
@@ -87,6 +95,10 @@ const emit = defineEmits<{
 const payments = ref<Record<string, number>>({});
 const paymentReferences = ref<Record<string, string>>({});
 const paymentNotes = ref<Record<string, string>>({});
+const paymentAccountIds = ref<Record<string, number | null>>({});
+const financialAccounts = ref<FinancialAccountOption[]>([]);
+const financialAccountsError = ref<string | null>(null);
+const finishLocked = ref(false);
 const activeMethodCode = ref<string | null>(null);
 const referenceNumber = ref('');
 const notes = ref('');
@@ -167,7 +179,9 @@ watch(
     (show) => {
         if (show) {
             fetchMethods(resolvedPaymentContext.value);
+            fetchFinancialAccounts();
             resetPayments();
+            finishLocked.value = false;
         }
     },
 );
@@ -179,9 +193,19 @@ watch(resolvedPaymentContext, () => {
     }
 });
 
+watch(
+    () => props.loading,
+    (loading) => {
+        if (!loading && props.error) {
+            finishLocked.value = false;
+        }
+    },
+);
+
 onMounted(() => {
     if (props.show) {
         fetchMethods(resolvedPaymentContext.value);
+        fetchFinancialAccounts();
     }
 });
 
@@ -189,9 +213,25 @@ const resetPayments = () => {
     payments.value = {};
     paymentReferences.value = {};
     paymentNotes.value = {};
+    paymentAccountIds.value = {};
     activeMethodCode.value = null;
     referenceNumber.value = '';
     notes.value = '';
+};
+
+const fetchFinancialAccounts = async () => {
+    financialAccountsError.value = null;
+    try {
+        const response = await apiClient.get('/money-accounts/options', {
+            params: { type: 'bank', purpose: 'settlement' },
+        });
+        financialAccounts.value = response.data?.data ?? [];
+    } catch (error: any) {
+        financialAccounts.value = [];
+        financialAccountsError.value =
+            error.response?.data?.message ||
+            'No se pudieron cargar las cuentas destino.';
+    }
 };
 
 const creditAvailable = computed(() => {
@@ -492,7 +532,7 @@ const effectiveCash = computed(() =>
 );
 
 const canFinish = computed(() => {
-    if (props.loading) {
+    if (props.loading || finishLocked.value) {
         return false;
     }
 
@@ -513,6 +553,16 @@ const canFinish = computed(() => {
         creditAmount.value > 0 &&
         !creditCanBeUsed.value
     ) {
+        return false;
+    }
+
+    const bankPaymentWithoutAccount = dynamicMethods.value.some(
+        (method) =>
+            method.liquidity_bucket === 'bank' &&
+            getPaymentAmount(method.code) > 0 &&
+            !paymentAccountIds.value[method.code],
+    );
+    if (bankPaymentWithoutAccount) {
         return false;
     }
 
@@ -561,6 +611,11 @@ const handleDynamicPayment = (code: string, value: number) => {
 };
 
 const handleFinish = () => {
+    if (!canFinish.value) {
+        return;
+    }
+
+    finishLocked.value = true;
     const paymentList: Payment[] = [];
 
     if (effectiveCash.value > 0) {
@@ -603,6 +658,10 @@ const handleFinish = () => {
                 amount: getPaymentAmount(method.code),
                 reference_number: getPaymentReference(method.code) || null,
                 notes: getPaymentNotes(method.code) || null,
+                financial_account_id:
+                    method.liquidity_bucket === 'bank'
+                        ? paymentAccountIds.value[method.code] || null
+                        : null,
             });
         }
     }
@@ -1049,6 +1108,49 @@ const handleCancel = () => {
                                             )
                                         "
                                     />
+                                </div>
+
+                                <div
+                                    v-if="
+                                        selectedDynamicMethod.liquidity_bucket ===
+                                        'bank'
+                                    "
+                                >
+                                    <label
+                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Cuenta destino
+                                    </label>
+                                    <select
+                                        v-model.number="
+                                            paymentAccountIds[
+                                                selectedDynamicMethod.code
+                                            ]
+                                        "
+                                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                    >
+                                        <option :value="null">
+                                            Selecciona una cuenta
+                                        </option>
+                                        <option
+                                            v-for="account in financialAccounts"
+                                            :key="account.endpoint_id"
+                                            :value="account.endpoint_id"
+                                        >
+                                            {{ account.name }}
+                                            {{
+                                                account.masked_number
+                                                    ? `· ${account.masked_number}`
+                                                    : ''
+                                            }}
+                                        </option>
+                                    </select>
+                                    <p
+                                        v-if="financialAccountsError"
+                                        class="mt-1 text-xs text-red-600 dark:text-red-400"
+                                    >
+                                        {{ financialAccountsError }}
+                                    </p>
                                 </div>
 
                                 <div

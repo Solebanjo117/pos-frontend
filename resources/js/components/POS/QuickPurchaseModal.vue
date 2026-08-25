@@ -16,6 +16,7 @@ import { useToast } from '@/composables/useToast';
 import { supplyListService } from '@/services/supply-list';
 import type { Supplier } from '@/types/supplier';
 import { formatCurrency, roundMoney } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 // Reusing global store settings if needed, or simply pass props.
 
@@ -48,6 +49,7 @@ const selectedSupplierId = ref<number | ''>('');
 const selectedVariantId = ref<number | ''>('');
 const quantity = ref(1);
 const unitCost = ref(0);
+const idempotencyKey = ref(createIdempotencyKey());
 
 // Computed options for SearchableSelect
 const supplierOptions = computed(() => {
@@ -79,6 +81,8 @@ const loadSuppliers = async () => {
 
 // Reset form
 const resetForm = () => {
+    selectedSupplierId.value = '';
+    idempotencyKey.value = createIdempotencyKey();
     quantity.value = 1;
 
     // Pre-select variant: from prop > single variant > default variant
@@ -177,6 +181,7 @@ const handleClose = () => {
 
 // Add to Supply List (recommended flow)
 const handleAddToSupplyList = async () => {
+    if (isSubmitting.value) return;
     if (quantity.value < 1) {
         return toast.error('La cantidad debe ser mayor a 0');
     }
@@ -217,7 +222,12 @@ const handleAddToSupplyList = async () => {
 
 // Quick Purchase (direct PO - advanced flow)
 const handleQuickPurchase = async () => {
-    if (!selectedSupplierId.value || quantity.value < 1 || unitCost.value < 0) {
+    if (isSubmitting.value) return;
+    if (
+        !selectedSupplierId.value ||
+        quantity.value < 1 ||
+        unitCost.value <= 0
+    ) {
         return toast.error(
             'Por favor verifica los datos ingresados (proveedor y costo requeridos)',
         );
@@ -231,6 +241,7 @@ const handleQuickPurchase = async () => {
         }
 
         await quickReceivePurchaseOrder({
+            idempotency_key: idempotencyKey.value,
             supplier_id: selectedSupplierId.value,
             warehouse_id: currentWarehouseId.value,
             items: [

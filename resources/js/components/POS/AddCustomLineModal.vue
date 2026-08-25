@@ -34,6 +34,7 @@ const form = reactive({
 });
 
 const error = ref<string | null>(null);
+const submitted = ref(false);
 
 const resetForm = () => {
     form.custom_description = '';
@@ -44,6 +45,7 @@ const resetForm = () => {
     form.discount_percent = 0;
     form.notes = '';
     error.value = null;
+    submitted.value = false;
 };
 
 watch(
@@ -56,6 +58,7 @@ watch(
 );
 
 const handleSubmit = () => {
+    if (submitted.value) return;
     error.value = null;
 
     if (!form.custom_description.trim()) {
@@ -63,8 +66,8 @@ const handleSubmit = () => {
         return;
     }
 
-    if (form.quantity <= 0) {
-        error.value = 'La cantidad debe ser mayor a 0.';
+    if (form.quantity <= 0 || !Number.isInteger(Number(form.quantity))) {
+        error.value = 'La cantidad debe ser un numero entero mayor a 0.';
         return;
     }
 
@@ -73,10 +76,11 @@ const handleSubmit = () => {
         return;
     }
 
+    submitted.value = true;
     emit('submit', {
         custom_description: form.custom_description.trim(),
         product_sku: form.product_sku.trim() || 'MISC',
-        quantity: Math.max(1, Number(form.quantity) || 1),
+        quantity: Number(form.quantity),
         unit_price: Math.max(0, Number(form.unit_price) || 0),
         tax_percent: Math.max(0, Number(form.tax_percent) || 0),
         discount_percent: Math.max(
@@ -228,6 +232,7 @@ const handleSubmit = () => {
                     <button
                         type="button"
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                        :disabled="submitted"
                         @click="handleSubmit"
                     >
                         Agregar linea

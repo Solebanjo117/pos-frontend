@@ -21,6 +21,7 @@ export function useProducts() {
     const lastPage = ref(1);
     const total = ref(0);
     const perPage = ref(20);
+    let latestFetchRequest = 0;
 
     // Computed
     const hasProducts = computed(() => products.value.length > 0);
@@ -31,6 +32,7 @@ export function useProducts() {
      * Fetch products with filters
      */
     async function fetchProducts(filters?: ProductFilters) {
+        const requestId = ++latestFetchRequest;
         loading.value = true;
         error.value = null;
 
@@ -42,18 +44,24 @@ export function useProducts() {
                     per_page: perPage.value,
                 });
 
-            products.value = response.data;
-            currentPage.value = response.meta.current_page;
-            lastPage.value = response.meta.last_page;
-            total.value = response.meta.total;
+            if (requestId === latestFetchRequest) {
+                products.value = response.data;
+                currentPage.value = response.meta.current_page;
+                lastPage.value = response.meta.last_page;
+                total.value = response.meta.total;
+            }
 
             return response;
         } catch (err: any) {
-            error.value =
-                err.response?.data?.message || 'Error al cargar productos';
+            if (requestId === latestFetchRequest) {
+                error.value =
+                    err.response?.data?.message || 'Error al cargar productos';
+            }
             throw err;
         } finally {
-            loading.value = false;
+            if (requestId === latestFetchRequest) {
+                loading.value = false;
+            }
         }
     }
 

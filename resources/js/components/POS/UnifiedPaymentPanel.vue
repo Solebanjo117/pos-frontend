@@ -7,6 +7,7 @@ interface Payment {
     amount: number;
     reference_number?: string | null;
     notes?: string | null;
+    financial_account_id?: number | null;
 }
 
 defineProps<{
@@ -18,6 +19,8 @@ defineProps<{
     subtotal?: number;
     taxAmount?: number;
     discountAmount?: number;
+    loading?: boolean;
+    error?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -41,6 +44,8 @@ function handleFinish(payments: Payment[]) {
         :subtotal="subtotal"
         :tax-amount="taxAmount"
         :discount-amount="discountAmount"
+        :loading="loading"
+        :error="error"
         @finish="handleFinish"
         @cancel="emit('cancel')"
     />

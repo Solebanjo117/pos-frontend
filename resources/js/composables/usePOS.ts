@@ -249,6 +249,8 @@ export function usePOS() {
     const shippingMethod = ref<'pickup' | 'delivery'>('pickup');
     const loading = ref(false);
     const error = ref<string | null>(null);
+    const pendingCheckoutKey = ref<string | null>(null);
+    const pendingCheckoutFingerprint = ref<string | null>(null);
     const connectionStatus = ref<'online' | 'offline' | 'error'>('online');
 
     // Watch activeSessionId to clear errors when switching sessions
@@ -803,6 +805,7 @@ export function usePOS() {
             amount: number;
             reference_number?: string | null;
             notes?: string | null;
+            financial_account_id?: number | null;
         }>,
     ) => {
         if (loading.value) return false;
@@ -851,7 +854,6 @@ export function usePOS() {
 
             const currentUser = page.props.auth?.user as any;
             const orderData: CreateSalesOrderData = {
-                idempotency_key: createIdempotencyKey(),
                 user_id: currentUser?.id, // Pass user_id from Inertia auth dynamically
                 customer_id: customer_id.value,
                 customer_vehicle_id: customer_vehicle_id.value,
@@ -897,8 +899,18 @@ export function usePOS() {
                 })),
             };
 
+            const checkoutFingerprint = JSON.stringify(orderData);
+            if (pendingCheckoutFingerprint.value !== checkoutFingerprint) {
+                pendingCheckoutFingerprint.value = checkoutFingerprint;
+                pendingCheckoutKey.value = createIdempotencyKey();
+            }
+            orderData.idempotency_key =
+                pendingCheckoutKey.value ?? createIdempotencyKey();
+
             const createdOrderResult =
                 await salesOrdersService.create(orderData);
+            pendingCheckoutFingerprint.value = null;
+            pendingCheckoutKey.value = null;
 
             // Show stock warnings from API as visible alert
             const apiWarnings = createdOrderResult?.warnings;

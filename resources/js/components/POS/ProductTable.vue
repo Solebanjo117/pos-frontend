@@ -26,6 +26,7 @@ const props = defineProps<{
     returnMode?: boolean;
     canEditSeller?: boolean;
     canEditCommercial?: boolean;
+    canManagePurchases?: boolean;
 }>();
 
 const emit = defineEmits([
@@ -169,6 +170,7 @@ const productForPurchase = ref<any>(null);
 const variantIdForPurchase = ref<number | null>(null);
 
 const openQuickPurchase = (item: any) => {
+    if (!props.canManagePurchases) return;
     if (!item.product_id) return;
     const fullProduct = props.products?.find(
         (p: any) => p.id === item.product_id,
@@ -343,7 +345,10 @@ const handlePurchaseSuccess = (result: {
                                         class="flex items-center justify-center gap-2"
                                     >
                                         <button
-                                            v-if="props.canEditCommercial !== false"
+                                            v-if="
+                                                props.canEditCommercial !==
+                                                false
+                                            "
                                             @click="
                                                 emit(
                                                     'update-quantity',
@@ -356,7 +361,10 @@ const handlePurchaseSuccess = (result: {
                                             <Minus class="h-3.5 w-3.5" />
                                         </button>
                                         <input
-                                            v-if="props.canEditCommercial !== false"
+                                            v-if="
+                                                props.canEditCommercial !==
+                                                false
+                                            "
                                             type="number"
                                             min="1"
                                             :value="item.quantity"
@@ -374,7 +382,10 @@ const handlePurchaseSuccess = (result: {
                                             class="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-gray-900 focus:ring-0 dark:text-white"
                                         />
                                         <button
-                                            v-if="props.canEditCommercial !== false"
+                                            v-if="
+                                                props.canEditCommercial !==
+                                                false
+                                            "
                                             @click="
                                                 emit(
                                                     'update-quantity',
@@ -387,7 +398,10 @@ const handlePurchaseSuccess = (result: {
                                             <Plus class="h-3.5 w-3.5" />
                                         </button>
                                         <span
-                                            v-if="props.canEditCommercial === false"
+                                            v-if="
+                                                props.canEditCommercial ===
+                                                false
+                                            "
                                             class="w-12 text-center text-sm font-semibold text-gray-900 dark:text-white"
                                         >
                                             {{ item.quantity }}
@@ -597,7 +611,10 @@ const handlePurchaseSuccess = (result: {
 
                                         <!-- Discount percent -->
                                         <div
-                                            v-if="props.canEditCommercial !== false"
+                                            v-if="
+                                                props.canEditCommercial !==
+                                                false
+                                            "
                                             class="space-y-2"
                                         >
                                             <label
@@ -637,7 +654,10 @@ const handlePurchaseSuccess = (result: {
 
                                         <!-- Seller selector -->
                                         <div
-                                            v-if="props.canEditCommercial !== false"
+                                            v-if="
+                                                props.canEditCommercial !==
+                                                false
+                                            "
                                             class="space-y-2"
                                         >
                                             <label
@@ -686,7 +706,10 @@ const handlePurchaseSuccess = (result: {
 
                                         <!-- Internal Notes -->
                                         <div
-                                            v-if="props.canEditCommercial !== false"
+                                            v-if="
+                                                props.canEditCommercial !==
+                                                false
+                                            "
                                             class="space-y-2"
                                         >
                                             <label
@@ -716,7 +739,9 @@ const handlePurchaseSuccess = (result: {
                                         <!-- Quick Reorder — only when stock = 0 -->
                                         <div
                                             v-if="
-                                                props.canEditCommercial !== false &&
+                                                props.canManagePurchases &&
+                                                props.canEditCommercial !==
+                                                    false &&
                                                 !item.is_custom_line &&
                                                 item.available_stock !==
                                                     undefined &&
@@ -837,7 +862,7 @@ const handlePurchaseSuccess = (result: {
 
         <!-- Quick Purchase Modal -->
         <QuickPurchaseModal
-            v-if="productForPurchase"
+            v-if="canManagePurchases && productForPurchase"
             :is-open="showQuickPurchase"
             :product="productForPurchase"
             :initial-variant-id="variantIdForPurchase"

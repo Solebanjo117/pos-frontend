@@ -69,6 +69,7 @@ const cashCounts = reactive<Record<string, number>>(
 const payments = reactive<Record<string, number>>({});
 const extraCash = ref(0);
 const notes = ref('');
+const submitted = ref(false);
 
 const summaryData = computed(
     () =>
@@ -228,6 +229,15 @@ const handleClear = (): void => {
 };
 
 const handleSubmit = (): void => {
+    if (
+        props.loading ||
+        submitted.value ||
+        (requiresNotes.value && !notes.value.trim())
+    ) {
+        return;
+    }
+
+    submitted.value = true;
     const paymentMethodCounts = paymentRows.value.reduce<
         Record<string, number>
     >((counts, row) => {
@@ -248,16 +258,29 @@ const handleSubmit = (): void => {
     emit('submit', totalCashCounted.value, notes.value, closingDetails);
 };
 
-const close = (): void => emit('close');
+const close = (): void => {
+    handleClear();
+    submitted.value = false;
+    emit('close');
+};
 
 watch(
     () => props.show,
     async (visible) => {
         if (visible) {
+            handleClear();
+            submitted.value = false;
             await fetchMethods();
         }
     },
     { immediate: true },
+);
+
+watch(
+    () => props.loading,
+    (loading) => {
+        if (!loading) submitted.value = false;
+    },
 );
 
 watch(
@@ -609,7 +632,11 @@ watch(
                 <div class="flex min-w-0 flex-wrap items-end gap-2">
                     <button
                         type="button"
-                        :disabled="loading || (requiresNotes && !notes.trim())"
+                        :disabled="
+                            loading ||
+                            submitted ||
+                            (requiresNotes && !notes.trim())
+                        "
                         class="inline-flex h-9 items-center gap-2 border border-slate-300 bg-slate-50 px-3 text-xs font-bold text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                         @click="handleSubmit"
                     >

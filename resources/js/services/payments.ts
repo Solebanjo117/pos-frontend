@@ -1,3 +1,4 @@
+import { createIdempotencyKey } from '@/utils/idempotency';
 import apiClient from './api/client';
 
 export const SalesOrderPaymentApiService = {
@@ -17,15 +18,22 @@ export const SalesOrderPaymentApiService = {
     async addPayment(
         orderId: number,
         payload: {
+            idempotency_key?: string;
             amount: number;
-            method: 'cash' | 'card' | 'transfer' | 'credit';
+            method: string;
+            financial_account_id?: number;
+            reference_number?: string;
             notes?: string;
             paid_at?: string;
         },
     ) {
         const { data } = await apiClient.post(
             `/sales-orders/${orderId}/payments`,
-            payload,
+            {
+                ...payload,
+                idempotency_key:
+                    payload.idempotency_key ?? createIdempotencyKey(),
+            },
         );
         return data;
     },
@@ -84,6 +92,7 @@ export const AccountsReceivableApiService = {
     async recordReceipt(
         customerId: number,
         payload: {
+            idempotency_key?: string;
             amount: number;
             method: string;
             reference_number?: string;
@@ -94,7 +103,11 @@ export const AccountsReceivableApiService = {
     ) {
         const { data } = await apiClient.post(
             `/accounts-receivable/${customerId}/receipts`,
-            payload,
+            {
+                ...payload,
+                idempotency_key:
+                    payload.idempotency_key ?? createIdempotencyKey(),
+            },
         );
         return data;
     },

@@ -115,10 +115,14 @@ export const salesOrdersService = {
         payload: {
             reason: string;
             refund_method?: string | null;
+            financial_account_id?: number | null;
             notes?: string | null;
         },
     ): Promise<SalesOrder> {
-        const { data } = await apiClient.post(`${BASE_URL}/${id}/cancel`, payload);
+        const { data } = await apiClient.post(
+            `${BASE_URL}/${id}/cancel`,
+            payload,
+        );
         return data.data;
     },
 

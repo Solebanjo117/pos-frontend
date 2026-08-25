@@ -573,6 +573,7 @@ const remainingToPay = computed(() => {
 const returnOrderData = ref<any>(null);
 const returnLoading = ref(false);
 const returnError = ref<string | null>(null);
+const returnIdempotencyKey = ref(createIdempotencyKey());
 
 // Edit mode state
 const editOrderData = ref<any>(null);
@@ -604,6 +605,7 @@ const getOriginalItemKey = (payload: {
 
 // Load order for edit (add/modify items on an existing confirmed order)
 async function loadOrderForReturn(orderId: number) {
+    returnIdempotencyKey.value = createIdempotencyKey();
     try {
         const res = await apiClient.get(`/sales-orders/${orderId}`);
         const order = res.data.data ?? res.data;
@@ -669,7 +671,8 @@ async function loadOrderForReturn(orderId: number) {
 
 // Confirm return
 async function confirmReturn() {
-    if (!props.orderId || cart.value.length === 0) return;
+    if (!props.orderId || cart.value.length === 0 || returnLoading.value)
+        return;
 
     returnLoading.value = true;
     returnError.value = null;
@@ -683,20 +686,13 @@ async function confirmReturn() {
         }));
 
         // Create the return
-        const returnRes = await SalesReturnsApiService.createForOrder(
-            props.orderId,
-            {
-                refund_method: 'balance', // Always use balance for store credit
-                reason: 'Devolución desde POS',
-                items,
-            },
-        );
-
-        const returnId = returnRes.data?.id;
-        if (returnId) {
-            // Approve immediately
-            await SalesReturnsApiService.approve(returnId);
-        }
+        await SalesReturnsApiService.createForOrder(props.orderId, {
+            idempotency_key: returnIdempotencyKey.value,
+            approve_immediately: true,
+            refund_method: 'balance', // Always use balance for store credit
+            reason: 'Devolución desde POS',
+            items,
+        });
 
         // Redirect to the original order
         router.visit(`/sales-orders/${props.orderId}`);

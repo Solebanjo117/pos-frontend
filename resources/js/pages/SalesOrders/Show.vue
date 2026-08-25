@@ -89,6 +89,11 @@ const cancellationReason = ref('');
 const cancellationNotes = ref('');
 const cancellationMethod = ref<string>('');
 const cancellationMethods = ref<ConfiguredPaymentMethod[]>([]);
+const cancellationFinancialAccountId = ref<number | null>(null);
+const cancellationFinancialAccounts = ref<
+    Array<{ endpoint_id: number; name: string; masked_number?: string | null }>
+>([]);
+const cancellationAccountsError = ref<string | null>(null);
 const cancellationReasonInput = ref<HTMLTextAreaElement | null>(null);
 const returnLoading = ref(false);
 const returnError = ref<string | null>(null);
@@ -179,6 +184,12 @@ const cancellationOptions = computed(() => {
             rows.findIndex((row) => row.code === option.code) === index,
     );
 });
+const cancellationIsBank = computed(
+    () =>
+        cancellationMethods.value.find(
+            (method) => method.code === cancellationMethod.value,
+        )?.liquidity_bucket === 'bank',
+);
 const customer = computed(() => order.value?.customer ?? null);
 
 const selectedWarehouseId = computed(() => {
@@ -315,6 +326,8 @@ const openCancellationModal = async (): Promise<void> => {
     cancellationReason.value = '';
     cancellationNotes.value = '';
     cancellationError.value = null;
+    cancellationAccountsError.value = null;
+    cancellationFinancialAccountId.value = null;
     try {
         cancellationMethods.value = await paymentMethodsService.getActive(
             'returns',
@@ -322,6 +335,19 @@ const openCancellationModal = async (): Promise<void> => {
         );
     } catch {
         cancellationMethods.value = [];
+    }
+    try {
+        const accountsResponse = await apiClient.get(
+            '/money-accounts/options',
+            {
+                params: { type: 'bank', purpose: 'settlement' },
+            },
+        );
+        cancellationFinancialAccounts.value = accountsResponse.data?.data ?? [];
+    } catch {
+        cancellationFinancialAccounts.value = [];
+        cancellationAccountsError.value =
+            'No se pudieron cargar las cuentas bancarias.';
     }
     cancellationMethod.value =
         customer.value && amountDue.value > 0
@@ -341,6 +367,11 @@ const handleCancel = async (): Promise<void> => {
         cancellationError.value = 'Seleccione cómo se resolverá la anulación.';
         return;
     }
+    if (cancellationIsBank.value && !cancellationFinancialAccountId.value) {
+        cancellationError.value =
+            'Seleccione una cuenta bancaria para el reembolso.';
+        return;
+    }
 
     cancellationLoading.value = true;
     cancellationError.value = null;
@@ -348,6 +379,9 @@ const handleCancel = async (): Promise<void> => {
         await cancelSalesOrder(props.id, {
             reason: cancellationReason.value.trim(),
             refund_method: cancellationMethod.value || null,
+            financial_account_id: cancellationIsBank.value
+                ? cancellationFinancialAccountId.value
+                : null,
             notes: cancellationNotes.value.trim() || null,
         });
         showCancellationModal.value = false;
@@ -387,6 +421,7 @@ const updatePostSaleItem = async (
 };
 
 const handleReturnSubmit = async (payload: {
+    idempotency_key: string;
     reason: string;
     refund_method: string;
     refund_notes: string;
@@ -399,14 +434,10 @@ const handleReturnSubmit = async (payload: {
     returnLoading.value = true;
     returnError.value = null;
     try {
-        const response = await SalesReturnsApiService.createForOrder(
-            props.id,
-            payload,
-        );
-        const returnId = response.data?.id;
-        if (returnId) {
-            await SalesReturnsApiService.approve(returnId);
-        }
+        await SalesReturnsApiService.createForOrder(props.id, {
+            ...payload,
+            approve_immediately: true,
+        });
         showReturnModal.value = false;
         await refreshOrder();
     } catch (err: any) {
@@ -1641,6 +1672,37 @@ onMounted(async () => {
                                 {{ method.name }}
                             </option>
                         </select>
+                    </label>
+                    <label
+                        v-if="cancellationIsBank"
+                        class="block text-sm font-medium"
+                    >
+                        Cuenta bancaria
+                        <select
+                            v-model.number="cancellationFinancialAccountId"
+                            required
+                            class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                        >
+                            <option :value="null">Seleccionar</option>
+                            <option
+                                v-for="account in cancellationFinancialAccounts"
+                                :key="account.endpoint_id"
+                                :value="account.endpoint_id"
+                            >
+                                {{ account.name
+                                }}{{
+                                    account.masked_number
+                                        ? ` · ${account.masked_number}`
+                                        : ''
+                                }}
+                            </option>
+                        </select>
+                        <span
+                            v-if="cancellationAccountsError"
+                            class="mt-1 block text-xs text-red-600"
+                        >
+                            {{ cancellationAccountsError }}
+                        </span>
                     </label>
                     <label class="block text-sm font-medium">
                         Nota opcional

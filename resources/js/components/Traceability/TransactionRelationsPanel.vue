@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link2, ShieldAlert } from 'lucide-vue-next';
-import DocumentReferenceLink from './DocumentReferenceLink.vue';
 import type { TransactionTraceNode } from '@/types/transaction-trace';
+import DocumentReferenceLink from './DocumentReferenceLink.vue';
 
 defineProps<{
     nodes: TransactionTraceNode[];
@@ -36,6 +36,11 @@ const relationLabel = (value?: string | null): string =>
         source_document: 'Documento origen',
         sale: 'Venta',
         supplier_payment: 'Pago proveedor',
+        account: 'Cuenta',
+        account_payment: 'Cobro / pago documental',
+        account_ledger: 'Mayor de cuenta',
+        applied_document: 'Documento aplicado',
+        expense: 'Gasto operativo',
     })[value || ''] ||
     value ||
     'Relacionado';

@@ -19,7 +19,7 @@ import {
     User,
     Warehouse,
 } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
@@ -44,6 +44,10 @@ import {
 } from '@/services/posSessions';
 import { type BreadcrumbItem } from '@/types';
 import { formatDuration as fmtDuration } from '@/utils/formatters';
+import {
+    getPosSessionDetailId,
+    setPosSessionDetailId,
+} from '@/utils/posSessionUrl';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -87,10 +91,14 @@ const selectedAccountPayments = ref<AccountPaymentRecord[]>([]);
 const selectedOperationalExpenses = ref<OperationalExpenseRecord[]>([]);
 const selectedDocuments = ref<PosSessionDocument[]>([]);
 const selectedTimeline = ref<PosSessionTimelineEvent[]>([]);
+const selectedSessionId = ref<number | null>(null);
 const showDetailModal = ref(false);
 const loadingDetail = ref(false);
+const detailError = ref<string | null>(null);
 const showCloseSessionModal = ref(false);
 const closeSessionLoading = ref(false);
+let sessionsAbortController: AbortController | null = null;
+let detailAbortController: AbortController | null = null;
 
 const warehouseOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Todas' },
@@ -345,19 +353,28 @@ const activeSessionDifference = computed(() =>
 );
 
 const fetchSessions = async (page: number = 1) => {
+    sessionsAbortController?.abort();
+    const request = new AbortController();
+    sessionsAbortController = request;
     loading.value = true;
     error.value = null;
 
     try {
-        const response = await PosSessionsApiService.list({
-            status: filterStatus.value || undefined,
-            warehouse_id: filterWarehouseId.value,
-            user_id: filterUserId.value,
-            date_from: filterDateFrom.value || undefined,
-            date_to: filterDateTo.value || undefined,
-            page,
-            per_page: pagination.value.per_page,
-        });
+        const response = await PosSessionsApiService.list(
+            {
+                status: filterStatus.value || undefined,
+                warehouse_id: filterWarehouseId.value,
+                user_id: filterUserId.value,
+                date_from: filterDateFrom.value || undefined,
+                date_to: filterDateTo.value || undefined,
+                page,
+                per_page: pagination.value.per_page,
+            },
+            request.signal,
+        );
+
+        if (sessionsAbortController !== request) return;
+
         const paginatedData = response.data;
 
         sessions.value = paginatedData.data || [];
@@ -368,17 +385,37 @@ const fetchSessions = async (page: number = 1) => {
             per_page: paginatedData.per_page,
         };
     } catch (err: any) {
+        if (err?.code === 'ERR_CANCELED') return;
+
         error.value =
             err.response?.data?.message ||
             'Error al cargar los cierres de caja.';
         console.error('Error fetching sessions:', err);
     } finally {
-        loading.value = false;
+        if (sessionsAbortController === request) {
+            loading.value = false;
+        }
     }
 };
 
-const openDetailById = async (sessionId: number) => {
+const syncSessionDetailUrl = (sessionId: number | null) => {
+    window.history.replaceState(
+        window.history.state,
+        '',
+        setPosSessionDetailId(window.location.href, sessionId),
+    );
+};
+
+const openDetailById = async (
+    sessionId: number,
+    options: { syncUrl?: boolean } = {},
+) => {
+    detailAbortController?.abort();
+    const request = new AbortController();
+    detailAbortController = request;
+    selectedSessionId.value = sessionId;
     loadingDetail.value = true;
+    detailError.value = null;
     showDetailModal.value = true;
     selectedSession.value = null;
     selectedSalesOrders.value = [];
@@ -389,8 +426,18 @@ const openDetailById = async (sessionId: number) => {
     selectedDocuments.value = [];
     selectedTimeline.value = [];
 
+    if (options.syncUrl !== false) {
+        syncSessionDetailUrl(sessionId);
+    }
+
     try {
-        const response = await PosSessionsApiService.show(sessionId);
+        const response = await PosSessionsApiService.show(
+            sessionId,
+            request.signal,
+        );
+
+        if (detailAbortController !== request) return;
+
         selectedSession.value = response.data;
         selectedSalesOrders.value = response.sales_orders;
         selectedCashMovements.value =
@@ -406,13 +453,16 @@ const openDetailById = async (sessionId: number) => {
         selectedDocuments.value = response.documents || [];
         selectedTimeline.value = response.timeline || [];
     } catch (err: any) {
-        error.value =
+        if (err?.code === 'ERR_CANCELED') return;
+
+        detailError.value =
             err.response?.data?.message ||
             'Error al cargar el detalle del cierre.';
         console.error('Error fetching session detail:', err);
-        showDetailModal.value = false;
     } finally {
-        loadingDetail.value = false;
+        if (detailAbortController === request) {
+            loadingDetail.value = false;
+        }
     }
 };
 
@@ -425,7 +475,12 @@ const openCurrentSessionDetail = () => {
 };
 
 const closeDetail = () => {
+    detailAbortController?.abort();
+    detailAbortController = null;
     showDetailModal.value = false;
+    loadingDetail.value = false;
+    detailError.value = null;
+    selectedSessionId.value = null;
     selectedSession.value = null;
     selectedSalesOrders.value = [];
     selectedCashMovements.value = [];
@@ -434,6 +489,13 @@ const closeDetail = () => {
     selectedOperationalExpenses.value = [];
     selectedDocuments.value = [];
     selectedTimeline.value = [];
+    syncSessionDetailUrl(null);
+};
+
+const retryDetail = () => {
+    if (selectedSessionId.value !== null) {
+        void openDetailById(selectedSessionId.value, { syncUrl: false });
+    }
 };
 
 const handleCloseSession = async (
@@ -495,6 +557,16 @@ onMounted(async () => {
     filterWarehouseId.value = currentWarehouseId.value || undefined;
     await checkCurrentSession(currentWarehouseId.value ?? undefined);
     await fetchSessions();
+
+    const linkedSessionId = getPosSessionDetailId(window.location.href);
+    if (linkedSessionId !== null) {
+        await openDetailById(linkedSessionId, { syncUrl: false });
+    }
+});
+
+onBeforeUnmount(() => {
+    sessionsAbortController?.abort();
+    detailAbortController?.abort();
 });
 </script>
 
@@ -1139,7 +1211,9 @@ onMounted(async () => {
             :documents="selectedDocuments"
             :timeline="selectedTimeline"
             :loading="loadingDetail"
+            :error="detailError"
             @close="closeDetail"
+            @retry="retryDetail"
         />
 
         <CloseSessionModal

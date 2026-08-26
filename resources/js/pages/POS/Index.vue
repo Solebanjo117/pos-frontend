@@ -1508,7 +1508,7 @@ const handleUnifiedPaymentFinish = async (
     // Clear any previous payment errors before attempting new payment
     error.value = null;
 
-    if (!validateCartStock('sale')) {
+    if (!isQuoteSession.value && !validateCartStock('sale')) {
         alert(error.value || 'Stock insuficiente para completar la venta.');
         return;
     }

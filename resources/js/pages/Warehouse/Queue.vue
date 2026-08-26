@@ -1,15 +1,9 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import {
-    PackageSearch,
-    Clock,
-    Package,
-    User,
-    CheckCircle,
-    X,
-} from 'lucide-vue-next';
+import { PackageSearch, Package, CheckCircle, X } from 'lucide-vue-next';
 import { ref, onMounted, onUnmounted } from 'vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import SalesQueueCard from '@/components/Queues/SalesQueueCard.vue';
 import {
     useWarehouseQueue,
     type WarehouseOrder,
@@ -93,13 +87,6 @@ const handlePrepare = async (order: WarehouseOrder) => {
         processingId.value = null;
     }
 };
-
-const summarizedProducts = (items: WarehouseOrder['items']) => {
-    const maxShow = 4;
-    const shown = items.slice(0, maxShow);
-    const extra = items.length - maxShow;
-    return { shown, extra: extra > 0 ? extra : 0 };
-};
 </script>
 
 <template>
@@ -177,102 +164,26 @@ const summarizedProducts = (items: WarehouseOrder['items']) => {
             v-else
             class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
         >
-            <div
+            <SalesQueueCard
                 v-for="order in orders"
                 :key="order.id"
-                class="flex h-[420px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow duration-200 hover:shadow-lg dark:border-border dark:bg-card"
+                :document-number="order.order_number"
+                :seller-name="order.user?.name"
+                :elapsed="timeAgo(order.sent_to_warehouse_at, now)"
+                :customer-name="order.customer?.name || 'Público General'"
+                :items="
+                    order.items.map((item) => ({
+                        id: item.id,
+                        product_name: item.is_custom_line
+                            ? item.custom_description
+                            : item.product?.name,
+                        quantity: item.quantity,
+                    }))
+                "
+                @open-document="router.visit(`/sales-orders/${order.id}`)"
+                @open="openOrderDetail(order)"
             >
-                <!-- Card Header -->
-                <div
-                    class="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-border"
-                >
-                    <div>
-                        <span
-                            class="cursor-pointer text-sm font-bold text-indigo-700 uppercase hover:underline dark:text-indigo-400"
-                            @click="router.visit(`/sales-orders/${order.id}`)"
-                            >{{ order.order_number }}</span
-                        >
-                        <div class="mt-0.5 flex items-center gap-1.5">
-                            <User :size="12" class="text-gray-400" />
-                            <span
-                                class="text-xs text-gray-500 dark:text-gray-400"
-                                >{{ order.user?.name ?? 'Sist.' }}</span
-                            >
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <div
-                            class="flex items-center gap-1 text-amber-600 dark:text-amber-400"
-                        >
-                            <Clock :size="14" />
-                            <span class="text-sm font-semibold tabular-nums">{{
-                                timeAgo(order.sent_to_warehouse_at, now)
-                            }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card Body (click to preview full order) -->
-                <div
-                    class="flex-1 cursor-pointer space-y-3 overflow-y-auto px-5 py-4"
-                    title="Ver detalle del encargo"
-                    @click="openOrderDetail(order)"
-                >
-                    <!-- Customer -->
-                    <div class="flex items-center gap-2">
-                        <span
-                            class="text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                            >Cliente:</span
-                        >
-                        <span
-                            class="text-sm font-semibold text-gray-900 dark:text-white"
-                        >
-                            {{ order.customer?.name || 'Público General' }}
-                        </span>
-                    </div>
-
-                    <!-- Products summary -->
-                    <div class="mt-2 space-y-1.5">
-                        <div
-                            v-for="item in summarizedProducts(order.items)
-                                .shown"
-                            :key="item.id"
-                            class="flex items-center justify-between gap-2 rounded bg-gray-50 px-2 py-1.5 text-sm dark:bg-muted/30"
-                        >
-                            <div
-                                class="flex items-center gap-2 overflow-hidden"
-                            >
-                                <Package
-                                    :size="14"
-                                    class="shrink-0 text-gray-400"
-                                />
-                                <span
-                                    class="truncate font-medium text-gray-700 dark:text-gray-300"
-                                >
-                                    {{ item.product?.name || 'Producto' }}
-                                </span>
-                            </div>
-                            <span
-                                class="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
-                            >
-                                x{{ item.quantity }}
-                            </span>
-                        </div>
-                        <p
-                            v-if="summarizedProducts(order.items).extra > 0"
-                            class="pt-2 text-center text-xs text-gray-400 dark:text-gray-500"
-                        >
-                            +
-                            {{ summarizedProducts(order.items).extra }}
-                            producto(s) adicional(es)
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Card Footer -->
-                <div
-                    class="border-t border-gray-100 bg-gray-50 px-5 py-3 dark:border-border dark:bg-background"
-                >
+                <template #action>
                     <button
                         @click="handlePrepare(order)"
                         :disabled="processingId === order.id"
@@ -289,8 +200,8 @@ const summarizedProducts = (items: WarehouseOrder['items']) => {
                                 : 'Marcar como Preparado'
                         }}
                     </button>
-                </div>
-            </div>
+                </template>
+            </SalesQueueCard>
         </div>
     </div>
 

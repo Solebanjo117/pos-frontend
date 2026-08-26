@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { QUEUE_ENTRY_TYPE, queueEntryKind } from './cashierQueue';
+import {
+    cashierPaymentSignature,
+    QUEUE_ENTRY_TYPE,
+    queueEntryKind,
+    resolveCashierPaymentAttempt,
+} from './cashierQueue';
 
 describe('queueEntryKind', () => {
     it('maps backend wire values to semantic kinds', () => {
@@ -25,5 +30,69 @@ describe('queueEntryKind', () => {
         expect(queueEntryKind(null)).toBeNull();
         expect(queueEntryKind(undefined)).toBeNull();
         expect(queueEntryKind('')).toBeNull();
+    });
+
+    it('keeps the UUID for a retry and renews it after payment changes', () => {
+        const payments = [{ method: 'cash', amount: 10 }];
+        const first = resolveCashierPaymentAttempt(
+            'uuid-1',
+            null,
+            payments,
+            () => 'uuid-2',
+        );
+        const retry = resolveCashierPaymentAttempt(
+            first.key,
+            first.signature,
+            payments,
+            () => 'uuid-2',
+        );
+        const changed = resolveCashierPaymentAttempt(
+            retry.key,
+            retry.signature,
+            [{ method: 'cash', amount: 9 }],
+            () => 'uuid-2',
+        );
+
+        expect(retry.key).toBe('uuid-1');
+        expect(changed.key).toBe('uuid-2');
+    });
+});
+
+describe('cashierPaymentSignature', () => {
+    it('is stable for an unchanged payment retry', () => {
+        const payments = [
+            {
+                method: 'bank_transfer',
+                amount: 25,
+                reference_number: 'ACH-123',
+                financial_account_id: 7,
+            },
+        ];
+
+        expect(cashierPaymentSignature(payments)).toBe(
+            cashierPaymentSignature(
+                payments.map((payment) => ({ ...payment })),
+            ),
+        );
+    });
+
+    it('changes when any financially relevant payment field changes', () => {
+        const original = [
+            {
+                method: 'bank_transfer',
+                amount: 25,
+                reference_number: 'ACH-123',
+                financial_account_id: 7,
+            },
+        ];
+
+        expect(
+            cashierPaymentSignature([
+                { ...original[0], financial_account_id: 8 },
+            ]),
+        ).not.toBe(cashierPaymentSignature(original));
+        expect(
+            cashierPaymentSignature([{ ...original[0], amount: 24 }]),
+        ).not.toBe(cashierPaymentSignature(original));
     });
 });

@@ -14,6 +14,17 @@ export interface CashierQueueSource {
     seller_name?: string | null;
     created_at?: string | null;
     notes?: string | null;
+    order_number?: string | null;
+    prepared_at?: string | null;
+    preparation_status?: 'prepared' | 'pending';
+    items?: Array<{
+        id: number;
+        product_id: number | null;
+        variant_id: number | null;
+        product_name: string | null;
+        product_sku: string | null;
+        quantity: number;
+    }>;
     planned_payment_method?: string | null;
     reference_number?: string | null;
     refund_method?: string | null;

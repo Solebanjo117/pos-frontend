@@ -60,6 +60,7 @@ interface PosCartSession {
     seller_id?: number; // set when session was loaded from a SalesQuote with an assigned seller
     notes: string;
     source_quote_id?: number; // set when session was loaded from a SalesQuote
+    quote_number?: string;
     sessionLogs: {
         action: string;
         metadata: Record<string, any>;
@@ -814,7 +815,10 @@ export function usePOS() {
             return false;
         }
 
-        if (!validateCartStock('sale')) {
+        if (
+            !activeSession.value.source_quote_id &&
+            !validateCartStock('sale')
+        ) {
             return false;
         }
 
@@ -1094,9 +1098,18 @@ export function usePOS() {
             } | null;
         }>;
     }): string => {
-        createNewCart(`COT-${quote.quote_number}`);
+        const existingSession = allSessions.value.find(
+            (session) => session.source_quote_id === quote.id,
+        );
+        if (existingSession) {
+            activeSessionId.value = existingSession.id;
+        } else {
+            createNewCart(`COT-${quote.quote_number}`);
+        }
 
         const newSession = activeSession.value;
+        newSession.name = `COT-${quote.quote_number}`;
+        newSession.quote_number = quote.quote_number;
         newSession.customer_id = quote.customer_id ?? undefined;
         newSession.customer_vehicle_id = quote.customer_vehicle_id ?? undefined;
         newSession.seller_id = quote.seller_id ?? undefined;

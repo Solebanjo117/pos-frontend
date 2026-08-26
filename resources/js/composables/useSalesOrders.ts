@@ -197,6 +197,7 @@ export function useSalesOrders() {
         payload: {
             reason: string;
             refund_method?: string | null;
+            financial_account_id?: number | null;
             notes?: string | null;
         },
     ) => {

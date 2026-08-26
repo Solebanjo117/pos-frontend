@@ -261,8 +261,11 @@ export interface SalesReturnOperationalDetail {
 }
 
 export interface SalesReturnCreatePayload {
+    idempotency_key: string;
+    approve_immediately?: boolean;
     reason?: string;
     refund_method: SalesReturnRefundMethod | string;
+    financial_account_id?: number | null;
     refund_notes?: string;
     items: Array<{
         sales_order_item_id: number;

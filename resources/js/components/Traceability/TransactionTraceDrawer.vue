@@ -7,9 +7,7 @@ import {
     ChevronRight,
     LoaderCircle,
 } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
-import TransactionRelationsPanel from './TransactionRelationsPanel.vue';
-import TransactionTimeline from './TransactionTimeline.vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import {
     Sheet,
     SheetContent,
@@ -23,6 +21,8 @@ import type {
     TransactionTrace,
     TransactionTraceNode,
 } from '@/types/transaction-trace';
+import TransactionRelationsPanel from './TransactionRelationsPanel.vue';
+import TransactionTimeline from './TransactionTimeline.vue';
 
 const props = defineProps<{
     open: boolean;
@@ -38,7 +38,9 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const currentType = ref<string | null>(null);
 const currentId = ref<number | null>(null);
+const currentPage = ref(1);
 const navigationStack = ref<TransactionTraceNode[]>([]);
+let traceAbortController: AbortController | null = null;
 
 const inventoryDetails = computed<InventoryMovementTraceDetails | null>(() =>
     trace.value?.root.type === 'inventory_movement'
@@ -53,20 +55,43 @@ const formatMoney = (value?: number | null): string =>
     }).format(Number(value || 0));
 
 const load = async (type: string, id: number, page = 1): Promise<void> => {
+    traceAbortController?.abort();
+    const request = new AbortController();
+    traceAbortController = request;
     currentType.value = type;
     currentId.value = id;
+    currentPage.value = page;
     loading.value = true;
     error.value = null;
     try {
-        trace.value = await transactionTraceService.get(type, id, page, 25);
+        const response = await transactionTraceService.get(
+            type,
+            id,
+            page,
+            25,
+            request.signal,
+        );
+
+        if (traceAbortController !== request) return;
+        trace.value = response;
     } catch (caught: any) {
+        if (caught?.code === 'ERR_CANCELED') return;
+
         error.value =
             caught.response?.status === 403
                 ? 'No tiene permiso para abrir este documento.'
                 : caught.response?.data?.message ||
                   'No se pudo cargar la trazabilidad.';
     } finally {
-        loading.value = false;
+        if (traceAbortController === request) {
+            loading.value = false;
+        }
+    }
+};
+
+const retry = (): void => {
+    if (currentType.value && currentId.value) {
+        void load(currentType.value, currentId.value, currentPage.value);
     }
 };
 
@@ -90,12 +115,29 @@ const changePage = (page: number): void => {
 watch(
     () => [props.open, props.type, props.id, props.initialTrace] as const,
     ([open, type, id, initialTrace]) => {
-        if (!open) return;
+        if (!open) {
+            traceAbortController?.abort();
+            traceAbortController = null;
+            trace.value = null;
+            error.value = null;
+            loading.value = false;
+            currentType.value = null;
+            currentId.value = null;
+            currentPage.value = 1;
+            navigationStack.value = [];
+
+            return;
+        }
         navigationStack.value = [];
         if (initialTrace) {
+            traceAbortController?.abort();
+            traceAbortController = null;
             trace.value = initialTrace;
+            error.value = null;
+            loading.value = false;
             currentType.value = initialTrace.root.type;
             currentId.value = initialTrace.root.id;
+            currentPage.value = initialTrace.meta.current_page;
             return;
         }
         if (
@@ -108,6 +150,8 @@ watch(
     },
     { immediate: true },
 );
+
+onBeforeUnmount(() => traceAbortController?.abort());
 </script>
 
 <template>
@@ -133,10 +177,20 @@ watch(
             </div>
             <div
                 v-else-if="error"
-                class="m-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                class="m-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+                role="alert"
             >
-                <AlertTriangle class="mr-1 inline h-4 w-4" />
-                {{ error }}
+                <div>
+                    <AlertTriangle class="mr-1 inline h-4 w-4" />
+                    {{ error }}
+                </div>
+                <button
+                    type="button"
+                    class="mt-3 rounded border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 dark:border-red-800 dark:hover:bg-red-950/60"
+                    @click="retry"
+                >
+                    Reintentar
+                </button>
             </div>
             <div v-else-if="trace" class="space-y-4 p-4 pt-0">
                 <button

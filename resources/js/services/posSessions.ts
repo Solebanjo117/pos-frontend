@@ -237,6 +237,7 @@ export const PosSessionsApiService = {
             page?: number;
             per_page?: number;
         } = {},
+        signal?: AbortSignal,
     ): Promise<{ data: any }> {
         const query = new URLSearchParams();
         Object.entries(params).forEach(([key, value]) => {
@@ -246,6 +247,7 @@ export const PosSessionsApiService = {
         });
         const response = await apiClient.get<{ data: any }>(
             `${BASE_PATH}?${query.toString()}`,
+            { signal },
         );
         return response.data;
     },
@@ -253,9 +255,13 @@ export const PosSessionsApiService = {
     /**
      * Get a single session with its sales orders
      */
-    async show(id: number): Promise<PosSessionDetailResponse> {
+    async show(
+        id: number,
+        signal?: AbortSignal,
+    ): Promise<PosSessionDetailResponse> {
         const response = await apiClient.get<PosSessionDetailResponse>(
             `${BASE_PATH}/${id}`,
+            { signal },
         );
         return response.data;
     },

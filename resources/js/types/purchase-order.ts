@@ -175,6 +175,7 @@ export interface UpdatePurchaseOrderData extends Partial<
 }
 
 export interface ReceiveItemsData {
+    idempotency_key: string;
     items: Array<{
         item_id: number;
         quantity_received: number;

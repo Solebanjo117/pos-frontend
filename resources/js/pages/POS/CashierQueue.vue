@@ -13,7 +13,6 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import {
     useCashierQueue,
@@ -22,14 +21,12 @@ import {
 import { usePOS } from '@/composables/usePOS';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
-import { salesOrdersService } from '@/services/sales-orders';
 import { queueEntryKind, type QueueEntryKind } from '@/utils/cashierQueue';
 import {
     formatCurrency,
     formatReportDateTime,
     roundMoney,
 } from '@/utils/formatters';
-import { createIdempotencyKey } from '@/utils/idempotency';
 
 defineOptions({ layout: AppLayout });
 
@@ -56,26 +53,6 @@ const settlementEntry = ref<CashierQueueEntry | null>(null);
 const traceEntryId = ref<number | null>(null);
 const traceOpen = ref(false);
 
-// ── Sales split into a table; expenses/returns keep their existing cards ──
-const saleEntries = computed(() =>
-    entries.value
-        .filter((entry) => kindOf(entry) === 'sale')
-        .slice()
-        .sort((a, b) => {
-            const aTime = a.scheduled_for
-                ? new Date(a.scheduled_for).getTime()
-                : 0;
-            const bTime = b.scheduled_for
-                ? new Date(b.scheduled_for).getTime()
-                : 0;
-            return aTime - bTime; // oldest first (priority)
-        }),
-);
-const otherEntries = computed(() =>
-    entries.value.filter((entry) => kindOf(entry) !== 'sale'),
-);
-
-// ── "Ver factura" summary modal ──
 interface QuoteSummary {
     id: number;
     quote_number: string;
@@ -98,14 +75,34 @@ interface QuoteSummary {
         total: number;
     }>;
 }
+
 const summaryEntry = ref<QuoteSummary | null>(null);
 const summaryLoading = ref(false);
 
-// ── "Cobrar" payment popup (reuses UnifiedPaymentPanel) ──
-const payEntry = ref<CashierQueueEntry | null>(null);
-const payQuote = ref<any>(null);
-const paymentOpen = ref(false);
-const paymentProcessing = ref(false);
+function saleQueueTimestamp(entry: CashierQueueEntry): number {
+    for (const value of [entry.scheduled_for, entry.source.created_at]) {
+        if (!value) continue;
+        const timestamp = Date.parse(value);
+        if (Number.isFinite(timestamp)) return timestamp;
+    }
+
+    return 0;
+}
+
+// ── Sales split into a table; expenses/returns keep their existing cards ──
+const saleEntries = computed(() =>
+    entries.value
+        .filter((entry) => kindOf(entry) === 'sale')
+        .slice()
+        .sort(
+            (a, b) =>
+                saleQueueTimestamp(b) - saleQueueTimestamp(a) || b.id - a.id,
+        ),
+);
+const otherEntries = computed(() =>
+    entries.value.filter((entry) => kindOf(entry) !== 'sale'),
+);
+
 const settlement = ref({
     final_amount: 0,
     payment_method: 'cash',
@@ -282,36 +279,15 @@ async function processEntry(entry: CashierQueueEntry) {
     }
 }
 
-async function viewInvoice(entry: CashierQueueEntry) {
-    summaryLoading.value = true;
-    summaryEntry.value = null;
-    try {
-        const response = await apiClient.get(
-            `/sales-quotes/${entry.source.id}/summary`,
-        );
-        summaryEntry.value = response.data.data;
-    } catch (exception: any) {
-        notice.value = {
-            title: 'No se pudo cargar la factura',
-            message:
-                exception.response?.data?.message ||
-                'Intenta nuevamente en unos segundos.',
-        };
-    } finally {
-        summaryLoading.value = false;
-    }
-}
-
 async function startCharge(entry: CashierQueueEntry) {
+    if (processingId.value !== null) return;
     processingId.value = entry.id;
     try {
         await openEntry(entry.id);
         const response = await apiClient.post(
             `/sales-quotes/${entry.source.id}/open-at-cashier`,
         );
-        payQuote.value = response.data.data;
-        payEntry.value = entry;
-        paymentOpen.value = true;
+        loadQuoteIntoPos(response.data.data);
     } catch (exception: any) {
         const data = exception.response?.data;
         if (
@@ -333,55 +309,25 @@ async function startCharge(entry: CashierQueueEntry) {
     }
 }
 
-async function handlePaymentFinish(
-    payments: Array<{
-        method: string;
-        amount: number;
-        reference_number?: string | null;
-        notes?: string | null;
-    }>,
-) {
-    if (!payQuote.value || paymentProcessing.value) return;
-    paymentProcessing.value = true;
+async function viewOrder(entry: CashierQueueEntry) {
+    if (summaryLoading.value) return;
+
+    summaryLoading.value = true;
+    summaryEntry.value = null;
     try {
-        const quote = payQuote.value;
-        await salesOrdersService.create({
-            idempotency_key: createIdempotencyKey(),
-            source_quote_id: quote.id,
-            status: 'confirmed',
-            warehouse_id: quote.warehouse_id ?? undefined,
-            payments,
-            payment_method: 'multiple' as any,
-            items: (quote.items ?? []).map((item: any) => ({
-                source_quote_item_id: item.id,
-                product_id: item.is_custom_line ? null : item.product_id,
-                variant_id: item.variant_id ?? undefined,
-                warehouse_id: item.warehouse_id ?? undefined,
-                quantity: item.quantity,
-                unit_price: item.unit_price,
-                discount_percent: item.discount_percent ?? 0,
-                tax_percent: item.tax_percent ?? 0,
-                is_custom_line: !!item.is_custom_line,
-                custom_description: item.custom_description ?? undefined,
-            })),
-        });
-        paymentOpen.value = false;
-        payEntry.value = null;
-        payQuote.value = null;
-        await fetchPending();
-        notice.value = {
-            title: 'Venta cobrada',
-            message: 'La venta fue registrada y salio de la cola.',
-        };
+        const response = await apiClient.get(
+            `/sales-quotes/${entry.source.id}/summary`,
+        );
+        summaryEntry.value = response.data.data;
     } catch (exception: any) {
         notice.value = {
-            title: 'No se pudo cobrar',
+            title: 'No se pudo cargar el pedido',
             message:
                 exception.response?.data?.message ||
-                'Revise el pago y la sesion de Caja.',
+                'Intenta nuevamente en unos segundos.',
         };
     } finally {
-        paymentProcessing.value = false;
+        summaryLoading.value = false;
     }
 }
 
@@ -452,12 +398,12 @@ async function settleExpense() {
 }
 
 async function confirmRemove() {
-    if (!removeEntry.value) return;
+    if (!removeEntry.value || processingId.value !== null) return;
     const entry = removeEntry.value;
-    removeEntry.value = null;
     processingId.value = entry.id;
     try {
         await removeSaleFromQueue(entry.source.id);
+        removeEntry.value = null;
         notice.value = {
             title: 'Cotizacion quitada de la cola',
             message:
@@ -535,12 +481,13 @@ async function confirmRemove() {
         </div>
 
         <template v-else>
-            <!-- Ventas: tabla -->
+            <!-- Ventas: tabla compacta de Caja -->
             <div
                 v-if="saleEntries.length"
+                data-test="sales-queue-table"
                 class="overflow-hidden rounded-md border bg-card"
             >
-                <div class="overflow-x-auto">
+                <div class="hidden overflow-x-auto md:block">
                     <table class="w-full text-sm">
                         <thead
                             class="border-b bg-muted/40 text-xs text-muted-foreground"
@@ -550,7 +497,7 @@ async function confirmRemove() {
                                     Fecha / Hora
                                 </th>
                                 <th class="px-4 py-2 text-left font-medium">
-                                    N.o factura
+                                    N.º factura
                                 </th>
                                 <th class="px-4 py-2 text-left font-medium">
                                     Cliente
@@ -562,7 +509,7 @@ async function confirmRemove() {
                                     Vendedor
                                 </th>
                                 <th class="px-4 py-2 text-left font-medium">
-                                    Timer
+                                    Tiempo
                                 </th>
                                 <th class="px-4 py-2 text-right font-medium">
                                     Acciones
@@ -573,6 +520,7 @@ async function confirmRemove() {
                             <tr
                                 v-for="entry in saleEntries"
                                 :key="entry.id"
+                                data-test="sales-queue-row"
                                 class="border-b last:border-0 hover:bg-muted/20"
                             >
                                 <td
@@ -607,34 +555,44 @@ async function confirmRemove() {
                                         {{ timeAgo(entry.scheduled_for, now) }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-2">
+                                <td class="px-4 py-2 text-right">
                                     <div
+                                        data-test="sale-actions"
                                         class="flex items-center justify-end gap-1"
                                     >
                                         <button
                                             type="button"
-                                            class="rounded-md border px-2 py-1 text-xs font-medium text-slate-600 hover:bg-muted dark:text-slate-300"
-                                            title="Ver factura"
-                                            @click="viewInvoice(entry)"
+                                            class="rounded-md border p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                            :disabled="summaryLoading"
+                                            title="Ver pedido"
+                                            aria-label="Ver pedido"
+                                            @click="viewOrder(entry)"
                                         >
                                             <Eye class="h-4 w-4" />
                                         </button>
                                         <button
                                             type="button"
-                                            class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-                                            :disabled="
-                                                processingId === entry.id
-                                            "
+                                            class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            :disabled="processingId !== null"
                                             title="Cobrar"
                                             @click="startCharge(entry)"
                                         >
-                                            <Banknote class="h-4 w-4" />
-                                            Cobrar
+                                            <span
+                                                v-if="processingId === entry.id"
+                                                class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"
+                                            />
+                                            <Banknote v-else class="h-4 w-4" />
+                                            {{
+                                                processingId === entry.id
+                                                    ? 'Abriendo...'
+                                                    : 'Cobrar'
+                                            }}
                                         </button>
                                         <button
                                             type="button"
-                                            class="rounded-md border p-1 text-muted-foreground hover:bg-sky-50 hover:text-sky-700"
-                                            title="Ver trazabilidad"
+                                            class="rounded-md border p-1 text-muted-foreground transition hover:bg-sky-50 hover:text-sky-700 dark:hover:bg-sky-950/30"
+                                            title="Rastrear"
+                                            aria-label="Rastrear"
                                             @click="
                                                 traceEntryId = entry.id;
                                                 traceOpen = true;
@@ -644,8 +602,10 @@ async function confirmRemove() {
                                         </button>
                                         <button
                                             type="button"
-                                            class="rounded-md border p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                                            class="rounded-md border p-1 text-muted-foreground transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                                            :disabled="processingId !== null"
                                             title="Quitar de cola"
+                                            aria-label="Quitar de cola"
                                             @click="removeEntry = entry"
                                         >
                                             <X class="h-4 w-4" />
@@ -655,6 +615,101 @@ async function confirmRemove() {
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div class="divide-y md:hidden">
+                    <article
+                        v-for="entry in saleEntries"
+                        :key="entry.id"
+                        data-test="sales-queue-mobile-row"
+                        class="space-y-3 p-4"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold">
+                                    {{ entry.source.document_number }}
+                                </p>
+                                <p
+                                    class="truncate text-sm text-muted-foreground"
+                                >
+                                    {{ entry.source.party }}
+                                </p>
+                            </div>
+                            <strong class="shrink-0 font-mono text-sm">
+                                {{ formatCurrency(entry.estimated_amount) }}
+                            </strong>
+                        </div>
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"
+                        >
+                            <span>{{ entry.source.seller_name || '—' }}</span>
+                            <span
+                                class="flex items-center gap-1 text-amber-600"
+                            >
+                                <Clock3 class="h-3.5 w-3.5" />
+                                {{ timeAgo(entry.scheduled_for, now) }}
+                            </span>
+                            <span class="basis-full">
+                                {{
+                                    formatReportDateTime(
+                                        entry.source.created_at ??
+                                            entry.scheduled_for,
+                                    )
+                                }}
+                            </span>
+                        </div>
+                        <div
+                            data-test="sale-mobile-actions"
+                            class="grid grid-cols-4 gap-2"
+                        >
+                            <button
+                                type="button"
+                                class="flex min-w-0 flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs text-muted-foreground"
+                                :disabled="summaryLoading"
+                                title="Ver pedido"
+                                @click="viewOrder(entry)"
+                            >
+                                <Eye class="h-4 w-4" />
+                                <span>Ver</span>
+                            </button>
+                            <button
+                                type="button"
+                                class="flex min-w-0 flex-col items-center gap-1 rounded-md bg-sky-600 px-2 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                :disabled="processingId !== null"
+                                title="Cobrar"
+                                @click="startCharge(entry)"
+                            >
+                                <span
+                                    v-if="processingId === entry.id"
+                                    class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                                />
+                                <Banknote v-else class="h-4 w-4" />
+                                <span>Cobrar</span>
+                            </button>
+                            <button
+                                type="button"
+                                class="flex min-w-0 flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs text-muted-foreground"
+                                title="Rastrear"
+                                @click="
+                                    traceEntryId = entry.id;
+                                    traceOpen = true;
+                                "
+                            >
+                                <Route class="h-4 w-4" />
+                                <span>Rastrear</span>
+                            </button>
+                            <button
+                                type="button"
+                                class="flex min-w-0 flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs text-muted-foreground disabled:opacity-50"
+                                :disabled="processingId !== null"
+                                title="Quitar de cola"
+                                @click="removeEntry = entry"
+                            >
+                                <X class="h-4 w-4" />
+                                <span>Quitar</span>
+                            </button>
+                        </div>
+                    </article>
                 </div>
             </div>
 
@@ -907,6 +962,7 @@ async function confirmRemove() {
                 <button
                     type="button"
                     class="rounded-md border px-3 py-2 text-sm"
+                    data-test="cancel-remove"
                     @click="removeEntry = null"
                 >
                     Cancelar
@@ -914,6 +970,8 @@ async function confirmRemove() {
                 <button
                     type="button"
                     class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white"
+                    data-test="confirm-remove"
+                    :disabled="processingId !== null"
                     @click="confirmRemove"
                 >
                     Quitar de cola
@@ -922,18 +980,21 @@ async function confirmRemove() {
         </div>
     </div>
 
-    <!-- Ver factura (resumen de solo lectura) -->
+    <!-- Resumen del pedido (solo lectura) -->
     <div
         v-if="summaryEntry || summaryLoading"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="queue-order-summary-title"
     >
         <div
             class="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-md border bg-card shadow-xl"
         >
             <div class="flex items-start justify-between border-b px-5 py-4">
                 <div>
-                    <h2 class="font-semibold">
-                        Factura {{ summaryEntry?.quote_number ?? '' }}
+                    <h2 id="queue-order-summary-title" class="font-semibold">
+                        Pedido {{ summaryEntry?.quote_number ?? '' }}
                     </h2>
                     <p
                         v-if="summaryEntry"
@@ -948,6 +1009,8 @@ async function confirmRemove() {
                 <button
                     type="button"
                     class="rounded p-1 text-muted-foreground hover:bg-muted"
+                    title="Cerrar resumen"
+                    aria-label="Cerrar resumen"
                     @click="summaryEntry = null"
                 >
                     <X class="h-4 w-4" />
@@ -958,47 +1021,32 @@ async function confirmRemove() {
                     v-if="summaryLoading"
                     class="py-10 text-center text-sm text-muted-foreground"
                 >
-                    Cargando factura...
+                    Cargando pedido...
                 </div>
-                <table v-else-if="summaryEntry" class="w-full text-sm">
-                    <thead class="border-b text-xs text-muted-foreground">
-                        <tr>
-                            <th class="py-2 text-left font-medium">Producto</th>
-                            <th class="py-2 text-left font-medium">SKU</th>
-                            <th class="py-2 text-right font-medium">Cant.</th>
-                            <th class="py-2 text-right font-medium">Precio</th>
-                            <th class="py-2 text-right font-medium">
-                                Subtotal
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="item in summaryEntry.items"
-                            :key="item.id"
-                            class="border-b last:border-0"
-                        >
-                            <td class="py-2">
-                                {{ item.product_name }}
-                                <span
-                                    v-if="item.brand"
-                                    class="text-xs text-muted-foreground"
-                                    >· {{ item.brand }}</span
+                <div v-else-if="summaryEntry" class="space-y-3">
+                    <article
+                        v-for="item in summaryEntry.items"
+                        :key="item.id"
+                        class="grid grid-cols-[1fr_auto] gap-3 border-b pb-3 text-sm last:border-0"
+                    >
+                        <div class="min-w-0">
+                            <p class="font-medium">{{ item.product_name }}</p>
+                            <p class="text-xs text-muted-foreground">
+                                SKU: {{ item.sku || '—' }}
+                                <span v-if="item.brand">
+                                    · {{ item.brand }}</span
                                 >
-                            </td>
-                            <td class="py-2 text-muted-foreground">
-                                {{ item.sku || '—' }}
-                            </td>
-                            <td class="py-2 text-right">{{ item.quantity }}</td>
-                            <td class="py-2 text-right font-mono">
+                            </p>
+                            <p class="mt-1 text-xs text-muted-foreground">
+                                {{ item.quantity }} ×
                                 {{ formatCurrency(item.unit_price) }}
-                            </td>
-                            <td class="py-2 text-right font-mono">
-                                {{ formatCurrency(item.subtotal) }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </p>
+                        </div>
+                        <strong class="font-mono text-sm">
+                            {{ formatCurrency(item.subtotal) }}
+                        </strong>
+                    </article>
+                </div>
             </div>
             <div
                 v-if="summaryEntry"
@@ -1036,22 +1084,6 @@ async function confirmRemove() {
             </div>
         </div>
     </div>
-
-    <!-- Cobrar: reutiliza el Payment Popup existente -->
-    <UnifiedPaymentPanel
-        v-if="paymentOpen && payQuote"
-        :show="paymentOpen"
-        :amount-to-charge="Number(payQuote.total ?? 0)"
-        :subtotal="Number(payQuote.subtotal ?? 0)"
-        :tax-amount="Number(payQuote.tax_amount ?? 0)"
-        :discount-amount="Number(payQuote.discount_amount ?? 0)"
-        @finish="handlePaymentFinish"
-        @cancel="
-            paymentOpen = false;
-            payEntry = null;
-            payQuote = null;
-        "
-    />
 
     <div
         v-if="notice"

@@ -13,10 +13,18 @@ import {
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import apiClient from '@/services/api/client';
 import type { User as UserType } from '@/types';
 import { formatCurrency, roundMoney } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 const { methods, fetchMethods } = usePaymentMethods();
+
+interface FinancialAccountOption {
+    endpoint_id: number;
+    name: string;
+    masked_number?: string | null;
+}
 
 interface OrderItem {
     id: number;
@@ -68,8 +76,10 @@ const emit = defineEmits<{
     (
         e: 'submit',
         payload: {
+            idempotency_key: string;
             reason: string;
             refund_method: string;
+            financial_account_id: number | null;
             refund_notes: string;
             items: {
                 sales_order_item_id: number;
@@ -89,19 +99,45 @@ const returnUsers = ref<Record<number, number | null>>({});
 const returnSearchQuery = ref('');
 const showReturnSearchModal = ref(false);
 const returnSearchInput = ref<HTMLInputElement | null>(null);
+const idempotencyKey = ref(createIdempotencyKey());
+const submitted = ref(false);
+const financialAccountId = ref<number | null>(null);
+const financialAccounts = ref<FinancialAccountOption[]>([]);
+const financialAccountsError = ref<string | null>(null);
+
+const fetchFinancialAccounts = async () => {
+    financialAccountsError.value = null;
+    try {
+        const response = await apiClient.get('/money-accounts/options', {
+            params: { type: 'bank', purpose: 'settlement' },
+        });
+        financialAccounts.value = response.data?.data ?? [];
+    } catch (error: any) {
+        financialAccounts.value = [];
+        financialAccountsError.value =
+            error.response?.data?.message ||
+            'No se pudieron cargar las cuentas bancarias.';
+    }
+};
 
 // Reset state when modal opens
 watch(
     () => props.show,
     (val) => {
         if (val) {
-            fetchMethods('returns');
+            idempotencyKey.value = createIdempotencyKey();
+            submitted.value = false;
+            void Promise.all([
+                fetchMethods('returns'),
+                fetchFinancialAccounts(),
+            ]);
             reason.value = '';
             refundMethod.value =
                 props.hasCustomer && Number(props.amountDue || 0) > 0
                     ? 'receivable'
                     : 'cash';
             refundNotes.value = '';
+            financialAccountId.value = null;
             returnSearchQuery.value = '';
             showReturnSearchModal.value = false;
             quantities.value = {};
@@ -110,6 +146,15 @@ watch(
                 quantities.value[item.id] = 0;
                 returnUsers.value[item.id] = props.currentUserId ?? null;
             });
+        }
+    },
+);
+
+watch(
+    () => props.loading,
+    (loading, previous) => {
+        if (previous && !loading && props.show && props.error) {
+            submitted.value = false;
         }
     },
 );
@@ -130,6 +175,18 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
 
 const hasSelectedItems = computed(() =>
     Object.values(quantities.value).some((q) => q > 0),
+);
+
+const isBankRefund = computed(
+    () =>
+        methods.value.find((method) => method.code === refundMethod.value)
+            ?.liquidity_bucket === 'bank',
+);
+
+const canSubmit = computed(
+    () =>
+        hasSelectedItems.value &&
+        (!isBankRefund.value || financialAccountId.value !== null),
 );
 
 const selectedCount = computed(
@@ -220,6 +277,8 @@ const estimatedRefund = computed(() => {
 });
 
 const handleSubmit = () => {
+    if (props.loading || submitted.value || !canSubmit.value) return;
+
     const returnItems = props.items
         .filter((item) => (quantities.value[item.id] ?? 0) > 0)
         .map((item) => ({
@@ -231,9 +290,14 @@ const handleSubmit = () => {
             user_id: returnUsers.value[item.id] ?? null,
         }));
 
+    submitted.value = true;
     emit('submit', {
+        idempotency_key: idempotencyKey.value,
         reason: reason.value,
         refund_method: refundMethod.value,
+        financial_account_id: isBankRefund.value
+            ? financialAccountId.value
+            : null,
         refund_notes: refundNotes.value,
         items: returnItems,
     });
@@ -756,6 +820,40 @@ const refundMethodColor = (method: string, color: string) => {
                                 </div>
                             </div>
 
+                            <div v-if="isBankRefund">
+                                <label
+                                    class="mb-1 block text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                                >
+                                    Cuenta bancaria
+                                </label>
+                                <select
+                                    v-model.number="financialAccountId"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
+                                >
+                                    <option :value="null">
+                                        Selecciona una cuenta
+                                    </option>
+                                    <option
+                                        v-for="account in financialAccounts"
+                                        :key="account.endpoint_id"
+                                        :value="account.endpoint_id"
+                                    >
+                                        {{ account.name
+                                        }}{{
+                                            account.masked_number
+                                                ? ` · ${account.masked_number}`
+                                                : ''
+                                        }}
+                                    </option>
+                                </select>
+                                <p
+                                    v-if="financialAccountsError"
+                                    class="mt-1 text-xs text-red-600 dark:text-red-400"
+                                >
+                                    {{ financialAccountsError }}
+                                </p>
+                            </div>
+
                             <!-- ── Estimated Refund ── -->
                             <div
                                 v-if="hasSelectedItems"
@@ -1028,7 +1126,7 @@ const refundMethodColor = (method: string, color: string) => {
                         >
                             <button
                                 @click="handleSubmit"
-                                :disabled="!hasSelectedItems || loading"
+                                :disabled="!canSubmit || loading || submitted"
                                 class="w-full rounded-xl bg-red-600 py-3 font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-40"
                             >
                                 {{

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { X, AlertCircle, Save } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
-import { CustomersApiService } from '@/services/customers';
 import apiClient from '@/services/api/client';
+import { CustomersApiService } from '@/services/customers';
 import type { CustomerType } from '@/types/customer';
 
 const props = defineProps<{

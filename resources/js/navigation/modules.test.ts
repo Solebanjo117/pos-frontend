@@ -74,6 +74,18 @@ describe('role and feature filtering', () => {
             true,
         );
     });
+
+    it('groups the cashier queue and request forms in cash operations', () => {
+        const cash = getVisibleModuleById('cash', 'cashier', features);
+        const actions = cash?.sections.flatMap((section) => section.actions);
+
+        expect(actions?.map((action) => action.title)).toEqual(
+            expect.arrayContaining(['Cola de caja', 'Agregar / Retirar']),
+        );
+        expect(actions?.map((action) => action.title)).not.toEqual(
+            expect.arrayContaining(['Agregar efectivo', 'Retirar efectivo']),
+        );
+    });
 });
 
 describe('module breadcrumbs', () => {

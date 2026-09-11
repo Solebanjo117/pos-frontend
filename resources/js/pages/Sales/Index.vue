@@ -9,7 +9,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Ventas', href: '/sales' }];
 
 <template>
     <Head title="Ventas" />
-    <AppLayout :breadcrumbs="breadcrumbs">
+    <AppLayout :breadcrumbs="breadcrumbs" :show-warehouse-selector="false">
         <ModuleHubLayout module-id="sales" />
     </AppLayout>
 </template>

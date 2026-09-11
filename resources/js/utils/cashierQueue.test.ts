@@ -11,12 +11,18 @@ describe('queueEntryKind', () => {
         expect(queueEntryKind(QUEUE_ENTRY_TYPE.sale)).toBe('sale');
         expect(queueEntryKind(QUEUE_ENTRY_TYPE.expense)).toBe('expense');
         expect(queueEntryKind(QUEUE_ENTRY_TYPE.return)).toBe('return');
+        expect(queueEntryKind(QUEUE_ENTRY_TYPE.cashIn)).toBe('cashIn');
+        expect(queueEntryKind(QUEUE_ENTRY_TYPE.cashOut)).toBe('cashOut');
+        expect(queueEntryKind(QUEUE_ENTRY_TYPE.funding)).toBe('funding');
     });
 
     it('maps raw wire strings exactly as the backend serializes them', () => {
         expect(queueEntryKind('sale_collection')).toBe('sale');
         expect(queueEntryKind('expense_payment')).toBe('expense');
         expect(queueEntryKind('sales_return_refund')).toBe('return');
+        expect(queueEntryKind('cash_in_request')).toBe('cashIn');
+        expect(queueEntryKind('cash_out_request')).toBe('cashOut');
+        expect(queueEntryKind('funding_request')).toBe('funding');
     });
 
     it('rejects legacy short labels that never arrive from the backend', () => {

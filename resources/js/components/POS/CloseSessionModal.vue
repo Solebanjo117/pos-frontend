@@ -96,6 +96,12 @@ const normalizeMoney = (value: string): number => {
     return Number.isFinite(parsed) && parsed > 0 ? money(parsed) : 0;
 };
 
+const normalizeSignedMoney = (value: string): number => {
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? money(parsed) : 0;
+};
+
 const existingRows = computed<ReconciliationRow[]>(() => {
     const rows = summaryData.value?.reconciliation_rows;
 
@@ -214,7 +220,7 @@ const handleExtraCashChange = (value: string): void => {
 };
 
 const handlePaymentChange = (code: string, value: string): void => {
-    payments[code] = normalizeMoney(value);
+    payments[code] = normalizeSignedMoney(value);
 };
 
 const handleClear = (): void => {
@@ -565,7 +571,6 @@ watch(
                                     </span>
                                     <input
                                         type="number"
-                                        min="0"
                                         step="0.01"
                                         :value="payments[row.code] || ''"
                                         class="min-w-0 flex-1 px-2 text-right text-sm font-bold outline-none focus:bg-slate-50"

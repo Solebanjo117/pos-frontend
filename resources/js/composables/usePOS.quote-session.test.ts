@@ -86,4 +86,93 @@ describe('usePOS quote sessions', () => {
 
         wrapper.unmount();
     });
+
+    it('keeps a quote discount fixed when quantity and price change', async () => {
+        const { usePOS } = await import('./usePOS');
+        let pos: ReturnType<typeof usePOS>;
+        const Harness = defineComponent({
+            setup() {
+                pos = usePOS();
+                return () => h('div');
+            },
+        });
+        const wrapper = mount(Harness);
+        const fixedQuote = quote(2);
+        fixedQuote.items[0].discount_percent = 15;
+        Object.assign(fixedQuote.items[0], {
+            discount_amount: 3,
+            subtotal: 17,
+            total: 17,
+        });
+
+        pos!.loadQuoteAsSession(fixedQuote);
+        const item = pos!.activeSession.value.cart[0];
+        pos!.updateQuantity(item.id, 3);
+
+        expect(item.discount_amount).toBe(3);
+        expect(item.subtotal).toBe(27);
+
+        pos!.updateItemPrice(item.id, 5);
+        expect(item.discount_amount).toBe(3);
+        expect(item.subtotal).toBe(12);
+
+        pos!.updateDiscountAmount(item.id, 20);
+        expect(item.discount_amount).toBe(15);
+        expect(item.total).toBe(0);
+
+        wrapper.unmount();
+    });
+
+    it('keeps fixed discounts unchanged for normal POS items', async () => {
+        const { usePOS } = await import('./usePOS');
+        let pos: ReturnType<typeof usePOS>;
+        const Harness = defineComponent({
+            setup() {
+                pos = usePOS();
+                return () => h('div');
+            },
+        });
+        const wrapper = mount(Harness);
+
+        pos!.loadQuoteAsSession(quote(2));
+        const item = pos!.activeSession.value.cart[0];
+        pos!.updateDiscountAmount(item.id, 3);
+        pos!.updateQuantity(item.id, 3);
+
+        expect(item.discount_amount).toBe(3);
+        expect(item.subtotal).toBe(27);
+
+        wrapper.unmount();
+    });
+
+    it('restores the item default tax after toggling an exempt line', async () => {
+        const { usePOS } = await import('./usePOS');
+        let pos: ReturnType<typeof usePOS>;
+        const Harness = defineComponent({
+            setup() {
+                pos = usePOS();
+                return () => h('div');
+            },
+        });
+        const wrapper = mount(Harness);
+        const taxedQuote = quote(1);
+        Object.assign(taxedQuote.items[0], {
+            tax_percent: 7,
+            tax_amount: 0.7,
+            total: 10.7,
+        });
+
+        pos!.loadQuoteAsSession(taxedQuote);
+        const item = pos!.activeSession.value.cart[0];
+
+        pos!.toggleItemTaxExempt(item.id);
+        expect(item.tax_percent).toBe(0);
+        expect(item.tax_amount).toBe(0);
+
+        pos!.toggleItemTaxExempt(item.id);
+        expect(item.tax_percent).toBe(7);
+        expect(item.tax_amount).toBe(0.7);
+
+        wrapper.unmount();
+    });
 });

@@ -13,8 +13,8 @@ Monolithic Laravel 12 app with an Inertia.js + Vue 3 frontend. Despite the repo 
 
 - **Backend**: Laravel 12, PHP 8.2+, PostgreSQL, Laravel Fortify (auth), Spatie Activity Log
 - **Frontend**: Vue 3, TypeScript, Inertia.js, Tailwind CSS v4, shadcn-vue (new-york-v4 style), VueUse
-- **Build**: Vite 7 with `@laravel/vite-plugin-wayfinder`
-- **Testing**: Pest PHP (backend only — no frontend test runner)
+- **Build**: Vite 8 with `laravel-vite-plugin` 3 and `@laravel/vite-plugin-wayfinder`
+- **Testing**: Pest PHP plus Vitest 3, Vue Test Utils and jsdom for frontend unit tests
 - **Lint/Format**: Pint (PHP), ESLint 9 flat config (JS/Vue/TS), Prettier with `prettier-plugin-tailwindcss`
 
 ## Commands
@@ -28,6 +28,9 @@ composer dev:ssr
 
 # Build
 npm run build
+
+# Frontend unit tests
+npm run test:unit
 
 # Lint
 npm run lint              # ESLint --fix
@@ -45,9 +48,11 @@ composer test
 # Test directly
 ./vendor/bin/pest
 
-# Type check (no npm script — run directly)
+# Type check
 npx vue-tsc --noEmit
 ```
+
+If Vitest, Vue Test Utils or jsdom cannot be resolved, treat the local `node_modules` as stale and restore it reproducibly from `package-lock.json` before diagnosing source failures. The dependency ranges declared by `package.json` are authoritative.
 
 ## Key Conventions
 

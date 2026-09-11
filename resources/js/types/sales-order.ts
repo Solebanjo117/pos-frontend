@@ -319,6 +319,9 @@ export interface SalesOrderFilters {
 }
 
 export interface SalesOrderStatistics {
+    draft_orders: number;
+    collected_sales: number;
+    credit_receivable: number;
     total_orders: number;
     total_sales: number;
     pending_orders: number;

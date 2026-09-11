@@ -131,39 +131,33 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 title: 'Operación',
                 actions: [
                     {
-                        title: 'Punto de venta',
-                        href: '/pos',
-                        description: 'Registrar ventas y procesar pagos.',
-                        icon: ShoppingCart,
-                        roles: roles.cash,
-                    },
-                    {
                         title: 'Cola de caja',
                         href: '/pos/cashier',
                         description: 'Atender operaciones pendientes de cobro.',
                         icon: Inbox,
                         roles: roles.cash,
                     },
+                    {
+                        title: 'Agregar / Retirar',
+                        href: '/cash/movements',
+                        description:
+                            'Enviar entradas o retiros de efectivo a Caja.',
+                        icon: Banknote,
+                        roles: roles.cash,
+                    },
+                    {
+                        title: 'Gastos / Funding',
+                        href: '/cash/expenses-funding',
+                        description:
+                            'Solicitar gastos o aportaciones en efectivo.',
+                        icon: Receipt,
+                        roles: roles.adminManager,
+                    },
                 ],
             },
             {
                 title: 'Efectivo y cierres',
                 actions: [
-                    {
-                        title: 'Agregar efectivo',
-                        href: '/pos?cash_action=in',
-                        description:
-                            'Registrar una entrada manual de efectivo.',
-                        icon: Plus,
-                        roles: roles.cash,
-                    },
-                    {
-                        title: 'Retirar efectivo',
-                        href: '/pos?cash_action=out',
-                        description: 'Registrar una salida manual de efectivo.',
-                        icon: Banknote,
-                        roles: roles.cash,
-                    },
                     {
                         title: 'Sesiones y cierres',
                         href: '/pos-sessions',

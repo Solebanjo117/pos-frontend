@@ -134,4 +134,62 @@ describe('cash session modals', () => {
         expect(vm.extraCash).toBe(0);
         expect(vm.notes).toBe('');
     });
+
+    it('preserves negative declared totals for non-cash payment methods', async () => {
+        const wrapper = mount(CloseSessionModal, {
+            props: {
+                show: true,
+                loading: false,
+                session: {
+                    id: 2,
+                    user_id: 1,
+                    opened_at: '2026-09-06T08:00:00Z',
+                    closed_at: null,
+                    opening_amount: 0,
+                    closing_amount: null,
+                    expected_amount: 0,
+                    status: 'open',
+                    notes: null,
+                    created_at: '2026-09-06T08:00:00Z',
+                    updated_at: '2026-09-06T08:00:00Z',
+                },
+                summary: {
+                    opening_amount: 0,
+                    cash_sales: 0,
+                    electronic_sales: 0,
+                    total_sales: 0,
+                    expected_cash: 0,
+                    reconciliation_rows: [
+                        {
+                            code: 'cash',
+                            label: 'Efectivo',
+                            start_adds: 0,
+                            payments: 0,
+                            withdrawals: 0,
+                            expected_total: 0,
+                        },
+                        {
+                            code: 'transfer',
+                            label: 'Transferencia',
+                            start_adds: 0,
+                            payments: 0,
+                            withdrawals: -50,
+                            expected_total: -50,
+                        },
+                    ],
+                },
+            },
+        });
+        const vm = wrapper.vm as any;
+
+        vm.handlePaymentChange('transfer', '-50');
+        await nextTick();
+        vm.handleSubmit();
+
+        expect(wrapper.emitted('submit')).toHaveLength(1);
+        expect(wrapper.emitted('submit')?.[0]?.[0]).toBe(0);
+        expect(wrapper.emitted('submit')?.[0]?.[2]).toMatchObject({
+            payment_method_counts: { transfer: -50 },
+        });
+    });
 });

@@ -2,6 +2,9 @@ export const QUEUE_ENTRY_TYPE = {
     sale: 'sale_collection',
     expense: 'expense_payment',
     return: 'sales_return_refund',
+    cashIn: 'cash_in_request',
+    cashOut: 'cash_out_request',
+    funding: 'funding_request',
 } as const;
 
 export type QueueEntryKind = keyof typeof QUEUE_ENTRY_TYPE;

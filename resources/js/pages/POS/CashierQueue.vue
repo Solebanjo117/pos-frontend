@@ -41,6 +41,7 @@ const {
     timeAgo,
     openEntry,
     completeEntry,
+    cancelEntry,
     removeSaleFromQueue,
 } = useCashierQueue();
 const { loadQuoteAsSession } = usePOS();
@@ -50,6 +51,8 @@ const processingId = ref<number | null>(null);
 const notice = ref<{ title: string; message: string } | null>(null);
 const removeEntry = ref<CashierQueueEntry | null>(null);
 const settlementEntry = ref<CashierQueueEntry | null>(null);
+const cancellationEntry = ref<CashierQueueEntry | null>(null);
+const cancellationReason = ref('');
 const traceEntryId = ref<number | null>(null);
 const traceOpen = ref(false);
 
@@ -121,12 +124,18 @@ const typeLabels: Record<QueueEntryKind, string> = {
     sale: 'Venta',
     expense: 'Gasto',
     return: 'Devolucion',
+    cashIn: 'Agregar efectivo',
+    cashOut: 'Retirar efectivo',
+    funding: 'Funding',
 };
 
 const typeIcons: Record<QueueEntryKind, typeof ShoppingCart> = {
     sale: ShoppingCart,
     expense: ReceiptText,
     return: RotateCcw,
+    cashIn: Banknote,
+    cashOut: Banknote,
+    funding: Banknote,
 };
 
 const labelOf = (entry: CashierQueueEntry): string => {
@@ -137,6 +146,14 @@ const labelOf = (entry: CashierQueueEntry): string => {
 const iconOf = (entry: CashierQueueEntry): typeof ShoppingCart => {
     const kind = kindOf(entry);
     return kind ? typeIcons[kind] : ReceiptText;
+};
+
+const actionLabel = (entry: CashierQueueEntry): string => {
+    const kind = kindOf(entry);
+    if (kind === 'return') return 'Liquidar devolución';
+    if (kind === 'expense')
+        return entry.fixed_cash_amount ? 'Confirmar gasto' : 'Pagar gasto';
+    return 'Confirmar movimiento';
 };
 
 const requiresReference = computed(
@@ -173,14 +190,20 @@ async function loadPaymentMethods(context: 'supplier_payments' | 'returns') {
 const isReturnSettlement = computed(
     () => kindOf(settlementEntry.value) === 'return',
 );
+const isFixedCashSettlement = computed(
+    () => settlementEntry.value?.fixed_cash_amount === true,
+);
 const returnNeedsMoney = computed(
     () =>
         isReturnSettlement.value &&
         Number(settlementEntry.value?.source.money_refund_amount ?? 0) > 0,
 );
-const settlementTitle = computed(() =>
-    isReturnSettlement.value ? 'Liquidar devolucion' : 'Pagar gasto',
-);
+const settlementTitle = computed(() => {
+    if (isReturnSettlement.value) return 'Liquidar devolución';
+    if (isFixedCashSettlement.value && settlementEntry.value)
+        return labelOf(settlementEntry.value);
+    return 'Pagar gasto';
+});
 
 onMounted(async () => {
     startPolling(15000);
@@ -248,9 +271,11 @@ async function processEntry(entry: CashierQueueEntry) {
         }
 
         const kind = kindOf(entry);
-        await loadPaymentMethods(
-            kind === 'return' ? 'returns' : 'supplier_payments',
-        );
+        if (!entry.fixed_cash_amount) {
+            await loadPaymentMethods(
+                kind === 'return' ? 'returns' : 'supplier_payments',
+            );
+        }
         settlementEntry.value = entry;
         settlement.value = {
             final_amount: roundMoney(
@@ -258,12 +283,13 @@ async function processEntry(entry: CashierQueueEntry) {
                     ? Number(entry.source.money_refund_amount ?? 0)
                     : entry.estimated_amount,
             ),
-            payment_method:
-                (kind === 'return'
-                    ? entry.source.refund_method
-                    : entry.source.planned_payment_method) ||
-                paymentMethods.value[0]?.code ||
-                '',
+            payment_method: entry.fixed_cash_amount
+                ? 'cash'
+                : (kind === 'return'
+                      ? entry.source.refund_method
+                      : entry.source.planned_payment_method) ||
+                  paymentMethods.value[0]?.code ||
+                  '',
             reference_number: entry.source.reference_number || '',
             variance_reason: '',
         };
@@ -333,7 +359,11 @@ async function viewOrder(entry: CashierQueueEntry) {
 
 async function settleExpense() {
     if (!settlementEntry.value) return;
-    if (hasVariance.value && !settlement.value.variance_reason.trim()) {
+    if (
+        !isFixedCashSettlement.value &&
+        hasVariance.value &&
+        !settlement.value.variance_reason.trim()
+    ) {
         notice.value = {
             title: 'Motivo requerido',
             message:
@@ -341,7 +371,11 @@ async function settleExpense() {
         };
         return;
     }
-    if (returnNeedsMoney.value && !settlement.value.payment_method) {
+    if (
+        !isFixedCashSettlement.value &&
+        returnNeedsMoney.value &&
+        !settlement.value.payment_method
+    ) {
         notice.value = {
             title: 'Metodo requerido',
             message:
@@ -350,6 +384,7 @@ async function settleExpense() {
         return;
     }
     if (
+        !isFixedCashSettlement.value &&
         requiresReference.value &&
         (!isReturnSettlement.value || returnNeedsMoney.value) &&
         !settlement.value.reference_number.trim()
@@ -364,33 +399,74 @@ async function settleExpense() {
     processingId.value = settlementEntry.value.id;
     try {
         const wasReturn = isReturnSettlement.value;
-        const payload =
-            wasReturn && !returnNeedsMoney.value
-                ? {
-                      reference_number:
-                          settlement.value.reference_number || null,
-                      variance_reason: null,
-                  }
-                : settlement.value;
+        const wasFixedCash = isFixedCashSettlement.value;
+        const fixedKind = kindOf(settlementEntry.value);
+        const payload = wasFixedCash
+            ? {}
+            : wasReturn && !returnNeedsMoney.value
+              ? {
+                    reference_number: settlement.value.reference_number || null,
+                    variance_reason: null,
+                }
+              : settlement.value;
         await completeEntry(settlementEntry.value.id, payload);
         settlementEntry.value = null;
-        notice.value = wasReturn
+        notice.value = wasFixedCash
             ? {
-                  title: 'Devolucion liquidada',
+                  title: 'Movimiento confirmado',
                   message:
-                      'La nota de credito y su resolucion financiera quedaron registradas.',
+                      fixedKind === 'funding'
+                          ? 'El efectivo y la aportación de capital quedaron vinculados.'
+                          : 'El movimiento de efectivo quedó registrado en la sesión.',
               }
-            : {
-                  title: 'Gasto pagado',
-                  message:
-                      'El pago, el movimiento y su asiento quedaron registrados.',
-              };
+            : wasReturn
+              ? {
+                    title: 'Devolucion liquidada',
+                    message:
+                        'La nota de credito y su resolucion financiera quedaron registradas.',
+                }
+              : {
+                    title: 'Gasto pagado',
+                    message:
+                        'El pago, el movimiento y su asiento quedaron registrados.',
+                };
     } catch (exception: any) {
         notice.value = {
             title: 'No se pudo completar',
             message:
                 exception.response?.data?.message ||
                 'Revise el monto, el metodo y la sesion de Caja.',
+        };
+    } finally {
+        processingId.value = null;
+    }
+}
+
+async function cancelCashRequest(): Promise<void> {
+    if (
+        !cancellationEntry.value ||
+        !cancellationReason.value.trim() ||
+        processingId.value !== null
+    )
+        return;
+    processingId.value = cancellationEntry.value.id;
+    try {
+        await cancelEntry(
+            cancellationEntry.value.id,
+            cancellationReason.value.trim(),
+        );
+        cancellationEntry.value = null;
+        cancellationReason.value = '';
+        notice.value = {
+            title: 'Solicitud cancelada',
+            message: 'No se registró ningún movimiento de efectivo.',
+        };
+    } catch (exception: any) {
+        notice.value = {
+            title: 'No se pudo cancelar',
+            message:
+                exception.response?.data?.message ||
+                'La solicitud permanece en la cola.',
         };
     } finally {
         processingId.value = null;
@@ -764,15 +840,34 @@ async function confirmRemove() {
                     <div class="flex-1 space-y-3 px-4 py-3 text-sm">
                         <div>
                             <p class="text-xs text-muted-foreground">
-                                Cliente / beneficiario
+                                {{
+                                    entry.source.requested_by
+                                        ? 'Solicitado por'
+                                        : 'Cliente / beneficiario'
+                                }}
                             </p>
-                            <p class="font-medium">{{ entry.source.party }}</p>
+                            <p class="font-medium">
+                                {{
+                                    entry.source.requested_by?.name ??
+                                    entry.source.party
+                                }}
+                            </p>
                         </div>
                         <div>
                             <p class="text-xs text-muted-foreground">
                                 Concepto
                             </p>
                             <p>{{ entry.source.description }}</p>
+                        </div>
+                        <div v-if="entry.source.category">
+                            <p class="text-xs text-muted-foreground">
+                                Categoría
+                            </p>
+                            <p>{{ entry.source.category }}</p>
+                        </div>
+                        <div v-if="entry.source.notes">
+                            <p class="text-xs text-muted-foreground">Notas</p>
+                            <p class="line-clamp-2">{{ entry.source.notes }}</p>
                         </div>
                         <div
                             class="flex items-end justify-between border-t pt-3"
@@ -786,19 +881,23 @@ async function confirmRemove() {
                         </div>
                     </div>
 
-                    <div class="border-t bg-muted/30 px-4 py-3">
+                    <div class="flex gap-2 border-t bg-muted/30 px-4 py-3">
+                        <button
+                            v-if="entry.can_cancel"
+                            type="button"
+                            class="rounded-md border px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/30"
+                            @click="cancellationEntry = entry"
+                        >
+                            Cancelar
+                        </button>
                         <button
                             type="button"
-                            class="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                            class="flex flex-1 items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
                             :disabled="processingId === entry.id"
                             @click="processEntry(entry)"
                         >
                             <component :is="iconOf(entry)" class="h-4 w-4" />
-                            {{
-                                kindOf(entry) === 'return'
-                                    ? 'Liquidar devolucion'
-                                    : 'Pagar gasto'
-                            }}
+                            {{ actionLabel(entry) }}
                         </button>
                     </div>
                 </article>
@@ -834,6 +933,43 @@ async function confirmRemove() {
             </div>
             <div class="grid gap-4 px-5 py-4 sm:grid-cols-2">
                 <div
+                    v-if="isFixedCashSettlement"
+                    class="space-y-3 sm:col-span-2"
+                >
+                    <div
+                        class="grid gap-3 rounded-md border bg-muted/30 p-3 text-sm sm:grid-cols-2"
+                    >
+                        <div>
+                            <span class="block text-xs text-muted-foreground"
+                                >Tipo</span
+                            ><strong>{{ labelOf(settlementEntry) }}</strong>
+                        </div>
+                        <div>
+                            <span class="block text-xs text-muted-foreground"
+                                >Método</span
+                            ><strong>Efectivo</strong>
+                        </div>
+                        <div v-if="settlementEntry.source.category">
+                            <span class="block text-xs text-muted-foreground"
+                                >Categoría</span
+                            ><strong>{{
+                                settlementEntry.source.category
+                            }}</strong>
+                        </div>
+                        <div>
+                            <span class="block text-xs text-muted-foreground"
+                                >Monto fijo</span
+                            ><strong>{{
+                                formatCurrency(settlementEntry.estimated_amount)
+                            }}</strong>
+                        </div>
+                    </div>
+                    <p class="text-sm text-muted-foreground">
+                        El monto no puede cambiarse. Para corregirlo, cancela
+                        esta solicitud y crea otra.
+                    </p>
+                </div>
+                <div
                     v-if="isReturnSettlement"
                     class="grid gap-2 rounded-md border bg-muted/30 p-3 text-sm sm:col-span-2 sm:grid-cols-3"
                 >
@@ -866,7 +1002,10 @@ async function confirmRemove() {
                         }}</strong>
                     </div>
                 </div>
-                <label v-if="!isReturnSettlement" class="space-y-1 text-sm">
+                <label
+                    v-if="!isReturnSettlement && !isFixedCashSettlement"
+                    class="space-y-1 text-sm"
+                >
                     <span>Monto final</span>
                     <input
                         v-model.number="settlement.final_amount"
@@ -878,7 +1017,10 @@ async function confirmRemove() {
                     />
                 </label>
                 <label
-                    v-if="!isReturnSettlement || returnNeedsMoney"
+                    v-if="
+                        !isFixedCashSettlement &&
+                        (!isReturnSettlement || returnNeedsMoney)
+                    "
                     class="space-y-1 text-sm"
                 >
                     <span>Metodo de pago</span>
@@ -897,7 +1039,10 @@ async function confirmRemove() {
                     </select>
                 </label>
                 <label
-                    v-if="!isReturnSettlement || returnNeedsMoney"
+                    v-if="
+                        !isFixedCashSettlement &&
+                        (!isReturnSettlement || returnNeedsMoney)
+                    "
                     class="space-y-1 text-sm sm:col-span-2"
                 >
                     <span>Referencia{{ requiresReference ? ' *' : '' }}</span>
@@ -922,6 +1067,17 @@ async function confirmRemove() {
             </div>
             <div class="flex justify-end gap-2 border-t px-5 py-4">
                 <button
+                    v-if="isFixedCashSettlement"
+                    type="button"
+                    class="mr-auto rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+                    @click="
+                        cancellationEntry = settlementEntry;
+                        settlementEntry = null;
+                    "
+                >
+                    Cancelar solicitud
+                </button>
+                <button
                     type="button"
                     class="rounded-md border px-3 py-2 text-sm"
                     @click="settlementEntry = null"
@@ -934,10 +1090,61 @@ async function confirmRemove() {
                     :disabled="processingId === settlementEntry.id"
                 >
                     {{
-                        isReturnSettlement
-                            ? 'Confirmar liquidacion'
-                            : 'Confirmar pago'
+                        isFixedCashSettlement
+                            ? 'Confirmar movimiento'
+                            : isReturnSettlement
+                              ? 'Confirmar liquidacion'
+                              : 'Confirmar pago'
                     }}
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div
+        v-if="cancellationEntry"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+    >
+        <form
+            class="w-full max-w-md rounded-md border bg-card shadow-xl"
+            @submit.prevent="cancelCashRequest"
+        >
+            <div class="border-b px-5 py-4">
+                <h2 class="font-semibold">Cancelar solicitud</h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                    No se registrará ningún movimiento de efectivo. Para
+                    corregir el monto, crea otra solicitud.
+                </p>
+            </div>
+            <label class="block space-y-1 px-5 py-4 text-sm">
+                <span>Motivo *</span>
+                <textarea
+                    v-model="cancellationReason"
+                    rows="3"
+                    maxlength="500"
+                    required
+                    class="w-full rounded-md border bg-background px-3 py-2"
+                />
+            </label>
+            <div class="flex justify-end gap-2 border-t px-5 py-4">
+                <button
+                    type="button"
+                    class="rounded-md border px-3 py-2 text-sm"
+                    @click="
+                        cancellationEntry = null;
+                        cancellationReason = '';
+                    "
+                >
+                    Volver
+                </button>
+                <button
+                    type="submit"
+                    :disabled="
+                        !cancellationReason.trim() || processingId !== null
+                    "
+                    class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                    Cancelar solicitud
                 </button>
             </div>
         </form>

@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { ClipboardCheck, PackageSearch, Truck } from 'lucide-vue-next';
 import { onMounted } from 'vue';
 import ModuleHubLayout from '@/components/modules/ModuleHubLayout.vue';
-import ModuleMetric from '@/components/modules/ModuleMetric.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useDeliveryQueue } from '@/composables/useDeliveryQueue';
 import { usePurchaseOrderQueue } from '@/composables/usePurchaseOrderQueue';
@@ -29,27 +27,14 @@ onMounted(() => {
 
 <template>
     <Head title="Cola" />
-    <AppLayout :breadcrumbs="breadcrumbs">
-        <ModuleHubLayout module-id="queues">
-            <template #metrics>
-                <ModuleMetric
-                    v-if="canViewWarehouse"
-                    label="Pendientes en bodega"
-                    :value="warehouse.count.value"
-                    :icon="PackageSearch"
-                />
-                <ModuleMetric
-                    v-if="canViewDelivery"
-                    label="Pendientes de entrega"
-                    :value="delivery.count.value"
-                    :icon="Truck"
-                />
-                <ModuleMetric
-                    label="Pedidos por recibir"
-                    :value="purchaseOrders.count.value"
-                    :icon="ClipboardCheck"
-                />
-            </template>
-        </ModuleHubLayout>
+    <AppLayout :breadcrumbs="breadcrumbs" :show-warehouse-selector="false">
+        <ModuleHubLayout
+            module-id="queues"
+            :action-counts="{
+                '/warehouses/queue': warehouse.count.value,
+                '/queues/delivery': delivery.count.value,
+                '/queues/purchase-orders': purchaseOrders.count.value,
+            }"
+        />
     </AppLayout>
 </template>

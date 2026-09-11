@@ -26,6 +26,9 @@ export interface CashierQueueSource {
         quantity: number;
     }>;
     planned_payment_method?: string | null;
+    requested_by?: { id: number; name: string } | null;
+    category?: string | null;
+    operation_type?: 'cash_in' | 'cash_out' | 'expense' | 'funding';
     reference_number?: string | null;
     refund_method?: string | null;
     money_refund_amount?: number;
@@ -44,11 +47,14 @@ export interface CashierQueueEntry {
     scheduled_for: string | null;
     opened_by: number | null;
     opened_at: string | null;
+    fixed_cash_amount?: boolean;
+    can_cancel?: boolean;
     source: CashierQueueSource;
 }
 
 export function useCashierQueue() {
     const entries = ref<CashierQueueEntry[]>([]);
+    const total = ref(0);
     const loading = ref(false);
     const error = ref<string | null>(null);
     let pollingInterval: ReturnType<typeof setInterval> | null = null;
@@ -62,6 +68,9 @@ export function useCashierQueue() {
                 params: { per_page: 100 },
             });
             entries.value = response.data.data ?? [];
+            total.value = Number(
+                response.data.meta?.total ?? entries.value.length,
+            );
             error.value = null;
         } catch (exception: any) {
             error.value =
@@ -99,6 +108,11 @@ export function useCashierQueue() {
         await fetchPending();
     }
 
+    async function cancelEntry(entryId: number, reason: string): Promise<void> {
+        await apiClient.post(`/cashier-queue/${entryId}/cancel`, { reason });
+        await fetchPending();
+    }
+
     function startPolling(intervalMs = 15000) {
         stopPolling();
         void fetchPending();
@@ -117,7 +131,7 @@ export function useCashierQueue() {
         return formatDuration(dateString, new Date(nowMs)) || 'Ahora';
     }
 
-    const count = computed(() => entries.value.length);
+    const count = computed(() => total.value);
 
     onUnmounted(stopPolling);
 
@@ -133,5 +147,6 @@ export function useCashierQueue() {
         openEntry,
         completeEntry,
         removeSaleFromQueue,
+        cancelEntry,
     };
 }

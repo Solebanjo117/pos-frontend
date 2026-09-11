@@ -21,6 +21,7 @@ interface CartItem {
     quantity: number;
     available_stock?: number;
     discount_percent: number;
+    discount_amount?: number;
     tax_percent: number;
     default_tax_percent: number; // original tax so we can restore it
     is_tax_overridden: boolean; // Phase 1: tracks if vendor manually changed ITBM
@@ -41,6 +42,7 @@ interface AddCustomLinePayload {
     unit_price: number;
     tax_percent?: number;
     discount_percent?: number;
+    discount_amount?: number;
     seller_id?: number;
     warehouse_id?: number;
     notes?: string;
@@ -107,11 +109,33 @@ function createEmptySession(name?: string): PosCartSession {
     };
 }
 
+function normalizeFixedDiscounts(sessions: PosCartSession[]): PosCartSession[] {
+    for (const session of sessions) {
+        for (const item of session.cart ?? []) {
+            if (item.discount_amount !== undefined) {
+                continue;
+            }
+
+            const grossSubtotal = roundMoney(
+                Math.max(0, Number(item.quantity) * Number(item.product_price)),
+            );
+            item.discount_amount = roundMoney(
+                grossSubtotal *
+                    (Math.max(0, Number(item.discount_percent) || 0) / 100),
+            );
+        }
+    }
+
+    return sessions;
+}
+
 function loadSessionsFromStorage(): PosCartSession[] {
     try {
         const stored = localStorage.getItem(sessionsKey());
         const parsed = stored ? JSON.parse(stored) : null;
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            return normalizeFixedDiscounts(parsed);
+        }
     } catch {}
     // Default: one empty session
     return [createEmptySession()];
@@ -154,7 +178,7 @@ function migrateLegacyCart(): PosCartSession[] | null {
         localStorage.removeItem('pos_notes');
         localStorage.removeItem('pos_shipping');
 
-        return [session];
+        return normalizeFixedDiscounts([session]);
     } catch {
         return null;
     }
@@ -297,11 +321,24 @@ export function usePOS() {
 
     // Recalculate item totals
     const recalculateItem = (item: CartItem) => {
-        const baseAmount = item.quantity * item.product_price;
-        const discountAmount = baseAmount * (item.discount_percent / 100);
-        item.subtotal = baseAmount - discountAmount;
-        item.tax_amount = item.subtotal * (item.tax_percent / 100);
-        item.total = item.subtotal + item.tax_amount;
+        const baseAmount = roundMoney(item.quantity * item.product_price);
+        const usesFixedDiscount = item.discount_amount !== undefined;
+        const discountAmount = usesFixedDiscount
+            ? Math.min(
+                  baseAmount,
+                  Math.max(0, roundMoney(item.discount_amount ?? 0)),
+              )
+            : roundMoney(baseAmount * (item.discount_percent / 100));
+
+        if (usesFixedDiscount) {
+            item.discount_amount = discountAmount;
+            item.discount_percent =
+                baseAmount > 0 ? (discountAmount / baseAmount) * 100 : 0;
+        }
+
+        item.subtotal = roundMoney(baseAmount - discountAmount);
+        item.tax_amount = roundMoney(item.subtotal * (item.tax_percent / 100));
+        item.total = roundMoney(item.subtotal + item.tax_amount);
     };
 
     const normalizeTaxPercent = (value: unknown): number => {
@@ -469,6 +506,7 @@ export function usePOS() {
                 quantity,
                 available_stock: availableStock,
                 discount_percent: 0,
+                discount_amount: 0,
                 tax_percent: resolvedTaxRate,
                 default_tax_percent: resolvedTaxRate,
                 is_tax_overridden: false,
@@ -538,6 +576,14 @@ export function usePOS() {
                 0,
                 Math.min(100, Number(payload.discount_percent ?? 0)),
             ),
+            ...(payload.discount_amount !== undefined
+                ? {
+                      discount_amount: Math.max(
+                          0,
+                          roundMoney(Number(payload.discount_amount) || 0),
+                      ),
+                  }
+                : {}),
             tax_percent: resolvedTax,
             default_tax_percent: resolvedTax,
             is_tax_overridden: false,
@@ -593,6 +639,20 @@ export function usePOS() {
         const item = cart.value.find((i) => i.id === itemId);
         if (item) {
             item.discount_percent = Math.max(0, Math.min(100, discountPercent));
+            recalculateItem(item);
+        }
+    };
+
+    const updateDiscountAmount = (itemId: string, discountAmount: number) => {
+        const item = cart.value.find((candidate) => candidate.id === itemId);
+        if (item) {
+            const grossSubtotal = roundMoney(
+                item.quantity * item.product_price,
+            );
+            item.discount_amount = Math.min(
+                grossSubtotal,
+                Math.max(0, roundMoney(discountAmount)),
+            );
             recalculateItem(item);
         }
     };
@@ -893,6 +953,7 @@ export function usePOS() {
                     quantity: item.quantity,
                     unit_price: item.product_price,
                     discount_percent: item.discount_percent,
+                    discount_amount: item.discount_amount ?? 0,
                     tax_percent: normalizeTaxPercent(item.tax_percent),
                     seller_id: item.seller_id,
                     notes: item.notes || undefined,
@@ -1024,6 +1085,7 @@ export function usePOS() {
                     quantity: item.quantity,
                     unit_price: item.product_price,
                     discount_percent: item.discount_percent,
+                    discount_amount: item.discount_amount ?? 0,
                     tax_percent: normalizeTaxPercent(item.tax_percent),
                     seller_id: item.seller_id,
                     notes: item.notes || undefined,
@@ -1085,6 +1147,7 @@ export function usePOS() {
             quantity: number;
             unit_price: number;
             discount_percent: number;
+            discount_amount?: number;
             tax_percent: number;
             subtotal: number;
             tax_amount: number;
@@ -1133,6 +1196,11 @@ export function usePOS() {
                 product_price: Number(item.unit_price) || 0,
                 quantity: Number(item.quantity) || 1,
                 discount_percent: Number(item.discount_percent) || 0,
+                discount_amount:
+                    item.discount_amount === undefined ||
+                    item.discount_amount === null
+                        ? undefined
+                        : Number(item.discount_amount),
                 tax_percent: normalizeTaxPercent(item.tax_percent),
                 default_tax_percent: normalizeTaxPercent(item.tax_percent),
                 is_tax_overridden: false,
@@ -1182,6 +1250,7 @@ export function usePOS() {
         addCustomLine,
         updateQuantity,
         updateDiscount,
+        updateDiscountAmount,
         updateItemPrice,
         removeItem,
         updateItemTax,

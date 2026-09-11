@@ -5,7 +5,6 @@ import {
     endOfMonth,
     endOfWeek,
     format,
-    isSameDay,
     isSameMonth,
     isWithinInterval,
     startOfMonth,
@@ -56,7 +55,7 @@ const parseDate = (value?: string): Date | null => {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
     const [year, month, day] = value.split('-').map(Number);
     const date = new Date(year, month - 1, day, 12);
-    return Number.isNaN(date.getTime()) ? null : date;
+    return Number.isNaN(date.getTime()) || format(date, 'yyyy-MM-dd') !== value ? null : date;
 };
 
 const inputDate = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -66,9 +65,29 @@ const displayDate = (value?: string): string => {
 };
 
 const visibleMonth = ref(startOfMonth(parseDate(props.from) ?? panamaToday()));
-const monthStart = computed(() => startOfWeek(startOfMonth(visibleMonth.value), { weekStartsOn: 1 }));
-const monthEnd = computed(() => endOfWeek(endOfMonth(visibleMonth.value), { weekStartsOn: 1 }));
-const days = computed(() => eachDayOfInterval({ start: monthStart.value, end: monthEnd.value }));
+const months = computed(() => Array.from({ length: 3 }, (_, index) => {
+    const month = addMonths(visibleMonth.value, index);
+    return { month, days: eachDayOfInterval({
+        start: startOfWeek(startOfMonth(month), { weekStartsOn: 1 }),
+        end: endOfWeek(endOfMonth(month), { weekStartsOn: 1 }),
+    }) };
+}));
+const panelPosition = ref({ top: '0px', left: '0px' });
+const positionPanel = (): void => {
+    const rect = trigger.value?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.min(800, window.innerWidth - 24);
+    panelPosition.value = {
+        left: Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)) + 'px',
+        top: Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - 470)) + 'px',
+    };
+};
+const applyDraft = (): void => {
+    const from = parseDate(draftFrom.value);
+    const to = parseDate(draftTo.value);
+    if (!from || !to) return;
+    commit(from < to ? from : to, from < to ? to : from);
+};
 
 const persist = (from: string, to: string): void => {
     if (!props.persistToUrl || typeof window === 'undefined') return;
@@ -77,7 +96,7 @@ const persist = (from: string, to: string): void => {
     else url.searchParams.delete('date_from');
     if (to) url.searchParams.set('date_to', to);
     else url.searchParams.delete('date_to');
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 };
 
 const commit = (from: Date | null, to: Date | null): void => {
@@ -132,14 +151,15 @@ const applyPreset = (preset: Preset): void => {
 
 const chooseDay = (day: Date): void => {
     const currentFrom = parseDate(draftFrom.value);
-    if (!selectingEnd.value || !currentFrom || day < currentFrom) {
+    if (!selectingEnd.value || !currentFrom) {
         draftFrom.value = inputDate(day);
-        draftTo.value = '';
+        draftTo.value = inputDate(day);
         selectingEnd.value = true;
         return;
     }
-    draftTo.value = inputDate(day);
-    commit(currentFrom, day);
+    draftFrom.value = inputDate(day < currentFrom ? day : currentFrom);
+    draftTo.value = inputDate(day < currentFrom ? currentFrom : day);
+    selectingEnd.value = false;
 };
 
 const inDraftRange = (day: Date): boolean => {
@@ -151,9 +171,11 @@ const inDraftRange = (day: Date): boolean => {
 const toggle = (): void => {
     open.value = !open.value;
     if (open.value) {
+        selectingEnd.value = false;
+        positionPanel();
         draftFrom.value = props.from;
         draftTo.value = props.to;
-        visibleMonth.value = startOfMonth(parseDate(props.from) ?? panamaToday());
+        visibleMonth.value = startOfMonth(parseDate(props.from) ?? subMonths(panamaToday(), 2));
         nextTick(() => {
             const selected = draftFrom.value || inputDate(panamaToday());
             panel.value
@@ -195,7 +217,7 @@ const handleDialogKeydown = (event: KeyboardEvent): void => {
 };
 
 const handleOutsideClick = (event: PointerEvent): void => {
-    if (open.value && !container.value?.contains(event.target as Node)) close();
+    if (open.value && !container.value?.contains(event.target as Node) && !panel.value?.contains(event.target as Node)) close();
 };
 
 onMounted(() => document.addEventListener('pointerdown', handleOutsideClick));
@@ -208,7 +230,7 @@ const handleDayKey = (event: KeyboardEvent, day: Date): void => {
     if (!(event.key in offsets)) return;
     event.preventDefault();
     const target = inputDate(new Date(day.getFullYear(), day.getMonth(), day.getDate() + offsets[event.key], 12));
-    document.querySelector<HTMLButtonElement>(`[data-calendar-day="${target}"]`)?.focus();
+    panel.value?.querySelector<HTMLButtonElement>(`[data-calendar-day="${target}"]`)?.focus();
 };
 </script>
 
@@ -222,35 +244,57 @@ const handleDayKey = (event: KeyboardEvent, day: Date): void => {
             <ChevronDown :size="15" class="shrink-0 text-slate-400 transition" :class="{ 'rotate-180': open }" />
         </button>
 
-        <div ref="panel" v-if="open" role="dialog" aria-modal="true" aria-label="Seleccionar rango de fechas" class="absolute top-full left-0 z-50 mt-1 grid w-[min(94vw,620px)] overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl sm:grid-cols-[180px_1fr] dark:border-slate-700 dark:bg-slate-950" @keydown="handleDialogKeydown">
-            <div class="grid grid-cols-2 gap-1 border-b border-slate-200 p-2 sm:grid-cols-1 sm:border-r sm:border-b-0 dark:border-slate-800">
-                <button v-for="preset in presetOptions" :key="preset.value" type="button" class="rounded px-2.5 py-2 text-left text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-slate-800" @click="applyPreset(preset.value)">
-                    {{ preset.label }}
-                </button>
+        <Teleport to="body">
+        <div ref="panel" v-if="open" role="dialog" aria-modal="true" aria-label="Seleccionar rango de fechas"
+            :style="panelPosition"
+            class="fixed z-[100] max-h-[calc(100dvh-24px)] w-[min(calc(100vw-24px),800px)] overflow-auto rounded-lg border bg-popover p-3 text-popover-foreground shadow-xl"
+            @keydown="handleDialogKeydown">
+            <div class="mb-3 flex items-center justify-between gap-2">
+                <button type="button" class="calendar-nav" aria-label="Mes anterior" @click="visibleMonth = subMonths(visibleMonth, 1)"><ChevronLeft :size="16" /></button>
+                <p class="text-xs font-medium">Seleccionar un día o un rango</p>
+                <button type="button" class="calendar-nav" aria-label="Mes siguiente" @click="visibleMonth = addMonths(visibleMonth, 1)"><ChevronRight :size="16" /></button>
             </div>
-
-            <div class="p-3">
-                <div class="mb-3 flex items-center justify-between">
-                    <button type="button" class="calendar-nav" aria-label="Mes anterior" @click="visibleMonth = subMonths(visibleMonth, 1)"><ChevronLeft :size="16" /></button>
-                    <strong class="text-sm capitalize text-slate-800 dark:text-slate-100">{{ format(visibleMonth, 'MMMM yyyy', { locale: es }) }}</strong>
-                    <button type="button" class="calendar-nav" aria-label="Mes siguiente" @click="visibleMonth = addMonths(visibleMonth, 1)"><ChevronRight :size="16" /></button>
+            <div class="overflow-x-auto">
+            <div class="grid min-w-[630px] grid-cols-3 gap-4">
+                <section v-for="month in months" :key="inputDate(month.month)">
+                    <h3 class="mb-2 text-center text-sm font-semibold capitalize">{{ format(month.month, 'MMMM yyyy', { locale: es }) }}</h3>
+                    <div class="grid grid-cols-7 text-center text-[11px] text-muted-foreground">
+                        <span v-for="name in ['Lu','Ma','Mi','Ju','Vi','Sa','Do']" :key="name" class="py-1">{{ name }}</span>
+                    </div>
+                    <div class="grid grid-cols-7 gap-px">
+                        <template v-for="day in month.days" :key="inputDate(day)">
+                        <button v-if="isSameMonth(day, month.month)" type="button"
+                            :data-calendar-day="inputDate(day)"
+                            :aria-label="format(day, 'd MMMM yyyy', { locale: es })"
+                            :aria-pressed="inDraftRange(day)"
+                            class="h-7 rounded-sm text-xs tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            :class="inDraftRange(day) ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'"
+                            @click="chooseDay(day)" @keydown="handleDayKey($event, day)">{{ format(day, 'd') }}</button>
+                        <span v-else class="h-7" />
+                        </template>
+                    </div>
+                </section>
+            </div>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-1 border-t pt-3">
+                <button v-for="preset in presetOptions" :key="preset.value" type="button"
+                    class="rounded px-2 py-1 text-xs text-primary hover:bg-accent"
+                    @click="applyPreset(preset.value)">{{ preset.label }}</button>
+            </div>
+            <div class="mt-3 flex flex-wrap items-end gap-2 border-t pt-3">
+                <label class="text-xs">Desde
+                    <input v-model="draftFrom" type="date" class="mt-1 block rounded border bg-background px-2 py-1.5" @input="selectingEnd = false" />
+                </label>
+                <label class="text-xs">Hasta
+                    <input v-model="draftTo" type="date" class="mt-1 block rounded border bg-background px-2 py-1.5" @input="selectingEnd = false" />
+                </label>
+                <div class="ml-auto flex gap-2">
+                    <button type="button" class="rounded border px-3 py-2 text-xs" @click="close">Cancelar</button>
+                    <button type="button" class="rounded bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-40" :disabled="!parseDate(draftFrom) || !parseDate(draftTo)" @click="applyDraft">Aplicar</button>
                 </div>
-                <div class="grid grid-cols-7 text-center text-[11px] font-semibold text-slate-400">
-                    <span v-for="name in ['Lu','Ma','Mi','Ju','Vi','Sa','Do']" :key="name" class="py-1">{{ name }}</span>
-                </div>
-                <div class="grid grid-cols-7 gap-0.5">
-                    <button v-for="day in days" :key="inputDate(day)" type="button" :data-calendar-day="inputDate(day)" :aria-selected="isSameDay(day, parseDate(draftFrom) ?? new Date(0)) || isSameDay(day, parseDate(draftTo) ?? new Date(0))" class="aspect-square rounded text-xs tabular-nums outline-none focus:ring-2 focus:ring-indigo-400" :class="{
-                        'text-slate-300 dark:text-slate-600': !isSameMonth(day, visibleMonth),
-                        'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200': inDraftRange(day),
-                        'bg-indigo-600 font-semibold text-white': isSameDay(day, parseDate(draftFrom) ?? new Date(0)) || isSameDay(day, parseDate(draftTo) ?? new Date(0)),
-                        'hover:bg-slate-100 dark:hover:bg-slate-800': !inDraftRange(day),
-                    }" @click="chooseDay(day)" @keydown="handleDayKey($event, day)">
-                        {{ format(day, 'd') }}
-                    </button>
-                </div>
-                <p class="mt-3 text-xs text-slate-500">{{ selectingEnd ? 'Seleccione la fecha final.' : 'Seleccione la fecha inicial.' }}</p>
             </div>
         </div>
+        </Teleport>
     </div>
 </template>
 

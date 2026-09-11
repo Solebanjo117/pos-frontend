@@ -8,13 +8,12 @@ import {
     Trash2,
     CheckCircle,
     XCircle,
-    Clock,
-    ShoppingCart,
-    DollarSign,
+    GripVertical,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { useReorderableColumns } from '@/composables/useReorderableColumns';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { SalesOrderStatus } from '@/types/sales-order';
@@ -36,6 +35,36 @@ const {
 } = useSalesOrders();
 
 const { currentWarehouseId, initWarehouse } = usePosSettings();
+
+const defaultColumns = [
+    { key: 'number', label: 'N° orden' },
+    { key: 'customer', label: 'Cliente' },
+    { key: 'date', label: 'Fecha' },
+    { key: 'total', label: 'Total' },
+    { key: 'status', label: 'Estado' },
+    { key: 'payment', label: 'Pago' },
+    { key: 'actions', label: 'Acciones' },
+] as const;
+const { columns, draggedColumnKey, moveColumn, dropColumn } =
+    useReorderableColumns(defaultColumns, 'hermex.sales-orders.columns');
+const metrics = computed(() => {
+    const stats = statistics.value;
+    if (!stats) return [];
+    const money = (value: number) =>
+        new Intl.NumberFormat('es-PA', {
+            style: 'currency',
+            currency: 'USD',
+        }).format(Number(value));
+    return [
+        { label: 'Total órdenes', value: stats.total_orders },
+        { label: 'Borrador', value: stats.draft_orders },
+        { label: 'Pendiente', value: stats.pending_orders },
+        { label: 'Completado', value: stats.completed_orders },
+        { label: 'Ventas totales', value: money(stats.total_sales) },
+        { label: 'Ventas cobradas', value: money(stats.collected_sales) },
+        { label: 'Créditos por cobrar', value: money(stats.credit_receivable) },
+    ];
+});
 
 // Filters
 const filters = ref({
@@ -60,8 +89,6 @@ const statusOptions = [
     { value: 'cancelled', label: 'Cancelada' },
 ];
 
-const quickStatusOptions = statusOptions.filter((option) => option.value);
-
 const paymentStatusOptions = [
     { value: '', label: 'Todos los pagos' },
     { value: 'pending', label: 'Pendiente' },
@@ -69,10 +96,6 @@ const paymentStatusOptions = [
     { value: 'paid', label: 'Pagado' },
     { value: 'refunded', label: 'Reembolsado' },
 ];
-
-const quickPaymentStatusOptions = paymentStatusOptions.filter(
-    (option) => option.value,
-);
 
 const paymentStatusLabels: Record<string, string> = {
     pending: 'Pendiente',
@@ -254,6 +277,11 @@ const loadSalesOrders = async () => {
         warehouse_id: currentWarehouseId.value || undefined,
     };
     await fetchSalesOrders(filterParams as any);
+    await fetchStatistics({
+        date_from: filterParams.date_from,
+        date_to: filterParams.date_to,
+        warehouse_id: filterParams.warehouse_id,
+    });
 };
 
 // Handle actions
@@ -289,16 +317,10 @@ const handleDelete = async (id: number) => {
 onMounted(async () => {
     await initWarehouse();
     await loadSalesOrders();
-    await fetchStatistics({
-        warehouse_id: currentWarehouseId.value || undefined,
-    });
 });
 
 watch(currentWarehouseId, async () => {
     await loadSalesOrders();
-    await fetchStatistics({
-        warehouse_id: currentWarehouseId.value || undefined,
-    });
 });
 </script>
 
@@ -328,116 +350,19 @@ watch(currentWarehouseId, async () => {
             </div>
         </div>
 
-        <!-- Statistics Cards -->
-        <div v-if="statistics" class="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div
+            v-if="statistics"
+            class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7"
+        >
             <div
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
+                v-for="metric in metrics"
+                :key="metric.label"
+                class="rounded-lg border bg-card p-3"
             >
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p
-                            class="text-sm font-medium text-gray-600 dark:text-gray-400"
-                        >
-                            Total Órdenes
-                        </p>
-                        <p
-                            class="mt-1 text-xl font-semibold text-gray-900 dark:text-white"
-                        >
-                            {{ statistics.total_orders }}
-                        </p>
-                    </div>
-                    <div class="rounded-md bg-blue-100 p-2 dark:bg-blue-900/30">
-                        <ShoppingCart
-                            class="text-blue-600 dark:text-blue-400"
-                            :size="20"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <div
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
-            >
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p
-                            class="text-sm font-medium text-gray-600 dark:text-gray-400"
-                        >
-                            Ventas Totales
-                        </p>
-                        <p
-                            class="mt-1 text-xl font-semibold text-gray-900 dark:text-white"
-                        >
-                            ${{
-                                statistics.total_sales.toLocaleString('es-MX', {
-                                    minimumFractionDigits: 2,
-                                })
-                            }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-md bg-green-100 p-2 dark:bg-green-900/30"
-                    >
-                        <DollarSign
-                            class="text-green-600 dark:text-green-400"
-                            :size="20"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <div
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
-            >
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p
-                            class="text-sm font-medium text-gray-600 dark:text-gray-400"
-                        >
-                            Pendientes
-                        </p>
-                        <p
-                            class="mt-1 text-xl font-semibold text-gray-900 dark:text-white"
-                        >
-                            {{ statistics.pending_orders }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-md bg-yellow-100 p-2 dark:bg-yellow-900/30"
-                    >
-                        <Clock
-                            class="text-yellow-600 dark:text-yellow-400"
-                            :size="20"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <div
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
-            >
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p
-                            class="text-sm font-medium text-gray-600 dark:text-gray-400"
-                        >
-                            Completadas
-                        </p>
-                        <p
-                            class="mt-1 text-xl font-semibold text-gray-900 dark:text-white"
-                        >
-                            {{ statistics.completed_orders }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-md bg-indigo-100 p-2 dark:bg-indigo-900/30"
-                    >
-                        <CheckCircle
-                            class="text-indigo-600 dark:text-indigo-400"
-                            :size="20"
-                        />
-                    </div>
-                </div>
+                <p class="text-xs text-muted-foreground">{{ metric.label }}</p>
+                <p class="mt-1 text-lg font-semibold tabular-nums">
+                    {{ metric.value }}
+                </p>
             </div>
         </div>
 
@@ -530,52 +455,9 @@ watch(currentWarehouseId, async () => {
             </div>
 
             <div
+                v-if="activeFilters.length"
                 class="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-border"
             >
-                <div class="flex flex-wrap items-center gap-2">
-                    <span
-                        class="text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                        >Estado</span
-                    >
-                    <button
-                        v-for="option in quickStatusOptions"
-                        :key="option.value"
-                        type="button"
-                        :class="[
-                            'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                            filters.status === option.value
-                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-primary dark:bg-primary/10 dark:text-primary'
-                                : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50',
-                        ]"
-                        @click="
-                            filterByStatus(option.value as SalesOrderStatus)
-                        "
-                    >
-                        {{ option.label }}
-                    </button>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2">
-                    <span
-                        class="text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
-                        >Pago</span
-                    >
-                    <button
-                        v-for="option in quickPaymentStatusOptions"
-                        :key="option.value"
-                        type="button"
-                        :class="[
-                            'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                            filters.payment_status === option.value
-                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-primary dark:bg-primary/10 dark:text-primary'
-                                : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-border dark:text-gray-300 dark:hover:bg-muted/50',
-                        ]"
-                        @click="filterByPaymentStatus(option.value)"
-                    >
-                        {{ option.label }}
-                    </button>
-                </div>
-
                 <div
                     v-if="activeFilters.length"
                     class="flex flex-wrap items-center gap-2"
@@ -612,42 +494,35 @@ watch(currentWarehouseId, async () => {
                 <table
                     class="min-w-full divide-y divide-gray-200 dark:divide-border"
                 >
-                    <thead class="bg-gray-50 dark:bg-background">
+                    <thead class="bg-gray-50 dark:bg-muted/50">
                         <tr>
                             <th
-                                class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                                v-for="(column, index) in columns"
+                                :key="column.key"
+                                draggable="true"
+                                class="px-4 py-3 text-left text-xs font-medium text-muted-foreground"
+                                @dragstart="draggedColumnKey = column.key"
+                                @dragover.prevent
+                                @drop.prevent="dropColumn(column.key)"
+                                @dragend="draggedColumnKey = null"
                             >
-                                N Orden
-                            </th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                            >
-                                Cliente
-                            </th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                            >
-                                Fecha
-                            </th>
-                            <th
-                                class="px-4 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                            >
-                                Total
-                            </th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                            >
-                                Estado
-                            </th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                            >
-                                Pago
-                            </th>
-                            <th
-                                class="px-4 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
-                            >
-                                Acciones
+                                <button
+                                    type="button"
+                                    class="flex items-center gap-1 whitespace-nowrap"
+                                    :aria-label="
+                                        column.label +
+                                        ': mover con Alt y flechas'
+                                    "
+                                    @keydown.alt.left.prevent="
+                                        moveColumn(index, index - 1)
+                                    "
+                                    @keydown.alt.right.prevent="
+                                        moveColumn(index, index + 1)
+                                    "
+                                >
+                                    <GripVertical :size="12" />
+                                    {{ column.label }}
+                                </button>
                             </th>
                         </tr>
                     </thead>
@@ -676,152 +551,180 @@ watch(currentWarehouseId, async () => {
                             :key="order.id"
                             class="hover:bg-gray-50 dark:hover:bg-muted/50"
                         >
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <Link
-                                    :href="`/sales-orders/${order.id}`"
-                                    class="text-sm font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-primary"
-                                    title="Ver venta"
-                                >
-                                    {{ order.order_number }}
-                                </Link>
-                            </td>
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <button
-                                    v-if="order.customer_id"
-                                    type="button"
-                                    class="text-left text-sm text-gray-900 underline-offset-2 hover:text-indigo-600 hover:underline dark:text-white dark:hover:text-primary"
-                                    title="Filtrar por cliente"
-                                    @click="filterByCustomer(order.customer_id)"
-                                >
-                                    {{ order.customer_name || 'Sin cliente' }}
-                                </button>
-                                <div
-                                    v-else
-                                    class="text-sm text-gray-900 dark:text-white"
-                                >
-                                    Sin cliente
-                                </div>
-                                <div
-                                    v-if="order.customer_code"
-                                    class="text-xs text-gray-500 dark:text-gray-400"
-                                >
-                                    {{ order.customer_code }}
-                                </div>
-                            </td>
-                            <td
-                                class="px-4 py-3 text-sm whitespace-nowrap text-gray-900 dark:text-white"
+                            <template
+                                v-for="column in columns"
+                                :key="column.key"
                             >
-                                {{
-                                    new Date(order.date).toLocaleDateString(
-                                        'es-MX',
-                                    )
-                                }}
-                            </td>
-                            <td class="px-4 py-3 text-right whitespace-nowrap">
-                                <div
-                                    class="text-sm font-semibold text-gray-900 dark:text-white"
-                                >
-                                    {{ order.formatted_total }}
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <button
-                                    type="button"
-                                    :class="[
-                                        'inline-flex rounded-full px-2 py-1 text-xs leading-5 font-semibold',
-                                        getStatusColor(order.status),
-                                    ]"
-                                    title="Filtrar por estado"
-                                    @click="filterByStatus(order.status)"
-                                >
-                                    {{ order.status_label }}
-                                </button>
-                            </td>
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <button
-                                    type="button"
-                                    :class="[
-                                        'inline-flex rounded-full px-2 py-1 text-xs leading-5 font-semibold',
-                                        getPaymentStatusColor(
-                                            order.payment_status,
-                                        ),
-                                    ]"
-                                    title="Filtrar por estado de pago"
-                                    @click="
-                                        filterByPaymentStatus(
-                                            order.payment_status,
-                                        )
-                                    "
-                                >
-                                    {{
-                                        paymentStatusLabels[
-                                            order.payment_status
-                                        ] || order.payment_status
-                                    }}
-                                </button>
-                            </td>
-                            <td
-                                class="px-4 py-3 text-right text-sm font-medium whitespace-nowrap"
-                            >
-                                <div
-                                    class="flex items-center justify-end gap-2"
+                                <td
+                                    v-if="column.key === 'number'"
+                                    class="px-4 py-3 whitespace-nowrap"
                                 >
                                     <Link
                                         :href="`/sales-orders/${order.id}`"
-                                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
-                                        title="Ver"
+                                        class="text-sm font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-primary"
+                                        title="Ver venta"
                                     >
-                                        <Eye :size="18" />
+                                        {{ order.order_number }}
                                     </Link>
-                                    <Link
-                                        v-if="
-                                            order.status === 'draft' ||
-                                            order.status === 'pending'
-                                        "
-                                        :href="`/sales-orders/${order.id}/edit`"
-                                        class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:text-primary dark:hover:text-blue-300"
-                                        title="Editar"
-                                    >
-                                        <Edit :size="18" />
-                                    </Link>
+                                </td>
+                                <td
+                                    v-if="column.key === 'customer'"
+                                    class="px-4 py-3 whitespace-nowrap"
+                                >
                                     <button
-                                        v-if="
-                                            order.status === 'draft' ||
-                                            order.status === 'pending'
+                                        v-if="order.customer_id"
+                                        type="button"
+                                        class="text-left text-sm text-gray-900 underline-offset-2 hover:text-indigo-600 hover:underline dark:text-white dark:hover:text-primary"
+                                        title="Filtrar por cliente"
+                                        @click="
+                                            filterByCustomer(order.customer_id)
                                         "
-                                        @click="handleConfirm(order.id)"
-                                        class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                                        title="Confirmar"
                                     >
-                                        <CheckCircle :size="18" />
+                                        {{
+                                            order.customer_name || 'Sin cliente'
+                                        }}
                                     </button>
-                                    <span
-                                        v-if="
-                                            hasDestructiveActions(order.status)
-                                        "
-                                        class="mx-1 h-5 border-l border-gray-200 dark:border-border"
-                                    ></span>
+                                    <div
+                                        v-else
+                                        class="text-sm text-gray-900 dark:text-white"
+                                    >
+                                        Sin cliente
+                                    </div>
+                                    <div
+                                        v-if="order.customer_code"
+                                        class="text-xs text-gray-500 dark:text-gray-400"
+                                    >
+                                        {{ order.customer_code }}
+                                    </div>
+                                </td>
+                                <td
+                                    v-if="column.key === 'date'"
+                                    class="px-4 py-3 text-sm whitespace-nowrap text-gray-900 dark:text-white"
+                                >
+                                    {{
+                                        new Date(order.date).toLocaleDateString(
+                                            'es-MX',
+                                        )
+                                    }}
+                                </td>
+                                <td
+                                    v-if="column.key === 'total'"
+                                    class="px-4 py-3 text-right whitespace-nowrap"
+                                >
+                                    <div
+                                        class="text-sm font-semibold text-gray-900 dark:text-white"
+                                    >
+                                        {{ order.formatted_total }}
+                                    </div>
+                                </td>
+                                <td
+                                    v-if="column.key === 'status'"
+                                    class="px-4 py-3 whitespace-nowrap"
+                                >
                                     <button
-                                        v-if="order.status !== 'cancelled'"
-                                        @click="handleCancel(order.id)"
-                                        class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                                        title="Abrir anulacion auditada"
+                                        type="button"
+                                        :class="[
+                                            'inline-flex rounded-full px-2 py-1 text-xs leading-5 font-semibold',
+                                            getStatusColor(order.status),
+                                        ]"
+                                        title="Filtrar por estado"
+                                        @click="filterByStatus(order.status)"
                                     >
-                                        <XCircle :size="18" />
+                                        {{ order.status_label }}
                                     </button>
+                                </td>
+                                <td
+                                    v-if="column.key === 'payment'"
+                                    class="px-4 py-3 whitespace-nowrap"
+                                >
                                     <button
-                                        v-if="
-                                            order.status === 'draft' ||
-                                            order.status === 'cancelled'
+                                        type="button"
+                                        :class="[
+                                            'inline-flex rounded-full px-2 py-1 text-xs leading-5 font-semibold',
+                                            getPaymentStatusColor(
+                                                order.payment_status,
+                                            ),
+                                        ]"
+                                        title="Filtrar por estado de pago"
+                                        @click="
+                                            filterByPaymentStatus(
+                                                order.payment_status,
+                                            )
                                         "
-                                        @click="handleDelete(order.id)"
-                                        class="text-gray-500 hover:text-red-700 dark:text-gray-400 dark:hover:text-red-300"
-                                        title="Eliminar"
                                     >
-                                        <Trash2 :size="18" />
+                                        {{
+                                            paymentStatusLabels[
+                                                order.payment_status
+                                            ] || order.payment_status
+                                        }}
                                     </button>
-                                </div>
-                            </td>
+                                </td>
+                                <td
+                                    v-if="column.key === 'actions'"
+                                    class="px-4 py-3 text-right text-sm font-medium whitespace-nowrap"
+                                >
+                                    <div
+                                        class="flex items-center justify-end gap-2"
+                                    >
+                                        <Link
+                                            :href="`/sales-orders/${order.id}`"
+                                            class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
+                                            title="Ver"
+                                        >
+                                            <Eye :size="18" />
+                                        </Link>
+                                        <Link
+                                            v-if="
+                                                order.status === 'draft' ||
+                                                order.status === 'pending'
+                                            "
+                                            :href="`/sales-orders/${order.id}/edit`"
+                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:text-primary dark:hover:text-blue-300"
+                                            title="Editar"
+                                        >
+                                            <Edit :size="18" />
+                                        </Link>
+                                        <button
+                                            v-if="
+                                                order.status === 'draft' ||
+                                                order.status === 'pending'
+                                            "
+                                            @click="handleConfirm(order.id)"
+                                            class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                                            title="Confirmar"
+                                        >
+                                            <CheckCircle :size="18" />
+                                        </button>
+                                        <span
+                                            v-if="
+                                                hasDestructiveActions(
+                                                    order.status,
+                                                )
+                                            "
+                                            class="mx-1 h-5 border-l border-gray-200 dark:border-border"
+                                        ></span>
+                                        <button
+                                            v-if="order.status !== 'cancelled'"
+                                            @click="handleCancel(order.id)"
+                                            class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                            title="Abrir anulacion auditada"
+                                        >
+                                            <XCircle :size="18" />
+                                        </button>
+                                        <button
+                                            v-if="
+                                                order.status === 'draft' ||
+                                                order.status === 'cancelled'
+                                            "
+                                            @click="handleDelete(order.id)"
+                                            class="text-gray-500 hover:text-red-700 dark:text-gray-400 dark:hover:text-red-300"
+                                            title="Eliminar"
+                                        >
+                                            <Trash2 :size="18" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </template>
                         </tr>
                     </tbody>
                 </table>

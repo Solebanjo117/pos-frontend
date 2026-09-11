@@ -40,6 +40,14 @@ Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/cash', function
     return Inertia::render('Cash/Index');
 })->name('cash.index');
 
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/cash/movements', function () {
+    return Inertia::render('Cash/Movements');
+})->name('cash.movements');
+
+Route::middleware(['auth', 'role:admin,manager'])->get('/cash/expenses-funding', function () {
+    return Inertia::render('Cash/ExpensesFunding');
+})->name('cash.expenses-funding');
+
 Route::middleware(['auth'])->get('/queues', function () {
     return Inertia::render('Queues/Index');
 })->name('queues.index');

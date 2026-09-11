@@ -4,6 +4,7 @@ import type { ModuleSectionDefinition } from '@/navigation/modules';
 
 defineProps<{
     section: ModuleSectionDefinition;
+    actionCounts?: Record<string, number>;
 }>();
 </script>
 
@@ -25,6 +26,7 @@ defineProps<{
                 v-for="action in section.actions"
                 :key="action.href"
                 :action="action"
+                :count="actionCounts?.[action.href]"
             />
         </div>
     </section>

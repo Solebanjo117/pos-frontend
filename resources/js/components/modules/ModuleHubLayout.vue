@@ -12,6 +12,7 @@ const props = withDefaults(
     defineProps<{
         moduleId: ModuleId;
         showSections?: boolean;
+        actionCounts?: Record<string, number>;
     }>(),
     {
         showSections: true,
@@ -60,6 +61,7 @@ const description = computed(
                     v-for="section in moduleDefinition.sections"
                     :key="section.title"
                     :section="section"
+                    :action-counts="actionCounts"
                 />
             </div>
 

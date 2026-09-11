@@ -14,7 +14,6 @@ import {
 import { ref, computed } from 'vue';
 import draggable from 'vuedraggable';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
-import PricingFormula from '@/components/Products/PricingFormula.vue';
 import { formatCurrency } from '@/utils/formatters';
 
 const props = defineProps<{
@@ -27,17 +26,17 @@ const props = defineProps<{
     canEditSeller?: boolean;
     canEditCommercial?: boolean;
     canManagePurchases?: boolean;
+    quoteMode?: boolean;
 }>();
 
 const emit = defineEmits([
     'update-quantity',
     'remove',
-    'update-item-tax',
     'toggle-item-tax-exempt',
     'update-item-seller',
     'update-item-notes',
     'update-item-price',
-    'update-item-discount',
+    'update-item-discount-amount',
     'view-details',
     'reorder',
     'reorder-success',
@@ -109,49 +108,22 @@ const isAtStockLimit = (item: any): boolean => {
     return item.quantity >= stock;
 };
 
+const formatTaxLabel = (taxPercent: unknown): string => {
+    const parsedTaxPercent = Number(taxPercent);
+
+    if (!Number.isFinite(parsedTaxPercent) || parsedTaxPercent <= 0) {
+        return 'Exento';
+    }
+
+    return `${parsedTaxPercent.toLocaleString('es-PA', {
+        maximumFractionDigits: 2,
+    })}% ITBMS`;
+};
+
 const getQtyInputMax = (item: any): number | undefined => {
     const stock = getStockLimit(item);
     if (stock === null || stock <= 0) return undefined;
     return stock;
-};
-
-// Get cost for a cart item from the products catalog
-const getItemCost = (item: any): number => {
-    if (!props.products) return 0;
-    const product = props.products.find((p: any) => p.id === item.product_id);
-    if (!product) return 0;
-    if (item.variant_id && product.variants) {
-        const variant = product.variants.find(
-            (v: any) => v.id === item.variant_id,
-        );
-        const activeInventory =
-            variant?.inventory?.find(
-                (inventory: any) =>
-                    props.warehouseId &&
-                    Number(
-                        inventory.warehouse?.id ?? inventory.warehouse_id,
-                    ) === Number(props.warehouseId),
-            ) ??
-            variant?.inventory?.find(
-                (inventory: any) =>
-                    Number(
-                        inventory.current_cost ??
-                            inventory.fifo_cost_current ??
-                            0,
-                    ) > 0,
-            );
-        if (
-            activeInventory?.current_cost ||
-            activeInventory?.fifo_cost_current
-        ) {
-            return Number(
-                activeInventory.current_cost ??
-                    activeInventory.fifo_cost_current,
-            );
-        }
-        if (variant?.pricing?.cost) return Number(variant.pricing.cost);
-    }
-    return Number(product.pricing?.cost ?? 0);
 };
 
 // ── Role-based access control ──────────────────────────────────────────────────
@@ -347,7 +319,7 @@ const handlePurchaseSuccess = (result: {
                                         <button
                                             v-if="
                                                 props.canEditCommercial !==
-                                                false
+                                                    false && !props.returnMode
                                             "
                                             @click="
                                                 emit(
@@ -459,7 +431,7 @@ const handlePurchaseSuccess = (result: {
                                     <div
                                         class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
                                     >
-                                        <!-- Price Override con Fórmula — solo Admin/Manager -->
+                                        <!-- Price Override — solo Admin/Manager -->
                                         <div class="space-y-2 lg:col-span-1">
                                             <label
                                                 class="block flex items-center gap-1 text-xs font-semibold tracking-wider text-gray-500 uppercase"
@@ -470,23 +442,37 @@ const handlePurchaseSuccess = (result: {
 
                                             <!-- Editable: admin / manager -->
                                             <template v-if="canEditPrice">
-                                                <PricingFormula
-                                                    :cost="getItemCost(item)"
-                                                    :tax-rate="0"
-                                                    :model-value="''"
-                                                    :price="item.product_price"
-                                                    @update:price="
-                                                        (p) =>
+                                                <div
+                                                    class="flex overflow-hidden rounded-lg border border-gray-300 bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500 dark:border-border dark:bg-card"
+                                                >
+                                                    <span
+                                                        class="flex items-center border-r border-gray-200 px-3 text-sm text-gray-500 dark:border-border dark:text-gray-400"
+                                                        >$</span
+                                                    >
+                                                    <input
+                                                        type="number"
+                                                        data-testid="unit-price"
+                                                        min="0"
+                                                        step="0.01"
+                                                        :value="
+                                                            Number(
+                                                                item.product_price,
+                                                            ).toFixed(2)
+                                                        "
+                                                        class="min-w-0 flex-1 bg-transparent px-3 py-2 text-right text-sm text-gray-900 focus:outline-none dark:text-white"
+                                                        @change.stop="
                                                             emit(
                                                                 'update-item-price',
                                                                 item.id,
-                                                                p,
+                                                                parseFloat(
+                                                                    (
+                                                                        $event.target as HTMLInputElement
+                                                                    ).value,
+                                                                ),
                                                             )
-                                                    "
-                                                    @update:model-value="
-                                                        () => {}
-                                                    "
-                                                />
+                                                        "
+                                                    />
+                                                </div>
                                                 <p
                                                     class="text-xs text-gray-400"
                                                 >
@@ -533,6 +519,8 @@ const handlePurchaseSuccess = (result: {
                                                 class="flex items-center gap-3"
                                             >
                                                 <button
+                                                    type="button"
+                                                    data-testid="item-tax-toggle"
                                                     @click.stop="
                                                         emit(
                                                             'toggle-item-tax-exempt',
@@ -556,45 +544,18 @@ const handlePurchaseSuccess = (result: {
                                                     />
                                                 </button>
                                                 <span
-                                                    class="text-sm text-gray-700"
+                                                    data-testid="item-tax-label"
+                                                    class="text-sm text-gray-700 dark:text-gray-300"
                                                 >
                                                     {{
-                                                        item.tax_percent > 0
-                                                            ? 'Con impuesto'
-                                                            : 'Exento'
+                                                        formatTaxLabel(
+                                                            item.tax_percent,
+                                                        )
                                                     }}
                                                 </span>
                                             </div>
-                                            <!-- Editable tax percent -->
                                             <div
-                                                v-if="item.tax_percent > 0"
-                                                class="mt-1 flex items-center gap-2"
-                                            >
-                                                <input
-                                                    type="number"
-                                                    step="0.5"
-                                                    min="0"
-                                                    max="100"
-                                                    :value="item.tax_percent"
-                                                    @change.stop="
-                                                        emit(
-                                                            'update-item-tax',
-                                                            item.id,
-                                                            parseFloat(
-                                                                (
-                                                                    $event.target as HTMLInputElement
-                                                                ).value,
-                                                            ),
-                                                        )
-                                                    "
-                                                    class="w-20 rounded-lg border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-border dark:bg-card dark:text-white"
-                                                />
-                                                <span
-                                                    class="text-xs text-gray-500"
-                                                    >%</span
-                                                >
-                                            </div>
-                                            <div
+                                                data-testid="item-tax-amount"
                                                 class="mt-1 text-xs text-gray-400"
                                             >
                                                 Monto:
@@ -609,7 +570,7 @@ const handlePurchaseSuccess = (result: {
                                             </div>
                                         </div>
 
-                                        <!-- Discount percent -->
+                                        <!-- Discount -->
                                         <div
                                             v-if="
                                                 props.canEditCommercial !==
@@ -619,22 +580,28 @@ const handlePurchaseSuccess = (result: {
                                         >
                                             <label
                                                 class="block text-xs font-semibold tracking-wider text-gray-500 uppercase"
-                                                >Descuento (%)</label
+                                                >Descuento $</label
                                             >
                                             <div
                                                 class="flex items-center gap-2"
                                             >
                                                 <input
                                                     type="number"
-                                                    step="0.5"
+                                                    data-testid="discount-amount"
+                                                    step="0.01"
                                                     min="0"
-                                                    max="100"
+                                                    :max="
+                                                        Math.abs(
+                                                            item.quantity,
+                                                        ) * item.product_price
+                                                    "
                                                     :value="
-                                                        item.discount_percent
+                                                        item.discount_amount ??
+                                                        0
                                                     "
                                                     @change.stop="
                                                         emit(
-                                                            'update-item-discount',
+                                                            'update-item-discount-amount',
                                                             item.id,
                                                             parseFloat(
                                                                 (
@@ -647,7 +614,7 @@ const handlePurchaseSuccess = (result: {
                                                 />
                                             </div>
                                             <p class="text-xs text-gray-400">
-                                                Porcentaje de descuento para
+                                                Monto fijo de descuento para
                                                 esta fila
                                             </p>
                                         </div>
@@ -774,7 +741,15 @@ const handlePurchaseSuccess = (result: {
                                         </div>
 
                                         <!-- Summary mini-card -->
-                                        <div class="space-y-2">
+                                        <div
+                                            class="space-y-2"
+                                            data-testid="line-summary"
+                                            :class="
+                                                props.quoteMode
+                                                    ? 'lg:col-start-4'
+                                                    : ''
+                                            "
+                                        >
                                             <label
                                                 class="block text-xs font-semibold tracking-wider text-gray-500 uppercase"
                                                 >Resumen</label

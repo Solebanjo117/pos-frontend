@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     stopPolling: vi.fn(),
     openEntry: vi.fn(),
     completeEntry: vi.fn(),
+    cancelEntry: vi.fn(),
     removeSaleFromQueue: vi.fn(),
     loadQuoteAsSession: vi.fn(),
     apiGet: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock('@/composables/useCashierQueue', () => ({
         timeAgo: () => '14s',
         openEntry: mocks.openEntry,
         completeEntry: mocks.completeEntry,
+        cancelEntry: mocks.cancelEntry,
         removeSaleFromQueue: mocks.removeSaleFromQueue,
     }),
 }));
@@ -161,6 +163,7 @@ describe('CashierQueue sale table and POS handoff', () => {
         mocks.apiPost.mockResolvedValue({ data: { data: quote } });
         mocks.openEntry.mockResolvedValue(entry);
         mocks.removeSaleFromQueue.mockResolvedValue(undefined);
+        mocks.cancelEntry.mockResolvedValue(undefined);
     });
 
     it('renders Ver, Cobrar, Rastrear and Quitar in that order', async () => {
@@ -405,5 +408,41 @@ describe('CashierQueue sale table and POS handoff', () => {
 
         expect(mocks.loadQuoteAsSession).toHaveBeenCalledOnce();
         expect(mocks.visit).toHaveBeenCalledWith('/pos');
+    });
+
+    it('confirms a fixed cash request without editable payment fields', async () => {
+        const cashRequest = {
+            ...entry,
+            id: 22,
+            entry_type: 'cash_in_request',
+            fixed_cash_amount: true,
+            can_cancel: true,
+            source: {
+                id: 41,
+                document_number: 'CJ-41',
+                description: 'Agregar efectivo',
+                party: 'Ana',
+                amount: 25,
+                requested_by: { id: 5, name: 'Ana' },
+                category: null,
+            },
+        };
+        mocks.entries.value = [cashRequest];
+        mocks.openEntry.mockResolvedValue(cashRequest);
+        mocks.completeEntry.mockResolvedValue(cashRequest);
+        const wrapper = mountQueue();
+        await flushPromises();
+
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text().includes('Confirmar movimiento'))!
+            .trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('Monto fijo');
+        expect(wrapper.find('input[type="number"]').exists()).toBe(false);
+
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+        expect(mocks.completeEntry).toHaveBeenCalledWith(22, {});
     });
 });

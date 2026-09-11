@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { Trash2, Save, Lock, CreditCard, FileText } from 'lucide-vue-next';
+import {
+    Trash2,
+    Save,
+    Lock,
+    CreditCard,
+    FileText,
+    Warehouse,
+} from 'lucide-vue-next';
 import { computed } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 
@@ -11,6 +18,7 @@ const props = defineProps<{
     canClear?: boolean;
     cashierMode?: boolean;
     savingQuote?: boolean;
+    quoteDestinationLoading?: 'send-to-deposit' | 'send-to-cashier' | null;
 }>();
 
 const emit = defineEmits([
@@ -19,6 +27,8 @@ const emit = defineEmits([
     'save-quote-changes',
     'open-cash-register',
     'open-payment-modal',
+    'send-quote-to-deposit',
+    'send-quote-to-cashier',
 ]);
 
 const { hasRole } = useAuth();
@@ -29,8 +39,42 @@ const canManageCashRegister = computed(() =>
 
 <template>
     <div class="flex flex-1 flex-col justify-end gap-3">
+        <div v-if="props.quoteMode" class="grid grid-cols-2 gap-2">
+            <button
+                type="button"
+                data-testid="quote-send-deposit"
+                :disabled="!!props.quoteDestinationLoading"
+                class="flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-500/30 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+                @click="emit('send-quote-to-deposit')"
+            >
+                <Warehouse class="h-4 w-4" />
+                {{
+                    props.quoteDestinationLoading === 'send-to-deposit'
+                        ? 'Enviando…'
+                        : 'Depósito'
+                }}
+            </button>
+            <button
+                type="button"
+                data-testid="quote-send-cashier"
+                :disabled="!!props.quoteDestinationLoading"
+                class="flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                @click="emit('send-quote-to-cashier')"
+            >
+                <CreditCard class="h-4 w-4" />
+                {{
+                    props.quoteDestinationLoading === 'send-to-cashier'
+                        ? 'Enviando…'
+                        : 'Caja'
+                }}
+            </button>
+        </div>
+
         <!-- Top Actions -->
-        <div v-if="!props.cashierMode" class="grid grid-cols-2 gap-2">
+        <div
+            v-if="!props.quoteMode && !props.cashierMode"
+            class="grid grid-cols-2 gap-2"
+        >
             <button
                 v-if="props.canClear !== false"
                 @click="emit('clear')"

@@ -17,6 +17,7 @@ const emit = defineEmits<{
             unit_price: number;
             tax_percent: number;
             discount_percent: number;
+            discount_amount?: number;
             notes?: string;
         },
     ];
@@ -30,6 +31,7 @@ const form = reactive({
     unit_price: 0,
     tax_percent: props.defaultTaxRate ?? storeDefaultTaxRate(),
     discount_percent: 0,
+    discount_amount: 0,
     notes: '',
 });
 
@@ -43,6 +45,7 @@ const resetForm = () => {
     form.unit_price = 0;
     form.tax_percent = props.defaultTaxRate ?? storeDefaultTaxRate();
     form.discount_percent = 0;
+    form.discount_amount = 0;
     form.notes = '';
     error.value = null;
     submitted.value = false;
@@ -76,6 +79,13 @@ const handleSubmit = () => {
         return;
     }
 
+    const grossSubtotal = Number(form.quantity) * Number(form.unit_price);
+    if (Number(form.discount_amount) > grossSubtotal) {
+        error.value =
+            'El descuento no puede superar el importe bruto de la línea.';
+        return;
+    }
+
     submitted.value = true;
     emit('submit', {
         custom_description: form.custom_description.trim(),
@@ -87,6 +97,7 @@ const handleSubmit = () => {
             0,
             Math.min(100, Number(form.discount_percent) || 0),
         ),
+        discount_amount: Math.max(0, Number(form.discount_amount) || 0),
         notes: form.notes.trim() || undefined,
     });
 };
@@ -189,13 +200,13 @@ const handleSubmit = () => {
                     <div class="md:col-span-2">
                         <label
                             class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >Descuento (%)</label
+                            >Descuento $</label
                         >
                         <input
-                            v-model.number="form.discount_percent"
+                            v-model.number="form.discount_amount"
                             type="number"
                             min="0"
-                            max="100"
+                            :max="form.quantity * form.unit_price"
                             step="0.01"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
                         />

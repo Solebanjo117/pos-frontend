@@ -1,21 +1,10 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
-import { Search } from 'lucide-vue-next';
-import { ref, computed, watch, nextTick } from 'vue';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
+import { FileText, Search } from 'lucide-vue-next';
+import { ref, watch, nextTick } from 'vue';
 import apiClient from '@/services/api/client';
 import { formatCurrency } from '@/utils/formatters';
 
-interface Category {
-    id: number;
-    name: string;
-}
-interface Brand {
-    id: number;
-    name: string;
-}
 interface Product {
     id: number;
     name: string;
@@ -30,8 +19,6 @@ interface Product {
 }
 
 const props = defineProps<{
-    categories?: Category[];
-    brands?: Brand[];
     warehouseId?: number | null;
     disabled?: boolean;
 }>();
@@ -39,36 +26,17 @@ const props = defineProps<{
 const emit = defineEmits<{
     'product-selected': [product: Product];
     'product-needs-variant': [product: Product];
-    'open-full-search': [
-        filters?: { query: string; category_id?: number; brand_id?: number },
-    ];
+    'open-full-search': [filters?: { query: string }];
+    'add-custom-line': [];
 }>();
 
 // State
 const searchQuery = ref('');
-const selectedCategoryId = ref<number | null>(null);
-const selectedBrandId = ref<number | null>(null);
 const searchResults = ref<Product[]>([]);
 const isSearching = ref(false);
 const showDropdown = ref(false);
 const focusedIndex = ref(-1);
 const searchInput = ref<HTMLInputElement | null>(null);
-
-const categoryOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Todas las categorías' },
-    ...(props.categories ?? []).map((cat) => ({
-        value: cat.id,
-        label: cat.name,
-    })),
-]);
-
-const brandOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Todas las marcas' },
-    ...(props.brands ?? []).map((brand) => ({
-        value: brand.id,
-        label: brand.name,
-    })),
-]);
 
 // Search function
 const performSearch = async () => {
@@ -88,9 +56,6 @@ const performSearch = async () => {
             with: 'variants,pricing,brand,category,default_variant',
         };
 
-        if (selectedCategoryId.value)
-            params.category_id = selectedCategoryId.value;
-        if (selectedBrandId.value) params.brand_id = selectedBrandId.value;
         if (props.warehouseId) params.warehouse_id = props.warehouseId;
 
         const res = await apiClient.get('/products', { params });
@@ -110,12 +75,6 @@ const debouncedSearch = useDebounceFn(performSearch, 300);
 // Watchers
 watch(searchQuery, () => {
     debouncedSearch();
-});
-
-watch([selectedCategoryId, selectedBrandId], () => {
-    if (searchQuery.value.trim().length >= 2) {
-        debouncedSearch();
-    }
 });
 
 // Product selection
@@ -153,8 +112,6 @@ const onKeyDown = (e: KeyboardEvent) => {
 
         emit('open-full-search', {
             query: searchQuery.value,
-            category_id: selectedCategoryId.value ?? undefined,
-            brand_id: selectedBrandId.value ?? undefined,
         });
         return;
     }
@@ -226,8 +183,8 @@ defineExpose({ focusSearch });
         @click.outside="handleClickOutside"
     >
         <div class="grid grid-cols-12 gap-3">
-            <!-- Search Input (col-6) -->
-            <div class="relative col-span-6">
+            <!-- Search Input -->
+            <div class="relative col-span-9">
                 <div class="relative">
                     <Search
                         class="pointer-events-none absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 text-gray-400"
@@ -366,8 +323,6 @@ defineExpose({ focusSearch });
                         @click="
                             emit('open-full-search', {
                                 query: searchQuery,
-                                category_id: selectedCategoryId ?? undefined,
-                                brand_id: selectedBrandId ?? undefined,
                             })
                         "
                         class="cursor-pointer border-t border-gray-200 px-4 py-3 text-center text-sm font-medium text-blue-600 hover:bg-blue-50 dark:border-border dark:text-blue-400 dark:hover:bg-blue-900/20"
@@ -377,25 +332,15 @@ defineExpose({ focusSearch });
                 </div>
             </div>
 
-            <!-- Category Filter (col-3) -->
-            <div class="col-span-3">
-                <SearchableSelect
-                    v-model="selectedCategoryId"
-                    :options="categoryOptions"
-                    :disabled="disabled"
-                    placeholder="Todas las categorías"
-                />
-            </div>
-
-            <!-- Brand Filter (col-3) -->
-            <div class="col-span-3">
-                <SearchableSelect
-                    v-model="selectedBrandId"
-                    :options="brandOptions"
-                    :disabled="disabled"
-                    placeholder="Todas las marcas"
-                />
-            </div>
+            <button
+                type="button"
+                data-testid="quote-custom-line"
+                class="col-span-3 inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 focus:ring-2 focus:ring-amber-500 focus:outline-none dark:border-amber-600/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                @click="emit('add-custom-line')"
+            >
+                <FileText class="h-4 w-4" />
+                Nueva miscelánea
+            </button>
         </div>
     </div>
 </template>

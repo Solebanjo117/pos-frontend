@@ -141,6 +141,7 @@ describe('POS quick flow modals', () => {
         expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
             custom_description: 'Instalación',
             quantity: 2,
+            discount_amount: 0,
         });
     });
 

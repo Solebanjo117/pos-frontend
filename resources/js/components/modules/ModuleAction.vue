@@ -5,6 +5,7 @@ import type { ModuleActionDefinition } from '@/navigation/modules';
 
 defineProps<{
     action: ModuleActionDefinition;
+    count?: number;
 }>();
 </script>
 
@@ -20,8 +21,16 @@ defineProps<{
             <component :is="action.icon" class="size-4" />
         </span>
         <span class="min-w-0 flex-1">
-            <span class="block text-sm font-semibold text-foreground">
+            <span
+                class="flex items-baseline gap-2 text-sm font-semibold text-foreground"
+            >
                 {{ action.title }}
+                <span
+                    v-if="count !== undefined"
+                    class="text-muted-foreground tabular-nums"
+                >
+                    {{ count }}
+                </span>
             </span>
             <span class="mt-1 block text-xs leading-5 text-muted-foreground">
                 {{ action.description }}

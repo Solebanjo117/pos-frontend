@@ -57,6 +57,7 @@ import apiClient from '@/services/api/client';
 // POSFilterSidebar removed — filtering now handled inside ProductSearchModal via ProductFilters
 
 import { SalesOrderPaymentApiService } from '@/services/payments';
+import { SalesQuotesApiService } from '@/services/sales-quotes';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
 import { formatDuration } from '@/utils/formatters';
@@ -115,9 +116,8 @@ const {
     addToCart,
     addCustomLine,
     updateQuantity,
-    updateDiscount,
+    updateDiscountAmount,
     removeItem,
-    updateItemTax,
     toggleItemTaxExempt,
     updateItemSeller,
     updateItemNotes,
@@ -454,6 +454,7 @@ const handleAddCustomLine = (payload: {
     unit_price: number;
     tax_percent: number;
     discount_percent: number;
+    discount_amount?: number;
     notes?: string;
 }) => {
     addCustomLine({
@@ -463,6 +464,9 @@ const handleAddCustomLine = (payload: {
         unit_price: payload.unit_price,
         tax_percent: payload.tax_percent,
         discount_percent: payload.discount_percent,
+        ...(payload.discount_amount !== undefined
+            ? { discount_amount: payload.discount_amount }
+            : {}),
         seller_id: seller_id.value,
         warehouse_id: currentWarehouseId.value || undefined,
         notes: payload.notes,
@@ -632,6 +636,7 @@ async function loadOrderForReturn(orderId: number) {
             const quantity = -Math.abs(item.quantity); // Negative for returns
             const unitPrice = Number(item.unit_price);
             const discountPercent = Number(item.discount_percent ?? 0);
+            const discountAmount = Number(item.discount_amount ?? 0);
             const taxPercent = normalizeTaxPercent(item.tax_percent);
 
             // Use the actual values from the original order to avoid discrepancies
@@ -650,6 +655,7 @@ async function loadOrderForReturn(orderId: number) {
                 product_price: unitPrice,
                 quantity,
                 discount_percent: discountPercent,
+                discount_amount: discountAmount,
                 tax_percent: taxPercent,
                 default_tax_percent: taxPercent,
                 is_tax_overridden: false,
@@ -733,6 +739,7 @@ async function loadOrderForEdit(orderId: number) {
             const quantity = Math.abs(item.quantity);
             const unitPrice = Number(item.unit_price);
             const discountPercent = Number(item.discount_percent ?? 0);
+            const discountAmount = Number(item.discount_amount ?? 0);
             const taxPercent = normalizeTaxPercent(item.tax_percent);
             const subtotal = Number(item.subtotal ?? 0);
             const taxAmount = Number(item.tax_amount ?? 0);
@@ -768,6 +775,7 @@ async function loadOrderForEdit(orderId: number) {
                 product_price: unitPrice,
                 quantity,
                 discount_percent: discountPercent,
+                discount_amount: discountAmount,
                 tax_percent: taxPercent,
                 default_tax_percent: taxPercent,
                 is_tax_overridden: false,
@@ -1583,6 +1591,28 @@ const handleTicketClose = () => {
 
 // Save changes back to the originating SalesQuote (update it in place)
 const saveQuoteChangesLoading = ref(false);
+const quoteDestinationLoading = ref<
+    'send-to-deposit' | 'send-to-cashier' | null
+>(null);
+const quoteDraftIdempotencyKey = ref(createIdempotencyKey());
+
+const buildQuoteItems = () =>
+    cart.value.map((item: any) => ({
+        product_id: item.is_custom_line ? null : item.product_id,
+        variant_id: item.variant_id ?? null,
+        warehouse_id: item.warehouse_id ?? currentWarehouseId.value,
+        quantity: item.quantity,
+        unit_price: item.product_price,
+        discount_percent: item.discount_percent ?? 0,
+        ...(item.discount_amount !== undefined
+            ? { discount_amount: item.discount_amount }
+            : {}),
+        tax_percent: normalizeTaxPercent(item.tax_percent),
+        is_custom_line: !!item.is_custom_line,
+        custom_description: item.is_custom_line
+            ? item.custom_description || item.product_name
+            : null,
+    }));
 
 const handleSaveQuoteChanges = async () => {
     if (saveQuoteChangesLoading.value) return;
@@ -1603,19 +1633,7 @@ const handleSaveQuoteChanges = async () => {
     }
     saveQuoteChangesLoading.value = true;
     try {
-        const items = cart.value.map((item: any) => ({
-            product_id: item.is_custom_line ? null : item.product_id,
-            variant_id: item.variant_id ?? null,
-            warehouse_id: item.warehouse_id ?? currentWarehouseId.value,
-            quantity: item.quantity,
-            unit_price: item.product_price,
-            discount_percent: item.discount_percent ?? 0,
-            tax_percent: normalizeTaxPercent(item.tax_percent),
-            is_custom_line: !!item.is_custom_line,
-            custom_description: item.is_custom_line
-                ? item.custom_description || item.product_name
-                : null,
-        }));
+        const items = buildQuoteItems();
 
         const res = await apiClient.put(`/sales-quotes/${quoteId}`, {
             customer_id: customer_id.value ?? null,
@@ -1666,19 +1684,7 @@ const handleSaveQuote = async () => {
     }
     saveQuoteLoading.value = true;
     try {
-        const items = cart.value.map((item: any) => ({
-            product_id: item.is_custom_line ? null : item.product_id,
-            variant_id: item.variant_id ?? null,
-            warehouse_id: item.warehouse_id ?? currentWarehouseId.value,
-            quantity: item.quantity,
-            unit_price: item.product_price,
-            discount_percent: item.discount_percent ?? 0,
-            tax_percent: normalizeTaxPercent(item.tax_percent),
-            is_custom_line: !!item.is_custom_line,
-            custom_description: item.is_custom_line
-                ? item.custom_description || item.product_name
-                : null,
-        }));
+        const items = buildQuoteItems();
 
         const res = await apiClient.post('/sales-quotes/from-pos', {
             idempotency_key: createIdempotencyKey(),
@@ -1715,6 +1721,91 @@ const handleSaveQuote = async () => {
         alert(extractApiErrorMessage(e, 'Error al guardar la cotización'));
     } finally {
         saveQuoteLoading.value = false;
+    }
+};
+
+const persistQuoteForDestination = async (): Promise<{
+    id: number;
+    quote_number: string;
+}> => {
+    const payload = {
+        customer_id: customer_id.value ?? null,
+        customer_vehicle_id: customer_vehicle_id.value ?? null,
+        warehouse_id: currentWarehouseId.value ?? null,
+        items: buildQuoteItems(),
+    };
+    const existingQuoteId = activeSession.value?.source_quote_id;
+    const response = existingQuoteId
+        ? await apiClient.put(`/sales-quotes/${existingQuoteId}`, payload)
+        : await apiClient.post('/sales-quotes/from-pos', {
+              ...payload,
+              idempotency_key: quoteDraftIdempotencyKey.value,
+          });
+    const savedQuote = response.data?.data;
+
+    if (!savedQuote?.id) {
+        throw new Error('La API no devolvió la cotización guardada.');
+    }
+
+    activeSession.value.source_quote_id = Number(savedQuote.id);
+    activeSession.value.quote_number = String(savedQuote.quote_number ?? '');
+
+    return {
+        id: Number(savedQuote.id),
+        quote_number: String(savedQuote.quote_number ?? ''),
+    };
+};
+
+const handleQuoteDestination = async (
+    destination: 'send-to-deposit' | 'send-to-cashier',
+) => {
+    if (quoteDestinationLoading.value || cart.value.length === 0) {
+        if (cart.value.length === 0) {
+            alert('Agrega productos antes de enviar la cotización.');
+        }
+        return;
+    }
+
+    const stockIssues = getStockWarnings('quote');
+    const destinationMessage =
+        destination === 'send-to-deposit'
+            ? 'Se guardará la cotización y se creará una orden pendiente para bodega.'
+            : 'Se guardará la cotización y se agregará a la cola de Caja.';
+    const stockMessage = stockIssues.length
+        ? `\n\nAdvertencias de stock:\n- ${stockIssues.join('\n- ')}`
+        : '';
+
+    if (
+        !confirm(`${destinationMessage}${stockMessage}\n\n¿Deseas continuar?`)
+    ) {
+        return;
+    }
+
+    quoteDestinationLoading.value = destination;
+    let savedQuoteId: number | undefined;
+
+    try {
+        const savedQuote = await persistQuoteForDestination();
+        savedQuoteId = savedQuote.id;
+        await SalesQuotesApiService.transition(savedQuote.id, destination);
+        alert(
+            destination === 'send-to-deposit'
+                ? `Cotización ${savedQuote.quote_number} enviada a Depósito.`
+                : `Cotización ${savedQuote.quote_number} enviada a Caja.`,
+        );
+        router.visit(`/sales-quotes/${savedQuote.id}`);
+    } catch (exception: any) {
+        const message = extractApiErrorMessage(
+            exception,
+            'No se pudo completar el envío de la cotización.',
+        );
+        alert(
+            savedQuoteId
+                ? `La cotización quedó guardada, pero no fue enviada. ${message}`
+                : message,
+        );
+    } finally {
+        quoteDestinationLoading.value = null;
     }
 };
 
@@ -1775,17 +1866,7 @@ const clearCashActionQuery = (): void => {
 };
 
 const openRequestedCashMovement = (action: CashAction): void => {
-    cashMovementInitialType.value = action;
-    cashMovementError.value = null;
-
-    if (isSessionOpen.value) {
-        pendingCashAction.value = null;
-        showCashMovementModal.value = true;
-        return;
-    }
-
-    pendingCashAction.value = action;
-    forceShowOpenSessionModal.value = true;
+    router.visit(`/cash/movements?type=${action}`, { replace: true });
 };
 
 const closeOpenSessionModal = (): void => {
@@ -1998,6 +2079,7 @@ onMounted(async () => {
                     quantity: item.quantity,
                     unit_price: item.unit_price,
                     discount_percent: item.discount_percent,
+                    discount_amount: item.discount_amount,
                     tax_percent: normalizeTaxPercent(item.tax_percent),
                     subtotal: item.subtotal,
                     tax_amount: item.tax_amount,
@@ -2239,7 +2321,7 @@ onUnmounted(() => {
                                         (activeSession as any)?.source_quote_id
                                     "
                                 >
-                                    Cotización #{{
+                                    COTIZACIÓN #{{
                                         (activeSession as any)?.quote_number ||
                                         (activeSession as any)?.source_quote_id
                                     }}
@@ -2303,23 +2385,12 @@ onUnmounted(() => {
                 >
                     <POSInlineSearch
                         ref="inlineSearchRef"
-                        :categories="categories"
-                        :brands="brands"
                         :warehouse-id="currentWarehouseId"
                         @product-selected="handleInlineSelect"
                         @product-needs-variant="handleInlineVariantNeeded"
                         @open-full-search="handleOpenFullSearch"
+                        @add-custom-line="showCustomLineModal = true"
                     />
-                    <div class="mt-2 flex justify-end">
-                        <button
-                            type="button"
-                            class="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-600/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
-                            @click="showCustomLineModal = true"
-                        >
-                            <FileText class="h-3.5 w-3.5" />
-                            Linea miscelanea
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Multi-Cart Tabs (hide in return mode and edit mode) -->
@@ -2327,6 +2398,7 @@ onUnmounted(() => {
                     v-if="
                         allSessions.length > 0 &&
                         !isStrictCashier &&
+                        !props.quoteMode &&
                         !props.returnMode &&
                         !props.editMode
                     "
@@ -2466,6 +2538,7 @@ onUnmounted(() => {
                         :can-edit-seller="canEditSeller"
                         :can-edit-commercial="!isStrictCashier"
                         :can-manage-purchases="canManagePurchases"
+                        :quote-mode="props.quoteMode"
                         @update-quantity="
                             (idx, qty) => handleUpdateQuantity(idx, qty)
                         "
@@ -2473,7 +2546,6 @@ onUnmounted(() => {
                             (idx) =>
                                 !isStrictCashier && removeItem(cart[idx].id)
                         "
-                        @update-item-tax="(id, tax) => updateItemTax(id, tax)"
                         @toggle-item-tax-exempt="
                             (id) => toggleItemTaxExempt(id)
                         "
@@ -2491,9 +2563,10 @@ onUnmounted(() => {
                             (id, price) =>
                                 !isStrictCashier && updateItemPrice(id, price)
                         "
-                        @update-item-discount="
+                        @update-item-discount-amount="
                             (id, discount) =>
-                                !isStrictCashier && updateDiscount(id, discount)
+                                !isStrictCashier &&
+                                updateDiscountAmount(id, discount)
                         "
                         @view-details="
                             (productId) => openProductDetail(productId)
@@ -2768,9 +2841,16 @@ onUnmounted(() => {
                         :saving-quote="
                             saveQuoteLoading || saveQuoteChangesLoading
                         "
+                        :quote-destination-loading="quoteDestinationLoading"
                         @clear="handleClearCurrentCart"
                         @save-quote="handleSaveQuote"
                         @save-quote-changes="handleSaveQuoteChanges"
+                        @send-quote-to-deposit="
+                            handleQuoteDestination('send-to-deposit')
+                        "
+                        @send-quote-to-cashier="
+                            handleQuoteDestination('send-to-cashier')
+                        "
                         @open-cash-register="forceShowOpenSessionModal = true"
                         @open-payment-modal="openPaymentModal('cash')"
                     />
@@ -2814,13 +2894,7 @@ onUnmounted(() => {
             :edit-mode="props.editMode"
             :subtotal="cartSubtotal"
             :tax-amount="cartTax"
-            :discount-amount="
-                cart.reduce(
-                    (sum: number, item: any) =>
-                        sum + (item.discount || 0) * item.quantity,
-                    0,
-                )
-            "
+            :discount-amount="cartDiscount"
             :loading="loading"
             :error="error"
             @finish="handleUnifiedPaymentFinish"

@@ -1,4 +1,4 @@
-import { router, usePage } from '@inertiajs/vue3';
+import { usePage } from '@inertiajs/vue3';
 import { ref, computed, onMounted, watch } from 'vue';
 import { salesOrdersService } from '@/services/sales-orders';
 import type { Product } from '@/types/product';
@@ -56,13 +56,21 @@ type StockValidationContext = 'sale' | 'quote';
 interface PosCartSession {
     id: string;
     name: string;
+    is_quote_draft?: boolean;
     cart: CartItem[];
     customer_id?: number;
     customer_vehicle_id?: number;
     seller_id?: number; // set when session was loaded from a SalesQuote with an assigned seller
     notes: string;
+    internal_notes?: string;
     source_quote_id?: number; // set when session was loaded from a SalesQuote
     quote_number?: string;
+    quote_customer_name?: string; // nombre del cliente registrado en la cotización
+    quote_seller_name?: string; // vendedor que creó la cotización
+    quote_created_at?: string; // fecha de creación de la cotización (ISO 8601)
+    quote_notes?: string; // notas originales de la cotización
+    quote_status?: string;
+    quote_total?: number;
     sessionLogs: {
         action: string;
         metadata: Record<string, any>;
@@ -134,7 +142,11 @@ function loadSessionsFromStorage(): PosCartSession[] {
         const stored = localStorage.getItem(sessionsKey());
         const parsed = stored ? JSON.parse(stored) : null;
         if (Array.isArray(parsed) && parsed.length > 0) {
-            return normalizeFixedDiscounts(parsed);
+            const posSessions = parsed.filter(
+                (session) => !session.is_quote_draft,
+            );
+            if (posSessions.length > 0)
+                return normalizeFixedDiscounts(posSessions);
         }
     } catch {}
     // Default: one empty session
@@ -151,8 +163,16 @@ function loadActiveSessionId(): string {
 
 function persistSessions(sessions: PosCartSession[], activeId: string) {
     try {
-        localStorage.setItem(sessionsKey(), JSON.stringify(sessions));
-        localStorage.setItem(activeSessionKey(), activeId);
+        const posSessions = sessions.filter(
+            (session) => !session.is_quote_draft,
+        );
+        localStorage.setItem(sessionsKey(), JSON.stringify(posSessions));
+        localStorage.setItem(
+            activeSessionKey(),
+            posSessions.some((session) => session.id === activeId)
+                ? activeId
+                : posSessions[0]?.id || '',
+        );
     } catch {}
 }
 
@@ -241,6 +261,13 @@ const notes = computed({
     get: () => activeSession.value.notes,
     set: (val) => {
         activeSession.value.notes = val;
+    },
+});
+
+const internal_notes = computed({
+    get: () => activeSession.value.internal_notes ?? '',
+    set: (val: string) => {
+        activeSession.value.internal_notes = val;
     },
 });
 
@@ -375,9 +402,7 @@ export function usePOS() {
         return `${item.product_name}${sku}: disponible ${available}, solicitado ${requested}.`;
     };
 
-    const getStockWarnings = (
-        context: StockValidationContext = 'sale',
-    ): string[] => {
+    const getStockWarnings = (): string[] => {
         const issues: string[] = [];
 
         for (const item of cart.value) {
@@ -398,7 +423,7 @@ export function usePOS() {
     const validateCartStock = (
         context: StockValidationContext = 'sale',
     ): boolean => {
-        const issues = getStockWarnings(context);
+        const issues = getStockWarnings();
 
         if (issues.length > 0) {
             // No longer blocking — just set a non-blocking warning message
@@ -789,6 +814,38 @@ export function usePOS() {
         shippingMethod.value = 'pickup';
     };
 
+    /** Quote editing uses a temporary cart that never enters POS cart storage. */
+    const createQuoteEditorSession = () => {
+        const previousSessionId = activeSessionId.value;
+        const session = createEmptySession('Cotización');
+        session.is_quote_draft = true;
+        allSessions.value.push(session);
+        activeSessionId.value = session.id;
+        return { sessionId: session.id, previousSessionId };
+    };
+
+    const closeQuoteEditorSession = (
+        sessionId: string,
+        previousSessionId: string,
+    ) => {
+        allSessions.value = allSessions.value.filter(
+            (session) => session.id !== sessionId,
+        );
+        if (
+            allSessions.value.some(
+                (session) => session.id === previousSessionId,
+            )
+        ) {
+            activeSessionId.value = previousSessionId;
+        } else if (allSessions.value.length > 0) {
+            activeSessionId.value = allSessions.value[0].id;
+        } else {
+            const fresh = createEmptySession();
+            allSessions.value = [fresh];
+            activeSessionId.value = fresh.id;
+        }
+    };
+
     /** Switch to an existing cart tab */
     const switchCart = (sessionId: string) => {
         if (allSessions.value.find((s) => s.id === sessionId)) {
@@ -874,6 +931,19 @@ export function usePOS() {
             error.value = 'El carrito está vacío';
             return false;
         }
+        const warehouseId = Number(currentWarehouseId.value);
+        if (
+            !warehouseId ||
+            cart.value.some(
+                (item) =>
+                    item.warehouse_id &&
+                    Number(item.warehouse_id) !== warehouseId,
+            )
+        ) {
+            error.value =
+                'Selecciona una sucursal válida para todos los artículos antes de cobrar.';
+            return false;
+        }
 
         if (
             !activeSession.value.source_quote_id &&
@@ -923,7 +993,7 @@ export function usePOS() {
                 customer_vehicle_id: customer_vehicle_id.value,
                 date: new Date().toISOString().split('T')[0],
                 status: 'confirmed', // POS sales must be confirmed immediately so they appear in session summary
-                warehouse_id: currentWarehouseId.value || 1,
+                warehouse_id: warehouseId,
                 notes: notes.value,
 
                 // Dynamic payment format
@@ -948,8 +1018,7 @@ export function usePOS() {
                     source_quote_item_id: item.source_quote_item_id,
                     product_id: item.is_custom_line ? null : item.product_id,
                     variant_id: item.variant_id, // Send variant ID to backend
-                    warehouse_id:
-                        item.warehouse_id || currentWarehouseId.value || 1, // Use backend context as fallback
+                    warehouse_id: warehouseId,
                     quantity: item.quantity,
                     unit_price: item.product_price,
                     discount_percent: item.discount_percent,
@@ -1057,6 +1126,19 @@ export function usePOS() {
             error.value = 'El carrito está vacío';
             return false;
         }
+        const warehouseId = Number(currentWarehouseId.value);
+        if (
+            !warehouseId ||
+            cart.value.some(
+                (item) =>
+                    item.warehouse_id &&
+                    Number(item.warehouse_id) !== warehouseId,
+            )
+        ) {
+            error.value =
+                'Selecciona una sucursal válida para todos los artículos antes de guardar.';
+            return false;
+        }
 
         if (!validateCartStock('sale')) {
             return false;
@@ -1075,13 +1157,12 @@ export function usePOS() {
                 notes: notes.value,
                 payment_method: undefined,
                 payment_status: 'pending',
-                warehouse_id: currentWarehouseId.value || 1,
+                warehouse_id: warehouseId,
                 discount_amount: 0,
                 shipping_cost: shippingCost.value,
                 items: cart.value.map((item) => ({
                     product_id: item.is_custom_line ? null : item.product_id,
-                    warehouse_id:
-                        item.warehouse_id || currentWarehouseId.value || 1,
+                    warehouse_id: warehouseId,
                     quantity: item.quantity,
                     unit_price: item.product_price,
                     discount_percent: item.discount_percent,
@@ -1130,43 +1211,59 @@ export function usePOS() {
      * Opens a SalesQuote as a new cart tab in the POS.
      * Items, prices, discounts and taxes are taken directly from the quote.
      */
-    const loadQuoteAsSession = (quote: {
-        id: number;
-        quote_number: string;
-        customer_id?: number | null;
-        customer_vehicle_id?: number | null;
-        seller_id?: number | null;
-        notes?: string | null;
-        items: Array<{
+    const loadQuoteAsSession = (
+        quote: {
             id: number;
-            product_id: number | null;
-            product_name: string;
-            product_sku: string;
-            variant_id?: number | null;
-            warehouse_id?: number | null;
-            quantity: number;
-            unit_price: number;
-            discount_percent: number;
-            discount_amount?: number;
-            tax_percent: number;
-            subtotal: number;
-            tax_amount: number;
-            total: number;
-            is_custom_line?: boolean;
-            custom_description?: string | null;
-            variant?: {
+            quote_number: string;
+            customer_id?: number | null;
+            customer_vehicle_id?: number | null;
+            seller_id?: number | null;
+            customer_name?: string | null;
+            seller_name?: string | null;
+            created_at?: string | null;
+            status?: string | null;
+            total?: number | string | null;
+            notes?: string | null;
+            internal_notes?: string | null;
+            items: Array<{
                 id: number;
-                sku: string;
-                brand?: { name: string } | null;
-            } | null;
-        }>;
-    }): string => {
-        const existingSession = allSessions.value.find(
-            (session) => session.source_quote_id === quote.id,
-        );
-        if (existingSession) {
+                product_id: number | null;
+                product_name: string;
+                product_sku: string;
+                variant_id?: number | null;
+                warehouse_id?: number | null;
+                quantity: number;
+                unit_price: number;
+                discount_percent: number;
+                discount_amount?: number;
+                tax_percent: number;
+                subtotal: number;
+                tax_amount: number;
+                total: number;
+                is_custom_line?: boolean;
+                custom_description?: string | null;
+                notes?: string | null;
+                variant?: {
+                    id: number;
+                    sku: string;
+                    brand?: { name: string } | null;
+                } | null;
+            }>;
+        },
+        intoEditor = false,
+    ): string => {
+        const existingSession =
+            !intoEditor &&
+            allSessions.value.find(
+                (session) => session.source_quote_id === quote.id,
+            );
+        if (intoEditor && !activeSession.value.is_quote_draft) {
+            throw new Error(
+                'No hay una sesión aislada para editar la cotización.',
+            );
+        } else if (existingSession) {
             activeSessionId.value = existingSession.id;
-        } else {
+        } else if (!intoEditor) {
             createNewCart(`COT-${quote.quote_number}`);
         }
 
@@ -1177,7 +1274,16 @@ export function usePOS() {
         newSession.customer_vehicle_id = quote.customer_vehicle_id ?? undefined;
         newSession.seller_id = quote.seller_id ?? undefined;
         newSession.notes = quote.notes ?? '';
+        newSession.internal_notes = quote.internal_notes ?? '';
         newSession.source_quote_id = quote.id; // ← persisted so POS can update it later
+        // Datos de cabecera de la cotización: el cajero necesita verlos al cobrar.
+        newSession.quote_customer_name = quote.customer_name ?? undefined;
+        newSession.quote_seller_name = quote.seller_name ?? undefined;
+        newSession.quote_created_at = quote.created_at ?? undefined;
+        newSession.quote_notes = quote.notes ?? undefined;
+        newSession.quote_status = quote.status ?? undefined;
+        newSession.quote_total =
+            quote.total == null ? undefined : Number(quote.total);
 
         newSession.cart = quote.items.map((item, idx): CartItem => {
             const cartItem: CartItem = {
@@ -1206,6 +1312,7 @@ export function usePOS() {
                 is_tax_overridden: false,
                 seller_id: quote.seller_id ?? undefined,
                 warehouse_id: item.warehouse_id ?? undefined,
+                notes: item.notes ?? undefined,
                 subtotal: 0,
                 tax_amount: 0,
                 total: 0,
@@ -1230,6 +1337,7 @@ export function usePOS() {
         customer_id,
         customer_vehicle_id,
         notes,
+        internal_notes,
         loading,
         error,
         connectionStatus,
@@ -1270,6 +1378,8 @@ export function usePOS() {
         activeSessionId,
         activeSession,
         createNewCart,
+        createQuoteEditorSession,
+        closeQuoteEditorSession,
         switchCart,
         removeCart,
         renameCart,

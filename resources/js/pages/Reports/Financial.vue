@@ -5,13 +5,17 @@ import {
     BarChart3,
     Clock,
     FileText,
+    Layers,
     PiggyBank,
     RefreshCw,
     Scale,
+    ShoppingCart,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import CapitalMovementModal from '@/components/Finance/CapitalMovementModal.vue';
+import CashPaymentsReport from '@/components/Finance/CashPaymentsReport.vue';
+import CashPositionReport from '@/components/Finance/CashPositionReport.vue';
 import FinanceAdvancedAccountingPanel from '@/components/Finance/FinanceAdvancedAccountingPanel.vue';
 import FinanceBalanceSheet from '@/components/Finance/FinanceBalanceSheet.vue';
 import FinanceDailySummaryTable from '@/components/Finance/FinanceDailySummaryTable.vue';
@@ -19,6 +23,7 @@ import FinanceIncomeStatement from '@/components/Finance/FinanceIncomeStatement.
 import FinanceKpiRow from '@/components/Finance/FinanceKpiRow.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import FinancialDrilldownDrawer from '@/components/Finance/FinancialDrilldownDrawer.vue';
+import SalesLinesReport from '@/components/Finance/SalesLinesReport.vue';
 import TraceableCell from '@/components/Traceability/TraceableCell.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import { Button } from '@/components/ui/button';
@@ -40,7 +45,16 @@ import {
 } from '@/utils/financialReport';
 import { formatCurrency } from '@/utils/formatters';
 
-type ReportTab = 'summary' | 'balance' | 'income' | 'credits' | 'investment';
+type ReportTab =
+    | 'summary'
+    | 'balance'
+    | 'income'
+    | 'credits'
+    | 'investment'
+    | 'line_profitability'
+    | 'sales'
+    | 'collections'
+    | 'cash';
 type ReportMode = 'basic' | 'advanced';
 type DrilldownFilters = {
     date_from: string;
@@ -75,11 +89,33 @@ const {
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 const { fetchSettings: fetchStoreSettings } = useStoreSettings();
 
+const reportTabKeys: ReportTab[] = [
+    'summary',
+    'balance',
+    'income',
+    'credits',
+    'investment',
+    'line_profitability',
+    'sales',
+    'collections',
+    'cash',
+];
+
 const initialUrlParams = new URLSearchParams(window.location.search);
+const initialTabParam = initialUrlParams.get('tab') as ReportTab | null;
 const activeTab = ref<ReportTab>(
-    initialUrlParams.has('as_of') ? 'balance' : 'summary',
+    initialTabParam && reportTabKeys.includes(initialTabParam)
+        ? initialTabParam
+        : initialUrlParams.has('as_of')
+          ? 'balance'
+          : 'summary',
 );
 const activeMode = ref<ReportMode>('basic');
+const standaloneReport = computed(() =>
+    ['sales', 'line_profitability', 'collections', 'cash'].includes(
+        activeTab.value,
+    ),
+);
 const capitalMovementOpen = ref(false);
 const capitalMovementType = ref<'in' | 'out'>('in');
 const capitalMovementSubmitting = ref(false);
@@ -127,7 +163,16 @@ const tabs: Array<{ key: ReportTab; label: string; icon: any }> = [
     { key: 'income', label: 'Income Statement', icon: FileText },
     { key: 'credits', label: 'Creditos', icon: Clock },
     { key: 'investment', label: 'Capital', icon: PiggyBank },
+    {
+        key: 'line_profitability',
+        label: 'Rentabilidad por linea',
+        icon: Layers,
+    },
+    { key: 'sales', label: 'Ventas', icon: ShoppingCart },
+    { key: 'collections', label: 'Cobros por método', icon: ShoppingCart },
+    { key: 'cash', label: 'Efectivo y bancos', icon: PiggyBank },
 ];
+
 const kpis = computed(() => {
     const totals = dailySummary.value?.totals ?? {};
     const credits = incomeStatementReport.value?.credit_balances;
@@ -364,6 +409,17 @@ const loadReports = async (): Promise<void> => {
     }
 };
 
+const selectTab = (tab: ReportTab): void => {
+    activeTab.value = tab;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState(
+        window.history.state,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+    );
+};
+
 const applyBalanceDate = async (): Promise<void> => {
     const validationMessage = validateBalanceSheetDate(balanceAsOf.value);
     if (validationMessage) {
@@ -590,15 +646,18 @@ watch(currentWarehouseId, (value) => {
                 eyebrow="Reportes"
                 title="Finanzas y Rentabilidad"
                 :subtitle="
-                    activeMode === 'basic' && activeTab === 'balance'
-                        ? `Balance al ${balanceAsOf} · Consolidado`
-                        : `${filters.date_from} - ${filters.date_to}`
+                    standaloneReport
+                        ? 'Filtros y totales propios de cada consulta'
+                        : activeMode === 'basic' && activeTab === 'balance'
+                          ? `Balance al ${balanceAsOf} · Consolidado`
+                          : `${filters.date_from} - ${filters.date_to}`
                 "
                 :icon="BarChart3"
             >
                 <div class="space-y-3">
                     <div
                         v-if="
+                            !standaloneReport &&
                             !(activeMode === 'basic' && activeTab === 'balance')
                         "
                         class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60"
@@ -628,7 +687,7 @@ watch(currentWarehouseId, (value) => {
                     </div>
 
                     <div
-                        v-else
+                        v-else-if="!standaloneReport"
                         class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60"
                     >
                         <label class="w-full sm:min-w-48 sm:flex-1 md:max-w-sm">
@@ -736,7 +795,7 @@ watch(currentWarehouseId, (value) => {
                                     ? 'bg-indigo-600 text-white shadow-sm'
                                     : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900'
                             "
-                            @click="activeTab = tab.key"
+                            @click="selectTab(tab.key)"
                         >
                             <component :is="tab.icon" :size="16" />
                             {{ tab.label }}
@@ -767,6 +826,19 @@ watch(currentWarehouseId, (value) => {
                         :currency-formatter="formatCurrency"
                         @select="openKpiDrilldown"
                     />
+
+                    <SalesLinesReport
+                        v-if="activeTab === 'line_profitability'"
+                        initial-group="brand"
+                    />
+
+                    <SalesLinesReport
+                        v-if="activeTab === 'sales'"
+                        initial-group="line"
+                    /><CashPaymentsReport
+                        v-if="activeTab === 'collections'"
+                        report-mode
+                    /><CashPositionReport v-if="activeTab === 'cash'" />
 
                     <div
                         v-if="activeTab === 'credits'"

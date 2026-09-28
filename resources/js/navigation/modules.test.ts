@@ -31,6 +31,7 @@ describe('module route resolution', () => {
         ['/products/42/edit', 'inventory'],
         ['/customers/42', 'customers'],
         ['/settings/pricing-formulas', 'settings'],
+        ['/transactions?type=quote', 'sales'],
     ])('assigns %s to %s', (path, moduleId) => {
         expect(findModuleForPath(path)?.id).toBe(moduleId);
     });
@@ -88,6 +89,19 @@ describe('role and feature filtering', () => {
     });
 });
 
+describe('sales navigation', () => {
+    it('shows one transaction entry for orders and quotes', () => {
+        for (const role of ['admin', 'seller', 'buyer'] as const) {
+            const sales = getVisibleModuleById('sales', role, features);
+            const actions = sales?.sections.flatMap(
+                (section) => section.actions,
+            );
+            expect(actions?.map((action) => action.href)).toEqual([
+                '/transactions',
+            ]);
+        }
+    });
+});
 describe('module breadcrumbs', () => {
     it('prepends the module hub and preserves supplied detail context', () => {
         expect(
@@ -104,7 +118,7 @@ describe('module breadcrumbs', () => {
     it('derives a child breadcrumb when a page does not provide one', () => {
         expect(resolveModuleBreadcrumbs('/sales-orders/42', [])).toEqual([
             { title: 'Ventas', href: '/sales' },
-            { title: 'Órdenes de venta', href: '/sales-orders' },
+            { title: 'Transacciones', href: '/transactions' },
             { title: 'Detalle' },
         ]);
     });

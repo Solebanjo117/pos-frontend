@@ -62,47 +62,38 @@ export function usePosSettings() {
                 return;
             }
 
-            // Backend returned null for current_warehouse_id — pick first allowed warehouse
+            // Single-warehouse mode explicitly defines the only warehouse to select.
             const allowed = context.allowed_warehouses ?? [];
-            if (allowed.length > 0) {
-                const firstId = allowed[0].id;
-                currentWarehouseId.value = firstId;
-                localStorage.setItem(CURRENT_WAREHOUSE_KEY, String(firstId));
-                try {
-                    await posService.setWarehouseContext(firstId);
-                } catch {}
+            const posSettings = await fetchSettings();
+            const defaultId = posSettings.default_warehouse_id;
+            if (
+                posSettings.single_warehouse_mode &&
+                defaultId &&
+                allowed.some((warehouse) => warehouse.id === defaultId)
+            ) {
+                await posService.setWarehouseContext(defaultId);
+                currentWarehouseId.value = defaultId;
+                localStorage.setItem(CURRENT_WAREHOUSE_KEY, String(defaultId));
                 return;
             }
-
-            // User has no warehouses assigned at all — leave as null
+            // Require an explicit choice when no active warehouse is set.
             currentWarehouseId.value = null;
             localStorage.removeItem(CURRENT_WAREHOUSE_KEY);
+            error.value =
+                'No tienes una sucursal asignada. Solicita la asignación a un administrador.';
             return;
         } catch (err: any) {
-            // If 401, silently fall back
             if (err.response?.status !== 401) {
                 console.warn(
                     'Failed to fetch warehouse context from backend:',
                     err.message,
                 );
             }
+            currentWarehouseId.value = null;
+            localStorage.removeItem(CURRENT_WAREHOUSE_KEY);
+            error.value =
+                'No se pudo verificar la sucursal activa. Inténtalo de nuevo.';
         }
-
-        // Fallback to localStorage (backend was unreachable)
-        const stored = localStorage.getItem(CURRENT_WAREHOUSE_KEY);
-        if (stored) {
-            currentWarehouseId.value = Number(stored);
-            // Try to sync — if 403 the stored warehouse is not allowed, clear it
-            try {
-                await posService.setWarehouseContext(Number(stored));
-            } catch (err: any) {
-                if (err.response?.status === 403) {
-                    localStorage.removeItem(CURRENT_WAREHOUSE_KEY);
-                    currentWarehouseId.value = null;
-                }
-            }
-        }
-        // Do NOT default to warehouse 1 — the user may not have access to it
     };
 
     const setWarehouse = async (id: number) => {

@@ -80,3 +80,20 @@ describe('financial transfer form', () => {
         ).toBeNull();
     });
 });
+
+it('blocks branch cash until its initial reconciliation exists', () => {
+    expect(
+        validateTransferSelection(
+            { ...account('warehouse_cash', 2), initialized: false },
+            account('financial_account', 1),
+            5,
+        ),
+    ).toContain('Saldo sin inicializar');
+    expect(
+        validateTransferSelection(
+            { ...account('warehouse_cash', 2), initialized: true },
+            account('financial_account', 1),
+            5,
+        ),
+    ).toBeNull();
+});

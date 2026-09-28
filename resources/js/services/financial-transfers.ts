@@ -63,6 +63,17 @@ export const financialTransfersService = {
     receiptUrl(id: number): string {
         return `/api/v1/financial-transfers/${id}/receipt`;
     },
+    async accountsReport(params: Record<string, unknown>) {
+        return (await apiClient.get('/financial-accounts/report', { params }))
+            .data;
+    },
+    async accountMovements(id: number, params: Record<string, unknown>) {
+        return (
+            await apiClient.get(`/financial-accounts/${id}/movements`, {
+                params,
+            })
+        ).data;
+    },
     async accounts(): Promise<FinancialAccount[]> {
         const response = await apiClient.get('/financial-accounts');
         return response.data.data;

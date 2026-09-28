@@ -28,6 +28,7 @@ import {
     validateTransferSelection,
 } from '@/utils/financialTransferForm';
 import { formatCurrency } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Transferencias', href: '/finance/transfers' },
@@ -46,8 +47,12 @@ const localDatetime = () => {
     return date.toISOString().slice(0, 16);
 };
 
+let requestedWarehouse =
+    Number(
+        new URLSearchParams(window.location.search).get('from_warehouse_id'),
+    ) || null;
 const form = ref({
-    from_type: 'bank' as FinancialAccountType,
+    from_type: (requestedWarehouse ? 'cash' : 'bank') as FinancialAccountType,
     from_key: null as string | null,
     to_type: 'bank' as FinancialAccountType,
     to_key: null as string | null,
@@ -64,13 +69,24 @@ const loadingTo = ref(false);
 const saving = ref(false);
 const error = ref<string | null>(null);
 const confirmOpen = ref(false);
+const transferKey = ref<string | null>(null);
+watch(
+    form,
+    () => {
+        transferKey.value = null;
+    },
+    { deep: true, flush: 'sync' },
+);
 
 const optionKey = moneyEndpointKey;
 const selectOptions = (options: MoneyAccountOption[]): SelectOption[] =>
     options.map((option) => ({
         value: optionKey(option),
         label: option.name,
-        sublabel: `${option.masked_number ? `${option.masked_number} · ` : ''}${formatCurrency(option.balance)}`,
+        sublabel:
+            option.initialized === false
+                ? 'Saldo sin inicializar · Caja / Movimientos por método'
+                : `${option.masked_number ? `${option.masked_number} · ` : ''}${formatCurrency(option.balance)}`,
     }));
 const fromOptions = computed(() => selectOptions(fromAccounts.value));
 const toOptions = computed(() => selectOptions(toAccounts.value));
@@ -102,10 +118,19 @@ async function loadSide(side: 'from' | 'to'): Promise<void> {
     const loading = side === 'from' ? loadingFrom : loadingTo;
     loading.value = true;
     try {
-        const options = await financialTransfersService.options(type);
+        const options = await financialTransfersService.options(
+            type,
+            'transfer',
+        );
         if (side === 'from') {
             fromAccounts.value = options;
-            form.value.from_key = null;
+            const requested = options.find(
+                (option) =>
+                    option.endpoint_type === 'warehouse_cash' &&
+                    option.endpoint_id === requestedWarehouse,
+            );
+            form.value.from_key = requested ? optionKey(requested) : null;
+            requestedWarehouse = null;
         } else {
             toAccounts.value = options;
             form.value.to_key = null;
@@ -157,7 +182,7 @@ async function submit(): Promise<void> {
     error.value = null;
     try {
         const transfer = await financialTransfersService.create({
-            idempotency_key: crypto.randomUUID(),
+            idempotency_key: (transferKey.value ??= createIdempotencyKey()),
             from_endpoint_type: selectedFrom.value.endpoint_type,
             from_endpoint_id: selectedFrom.value.endpoint_id,
             to_endpoint_type: selectedTo.value.endpoint_type,

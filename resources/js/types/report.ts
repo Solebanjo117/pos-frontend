@@ -842,3 +842,91 @@ export interface CapitalMovement {
     warehouse_id?: number | null;
     user_id?: number | null;
 }
+
+/**
+ * Rentabilidad agrupada por linea de negocio.
+ * `GET /reports/brand-profitability` devuelve `brand_id` / `brand_name`
+ * y `GET /reports/category-profitability` devuelve `category_id` / `category_name`,
+ * ambos dentro de `{ data: [...] }`.
+ */
+export type LineProfitabilityGroupBy = 'brand' | 'category';
+
+export interface BrandProfitabilityRow {
+    brand_id: number | null;
+    brand_name: string;
+    revenue: number;
+    cogs: number;
+    profit: number;
+    items_sold: number;
+    margin: number;
+}
+
+export interface CategoryProfitabilityRow {
+    category_id: number | null;
+    category_name: string;
+    revenue: number;
+    cogs: number;
+    profit: number;
+    items_sold: number;
+    margin: number;
+}
+
+export type LineProfitabilityApiRow =
+    | BrandProfitabilityRow
+    | CategoryProfitabilityRow;
+
+/** Fila normalizada para la tabla, independiente del agrupador. */
+export interface LineProfitabilityRow {
+    key: string;
+    label: string;
+    revenue: number;
+    cogs: number;
+    profit: number;
+    items_sold: number;
+    margin: number;
+}
+
+export interface SalesByProductFilters {
+    date_from?: string | null;
+    date_to?: string | null;
+    warehouse_id?: number | null;
+    search?: string | null;
+    page?: number;
+    per_page?: number;
+}
+
+export interface SalesByProductRow {
+    product_id: number | null;
+    variant_id: number | null;
+    product_name: string;
+    sku: string;
+    quantity_sold: number;
+    quantity_returned: number;
+    gross_sales: number;
+    returns_amount: number;
+    net_sales: number;
+    cost: number;
+    profit: number;
+}
+
+export interface SalesByProductSummary {
+    count: number;
+    quantity_sold: number;
+    quantity_returned: number;
+    gross_sales: number;
+    returns_amount: number;
+    net_sales: number;
+    cost: number;
+    profit: number;
+}
+
+export interface SalesByProductReport {
+    data: SalesByProductRow[];
+    summary: SalesByProductSummary;
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+}

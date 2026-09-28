@@ -3,37 +3,18 @@ import { Head, usePage } from '@inertiajs/vue3';
 import { router } from '@inertiajs/vue3';
 import {
     Search,
-    Trash2,
-    Save,
-    Banknote,
-    CreditCard,
-    Landmark,
     AlertTriangle,
     Keyboard,
-    LogOut,
-    Car,
-    Gift,
     FileText,
-    SlidersHorizontal,
     ArrowUpDown,
-    Filter,
 } from 'lucide-vue-next';
-import {
-    ref,
-    reactive,
-    computed,
-    onMounted,
-    onUnmounted,
-    watch,
-    nextTick,
-} from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import ActionButtons from '@/components/POS/ActionButtons.vue';
 import AddCustomLineModal from '@/components/POS/AddCustomLineModal.vue';
 import AddPaymentModal from '@/components/POS/AddPaymentModal.vue';
 import CashMovementModal from '@/components/POS/CashMovementModal.vue';
 import CashRegisterStatus from '@/components/POS/CashRegisterStatus.vue';
 import OpenSessionModal from '@/components/POS/OpenSessionModal.vue';
-import type POSControls from '@/components/POS/POSControls.vue';
 import POSInlineSearch from '@/components/POS/POSInlineSearch.vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductSearchModal from '@/components/POS/ProductSearchModal.vue';
@@ -43,25 +24,33 @@ import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
 import SummarySection from '@/components/POS/SummarySection.vue';
 import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue';
 import VariantSelectModal from '@/components/POS/VariantSelectModal.vue';
+import VehicleContextHeader from '@/components/POS/VehicleContextHeader.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
-import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSession } from '@/composables/usePosSession';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
+import { useSalesQuoteDraft } from '@/composables/useSalesQuoteDraft';
+import type { QuoteDraftPayload } from '@/composables/useSalesQuoteDraft';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { useToast } from '@/composables/useToast';
+import { useVehicleContext } from '@/composables/useVehicleContext';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 // POSFilterSidebar removed — filtering now handled inside ProductSearchModal via ProductFilters
 
-import { SalesOrderPaymentApiService } from '@/services/payments';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { ProductVariantSelection } from '@/types/product-variant-picker';
-import { formatDuration } from '@/utils/formatters';
+import { formatDuration, formatReportDateTime } from '@/utils/formatters';
 import { createIdempotencyKey } from '@/utils/idempotency';
+import {
+    createSalesOrderAmendmentKeyResolver,
+    previewSalesOrderAmendment,
+} from '@/utils/posAmendment';
+import type { AmendmentPayment } from '@/utils/posAmendment';
 
 defineOptions({ layout: AppLayout });
 
@@ -93,17 +82,22 @@ const canManagePurchases = computed(
 const canClearCurrentCart = computed(
     () =>
         !isStrictCashier.value &&
+        !props.quoteMode &&
         !activeSession.value?.source_quote_id &&
         !props.editMode,
 );
 
 const { defaultTaxRate } = useStoreSettings();
+const toast = useToast();
+const { vehicle: catalogVehicle, setVehicle: setCatalogVehicle } =
+    useVehicleContext();
 
 const {
     cart,
     customer_id,
     customer_vehicle_id,
     notes,
+    internal_notes,
     loading,
     error,
     paymentMethod,
@@ -112,7 +106,6 @@ const {
     cartTax,
     cartTotal,
     cartItemCount,
-    change,
     addToCart,
     addCustomLine,
     updateQuantity,
@@ -127,20 +120,21 @@ const {
     validateCartStock,
     getStockWarnings,
     processSale,
-    saveDraft,
     shippingCost,
-    shippingMethod,
     logAction,
     // Multi-cart
     allSessions,
     activeSessionId,
     activeSession,
     createNewCart,
+    createQuoteEditorSession,
+    closeQuoteEditorSession,
     switchCart,
     removeCart,
-    renameCart,
     loadQuoteAsSession,
 } = usePOS();
+
+const quoteEditorSession = props.quoteMode ? createQuoteEditorSession() : null;
 
 const {
     currentWarehouseId,
@@ -159,7 +153,7 @@ const {
     loading: productsLoading,
 } = useProducts();
 const { customers, fetchCustomers, perPage: customerPerPage } = useCustomers();
-const { warehouses, fetchWarehouses } = useWarehouses();
+const { fetchWarehouses } = useWarehouses();
 
 const {
     isChecking: isCheckingSession,
@@ -172,7 +166,7 @@ const {
 
 // UI State
 const searchQuery = ref('');
-const posControlsRef = ref<InstanceType<typeof POSControls> | null>(null);
+
 const inlineSearchRef = ref<InstanceType<typeof POSInlineSearch> | null>(null);
 const selectedCategoryId = ref<number | undefined>(undefined);
 const selectedBrandId = ref<number | undefined>(undefined);
@@ -190,7 +184,6 @@ const forceShowOpenSessionModal = ref(false);
 const sessionActionLoading = ref(false);
 
 // R45: Filter sidebar state
-const showFilterSidebar = ref(false);
 
 // R44: Cart search and sort state
 const cartSearchQuery = ref('');
@@ -288,7 +281,6 @@ const pendingProduct = computed(() => variantQueue.value[0] ?? null); // always 
 const showAddPaymentModal = ref(false);
 const addPaymentLoading = ref(false);
 const addPaymentError = ref<string | null>(null);
-const pendingOrderId = ref<number | null>(null);
 
 // Product Detail Modal (from right-click in cart)
 const selectedProductForModal = ref<any>(null);
@@ -496,33 +488,14 @@ const handleReorderSuccess = (result: {
     }
 };
 const pendingOrderTotal = ref(0);
-const pendingOrderAmountPaid = ref(0);
-// Electronic Payments for Multi-Tender Flow
-const electronicPayments = reactive<Record<string, number>>({});
-// Store credit (saldo a favor) to apply to this sale
-const storeCreditToApply = ref(0);
-const handlePaymentChange = (id: string, value: number) => {
-    electronicPayments[id] = value;
-};
 
-const totalElectronicPayments = computed(() => {
-    return Object.values(electronicPayments).reduce((sum, val) => sum + val, 0);
-});
+// Electronic Payments for Multi-Tender Flow
+// Store credit (saldo a favor) to apply to this sale
 
 // Total dinero realmente recibido (efectivo, tarjeta, transferencia, saldo a favor)
 // NO incluye crédito porque el crédito es deuda, no dinero recibido
-const totalReceived = computed(() => {
-    return (
-        amountReceived.value +
-        totalElectronicPayments.value +
-        storeCreditToApply.value
-    );
-});
 
 // Monto pendiente (lo que falta por cobrar o se cargará a crédito)
-const pendingAmount = computed(() => {
-    return Math.max(0, amountToCharge.value - totalReceived.value);
-});
 
 // Total de descuento en el carrito
 const cartDiscount = computed(() => {
@@ -532,46 +505,7 @@ const cartDiscount = computed(() => {
     );
 });
 
-// Vuelto a entregar (solo si se recibió más de lo debido)
-const localChange = computed(() => {
-    return Math.max(0, totalReceived.value - cartTotal.value);
-});
-
 // Available credit for the selected customer
-const creditAvailable = computed(() => {
-    if (!selectedCustomer.value) return 0;
-    return Math.max(
-        0,
-        (selectedCustomer.value.credit_limit ?? 0) -
-            Math.max(0, selectedCustomer.value.current_balance ?? 0),
-    );
-});
-
-// El crédito a cargar se calcula automáticamente: es el mínimo entre lo pendiente y el crédito disponible
-// Solo aplica si hay cliente seleccionado
-const creditToCharge = computed(() => {
-    if (!selectedCustomer.value || pendingAmount.value <= 0) return 0;
-    return Math.min(pendingAmount.value, creditAvailable.value);
-});
-
-// Monto que queda sin cubrir (ni pagado ni cubierto por crédito)
-const uncoveredAmount = computed(() => {
-    return Math.max(0, pendingAmount.value - creditToCharge.value);
-});
-
-// Para compatibilidad con el template existente
-const totalPaid = computed(() => {
-    return totalReceived.value + creditToCharge.value;
-});
-
-const totalRemaining = computed(() => {
-    return uncoveredAmount.value;
-});
-
-// Remaining to pay after cash and electronic payments (alias para compatibilidad)
-const remainingToPay = computed(() => {
-    return pendingAmount.value;
-});
 
 // Return mode state
 const returnOrderData = ref<any>(null);
@@ -583,29 +517,9 @@ const returnIdempotencyKey = ref(createIdempotencyKey());
 const editOrderData = ref<any>(null);
 const editLoading = ref(false);
 const editError = ref<string | null>(null);
-interface OriginalItemSnapshot {
-    qty: number;
-    price: number;
-    order_item_id: number;
-}
-const originalItems = ref<Record<string, OriginalItemSnapshot>>({});
+const resolveAmendmentPayload = createSalesOrderAmendmentKeyResolver();
 const nowTick = ref(Date.now());
 let elapsedTimer: ReturnType<typeof setInterval> | null = null;
-
-const getOriginalItemKey = (payload: {
-    product_id?: number | null;
-    variant_id?: number | null;
-    warehouse_id?: number | null;
-    is_custom_line?: boolean;
-    custom_description?: string | null;
-}) => {
-    if (payload.is_custom_line) {
-        const label = (payload.custom_description || '').trim().toLowerCase();
-        return `custom:${label}:${payload.warehouse_id ?? 'none'}`;
-    }
-
-    return `${payload.product_id ?? 'none'}:${payload.variant_id ?? 'none'}:${payload.warehouse_id ?? 'none'}`;
-};
 
 // Load order for edit (add/modify items on an existing confirmed order)
 async function loadOrderForReturn(orderId: number) {
@@ -722,6 +636,11 @@ async function loadOrderForEdit(orderId: number) {
         const res = await apiClient.get(`/sales-orders/${orderId}`);
         const order = res.data.data ?? res.data;
         editOrderData.value = order;
+        if (order.status === 'pending' && order.source_quote?.id) {
+            editError.value =
+                'Esta transacción se edita desde su cotización. Abre la cotización para continuar.';
+            return;
+        }
 
         // Set customer
         if (order.customer_id) {
@@ -734,7 +653,7 @@ async function loadOrderForEdit(orderId: number) {
             customer_id.value = order.customer_id;
         }
 
-        // Load existing items with POSITIVE quantities and snapshot original state
+        // Load existing items with their original line IDs.
         for (const item of order.items ?? []) {
             const quantity = Math.abs(item.quantity);
             const unitPrice = Number(item.unit_price);
@@ -744,21 +663,6 @@ async function loadOrderForEdit(orderId: number) {
             const subtotal = Number(item.subtotal ?? 0);
             const taxAmount = Number(item.tax_amount ?? 0);
             const total = Number(item.total ?? 0);
-
-            const originalKey = getOriginalItemKey({
-                product_id: item.product_id,
-                variant_id: item.variant_id ?? null,
-                warehouse_id: item.warehouse_id ?? null,
-                is_custom_line: item.is_custom_line,
-                custom_description: item.custom_description,
-            });
-
-            // Snapshot original state
-            originalItems.value[originalKey] = {
-                qty: quantity,
-                price: unitPrice,
-                order_item_id: item.id,
-            };
 
             cart.value.push({
                 id: `edit-${item.id}`,
@@ -794,94 +698,66 @@ async function loadOrderForEdit(orderId: number) {
     }
 }
 
-// Computed: calculate difference between current cart and original order
-const orderDiff = computed(() => {
-    if (!props.editMode) return { items: [], total: 0 };
+const isPostSaleAmendment = computed(() =>
+    ['confirmed', 'processing', 'completed'].includes(
+        editOrderData.value?.status,
+    ),
+);
+const isEditableDraftOrder = computed(
+    () =>
+        ['draft', 'pending'].includes(editOrderData.value?.status) &&
+        !editOrderData.value?.source_quote?.id,
+);
 
-    const diffItems: Array<{
-        product_id: number | null;
-        variant_id?: number;
-        warehouse_id: number;
-        qty: number;
-        qty_diff: number;
-        price: number;
-        tax_percent: number;
-        seller_id?: number;
-        is_custom_line?: boolean;
-        custom_description?: string;
-        is_new: boolean;
-        order_item_id?: number;
-    }> = [];
-
-    let diffTotal = 0;
-
-    for (const item of cart.value) {
-        const originalKey = getOriginalItemKey({
-            product_id: item.product_id,
-            variant_id: item.variant_id ?? null,
-            warehouse_id: item.warehouse_id ?? null,
-            is_custom_line: item.is_custom_line,
-            custom_description: item.custom_description,
-        });
-        const original = originalItems.value[originalKey];
-
-        if (!original) {
-            // New product (not in original order)
-            const itemSubtotal = item.quantity * item.product_price;
-            const safeTaxPercent = normalizeTaxPercent(item.tax_percent);
-            const itemTax = itemSubtotal * (safeTaxPercent / 100);
-            diffTotal += itemSubtotal + itemTax;
-
-            diffItems.push({
-                product_id: item.product_id,
-                variant_id: item.variant_id,
-                warehouse_id: Number(
-                    item.warehouse_id ?? currentWarehouseId.value ?? 0,
-                ),
-                qty: item.quantity,
-                qty_diff: item.quantity,
-                price: item.product_price,
-                tax_percent: safeTaxPercent,
-                seller_id: item.seller_id,
-                is_custom_line: !!item.is_custom_line,
-                custom_description: item.custom_description,
-                is_new: true,
-            });
-        } else if (item.quantity > original.qty) {
-            // Quantity increased
-            const qtyDiff = item.quantity - original.qty;
-            const itemSubtotal = qtyDiff * item.product_price;
-            const safeTaxPercent = normalizeTaxPercent(item.tax_percent);
-            const itemTax = itemSubtotal * (safeTaxPercent / 100);
-            diffTotal += itemSubtotal + itemTax;
-
-            diffItems.push({
-                product_id: item.product_id,
-                variant_id: item.variant_id,
-                warehouse_id: Number(
-                    item.warehouse_id ?? currentWarehouseId.value ?? 0,
-                ),
-                qty: item.quantity,
-                qty_diff: qtyDiff,
-                price: item.product_price,
-                tax_percent: safeTaxPercent,
-                seller_id: item.seller_id,
-                is_custom_line: !!item.is_custom_line,
-                custom_description: item.custom_description,
-                is_new: false,
-                order_item_id: original.order_item_id,
-            });
-        }
-        // If quantity <= original, no diff (we don't allow reducing in edit mode)
+const amendmentPreview = computed(() => {
+    if (!props.editMode || !isPostSaleAmendment.value || !editOrderData.value) {
+        return { preview: null, error: null };
     }
+    try {
+        return {
+            preview: previewSalesOrderAmendment(
+                editOrderData.value,
+                cart.value,
+                Number(currentWarehouseId.value),
+            ),
+            error: null,
+        };
+    } catch (exception) {
+        return {
+            preview: null,
+            error:
+                exception instanceof Error
+                    ? exception.message
+                    : 'Revisa los cambios de la transacción.',
+        };
+    }
+});
 
-    return { items: diffItems, total: Number(diffTotal.toFixed(2)) };
+// Show the same delta that will be submitted to the server.
+const orderDiff = computed(() => {
+    const preview = amendmentPreview.value.preview;
+    if (!preview) return { items: [], total: 0 };
+    const originalById = new Map<number, any>(
+        (editOrderData.value?.items ?? []).map((item: any) => [item.id, item]),
+    );
+    return {
+        items: preview.items.map((item) => ({
+            ...item,
+            qty_diff:
+                item.qty -
+                Number(
+                    originalById.get(item.order_item_id ?? 0)?.quantity ?? 0,
+                ),
+            is_new: !item.order_item_id,
+        })),
+        total: preview.difference,
+    };
 });
 
 // Format elapsed time since order creation
 const editOrderElapsedTime = computed(() => {
     if (!editOrderData.value?.created_at) return '';
-    nowTick.value;
+
     return formatDuration(
         editOrderData.value.created_at,
         new Date(nowTick.value),
@@ -900,16 +776,11 @@ const handleUpdateQuantity = (index: number, qty: number) => {
     const item = cart.value[index];
     if (!item) return;
 
-    if (props.editMode) {
-        const originalKey = getOriginalItemKey({
-            product_id: item.product_id,
-            variant_id: item.variant_id ?? null,
-            warehouse_id: item.warehouse_id ?? null,
-            is_custom_line: item.is_custom_line,
-            custom_description: item.custom_description,
-        });
-        const original = originalItems.value[originalKey];
-        if (original && qty < original.qty) {
+    if (props.editMode && isPostSaleAmendment.value && item.order_item_id) {
+        const original = editOrderData.value?.items?.find(
+            (entry: any) => entry.id === item.order_item_id,
+        );
+        if (original && qty < Number(original.quantity)) {
             editError.value =
                 'No se permite reducir cantidades en modo edición. Para reducciones usa devoluciones.';
             return;
@@ -920,79 +791,70 @@ const handleUpdateQuantity = (index: number, qty: number) => {
     updateQuantity(item.id, qty);
 };
 
-// Confirm edit order (add items / charge difference)
-async function confirmEditOrder() {
-    if (!props.orderId || orderDiff.value.items.length === 0) return;
+async function saveEditableOrder() {
+    if (!props.orderId || !isEditableDraftOrder.value || editLoading.value)
+        return;
+    if (!currentWarehouseId.value || cart.value.length === 0) {
+        editError.value =
+            'Selecciona una sucursal y agrega al menos un artículo.';
+        return;
+    }
+
+    editLoading.value = true;
+    editError.value = null;
+    try {
+        await apiClient.put(`/sales-orders/${props.orderId}`, {
+            customer_id: customer_id.value ?? null,
+            customer_vehicle_id: customer_vehicle_id.value ?? null,
+            notes: notes.value ?? null,
+            items: cart.value.map((item) => ({
+                product_id: item.is_custom_line ? null : item.product_id,
+                variant_id: item.is_custom_line
+                    ? null
+                    : (item.variant_id ?? null),
+                warehouse_id: item.warehouse_id ?? currentWarehouseId.value,
+                quantity: item.quantity,
+                unit_price: item.product_price,
+                discount_percent: item.discount_percent ?? 0,
+                discount_amount: item.discount_amount ?? 0,
+                tax_percent: normalizeTaxPercent(item.tax_percent),
+                seller_id: item.seller_id ?? null,
+                is_custom_line: !!item.is_custom_line,
+                custom_description: item.is_custom_line
+                    ? (item.custom_description ?? item.product_name)
+                    : null,
+            })),
+        });
+        router.visit(`/sales-orders/${props.orderId}`);
+    } catch (exception: any) {
+        editError.value =
+            exception.response?.data?.error ||
+            exception.response?.data?.message ||
+            'No se pudieron guardar los cambios.';
+    } finally {
+        editLoading.value = false;
+    }
+}
+
+// Confirm a post-sale amendment using the payment panel's complete payment data.
+async function confirmEditOrder(payments: AmendmentPayment[]) {
+    if (!props.orderId || !isPostSaleAmendment.value || editLoading.value)
+        return;
 
     editLoading.value = true;
     editError.value = null;
 
     try {
-        // Build items payload
-        const items = orderDiff.value.items.map((item) => ({
-            product_id: item.is_custom_line ? null : item.product_id,
-            variant_id: item.variant_id ?? null,
-            warehouse_id:
-                Number(item.warehouse_id) ||
-                Number(currentWarehouseId.value) ||
-                1,
-            qty: item.qty,
-            price: item.price,
-            tax_percent: normalizeTaxPercent(item.tax_percent),
-            seller_id: item.seller_id ?? null,
-            is_custom_line: !!item.is_custom_line,
-            custom_description: item.is_custom_line
-                ? item.custom_description
-                : null,
-        }));
-
-        // Build payments array from current modal state
-        const paymentsArray: Array<{
-            method: string;
-            amount: number;
-            notes?: string;
-        }> = [];
-
-        if (amountReceived.value > 0) {
-            const cashEffectiveAmount =
-                localChange.value > 0
-                    ? amountReceived.value - localChange.value
-                    : amountReceived.value;
-            if (cashEffectiveAmount > 0) {
-                paymentsArray.push({
-                    method: 'cash',
-                    amount: cashEffectiveAmount,
-                });
-            }
-        }
-
-        for (const [methodId, amount] of Object.entries(electronicPayments)) {
-            if (amount > 0) {
-                paymentsArray.push({ method: methodId, amount: amount });
-            }
-        }
-
-        if (storeCreditToApply.value > 0) {
-            paymentsArray.push({
-                method: 'store_credit',
-                amount: storeCreditToApply.value,
-                notes: 'Aplicado de saldo a favor del cliente',
-            });
-        }
-
-        if (creditToCharge.value > 0 && selectedCustomer.value) {
-            paymentsArray.push({
-                method: 'credit',
-                amount: creditToCharge.value,
-                notes: 'Cobrado a crédito del cliente',
-            });
-        }
-
-        // Call backend endpoint
-        await apiClient.patch(`/sales-orders/${props.orderId}/add-items`, {
-            items,
-            payment: paymentsArray,
-        });
+        const preview = previewSalesOrderAmendment(
+            editOrderData.value,
+            cart.value,
+            Number(currentWarehouseId.value),
+        );
+        const payload = resolveAmendmentPayload(preview, payments);
+        await apiClient.patch(
+            `/sales-orders/${props.orderId}/add-items`,
+            payload,
+        );
 
         // Redirect to the order detail
         router.visit(`/sales-orders/${props.orderId}`);
@@ -1031,7 +893,7 @@ const categories = ref<Category[]>([]);
 const brands = ref<Brand[]>([]);
 const users = ref<{ id: number; name: string }[]>([]);
 
-// Refs (searchInput kept for backward compat, posControlsRef is primary)
+// Search input reference
 const searchInput = ref<HTMLInputElement>();
 const quantityInput = ref<HTMLInputElement>();
 
@@ -1067,29 +929,6 @@ const extractApiErrorMessage = (err: any, fallback: string): string => {
 };
 
 // Get helpers
-const getProductPrice = (product: any): number =>
-    product.pricing?.base_price ??
-    product.default_variant?.pricing?.base_price ??
-    0;
-
-const getProductTaxRate = (product: any): number =>
-    normalizeTaxPercent(
-        product.pricing?.sale_tax_rate ??
-            product.pricing?.tax_rate ??
-            product.default_variant?.pricing?.sale_tax_rate ??
-            product.default_variant?.pricing?.tax_rate ??
-            0,
-    );
-
-const getProductStock = (product: any): number =>
-    product.total_stock ?? product.default_variant?.total_stock ?? 0;
-
-const getProductSKU = (product: any): string => {
-    if (isClientMode()) return `#${product.id}`;
-    return (
-        product.sku_base ?? product.sku ?? product.default_variant?.sku ?? ''
-    );
-};
 
 // Advanced filter state from ProductSearchModal
 const modalMinPrice = ref<number | undefined>(undefined);
@@ -1211,20 +1050,6 @@ const loadMoreProducts = async () => {
     } catch (err) {
         console.error('POS load more error:', err);
     }
-};
-
-const handleControlsSearch = (data: {
-    query: string;
-    quantity: number;
-    category_id?: number;
-    brand_id?: number;
-}) => {
-    searchQuery.value = data.query;
-    quantity.value = data.quantity;
-    if (data.category_id !== undefined)
-        selectedCategoryId.value = data.category_id;
-    if (data.brand_id !== undefined) selectedBrandId.value = data.brand_id;
-    performSearch(data.query, data.quantity);
 };
 
 // R43: Handle search-in-modal — re-run product fetch without closing modal (with advanced filters)
@@ -1444,7 +1269,7 @@ const handleKeyboard = (e: KeyboardEvent) => {
                 isSessionOpen.value &&
                 cart.value.length > 0
             )
-                openPaymentModal('cash');
+                openPaymentModal();
             break;
         case 'F12':
             e.preventDefault();
@@ -1454,10 +1279,21 @@ const handleKeyboard = (e: KeyboardEvent) => {
 };
 
 // Payment (Cash/Card/Transfer/Multiple) - Now unified
-const openPaymentModal = (method: 'cash' | 'card' | 'transfer' = 'cash') => {
+const openPaymentModal = () => {
     if (cart.value.length > 0) {
+        if (
+            props.editMode &&
+            isPostSaleAmendment.value &&
+            !isSessionOpen.value
+        ) {
+            editError.value =
+                'Abre Caja en la sucursal de esta venta antes de cobrar la diferencia.';
+            forceShowOpenSessionModal.value = true;
+            return;
+        }
         // Reset all amounts and clear previous errors
         error.value = null;
+        editError.value = null;
         showPaymentModal.value = true;
     }
 };
@@ -1473,40 +1309,7 @@ const handleUnifiedPaymentFinish = async (
     }>,
 ) => {
     if (props.editMode) {
-        // For edit mode, use the existing confirmEditOrder with the payments array
-        // Build payments for edit mode
-        const paymentsArray = payments.map((p) => ({
-            method: p.method,
-            amount: p.amount,
-            reference_number: p.reference_number ?? undefined,
-            notes:
-                p.notes ??
-                (p.method === 'store_credit'
-                    ? 'Aplicado de saldo a favor del cliente'
-                    : p.method === 'credit'
-                      ? 'Cobrado a crédito del cliente'
-                      : undefined),
-            financial_account_id: p.financial_account_id ?? undefined,
-        }));
-
-        // Temporarily store payments for confirmEditOrder
-        amountReceived.value = 0;
-        Object.keys(electronicPayments).forEach(
-            (k) => delete electronicPayments[k],
-        );
-        storeCreditToApply.value = 0;
-
-        for (const p of payments) {
-            if (p.method === 'cash') {
-                amountReceived.value = p.amount;
-            } else if (p.method === 'store_credit') {
-                storeCreditToApply.value = p.amount;
-            } else if (p.method !== 'credit') {
-                electronicPayments[p.method] = p.amount;
-            }
-        }
-
-        await confirmEditOrder();
+        await confirmEditOrder(payments);
         if (!editError.value) {
             closePaymentModal();
         }
@@ -1517,7 +1320,10 @@ const handleUnifiedPaymentFinish = async (
     error.value = null;
 
     if (!isQuoteSession.value && !validateCartStock('sale')) {
-        alert(error.value || 'Stock insuficiente para completar la venta.');
+        toast.error(
+            error.value || 'Stock insuficiente para completar la venta.',
+            6000,
+        );
         return;
     }
 
@@ -1558,14 +1364,6 @@ const handleUnifiedPaymentFinish = async (
 };
 
 // Payment (Credit) — Uses the new AddPaymentModal for partial payments
-const openCreditSale = () => {
-    if (cart.value.length > 0 && selectedCustomer.value) {
-        pendingOrderTotal.value = cartTotal.value;
-        pendingOrderAmountPaid.value = 0;
-        error.value = null;
-        showAddPaymentModal.value = true;
-    }
-};
 
 const closePaymentModal = () => {
     showPaymentModal.value = false;
@@ -1574,6 +1372,73 @@ const closePaymentModal = () => {
 
 // Detect if the active session was loaded from a SalesQuote
 const isQuoteSession = computed(() => !!activeSession.value?.source_quote_id);
+const quoteStatusLabels: Record<string, string> = {
+    draft: 'Borrador',
+    sent: 'Enviada',
+    sent_to_deposit: 'En Depósito',
+    sent_to_cashier: 'En Caja',
+    accepted: 'Aceptada',
+    collected: 'Cobrada',
+    rejected: 'Rechazada',
+    expired: 'Vencida',
+    converted: 'Convertida',
+};
+
+/** Datos de cabecera de la cotización que se está cobrando (banner del POS). */
+const quoteSessionInfo = computed(() => {
+    const session = activeSession.value;
+
+    return {
+        number: session?.quote_number || session?.source_quote_id || '',
+        customerName:
+            session?.quote_customer_name ||
+            selectedCustomer.value?.name ||
+            'Público general',
+        sellerName: session?.quote_seller_name || '',
+        createdAt: session?.quote_created_at || '',
+        notes: session?.quote_notes || '',
+        status:
+            quoteStatusLabels[session?.quote_status ?? ''] ||
+            session?.quote_status ||
+            'Borrador',
+        confirmedTotal: session?.quote_total,
+    };
+});
+const quoteTotalHasChanged = computed(
+    () =>
+        quoteSessionInfo.value.confirmedTotal !== undefined &&
+        Math.abs(
+            Number(quoteSessionInfo.value.confirmedTotal) - cartTotal.value,
+        ) >= 0.01,
+);
+
+/**
+ * Las advertencias de stock son informativas: nunca bloquean la acción.
+ * En modo cajero se omiten porque el stock ya quedó reservado al enviar la
+ * cotización a Caja y avisar al cajero solo sería ruido.
+ */
+const notifyStockWarnings = (issues: string[]): void => {
+    if (isStrictCashier.value || issues.length === 0) {
+        return;
+    }
+
+    toast.warning(`Advertencia de stock: ${issues.join(' ')}`, 6000);
+};
+
+/** Convierte las advertencias de stock que devuelve la API en un aviso no bloqueante. */
+const notifyApiStockWarnings = (apiWarnings: unknown): void => {
+    if (!Array.isArray(apiWarnings) || apiWarnings.length === 0) {
+        return;
+    }
+
+    notifyStockWarnings(
+        apiWarnings.map((warning: any) =>
+            typeof warning?.message === 'string'
+                ? warning.message
+                : JSON.stringify(warning),
+        ),
+    );
+};
 
 const returnToCashierQueue = () => {
     if (isStrictCashier.value) {
@@ -1608,29 +1473,94 @@ const buildQuoteItems = () =>
             ? { discount_amount: item.discount_amount }
             : {}),
         tax_percent: normalizeTaxPercent(item.tax_percent),
+        notes: item.notes ?? null,
         is_custom_line: !!item.is_custom_line,
         custom_description: item.is_custom_line
             ? item.custom_description || item.product_name
             : null,
     }));
 
+const buildDraftPayload = (): QuoteDraftPayload => ({
+    seller_id: seller_id.value ?? null,
+    vehicle_context: catalogVehicle.value,
+    customer_id: customer_id.value ?? null,
+    customer_vehicle_id: customer_vehicle_id.value ?? null,
+    warehouse_id: Number(currentWarehouseId.value || 0),
+    notes: notes.value || null,
+    internal_notes: internal_notes.value || null,
+    items: buildQuoteItems(),
+});
+
+const quoteDraft = useSalesQuoteDraft(
+    () => ({
+        payload: buildDraftPayload(),
+        cart: cart.value,
+        vehicleContext: catalogVehicle.value,
+    }),
+    (savedQuote) => {
+        activeSession.value.source_quote_id = savedQuote.id;
+        activeSession.value.quote_number = savedQuote.quote_number;
+        activeSession.value.quote_customer_name =
+            savedQuote.customer?.name ??
+            activeSession.value.quote_customer_name;
+        activeSession.value.quote_seller_name =
+            savedQuote.user?.name ??
+            users.value.find((user) => user.id === savedQuote.user_id)?.name ??
+            activeSession.value.quote_seller_name;
+        activeSession.value.quote_created_at =
+            savedQuote.created_at ?? activeSession.value.quote_created_at;
+        activeSession.value.quote_notes = savedQuote.notes ?? undefined;
+        activeSession.value.quote_status = savedQuote.status;
+        if (savedQuote.total !== undefined) {
+            activeSession.value.quote_total = Number(savedQuote.total);
+        }
+    },
+);
+let restoringQuoteDraft = false;
+let allowSavedQuoteNavigation = false;
+let clearDraftOnUnmount = false;
+
+watch(
+    [
+        cart,
+        customer_id,
+        customer_vehicle_id,
+        seller_id,
+        notes,
+        internal_notes,
+        catalogVehicle,
+    ],
+    () => {
+        if (props.quoteMode && !restoringQuoteDraft && quoteDraft.ready.value) {
+            quoteDraft.recordChange();
+        }
+    },
+    { deep: true, flush: 'sync' },
+);
+
 const handleSaveQuoteChanges = async () => {
+    if (props.quoteMode) {
+        const saved = await quoteDraft.flush();
+        if (saved) toast.success('Cotización guardada.');
+        else
+            toast.error(
+                quoteDraft.error.value || 'No se pudo guardar la cotización.',
+                6000,
+            );
+        return;
+    }
     if (saveQuoteChangesLoading.value) return;
     if (isStrictCashier.value) return;
     const quoteId = activeSession.value?.source_quote_id;
     if (!quoteId) return;
     if (cart.value.length === 0) {
-        alert('El carrito está vacío, agrega productos antes de guardar.');
+        toast.error(
+            'El carrito está vacío, agrega productos antes de guardar.',
+        );
         return;
     }
     // Collect stock warnings but do NOT block — show as advisory
-    const stockIssues = getStockWarnings('quote');
-    if (stockIssues.length > 0) {
-        const proceed = confirm(
-            `Advertencia de stock:\n- ${stockIssues.join('\n- ')}\n\n¿Deseas continuar?`,
-        );
-        if (!proceed) return;
-    }
+    notifyStockWarnings(getStockWarnings());
     saveQuoteChangesLoading.value = true;
     try {
         const items = buildQuoteItems();
@@ -1642,24 +1572,14 @@ const handleSaveQuoteChanges = async () => {
             items,
         });
 
-        const apiWarnings = res.data?.warnings;
-        if (
-            apiWarnings &&
-            Array.isArray(apiWarnings) &&
-            apiWarnings.length > 0
-        ) {
-            const warningMsgs = apiWarnings
-                .map((w: any) => w.message || JSON.stringify(w))
-                .join('\n- ');
-            alert(
-                `Cotización actualizada correctamente.\n\nAdvertencias de stock:\n- ${warningMsgs}`,
-            );
-        } else {
-            alert('Cotización actualizada correctamente.');
-        }
+        toast.success('Cotización actualizada correctamente.');
+        notifyApiStockWarnings(res.data?.warnings);
         searchInput.value?.focus();
     } catch (e: any) {
-        alert(extractApiErrorMessage(e, 'Error al actualizar la cotización'));
+        toast.error(
+            extractApiErrorMessage(e, 'Error al actualizar la cotización'),
+            6000,
+        );
     } finally {
         saveQuoteChangesLoading.value = false;
     }
@@ -1669,19 +1589,32 @@ const handleSaveQuoteChanges = async () => {
 const saveQuoteLoading = ref(false);
 
 const handleSaveQuote = async () => {
+    if (props.quoteMode) {
+        if (
+            cart.value.length > 0 &&
+            !quoteDraft.dirty.value &&
+            !quoteDraft.quoteId.value
+        )
+            quoteDraft.recordChange();
+        const saved = await quoteDraft.flush();
+        if (saved && quoteDraft.quoteId.value)
+            toast.success('Cotización guardada.');
+        else
+            toast.error(
+                quoteDraft.error.value || 'No se pudo guardar la cotización.',
+                6000,
+            );
+        return;
+    }
     if (saveQuoteLoading.value) return;
     if (cart.value.length === 0) {
-        alert('Agrega productos al carrito antes de guardar una cotización.');
+        toast.error(
+            'Agrega productos al carrito antes de guardar una cotización.',
+        );
         return;
     }
     // Collect stock warnings but do NOT block — show as advisory
-    const stockIssues = getStockWarnings('quote');
-    if (stockIssues.length > 0) {
-        const proceed = confirm(
-            `Advertencia de stock:\n- ${stockIssues.join('\n- ')}\n\n¿Deseas continuar?`,
-        );
-        if (!proceed) return;
-    }
+    notifyStockWarnings(getStockWarnings());
     saveQuoteLoading.value = true;
     try {
         const items = buildQuoteItems();
@@ -1695,30 +1628,24 @@ const handleSaveQuote = async () => {
         });
 
         const quoteNumber = res.data?.data?.quote_number ?? '';
-        const apiWarnings = res.data?.warnings || res.data?.data?.warnings;
 
         clearCart();
 
-        let alertMsg = `Cotización ${quoteNumber} guardada correctamente.`;
-        if (
-            apiWarnings &&
-            Array.isArray(apiWarnings) &&
-            apiWarnings.length > 0
-        ) {
-            const warningMsgs = apiWarnings
-                .map((w: any) => w.message || JSON.stringify(w))
-                .join('\n- ');
-            alertMsg += `\n\nAdvertencias de stock:\n- ${warningMsgs}`;
-        }
+        toast.success(`Cotización ${quoteNumber} guardada correctamente.`);
+        notifyApiStockWarnings(res.data?.warnings || res.data?.data?.warnings);
 
+        // Navegar descarta la pantalla actual: sigue siendo una decisión del usuario.
         const shouldNavigate = confirm(
-            `${alertMsg}\n\n¿Deseas ir al listado de cotizaciones?`,
+            `Cotización ${quoteNumber} guardada.\n\n¿Deseas ir al listado de cotizaciones?`,
         );
         if (shouldNavigate) {
             window.location.href = '/sales-quotes';
         }
     } catch (e: any) {
-        alert(extractApiErrorMessage(e, 'Error al guardar la cotización'));
+        toast.error(
+            extractApiErrorMessage(e, 'Error al guardar la cotización'),
+            6000,
+        );
     } finally {
         saveQuoteLoading.value = false;
     }
@@ -1728,6 +1655,23 @@ const persistQuoteForDestination = async (): Promise<{
     id: number;
     quote_number: string;
 }> => {
+    if (props.quoteMode) {
+        if (
+            cart.value.length > 0 &&
+            !quoteDraft.dirty.value &&
+            !quoteDraft.quoteId.value
+        )
+            quoteDraft.recordChange();
+        if (!(await quoteDraft.flush()) || !quoteDraft.quoteId.value) {
+            throw new Error(
+                quoteDraft.error.value || 'No se pudo guardar la cotización.',
+            );
+        }
+        return {
+            id: quoteDraft.quoteId.value,
+            quote_number: String(activeSession.value.quote_number || ''),
+        };
+    }
     const payload = {
         customer_id: customer_id.value ?? null,
         customer_vehicle_id: customer_vehicle_id.value ?? null,
@@ -1761,25 +1705,24 @@ const handleQuoteDestination = async (
 ) => {
     if (quoteDestinationLoading.value || cart.value.length === 0) {
         if (cart.value.length === 0) {
-            alert('Agrega productos antes de enviar la cotización.');
+            toast.error('Agrega productos antes de enviar la cotización.');
         }
         return;
     }
 
-    const stockIssues = getStockWarnings('quote');
+    const stockIssues = getStockWarnings();
     const destinationMessage =
         destination === 'send-to-deposit'
             ? 'Se guardará la cotización y se creará una orden pendiente para bodega.'
             : 'Se guardará la cotización y se agregará a la cola de Caja.';
-    const stockMessage = stockIssues.length
-        ? `\n\nAdvertencias de stock:\n- ${stockIssues.join('\n- ')}`
-        : '';
 
-    if (
-        !confirm(`${destinationMessage}${stockMessage}\n\n¿Deseas continuar?`)
-    ) {
+    // Enviar la cotización tiene consecuencias: la confirmación sigue siendo explícita.
+    if (!confirm(`${destinationMessage}\n\n¿Deseas continuar?`)) {
         return;
     }
+
+    // El aviso de stock se muestra al continuar: un diálogo nativo taparía el toast.
+    notifyStockWarnings(stockIssues);
 
     quoteDestinationLoading.value = destination;
     let savedQuoteId: number | undefined;
@@ -1788,7 +1731,8 @@ const handleQuoteDestination = async (
         const savedQuote = await persistQuoteForDestination();
         savedQuoteId = savedQuote.id;
         await SalesQuotesApiService.transition(savedQuote.id, destination);
-        alert(
+        if (props.quoteMode) clearDraftOnUnmount = true;
+        toast.success(
             destination === 'send-to-deposit'
                 ? `Cotización ${savedQuote.quote_number} enviada a Depósito.`
                 : `Cotización ${savedQuote.quote_number} enviada a Caja.`,
@@ -1799,10 +1743,11 @@ const handleQuoteDestination = async (
             exception,
             'No se pudo completar el envío de la cotización.',
         );
-        alert(
+        toast.error(
             savedQuoteId
                 ? `La cotización quedó guardada, pero no fue enviada. ${message}`
                 : message,
+            6000,
         );
     } finally {
         quoteDestinationLoading.value = null;
@@ -1949,6 +1894,47 @@ const handleCashMovement = async (payload: {
 let returnSessionId: string | null = null;
 let editSessionId: string | null = null;
 
+const loadQuoteForEditor = (quote: any) => {
+    setCatalogVehicle(quote.vehicle_context ?? {});
+    loadQuoteAsSession(
+        {
+            id: quote.id,
+            quote_number: quote.quote_number,
+            status: quote.status,
+            total: quote.total,
+            customer_id: quote.customer?.id ?? quote.customer_id ?? null,
+            customer_vehicle_id: quote.customer_vehicle_id ?? null,
+            seller_id: quote.user?.id ?? quote.user_id ?? null,
+            customer_name: quote.customer?.name ?? null,
+            seller_name: quote.user?.name ?? null,
+            created_at: quote.created_at ?? null,
+            notes: quote.notes ?? null,
+            internal_notes: quote.internal_notes ?? null,
+            items: (quote.items ?? []).map((item: any) => ({
+                id: item.id,
+                product_id: item.product_id ?? null,
+                product_name: item.product_name,
+                product_sku: item.product_sku,
+                variant_id: item.variant_id ?? null,
+                warehouse_id: item.warehouse_id ?? null,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                discount_percent: item.discount_percent,
+                discount_amount: item.discount_amount,
+                tax_percent: normalizeTaxPercent(item.tax_percent),
+                subtotal: item.subtotal,
+                tax_amount: item.tax_amount,
+                total: item.total,
+                notes: item.notes ?? null,
+                is_custom_line: !!item.is_custom_line,
+                custom_description: item.custom_description ?? null,
+                variant: item.variant ?? null,
+            })),
+        },
+        true,
+    );
+};
+
 onMounted(async () => {
     if (
         isStrictCashier.value &&
@@ -1961,9 +1947,9 @@ onMounted(async () => {
 
     window.addEventListener('keydown', handleKeyboard);
 
-    // UX-001: Prevent accidental tab close or refresh when cart has items
+    // A local quote snapshot survives refresh; warn only while the server has not acknowledged it.
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-        if (cart.value.length > 0) {
+        if (props.quoteMode ? quoteDraft.dirty.value : cart.value.length > 0) {
             e.preventDefault();
             e.returnValue = '';
         }
@@ -1972,6 +1958,47 @@ onMounted(async () => {
 
     // UX-001: Intercept Inertia navigation when cart has items
     const removeInertiaListener = router.on('before', (event) => {
+        if (props.quoteMode) {
+            if (allowSavedQuoteNavigation) {
+                allowSavedQuoteNavigation = false;
+                return true;
+            }
+            if (!quoteDraft.dirty.value) {
+                clearDraftOnUnmount = !!quoteDraft.quoteId.value;
+                return true;
+            }
+            const originalVisit = (event as any)?.detail?.visit;
+            const target = originalVisit?.url;
+            const targetUrl =
+                typeof target === 'string' ? target : target?.toString();
+            void quoteDraft.flush().then((saved) => {
+                if (saved && targetUrl) {
+                    clearDraftOnUnmount = !!quoteDraft.quoteId.value;
+                    allowSavedQuoteNavigation = true;
+                    router.visit(targetUrl, {
+                        method: originalVisit.method,
+                        data: originalVisit.data,
+                        headers: originalVisit.headers,
+                        replace: originalVisit.replace,
+                        preserveState: originalVisit.preserveState,
+                        preserveScroll: originalVisit.preserveScroll,
+                        only: originalVisit.only,
+                        except: originalVisit.except,
+                        errorBag: originalVisit.errorBag,
+                        forceFormData: originalVisit.forceFormData,
+                        queryStringArrayFormat:
+                            originalVisit.queryStringArrayFormat,
+                    });
+                } else if (!saved) {
+                    toast.error(
+                        quoteDraft.error.value ||
+                            'No se pudo guardar la cotización.',
+                        6000,
+                    );
+                }
+            });
+            return false;
+        }
         if (cart.value.length > 0) {
             // Allow navigation when explicitly approved (e.g. after sale completes)
             const target = (event as any)?.detail?.visit?.url?.pathname || '';
@@ -2000,7 +2027,7 @@ onMounted(async () => {
 
     await initWarehouse();
 
-    // Skip session check in quote mode, return mode, and edit mode — no cash register needed
+    // Amending a paid order needs an active cash session; drafts do not.
     if (!props.quoteMode && !props.returnMode && !props.editMode) {
         // Session source of truth comes from backend before showing open-session flow
         await checkCurrentSession(currentWarehouseId.value ?? undefined);
@@ -2058,41 +2085,75 @@ onMounted(async () => {
         editSessionId = activeSessionId.value;
 
         await loadOrderForEdit(props.orderId);
+        if (isPostSaleAmendment.value) {
+            await checkCurrentSession(currentWarehouseId.value ?? undefined);
+        }
     }
 
-    // In quote mode with an existing quote, auto-load it into the cart
-    if (props.quoteMode && props.quoteId) {
+    if (props.quoteMode) {
+        restoringQuoteDraft = true;
         try {
-            const res = await apiClient.get(`/sales-quotes/${props.quoteId}`);
-            const q = res.data;
-            loadQuoteAsSession({
-                id: q.id,
-                quote_number: q.quote_number,
-                customer_id: q.customer?.id ?? null,
-                customer_vehicle_id: q.customer_vehicle_id ?? null,
-                items: (q.items ?? []).map((item: any) => ({
-                    product_id: item.product_id ?? null,
-                    product_name: item.product_name,
-                    product_sku: item.product_sku,
-                    variant_id: item.variant_id ?? null,
-                    warehouse_id: item.warehouse_id ?? null,
-                    quantity: item.quantity,
-                    unit_price: item.unit_price,
-                    discount_percent: item.discount_percent,
-                    discount_amount: item.discount_amount,
-                    tax_percent: normalizeTaxPercent(item.tax_percent),
-                    subtotal: item.subtotal,
-                    tax_amount: item.tax_amount,
-                    total: item.total,
-                    is_custom_line: !!item.is_custom_line,
-                    custom_description: item.custom_description ?? null,
-                    variant: item.variant ?? null,
-                })),
-            });
+            let serverQuote: any = null;
+            if (props.quoteId) {
+                const response = await apiClient.get(
+                    `/sales-quotes/${props.quoteId}`,
+                );
+                serverQuote = response.data;
+                loadQuoteForEditor(serverQuote);
+            }
+            const warehouseId = Number(
+                currentWarehouseId.value || serverQuote?.warehouse_id || 0,
+            );
+            if (!warehouseId) {
+                throw new Error(
+                    'Selecciona una sucursal antes de crear la cotización.',
+                );
+            }
+            const userId = Number((page.props.auth?.user as any)?.id || 0);
+            const local = quoteDraft.start(
+                userId,
+                warehouseId,
+                props.quoteId,
+                Number(serverQuote?.draft_revision || 0),
+                serverQuote?.idempotency_key,
+            );
+            if (!serverQuote && quoteDraft.quoteId.value) {
+                const response = await apiClient.get(
+                    `/sales-quotes/${quoteDraft.quoteId.value}`,
+                );
+                serverQuote = response.data;
+                quoteDraft.reconcileServer(serverQuote);
+                if (!local?.dirty) loadQuoteForEditor(serverQuote);
+            }
+            if (local?.dirty) {
+                cart.value = local.cart as typeof cart.value;
+                customer_id.value = local.payload.customer_id ?? undefined;
+                customer_vehicle_id.value =
+                    local.payload.customer_vehicle_id ?? undefined;
+                seller_id.value = local.payload.seller_id ?? seller_id.value;
+                notes.value = local.payload.notes ?? '';
+                internal_notes.value = local.payload.internal_notes ?? '';
+                activeSession.value.source_quote_id =
+                    local.quoteId ?? undefined;
+                if (local.vehicleContext)
+                    setCatalogVehicle(local.vehicleContext);
+            }
+            if (
+                serverQuote &&
+                (!['draft', 'sent'].includes(serverQuote.status) ||
+                    serverQuote.converted_order_id)
+            ) {
+                quoteDraft.conflict.value = true;
+                quoteDraft.error.value =
+                    'Esta cotización ya fue enviada o tiene una orden vinculada. Abre su detalle para continuar.';
+            }
         } catch (e: any) {
-            console.error('Error loading quote:', e);
             error.value =
-                e.response?.data?.message || 'Error al cargar la cotización';
+                e.response?.data?.message ||
+                e.message ||
+                'Error al cargar la cotización';
+        } finally {
+            restoringQuoteDraft = false;
         }
     }
 
@@ -2103,6 +2164,14 @@ onMounted(async () => {
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyboard);
+    if (props.quoteMode && quoteEditorSession) {
+        if (clearDraftOnUnmount) quoteDraft.clearAfterLeave();
+        quoteDraft.dispose();
+        closeQuoteEditorSession(
+            quoteEditorSession.sessionId,
+            quoteEditorSession.previousSessionId,
+        );
+    }
 
     // UX-001: Cleanup beforeunload and Inertia listener
     const cleanup = (window as any).__posCleanup;
@@ -2274,7 +2343,10 @@ onUnmounted(() => {
                             {{ formatCurrency(editOrderData?.total || 0) }}
                         </p>
                     </div>
-                    <div class="border-l border-blue-500 pl-6 text-right">
+                    <div
+                        v-if="isPostSaleAmendment"
+                        class="border-l border-blue-500 pl-6 text-right"
+                    >
                         <p class="text-xs text-blue-200">Diferencia a cobrar</p>
                         <p class="text-2xl font-bold">
                             {{ formatCurrency(orderDiff.total) }}
@@ -2289,7 +2361,7 @@ onUnmounted(() => {
             v-if="props.quoteMode"
             class="z-20 shrink-0 bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white shadow-sm"
         >
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
                     <button
                         @click="router.visit('/sales-quotes')"
@@ -2328,6 +2400,22 @@ onUnmounted(() => {
                                 </template>
                                 <template v-else> NUEVA COTIZACIÓN </template>
                             </p>
+                            <p
+                                data-test="quote-autosave-status"
+                                class="mt-1 text-xs text-purple-100"
+                            >
+                                {{
+                                    quoteDraft.conflict.value
+                                        ? 'Requiere revisión'
+                                        : quoteDraft.saving.value
+                                          ? 'Guardando…'
+                                          : quoteDraft.dirty.value
+                                            ? 'Cambios pendientes'
+                                            : quoteDraft.quoteId.value
+                                              ? 'Guardada'
+                                              : 'Se guardará al agregar productos'
+                                }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -2344,11 +2432,139 @@ onUnmounted(() => {
                     </div>
                 </div>
             </div>
+            <div
+                v-if="isQuoteSession"
+                class="mt-3 flex flex-wrap gap-x-6 gap-y-2 border-t border-purple-300/30 pt-3 text-sm"
+            >
+                <span
+                    ><span class="text-purple-200">Cliente:</span>
+                    {{ quoteSessionInfo.customerName }}</span
+                >
+                <span
+                    ><span class="text-purple-200">Vendedor:</span>
+                    {{ quoteSessionInfo.sellerName || 'Sin vendedor' }}</span
+                >
+                <span
+                    ><span class="text-purple-200">Creada:</span>
+                    {{
+                        quoteSessionInfo.createdAt
+                            ? formatReportDateTime(quoteSessionInfo.createdAt)
+                            : 'Sin fecha'
+                    }}</span
+                >
+                <span
+                    ><span class="text-purple-200">Estado:</span>
+                    {{ quoteSessionInfo.status }}</span
+                >
+                <span v-if="quoteSessionInfo.confirmedTotal !== undefined"
+                    ><span class="text-purple-200">Total guardado:</span>
+                    {{ formatCurrency(quoteSessionInfo.confirmedTotal) }}</span
+                >
+            </div>
+            <p
+                v-if="isQuoteSession && quoteSessionInfo.notes"
+                class="mt-2 text-sm text-purple-100"
+            >
+                <span class="font-semibold">Notas:</span>
+                {{ quoteSessionInfo.notes }}
+            </p>
+            <p
+                v-if="isQuoteSession && quoteTotalHasChanged"
+                class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
+            >
+                El total actual difiere del último total guardado. Guarda la
+                cotización para actualizarlo.
+            </p>
         </div>
 
-        <!-- Header - Fixed Height (hidden in quoteMode, returnMode, and editMode — no cash register needed) -->
+        <!-- Cotización en curso (cobro desde la Cola de Caja) -->
         <div
-            v-if="!props.quoteMode && !props.returnMode && !props.editMode"
+            v-if="
+                isQuoteSession &&
+                !props.quoteMode &&
+                !props.returnMode &&
+                !props.editMode
+            "
+            data-test="quote-session-banner"
+            class="z-20 shrink-0 bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-white shadow-sm"
+        >
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-2">
+                    <FileText class="h-6 w-6 shrink-0 text-emerald-200" />
+                    <div>
+                        <h2 class="text-lg font-bold">
+                            COTIZACIÓN #{{ quoteSessionInfo.number }}
+                        </h2>
+                        <p class="text-sm text-emerald-100">
+                            Estado: {{ quoteSessionInfo.status }} · Cobrando una
+                            cotización enviada a Caja
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-6">
+                    <div>
+                        <p class="text-xs text-emerald-200">Cliente</p>
+                        <p
+                            data-test="quote-session-customer"
+                            class="text-sm font-medium"
+                        >
+                            {{ quoteSessionInfo.customerName }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-emerald-200">Vendedor</p>
+                        <p
+                            data-test="quote-session-seller"
+                            class="text-sm font-medium"
+                        >
+                            {{ quoteSessionInfo.sellerName || 'Sin vendedor' }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-emerald-200">Creada</p>
+                        <p
+                            data-test="quote-session-created-at"
+                            class="text-sm font-medium"
+                        >
+                            {{
+                                formatReportDateTime(quoteSessionInfo.createdAt)
+                            }}
+                        </p>
+                    </div>
+                    <div class="border-l border-emerald-400/40 pl-6 text-right">
+                        <p class="text-xs text-emerald-200">Total a cobrar</p>
+                        <p class="text-2xl font-bold">
+                            {{ formatCurrency(cartTotal) }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <p
+                v-if="quoteSessionInfo.notes"
+                data-test="quote-session-notes"
+                class="mt-2 border-t border-emerald-400/30 pt-2 text-sm text-emerald-100"
+            >
+                <span class="font-semibold">Notas:</span>
+                {{ quoteSessionInfo.notes }}
+            </p>
+            <p
+                v-if="quoteTotalHasChanged"
+                class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
+            >
+                El total actual {{ formatCurrency(cartTotal) }} difiere del
+                total guardado
+                {{ formatCurrency(quoteSessionInfo.confirmedTotal || 0) }}.
+                Revisa la cotización antes de cobrar.
+            </p>
+        </div>
+
+        <!-- Cash register is also available while charging a post-sale amendment. -->
+        <div
+            v-if="
+                !props.quoteMode &&
+                !props.returnMode &&
+                (!props.editMode || isPostSaleAmendment)
+            "
             class="relative z-20 shrink-0 shadow-sm"
         >
             <CashRegisterStatus
@@ -2367,6 +2583,10 @@ onUnmounted(() => {
                 @close="closeOpenSessionModal"
             />
         </div>
+
+        <VehicleContextHeader
+            v-if="!props.returnMode && !props.editMode && canUseProductSearch"
+        />
 
         <!-- Main Content - Flex to fill remaining height -->
         <main
@@ -2634,6 +2854,39 @@ onUnmounted(() => {
                             este vehículo.
                         </p>
                     </div>
+                    <div v-if="props.quoteMode" class="mt-3 space-y-2">
+                        <label
+                            for="quote-notes"
+                            class="text-xs font-medium text-muted-foreground"
+                            >Notas de la cotización</label
+                        >
+                        <textarea
+                            id="quote-notes"
+                            v-model="notes"
+                            rows="2"
+                            class="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                            placeholder="Indicaciones para el cliente"
+                        ></textarea>
+                        <label
+                            for="quote-internal-notes"
+                            class="text-xs font-medium text-muted-foreground"
+                            >Notas internas</label
+                        >
+                        <textarea
+                            id="quote-internal-notes"
+                            v-model="internal_notes"
+                            rows="2"
+                            class="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                            placeholder="Información para el equipo"
+                        ></textarea>
+                    </div>
+                </div>
+                <div
+                    v-if="props.quoteMode && quoteDraft.error.value"
+                    class="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                    data-test="quote-draft-error"
+                >
+                    {{ quoteDraft.error.value }}
                 </div>
                 <div
                     v-if="error && !props.returnMode && !props.editMode"
@@ -2699,9 +2952,52 @@ onUnmounted(() => {
                             {{ editError }}
                         </div>
 
+                        <div
+                            v-if="
+                                editOrderData?.source_quote?.id &&
+                                !isPostSaleAmendment
+                            "
+                            class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+                        >
+                            Esta transacción se modifica desde su cotización.
+                            <button
+                                type="button"
+                                class="mt-2 block font-semibold underline"
+                                @click="
+                                    router.visit(
+                                        `/sales-quotes/${editOrderData.source_quote.id}`,
+                                    )
+                                "
+                            >
+                                Abrir cotización
+                            </button>
+                        </div>
+
+                        <p
+                            v-if="isEditableDraftOrder"
+                            class="rounded-xl bg-blue-50 p-4 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                        >
+                            Guarda los cambios de esta orden pendiente sin
+                            realizar un cobro.
+                        </p>
+
+                        <div
+                            v-if="
+                                isPostSaleAmendment &&
+                                amendmentPreview.error &&
+                                cart.length > 0
+                            "
+                            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+                        >
+                            {{ amendmentPreview.error }}
+                        </div>
+
                         <!-- Show diff summary -->
                         <div
-                            v-if="orderDiff.items.length > 0"
+                            v-if="
+                                isPostSaleAmendment &&
+                                orderDiff.items.length > 0
+                            "
                             class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-700 dark:bg-blue-900/20"
                         >
                             <p
@@ -2741,7 +3037,9 @@ onUnmounted(() => {
 
                         <!-- No changes message -->
                         <div
-                            v-else
+                            v-else-if="
+                                isPostSaleAmendment && !amendmentPreview.error
+                            "
                             class="rounded-xl bg-gray-50 p-4 text-center dark:bg-muted"
                         >
                             <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -2751,8 +3049,8 @@ onUnmounted(() => {
 
                         <!-- Action buttons -->
                         <button
-                            v-if="orderDiff.total > 0"
-                            @click="openPaymentModal('cash')"
+                            v-if="isPostSaleAmendment && orderDiff.total > 0"
+                            @click="openPaymentModal()"
                             :disabled="editLoading"
                             class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-blue-600 text-lg font-bold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
                         >
@@ -2783,9 +3081,9 @@ onUnmounted(() => {
                         </button>
 
                         <button
-                            v-else-if="orderDiff.items.length > 0"
-                            @click="confirmEditOrder"
-                            :disabled="editLoading"
+                            v-else-if="isEditableDraftOrder"
+                            @click="saveEditableOrder"
+                            :disabled="editLoading || cart.length === 0"
                             class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-blue-600 text-lg font-bold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
                         >
                             <svg
@@ -2812,7 +3110,10 @@ onUnmounted(() => {
                         </button>
 
                         <button
-                            v-else-if="orderDiff.items.length === 0"
+                            v-else-if="
+                                isPostSaleAmendment &&
+                                orderDiff.items.length === 0
+                            "
                             disabled
                             class="flex h-14 w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl bg-gray-300 text-lg font-bold text-gray-500 dark:bg-muted"
                         >
@@ -2852,7 +3153,7 @@ onUnmounted(() => {
                             handleQuoteDestination('send-to-cashier')
                         "
                         @open-cash-register="forceShowOpenSessionModal = true"
-                        @open-payment-modal="openPaymentModal('cash')"
+                        @open-payment-modal="openPaymentModal()"
                     />
                     <button
                         v-if="isStrictCashier && isQuoteSession"
@@ -2895,8 +3196,8 @@ onUnmounted(() => {
             :subtotal="cartSubtotal"
             :tax-amount="cartTax"
             :discount-amount="cartDiscount"
-            :loading="loading"
-            :error="error"
+            :loading="props.editMode ? editLoading : loading"
+            :error="props.editMode ? editError : error"
             @finish="handleUnifiedPaymentFinish"
             @cancel="closePaymentModal"
         />

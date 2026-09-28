@@ -11,7 +11,146 @@ import type {
     FinancialDrilldownReport,
     FinancialAdvancedStatusReport,
     IncomeStatementReport,
+    BrandProfitabilityRow,
+    CategoryProfitabilityRow,
+    LineProfitabilityApiRow,
+    LineProfitabilityGroupBy,
+    LineProfitabilityRow,
+    SalesByProductFilters,
+    SalesByProductReport,
+    SalesByProductRow,
+    SalesByProductSummary,
 } from '@/types/report';
+
+const toNumber = (value: unknown): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const roundMoney = (value: number): number =>
+    Math.round((value + Number.EPSILON) * 100) / 100;
+
+/**
+ * Normaliza las filas de marca y categoria a una forma comun para la tabla.
+ * El backend entrega `brand_id`/`brand_name` o `category_id`/`category_name`
+ * segun el endpoint consultado.
+ */
+export const normalizeLineProfitabilityRows = (
+    rows: LineProfitabilityApiRow[] | null | undefined,
+    groupBy: LineProfitabilityGroupBy,
+): LineProfitabilityRow[] => {
+    if (!Array.isArray(rows)) return [];
+
+    return rows.map((row, index) => {
+        const id =
+            groupBy === 'brand'
+                ? (row as BrandProfitabilityRow).brand_id
+                : (row as CategoryProfitabilityRow).category_id;
+        const label =
+            groupBy === 'brand'
+                ? (row as BrandProfitabilityRow).brand_name
+                : (row as CategoryProfitabilityRow).category_name;
+
+        return {
+            key: `${groupBy}-${id ?? `sin-asignar-${index}`}`,
+            label:
+                label || (groupBy === 'brand' ? 'Sin marca' : 'Sin categoria'),
+            revenue: toNumber(row.revenue),
+            cogs: toNumber(row.cogs),
+            profit: toNumber(row.profit),
+            items_sold: toNumber(row.items_sold),
+            margin: toNumber(row.margin),
+        };
+    });
+};
+
+/**
+ * Totales de la tabla de rentabilidad. El margen no se suma: se recalcula
+ * sobre los totales para que la fila final sea el margen real del periodo.
+ */
+export const sumLineProfitability = (
+    rows: LineProfitabilityRow[],
+): Omit<LineProfitabilityRow, 'key' | 'label'> => {
+    const totals = rows.reduce(
+        (carry, row) => ({
+            revenue: carry.revenue + toNumber(row.revenue),
+            cogs: carry.cogs + toNumber(row.cogs),
+            profit: carry.profit + toNumber(row.profit),
+            items_sold: carry.items_sold + toNumber(row.items_sold),
+        }),
+        { revenue: 0, cogs: 0, profit: 0, items_sold: 0 },
+    );
+
+    return {
+        revenue: roundMoney(totals.revenue),
+        cogs: roundMoney(totals.cogs),
+        profit: roundMoney(totals.profit),
+        items_sold: roundMoney(totals.items_sold),
+        margin:
+            totals.revenue > 0
+                ? roundMoney((totals.profit / totals.revenue) * 100)
+                : 0,
+    };
+};
+
+export const emptySalesByProductSummary = (): SalesByProductSummary => ({
+    count: 0,
+    quantity_sold: 0,
+    quantity_returned: 0,
+    gross_sales: 0,
+    returns_amount: 0,
+    net_sales: 0,
+    cost: 0,
+    profit: 0,
+});
+
+/**
+ * Totales de ventas por producto. Se usa el `summary` del backend cuando
+ * existe (cubre todas las paginas) y se suman las filas visibles si falta.
+ */
+export const sumSalesByProduct = (
+    rows: SalesByProductRow[],
+    summary?: SalesByProductSummary | null,
+): SalesByProductSummary => {
+    if (summary) {
+        return {
+            count: toNumber(summary.count),
+            quantity_sold: toNumber(summary.quantity_sold),
+            quantity_returned: toNumber(summary.quantity_returned),
+            gross_sales: toNumber(summary.gross_sales),
+            returns_amount: toNumber(summary.returns_amount),
+            net_sales: toNumber(summary.net_sales),
+            cost: toNumber(summary.cost),
+            profit: toNumber(summary.profit),
+        };
+    }
+
+    const totals = rows.reduce<SalesByProductSummary>(
+        (carry, row) => ({
+            ...carry,
+            count: carry.count + 1,
+            quantity_sold: carry.quantity_sold + toNumber(row.quantity_sold),
+            quantity_returned:
+                carry.quantity_returned + toNumber(row.quantity_returned),
+            gross_sales: carry.gross_sales + toNumber(row.gross_sales),
+            returns_amount: carry.returns_amount + toNumber(row.returns_amount),
+            net_sales: carry.net_sales + toNumber(row.net_sales),
+            cost: carry.cost + toNumber(row.cost),
+        }),
+        emptySalesByProductSummary(),
+    );
+
+    return {
+        count: totals.count,
+        quantity_sold: roundMoney(totals.quantity_sold),
+        quantity_returned: roundMoney(totals.quantity_returned),
+        gross_sales: roundMoney(totals.gross_sales),
+        returns_amount: roundMoney(totals.returns_amount),
+        net_sales: roundMoney(totals.net_sales),
+        cost: roundMoney(totals.cost),
+        profit: roundMoney(totals.net_sales - totals.cost),
+    };
+};
 
 export function useReports() {
     const stockLevelsReport = ref<StockLevelsReport | null>(null);
@@ -102,8 +241,11 @@ export function useReports() {
     const financialReport = ref<any>(null);
     const incomeStatementReport = ref<IncomeStatementReport | null>(null);
     const financialPositionReport = ref<any>(null);
-    const brandProfitabilityReport = ref<any[] | null>(null);
-    const categoryProfitabilityReport = ref<any[] | null>(null);
+    const brandProfitabilityReport = ref<BrandProfitabilityRow[] | null>(null);
+    const categoryProfitabilityReport = ref<CategoryProfitabilityRow[] | null>(
+        null,
+    );
+    const salesByProductReport = ref<SalesByProductReport | null>(null);
     const zReport = ref<any>(null);
     const dailySummary = ref<DailyFinancialSummary | null>(null);
     const balanceSheet = ref<BalanceSheetReport | null>(null);
@@ -227,6 +369,26 @@ export function useReports() {
                 err.response?.data?.message ||
                 'Error fetching category profitability';
             console.error('Error fetching category profitability:', err);
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    /**
+     * Fetch sales by product report
+     */
+    const fetchSalesByProduct = async (filters: SalesByProductFilters) => {
+        loading.value = true;
+        error.value = null;
+
+        try {
+            salesByProductReport.value =
+                await ReportsApiService.getSalesByProduct(filters);
+        } catch (err: any) {
+            error.value =
+                err.response?.data?.message ||
+                'Error fetching sales by product';
+            console.error('Error fetching sales by product:', err);
         } finally {
             loading.value = false;
         }
@@ -430,6 +592,7 @@ export function useReports() {
         financialPositionReport,
         brandProfitabilityReport,
         categoryProfitabilityReport,
+        salesByProductReport,
         zReport,
         dailySummary,
         balanceSheet,
@@ -446,6 +609,7 @@ export function useReports() {
         fetchFinancialPosition,
         fetchBrandProfitability,
         fetchCategoryProfitability,
+        fetchSalesByProduct,
         fetchZReport,
         exportZReport,
         fetchDailySummary,

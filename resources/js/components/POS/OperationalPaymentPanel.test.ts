@@ -111,3 +111,38 @@ describe('OperationalPaymentPanel', () => {
         expect(vm.canFinish).toBe(true);
     });
 });
+
+it('allows optional bank accounts and enforces the exact amount and reference', async () => {
+    const wrapper = mount(OperationalPaymentPanel, {
+        props: {
+            show: true,
+            amountToCharge: 100,
+            exactAmount: true,
+            mode: 'purchase',
+        },
+    });
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    vm.dynamicMethods[0].requires_financial_account = false;
+    vm.dynamicMethods[0].requires_reference = true;
+    vm.payments.transfer = 101;
+    vm.paymentReferences.transfer = 'Y-1';
+    await nextTick();
+    expect(vm.canFinish).toBe(false);
+    vm.payments.transfer = 100;
+    vm.paymentReferences.transfer = '';
+    await nextTick();
+    expect(vm.canFinish).toBe(false);
+    vm.paymentReferences.transfer = 'Y-1';
+    await nextTick();
+    expect(vm.canFinish).toBe(true);
+    vm.handleFinish();
+    expect(wrapper.emitted('finish')?.[0]?.[0]).toEqual([
+        expect.objectContaining({
+            amount: 100,
+            financial_account_id: null,
+            reference_number: 'Y-1',
+        }),
+    ]);
+    wrapper.unmount();
+});

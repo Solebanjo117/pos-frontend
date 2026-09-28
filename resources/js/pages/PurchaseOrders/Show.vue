@@ -8,16 +8,12 @@ import {
     FileText,
     Package,
     PackageCheck,
-    Pencil,
     Plus,
-    Send,
     Trash2,
     UserRound,
-    XCircle,
 } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
-import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
@@ -29,6 +25,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
 import { formatCurrency } from '@/utils/formatters';
+import { createIdempotencyKey } from '@/utils/idempotency';
 
 const props = defineProps<{ purchaseOrderId: number }>();
 const {
@@ -48,6 +45,41 @@ const paymentStatus = ref<string>('pending');
 const amountPaid = ref<number>(0);
 const amountDue = ref<number>(0);
 const showPaymentModal = ref(false);
+const requestedPaymentAmount = ref(0);
+const requestedPaymentNotes = ref('');
+const paymentRequestKey = ref<string | null>(null);
+const paymentRequests = ref<any[]>([]);
+const activePaymentRequest = computed(() =>
+    paymentRequests.value.find((request) =>
+        ['pending', 'opened'].includes(request.queue_entry?.status),
+    ),
+);
+async function loadPaymentRequests() {
+    paymentRequests.value =
+        (
+            await apiClient.get(
+                `/purchase-orders/${props.purchaseOrderId}/payment-requests`,
+            )
+        ).data.data ?? [];
+}
+async function cancelPaymentRequest() {
+    if (!activePaymentRequest.value) return;
+    paymentLoading.value = true;
+    paymentError.value = null;
+    try {
+        await apiClient.post(
+            `/purchase-orders/${props.purchaseOrderId}/payment-requests/${activePaymentRequest.value.id}/cancel`,
+            { reason: 'Cancelación solicitada desde la compra.' },
+        );
+        await loadPaymentRequests();
+    } catch (error: any) {
+        paymentError.value =
+            error.response?.data?.message ||
+            'No se pudo cancelar la solicitud.';
+    } finally {
+        paymentLoading.value = false;
+    }
+}
 const paymentLoading = ref(false);
 const paymentError = ref<string | null>(null);
 const activeTab = ref<
@@ -189,6 +221,7 @@ async function loadPayments() {
     amountPaid.value = res.data.amount_paid;
     amountDue.value = res.data.amount_due;
     paymentStatus.value = res.data.payment_status;
+    await loadPaymentRequests();
 }
 
 function updatePurchaseOrderBusinessDatetime(value: string | null) {
@@ -207,45 +240,29 @@ function updatePurchasePaymentBusinessDatetime(
     }
 }
 
-async function handlePurchasePaymentFinish(
-    submittedPayments: { method: string; amount: number }[],
-    meta: {
-        reference_number?: string | null;
-        notes?: string | null;
-    },
-) {
+async function requestPurchasePayment() {
     paymentLoading.value = true;
     paymentError.value = null;
-
+    paymentRequestKey.value ??= createIdempotencyKey();
     try {
-        const realPayments = submittedPayments.filter(
-            (payment) => payment.amount > 0,
+        await apiClient.post(
+            `/purchase-orders/${props.purchaseOrderId}/payment-requests`,
+            {
+                amount: requestedPaymentAmount.value,
+                notes: requestedPaymentNotes.value || null,
+                idempotency_key: paymentRequestKey.value,
+            },
         );
-
-        for (const payment of realPayments) {
-            await apiClient.post(
-                `/purchase-orders/${props.purchaseOrderId}/payments`,
-                {
-                    warehouse_id: purchaseOrder.value?.warehouse_id,
-                    amount: payment.amount,
-                    method: payment.method,
-                    reference_number: meta.reference_number || null,
-                    notes: meta.notes || null,
-                },
-            );
-        }
-
         showPaymentModal.value = false;
-        await loadPayments();
-        await fetchPurchaseOrderById(props.purchaseOrderId);
-    } catch (e: any) {
+        paymentRequestKey.value = null;
+        await loadPaymentRequests();
+    } catch (error: any) {
         paymentError.value =
-            e.response?.data?.message || 'Error al registrar el pago.';
+            error.response?.data?.message || 'No se pudo enviar la solicitud.';
     } finally {
         paymentLoading.value = false;
     }
 }
-
 async function deletePayment(id: number) {
     if (!confirm('Eliminar este pago?')) return;
     await apiClient.delete(
@@ -1470,16 +1487,20 @@ onMounted(async () => {
                                         </span>
                                     </div>
                                     <button
-                                        v-if="amountDue > 0"
+                                        v-if="
+                                            amountDue > 0 &&
+                                            !activePaymentRequest
+                                        "
                                         type="button"
                                         class="inline-flex items-center gap-2 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
                                         @click="
+                                            requestedPaymentAmount = amountDue;
                                             showPaymentModal = true;
                                             paymentError = null;
                                         "
                                     >
                                         <Plus :size="15" />
-                                        Registrar Pago
+                                        Solicitar pago en Caja
                                     </button>
                                 </div>
                                 <p
@@ -1570,44 +1591,79 @@ onMounted(async () => {
             </main>
         </div>
 
-        <OperationalPaymentPanel
-            mode="purchase"
-            :show="showPaymentModal"
-            :amount-to-charge="amountDue"
-            :subtotal="amountDue"
-            title="Registrar pago OC"
-            primary-action-label="Registrar pago"
-            cancel-label="Cancelar"
-            allow-partial
-            payment-context="purchase_orders"
-            show-reference-number
-            show-notes
-            reference-number-label="Numero de recibo"
-            notes-label="Notas"
-            :loading="paymentLoading"
-            :error="paymentError"
-            @finish="handlePurchasePaymentFinish"
-            @cancel="
-                showPaymentModal = false;
-                paymentError = null;
-            "
+        <div
+            v-if="activePaymentRequest"
+            class="mx-5 my-3 flex items-center justify-between rounded-md border p-3 text-sm"
         >
-            <template #details>
-                <div
-                    class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
-                >
-                    Efectivo, tarjeta, transferencia u otro método real se
-                    concilian contra la caja abierta de
-                    <span class="font-semibold">
-                        {{
-                            purchaseOrder?.warehouse?.name ||
-                            'la sucursal de la OC'
-                        }}
-                    </span>
-                    . El crédito proveedor queda como cuenta por pagar, no como
-                    pago inmediato.
+            <span
+                >Solicitud #{{ activePaymentRequest.id }} en Caja ·
+                {{ formatCurrency(activePaymentRequest.amount) }}</span
+            >
+            <button
+                type="button"
+                :disabled="paymentLoading"
+                @click="cancelPaymentRequest"
+            >
+                Cancelar solicitud
+            </button>
+        </div>
+        <div
+            v-if="showPaymentModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Solicitar pago en Caja"
+        >
+            <form
+                class="w-full max-w-md space-y-4 rounded-md border bg-card p-5"
+                @submit.prevent="requestPurchasePayment"
+            >
+                <h2 class="font-semibold">Solicitar pago en Caja</h2>
+                <p class="text-sm">
+                    Saldo pendiente: {{ formatCurrency(amountDue) }}
+                </p>
+                <label class="block text-sm"
+                    >Total o abono
+                    <input
+                        v-model.number="requestedPaymentAmount"
+                        type="number"
+                        min="0.01"
+                        :max="amountDue"
+                        step="0.01"
+                        required
+                        class="mt-1 w-full rounded-md border bg-background p-2"
+                        @input="paymentRequestKey = null"
+                    />
+                </label>
+                <label class="block text-sm"
+                    >Notas
+                    <textarea
+                        v-model="requestedPaymentNotes"
+                        maxlength="500"
+                        class="mt-1 w-full rounded-md border bg-background p-2"
+                        @input="paymentRequestKey = null"
+                    />
+                </label>
+                <p v-if="paymentError" class="text-sm text-red-600">
+                    {{ paymentError }}
+                </p>
+                <div class="flex justify-end gap-3">
+                    <button
+                        type="button"
+                        :disabled="paymentLoading"
+                        @click="showPaymentModal = false"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="submit"
+                        :disabled="paymentLoading"
+                        class="rounded-md bg-primary px-3 py-2 text-primary-foreground"
+                    >
+                        Enviar a Caja
+                    </button>
                 </div>
-            </template>
-        </OperationalPaymentPanel>
+            </form>
+        </div>
     </AppLayout>
 </template>

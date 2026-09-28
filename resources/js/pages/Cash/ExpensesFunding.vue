@@ -173,7 +173,7 @@ onUnmounted(() => {
                     </h1>
                     <p class="mt-1 text-sm text-muted-foreground">
                         Registra una solicitud pendiente para que Caja confirme
-                        el movimiento en efectivo.
+                        los métodos y cuentas de la operación.
                     </p>
                 </div>
                 <Link
@@ -234,7 +234,8 @@ onUnmounted(() => {
                             ><span class="font-medium">Método</span
                             ><span
                                 class="flex min-h-10 items-center gap-2 rounded-md border bg-muted/40 px-3"
-                                ><Banknote class="size-4" /> Efectivo</span
+                                ><Banknote class="size-4" /> Se elige en
+                                Caja</span
                             ></label
                         >
                     </div>

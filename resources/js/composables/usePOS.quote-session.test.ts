@@ -145,6 +145,63 @@ describe('usePOS quote sessions', () => {
         wrapper.unmount();
     });
 
+    it('persists the quote header data so the POS can display it', async () => {
+        const { usePOS } = await import('./usePOS');
+        let pos: ReturnType<typeof usePOS>;
+        const Harness = defineComponent({
+            setup() {
+                pos = usePOS();
+                return () => h('div');
+            },
+        });
+        const wrapper = mount(Harness);
+
+        pos!.loadQuoteAsSession({
+            ...quote(1),
+            customer_name: 'Taller Los Andes',
+            seller_name: 'Ana Vendedora',
+            created_at: '2026-08-25T09:45:00.000Z',
+        });
+        const session = pos!.activeSession.value;
+
+        expect(session.source_quote_id).toBe(19);
+        expect(session.quote_number).toBe('0000000269');
+        expect(session.quote_customer_name).toBe('Taller Los Andes');
+        expect(session.quote_seller_name).toBe('Ana Vendedora');
+        expect(session.quote_created_at).toBe('2026-08-25T09:45:00.000Z');
+        expect(session.quote_notes).toBe('Entregar hoy');
+
+        wrapper.unmount();
+    });
+
+    it('leaves the quote header fields empty when the API omits them', async () => {
+        const { usePOS } = await import('./usePOS');
+        let pos: ReturnType<typeof usePOS>;
+        const Harness = defineComponent({
+            setup() {
+                pos = usePOS();
+                return () => h('div');
+            },
+        });
+        const wrapper = mount(Harness);
+
+        pos!.loadQuoteAsSession({
+            ...quote(1),
+            customer_name: null,
+            seller_name: null,
+            created_at: null,
+            notes: null,
+        });
+        const session = pos!.activeSession.value;
+
+        expect(session.quote_customer_name).toBeUndefined();
+        expect(session.quote_seller_name).toBeUndefined();
+        expect(session.quote_created_at).toBeUndefined();
+        expect(session.quote_notes).toBeUndefined();
+
+        wrapper.unmount();
+    });
+
     it('restores the item default tax after toggling an exempt line', async () => {
         const { usePOS } = await import('./usePOS');
         let pos: ReturnType<typeof usePOS>;

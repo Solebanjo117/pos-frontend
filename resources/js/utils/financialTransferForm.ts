@@ -12,6 +12,9 @@ export const validateTransferSelection = (
         return 'Completa las cuentas y el monto.';
     }
 
+    if (from.initialized === false || to.initialized === false)
+        return 'Saldo sin inicializar. Concilie el efectivo de la sucursal.';
+
     if (moneyEndpointKey(from) === moneyEndpointKey(to)) {
         return 'La cuenta de origen y destino deben ser diferentes.';
     }

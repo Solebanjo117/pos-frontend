@@ -203,6 +203,9 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('reports')->name('repo
         return Inertia::render('Reports/SalesByClient');
     })->name('sales-by-client');
 
+    Route::get('/sales-lines', fn () => Inertia::render('Reports/SalesLines'))->name('sales-lines');
+    Route::get('/cash-position', fn () => Inertia::render('Reports/CashPosition'))->name('cash-position');
+    Route::get('/payment-methods', fn () => Inertia::render('Reports/PaymentMethods'))->name('payment-methods');
     Route::get('/sales-by-product', fn () => Inertia::render('Reports/OperationalAnalytics', ['reportKey' => 'sales-by-product']))->name('sales-by-product');
     Route::get('/purchases-by-supplier', fn () => Inertia::render('Reports/OperationalAnalytics', ['reportKey' => 'purchases-by-supplier']))->name('purchases-by-supplier');
     Route::get('/credit-notes', fn () => Inertia::render('Reports/OperationalAnalytics', ['reportKey' => 'credit-notes']))->name('credit-notes');
@@ -261,10 +264,14 @@ Route::middleware(['auth'])->group(function () {
     })->name('accounts-receivable.index')->middleware('role:admin,manager,seller,cashier');
 });
 
+Route::middleware(['auth', 'role:admin,manager,buyer,seller,assistant'])
+    ->get('/transactions', fn () => Inertia::render('Transactions/Index'))
+    ->name('transactions.index');
+
 // Sales Orders routes
 Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->group(function () {
     Route::get('/', function () {
-        return Inertia::render('SalesOrders/Index');
+        return redirect('/transactions?type=order');
     })->name('index')->middleware('role:admin,manager,buyer,seller,assistant');
 
     Route::get('/create', function () {
@@ -275,8 +282,9 @@ Route::middleware(['auth'])->prefix('sales-orders')->name('sales-orders.')->grou
         return Inertia::render('SalesOrders/Show', ['id' => (int) $id]);
     })->name('show');
 
+    // Editar una orden abre el POS en modo edición (Caja), igual que las devoluciones.
     Route::get('/{id}/edit', function ($id) {
-        return Inertia::render('SalesOrders/Edit', ['id' => (int) $id]);
+        return Inertia::render('SalesOrders/EditOrderEditor', ['orderId' => (int) $id]);
     })->name('edit')->middleware('role:admin,manager,buyer,seller,assistant');
 });
 
@@ -616,7 +624,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('settings')->name('settings.')
 // ==================== SALES QUOTES (Cotizaciones) ====================
 Route::middleware(['auth'])->group(function () {
     Route::get('/sales-quotes', function () {
-        return Inertia::render('SalesQuotes/Index');
+        return redirect('/transactions?type=quote');
     })->name('sales-quotes.index')->middleware('role:admin,manager,buyer,seller,assistant');
     Route::get('/sales-quotes/create', function () {
         return Inertia::render('SalesQuotes/Editor');
@@ -637,3 +645,7 @@ Route::middleware(['auth'])->group(function () {
     ])
     )->name('quotes.edit')->middleware('role:admin,manager,seller');
 });
+
+Route::middleware(['auth', 'role:admin,manager,cashier'])->get('/cash/payments', function () {
+    return Inertia::render('Cash/Payments');
+})->name('cash.payments');

@@ -35,7 +35,7 @@ export interface VehicleModelRow extends VehicleCatalogCapability {
     make_id: number;
     name: string;
     year_from: number;
-    year_to: number;
+    year_to: number | null;
     generation?: string | null;
     engines_count: number;
     vehicles_count: number;
@@ -71,7 +71,7 @@ export interface VehicleConfigurationRow extends VehicleCatalogCapability {
         id: number;
         name: string;
         year_from: number;
-        year_to: number;
+        year_to: number | null;
         generation?: string | null;
     };
     engine: {

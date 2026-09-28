@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Car, X, ChevronRight } from 'lucide-vue-next';
+import { Car, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 import VehicleSelector from '@/components/VehicleSelector.vue';
 import {
@@ -51,7 +51,7 @@ const handleConfirm = () => {
                 <span
                     class="text-sm font-medium text-indigo-900 dark:text-indigo-200"
                 >
-                    Vehículo Activo:
+                    Vehículo de catálogo:
                 </span>
                 <span
                     class="text-lg font-bold text-indigo-700 dark:text-indigo-300"
@@ -80,9 +80,7 @@ const handleConfirm = () => {
             @click="openModal"
             class="rounded border border-indigo-200 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50 dark:border-indigo-700 dark:bg-card dark:text-indigo-300 dark:hover:bg-indigo-900"
         >
-            {{
-                isVehicleSelected ? 'Cambiar Vehículo' : 'Seleccionar Vehículo'
-            }}
+            {{ isVehicleSelected ? 'Cambiar vehículo' : 'Buscar vehículo' }}
         </button>
 
         <!-- Modal -->
@@ -104,7 +102,7 @@ const handleConfirm = () => {
                             :size="20"
                             class="text-indigo-600 dark:text-primary"
                         />
-                        Seleccionar Vehículo del Cliente
+                        Buscar vehículo de catálogo
                     </h3>
                     <button
                         @click="closeModal"

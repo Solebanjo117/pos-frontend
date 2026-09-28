@@ -37,6 +37,20 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Configuracion de tienda', href: '/settings/store' },
 ];
 
+const paymentAccounts = ref<Array<{ endpoint_id: number; name: string }>>([]);
+onMounted(async () => {
+    try {
+        paymentAccounts.value =
+            (
+                await apiClient.get('/money-accounts/options', {
+                    params: { type: 'bank', purpose: 'settlement' },
+                })
+            ).data.data ?? [];
+    } catch {
+        paymentAccounts.value = [];
+    }
+});
+
 const { isAdmin } = useAuth();
 const {
     settings,
@@ -894,6 +908,72 @@ const handleResetData = async () => {
                                                     {{ option.label }}
                                                 </option>
                                             </select>
+                                            <div
+                                                v-if="
+                                                    method.liquidity_bucket ===
+                                                    'bank'
+                                                "
+                                                class="mt-2 space-y-2"
+                                            >
+                                                <label
+                                                    class="flex items-center gap-2 text-xs"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        :checked="
+                                                            method.requires_financial_account !==
+                                                            false
+                                                        "
+                                                        @change="
+                                                            updateMethod(
+                                                                method.id,
+                                                                {
+                                                                    requires_financial_account:
+                                                                        !method.requires_financial_account,
+                                                                },
+                                                            )
+                                                        "
+                                                    />
+                                                    Cuenta requerida
+                                                </label>
+                                                <select
+                                                    :value="
+                                                        method.default_financial_account_id ??
+                                                        ''
+                                                    "
+                                                    class="h-8 rounded-md border bg-background px-2 text-xs"
+                                                    aria-label="Cuenta predeterminada"
+                                                    @change="
+                                                        updateMethod(
+                                                            method.id,
+                                                            {
+                                                                default_financial_account_id:
+                                                                    Number(
+                                                                        (
+                                                                            $event.target as HTMLSelectElement
+                                                                        ).value,
+                                                                    ) || null,
+                                                            },
+                                                        )
+                                                    "
+                                                >
+                                                    <option value="">
+                                                        Sin cuenta
+                                                        predeterminada
+                                                    </option>
+                                                    <option
+                                                        v-for="account in paymentAccounts"
+                                                        :key="
+                                                            account.endpoint_id
+                                                        "
+                                                        :value="
+                                                            account.endpoint_id
+                                                        "
+                                                    >
+                                                        {{ account.name }}
+                                                    </option>
+                                                </select>
+                                            </div>
                                         </td>
                                         <td class="px-3 py-2">
                                             <label

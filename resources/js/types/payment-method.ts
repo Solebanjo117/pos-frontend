@@ -7,6 +7,8 @@ export interface PaymentMethod {
     is_system: boolean;
     requires_reference: boolean;
     requires_cash_count: boolean;
+    requires_financial_account?: boolean;
+    default_financial_account_id?: number | null;
     liquidity_bucket?: 'cash' | 'bank' | 'credit' | 'store_credit';
     available_in_sales?: boolean;
     available_in_customer_receipts?: boolean;
@@ -31,6 +33,8 @@ export interface CreatePaymentMethodData {
     is_active?: boolean;
     requires_reference?: boolean;
     requires_cash_count?: boolean;
+    requires_financial_account?: boolean;
+    default_financial_account_id?: number | null;
     liquidity_bucket?: 'cash' | 'bank' | 'credit' | 'store_credit';
     available_in_sales?: boolean;
     available_in_customer_receipts?: boolean;
@@ -44,6 +48,8 @@ export interface UpdatePaymentMethodData {
     is_active?: boolean;
     requires_reference?: boolean;
     requires_cash_count?: boolean;
+    requires_financial_account?: boolean;
+    default_financial_account_id?: number | null;
     liquidity_bucket?: 'cash' | 'bank' | 'credit' | 'store_credit';
     available_in_sales?: boolean;
     available_in_customer_receipts?: boolean;

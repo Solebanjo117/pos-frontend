@@ -13,6 +13,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import {
     useCashierQueue,
@@ -21,6 +22,7 @@ import {
 import { usePOS } from '@/composables/usePOS';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
+import type { CashierPayment } from '@/utils/cashierQueue';
 import { queueEntryKind, type QueueEntryKind } from '@/utils/cashierQueue';
 import {
     formatCurrency,
@@ -50,6 +52,9 @@ const now = ref(Date.now());
 const processingId = ref<number | null>(null);
 const notice = ref<{ title: string; message: string } | null>(null);
 const removeEntry = ref<CashierQueueEntry | null>(null);
+const paymentPanelOpen = ref(false);
+const paymentPanelError = ref<string | null>(null);
+const realMethodCodes = ref<string[]>([]);
 const settlementEntry = ref<CashierQueueEntry | null>(null);
 const cancellationEntry = ref<CashierQueueEntry | null>(null);
 const cancellationReason = ref('');
@@ -126,7 +131,8 @@ const typeLabels: Record<QueueEntryKind, string> = {
     return: 'Devolucion',
     cashIn: 'Agregar efectivo',
     cashOut: 'Retirar efectivo',
-    funding: 'Funding',
+    funding: 'Aportación',
+    purchase: 'Compra',
 };
 
 const typeIcons: Record<QueueEntryKind, typeof ShoppingCart> = {
@@ -136,6 +142,7 @@ const typeIcons: Record<QueueEntryKind, typeof ShoppingCart> = {
     cashIn: Banknote,
     cashOut: Banknote,
     funding: Banknote,
+    purchase: ShoppingCart,
 };
 
 const labelOf = (entry: CashierQueueEntry): string => {
@@ -222,6 +229,10 @@ function loadQuoteIntoPos(quote: any): void {
         quote_number: quote.quote_number,
         customer_id: quote.customer?.id ?? null,
         seller_id: quote.user?.id ?? null,
+        // El POS muestra estos datos en el banner de la cotización en curso.
+        customer_name: quote.customer?.name ?? quote.customer_name ?? null,
+        seller_name: quote.user?.name ?? quote.seller_name ?? null,
+        created_at: quote.created_at ?? null,
         notes: quote.notes ?? null,
         items: (quote.items ?? []).map((item: any) => ({
             id: item.id,
@@ -293,6 +304,11 @@ async function processEntry(entry: CashierQueueEntry) {
             reference_number: entry.source.reference_number || '',
             variance_reason: '',
         };
+        if (
+            entry.fixed_cash_amount &&
+            ['expense', 'funding', 'purchase'].includes(kind ?? '')
+        )
+            await openOperationalPayments();
     } catch (exception: any) {
         notice.value = {
             title: 'No se pudo abrir el registro',
@@ -357,7 +373,62 @@ async function viewOrder(entry: CashierQueueEntry) {
     }
 }
 
+async function openOperationalPayments() {
+    if (!settlementEntry.value) return;
+    const context =
+        kindOf(settlementEntry.value) === 'funding'
+            ? 'customer_receipts'
+            : kindOf(settlementEntry.value) === 'purchase'
+              ? 'purchase_orders'
+              : 'supplier_payments';
+    try {
+        const { data } = await apiClient.get('/payment-methods', {
+            params: { context, real_money: true },
+        });
+        realMethodCodes.value = data
+            .filter((method: { code: string; liquidity_bucket: string }) =>
+                ['cash', 'bank'].includes(method.liquidity_bucket),
+            )
+            .map((method: { code: string }) => method.code);
+        paymentPanelError.value = null;
+        paymentPanelOpen.value = true;
+    } catch (error: any) {
+        notice.value = {
+            title: 'No se pudieron cargar los métodos',
+            message: error.response?.data?.message || 'Reintente la operación.',
+        };
+    }
+}
+
+async function finishOperationalPayments(payments: CashierPayment[]) {
+    if (!settlementEntry.value) return;
+    processingId.value = settlementEntry.value.id;
+    paymentPanelError.value = null;
+    try {
+        await completeEntry(settlementEntry.value.id, {
+            payments,
+            final_amount: settlement.value.final_amount,
+            variance_reason: settlement.value.variance_reason,
+        });
+        paymentPanelOpen.value = false;
+        settlementEntry.value = null;
+    } catch (error: any) {
+        paymentPanelError.value =
+            error.response?.data?.message || 'No se pudo confirmar el pago.';
+    } finally {
+        processingId.value = null;
+    }
+}
+
 async function settleExpense() {
+    if (
+        ['expense', 'funding', 'purchase'].includes(
+            kindOf(settlementEntry.value) ?? '',
+        )
+    ) {
+        await openOperationalPayments();
+        return;
+    }
     if (!settlementEntry.value) return;
     if (
         !isFixedCashSettlement.value &&
@@ -913,7 +984,7 @@ async function confirmRemove() {
     />
 
     <div
-        v-if="settlementEntry"
+        v-if="settlementEntry && !paymentPanelOpen"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
     >
         <form
@@ -1019,7 +1090,8 @@ async function confirmRemove() {
                 <label
                     v-if="
                         !isFixedCashSettlement &&
-                        (!isReturnSettlement || returnNeedsMoney)
+                        isReturnSettlement &&
+                        returnNeedsMoney
                     "
                     class="space-y-1 text-sm"
                 >
@@ -1041,7 +1113,8 @@ async function confirmRemove() {
                 <label
                     v-if="
                         !isFixedCashSettlement &&
-                        (!isReturnSettlement || returnNeedsMoney)
+                        isReturnSettlement &&
+                        returnNeedsMoney
                     "
                     class="space-y-1 text-sm sm:col-span-2"
                 >
@@ -1314,4 +1387,29 @@ async function confirmRemove() {
             </div>
         </div>
     </div>
+    <OperationalPaymentPanel
+        v-if="settlementEntry && paymentPanelOpen"
+        :show="paymentPanelOpen"
+        :amount-to-charge="settlement.final_amount"
+        mode="purchase"
+        :exact-amount="true"
+        :allowed-method-codes="realMethodCodes"
+        :payment-context="
+            kindOf(settlementEntry) === 'funding'
+                ? 'customer_receipts'
+                : kindOf(settlementEntry) === 'purchase'
+                  ? 'purchase_orders'
+                  : 'supplier_payments'
+        "
+        :title="
+            kindOf(settlementEntry) === 'funding'
+                ? 'Registrar aportación'
+                : 'Confirmar pago'
+        "
+        primary-action-label="Confirmar en Caja"
+        :loading="processingId !== null"
+        :error="paymentPanelError"
+        @finish="finishOperationalPayments"
+        @cancel="paymentPanelOpen = false"
+    />
 </template>

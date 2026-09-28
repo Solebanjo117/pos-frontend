@@ -238,4 +238,29 @@ describe('VehicleCatalogDialog', () => {
             ).value,
         ).toBe('CUSTOMER-VIN');
     });
+
+    it('preserves an open-ended model year range when editing other fields', async () => {
+        const openEndedModel = { ...baseProps.models[0], year_to: null };
+        const wrapper = mount(VehicleCatalogDialog, {
+            props: {
+                ...baseProps,
+                tab: 'models',
+                row: openEndedModel,
+                models: [openEndedModel],
+            },
+            global: { stubs },
+        });
+        await nextTick();
+
+        expect(
+            wrapper.get('#vehicle-year-to').attributes('required'),
+        ).toBeUndefined();
+        await wrapper.get('form').trigger('submit');
+
+        expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+            name: 'Corolla',
+            year_from: 2020,
+        });
+        expect(wrapper.emitted('save')?.[0]?.[0]).not.toHaveProperty('year_to');
+    });
 });

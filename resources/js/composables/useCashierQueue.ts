@@ -1,6 +1,6 @@
 import { computed, onUnmounted, ref } from 'vue';
 import apiClient from '@/services/api/client';
-import type { QueueEntryWireType } from '@/utils/cashierQueue';
+import type { QueueEntryWireType, CashierPayment } from '@/utils/cashierQueue';
 import { formatDuration } from '@/utils/formatters';
 
 export type CashierQueueType = QueueEntryWireType;
@@ -89,6 +89,7 @@ export function useCashierQueue() {
     async function completeEntry(
         entryId: number,
         payload: {
+            payments?: CashierPayment[];
             final_amount?: number;
             payment_method?: string;
             reference_number?: string | null;

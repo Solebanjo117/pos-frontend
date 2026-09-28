@@ -55,7 +55,7 @@ const form = reactive({
     engine_id: null as number | null,
     model_ids: [] as number[],
     year_from: currentYear,
-    year_to: currentYear,
+    year_to: currentYear as number | null,
     generation: '',
     chassis_id: null as number | null,
     engine_code: '',
@@ -71,6 +71,12 @@ const form = reactive({
 });
 
 const isEditing = computed(() => props.row !== null);
+const hasOpenYearRange = computed(
+    () =>
+        props.tab === 'models' &&
+        props.row !== null &&
+        (props.row as VehicleModelRow).year_to === null,
+);
 const title = computed(() => {
     const noun = {
         makes: 'marca',
@@ -99,7 +105,7 @@ const modelOptions = computed<SelectOption[]>(() =>
         .map((model) => ({
             value: model.id,
             label: `${model.make?.name ?? ''} ${model.name}`.trim(),
-            sublabel: `${model.year_from}-${model.year_to}${model.generation ? ` • ${model.generation}` : ''}`,
+            sublabel: `${model.year_from}-${model.year_to ?? 'Presente'}${model.generation ? ` • ${model.generation}` : ''}`,
         })),
 );
 const engineOptions = computed<SelectOption[]>(() => {
@@ -144,10 +150,13 @@ const canSubmit = computed(() => {
             form.make_id !== null &&
             form.name.trim().length > 0 &&
             Number.isInteger(Number(form.year_from)) &&
-            Number.isInteger(Number(form.year_to)) &&
+            (form.year_to === null
+                ? hasOpenYearRange.value
+                : Number.isInteger(Number(form.year_to)) &&
+                  Number(form.year_to) >= Number(form.year_from) &&
+                  Number(form.year_to) <= currentYear + 2) &&
             Number(form.year_from) >= 1900 &&
-            Number(form.year_to) >= Number(form.year_from) &&
-            Number(form.year_to) <= currentYear + 2
+            Number(form.year_from) <= currentYear + 2
         );
     }
     if (props.tab === 'engines') {
@@ -277,7 +286,7 @@ const submit = () => {
             make_id: form.make_id,
             name: form.name.trim(),
             year_from: Number(form.year_from),
-            year_to: Number(form.year_to),
+            ...(form.year_to === null ? {} : { year_to: Number(form.year_to) }),
             generation: form.generation.trim() || null,
             chassis_id: form.chassis_id,
         });
@@ -362,11 +371,15 @@ const submit = () => {
                             <Label for="vehicle-year-to">Año hasta</Label>
                             <Input
                                 id="vehicle-year-to"
-                                v-model.number="form.year_to"
+                                :model-value="form.year_to ?? ''"
+                                @update:model-value="
+                                    form.year_to =
+                                        $event === '' ? null : Number($event)
+                                "
                                 type="number"
                                 min="1900"
                                 :max="currentYear + 2"
-                                required
+                                :required="!hasOpenYearRange"
                             />
                         </div>
                     </div>
@@ -468,7 +481,7 @@ const submit = () => {
                                 <span>{{ model.name }}</span>
                                 <span class="text-muted-foreground"
                                     >{{ model.year_from }}-{{
-                                        model.year_to
+                                        model.year_to ?? 'Presente'
                                     }}</span
                                 >
                             </label>

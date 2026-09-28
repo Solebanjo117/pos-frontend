@@ -528,10 +528,19 @@ onBeforeUnmount(() => {
                             v-model="filters.search"
                             class="pl-9"
                             :placeholder="
-                                'Buscar ' + singularLabel[activeTab] + '…'
+                                activeTab === 'vehicles'
+                                    ? 'Buscar marca, modelo, año, motor o VIN…'
+                                    : 'Buscar ' + singularLabel[activeTab] + '…'
                             "
                             @input="searchChanged"
                         />
+                        <p
+                            v-if="activeTab === 'vehicles'"
+                            class="mt-1 text-xs text-muted-foreground"
+                        >
+                            Combina términos de marca, modelo, año, motor,
+                            cilindrada, VIN, combustible y aspiración.
+                        </p>
                     </div>
                     <Button
                         v-if="canManage && selectedRows.length"

@@ -138,6 +138,14 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         roles: roles.cash,
                     },
                     {
+                        title: 'Movimientos por método',
+                        href: '/cash/payments',
+                        description:
+                            'Cobros, devoluciones y cuentas pendientes.',
+                        icon: Receipt,
+                        roles: roles.cash,
+                    },
+                    {
                         title: 'Agregar / Retirar',
                         href: '/cash/movements',
                         description:
@@ -149,7 +157,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         title: 'Gastos / Funding',
                         href: '/cash/expenses-funding',
                         description:
-                            'Solicitar gastos o aportaciones en efectivo.',
+                            'Solicitar gastos o aportaciones para procesar en Caja.',
                         icon: Receipt,
                         roles: roles.adminManager,
                     },
@@ -220,40 +228,26 @@ export const moduleDefinitions: ModuleDefinition[] = [
     {
         id: 'sales',
         title: 'Ventas',
-        description: 'Transacciones, cotizaciones y seguimiento comercial.',
+        description: 'Transacciones y seguimiento comercial.',
         href: '/sales',
         icon: ShoppingCart,
-        activePaths: ['/sales', '/sales-orders', '/sales-quotes', '/quotes'],
+        activePaths: [
+            '/sales',
+            '/transactions',
+            '/sales-orders',
+            '/sales-quotes',
+            '/quotes',
+        ],
         sections: [
             {
                 title: 'Transacciones',
                 actions: [
                     {
-                        title: 'Órdenes de venta',
-                        href: '/sales-orders',
-                        description: 'Consultar ventas, pagos y rentabilidad.',
+                        title: 'Transacciones',
+                        href: '/transactions',
+                        description:
+                            'Órdenes, cotizaciones, pagos y seguimiento.',
                         icon: ClipboardList,
-                        roles: roles.sales,
-                    },
-                ],
-            },
-            {
-                title: 'Cotizaciones',
-                actions: [
-                    {
-                        title: 'Cotizaciones',
-                        href: '/sales-quotes',
-                        description:
-                            'Consultar y dar seguimiento a cotizaciones.',
-                        icon: FileText,
-                        roles: roles.sales,
-                    },
-                    {
-                        title: 'Nueva cotización',
-                        href: '/sales-quotes/create',
-                        description:
-                            'Preparar una nueva propuesta para un cliente.',
-                        icon: Plus,
                         roles: roles.sales,
                     },
                 ],
@@ -638,18 +632,11 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 title: 'Ventas',
                 actions: [
                     {
-                        title: 'Órdenes de venta',
-                        href: '/sales-orders',
+                        title: 'Transacciones',
+                        href: '/transactions',
                         description:
-                            'Facturas, pagos, artículos y rentabilidad.',
+                            'Órdenes y cotizaciones en un solo historial.',
                         icon: ClipboardList,
-                        roles: roles.adminManager,
-                    },
-                    {
-                        title: 'Cotizaciones',
-                        href: '/sales-quotes',
-                        description: 'Cotizaciones y envíos a Caja.',
-                        icon: FileText,
                         roles: roles.adminManager,
                     },
                 ],
@@ -747,6 +734,30 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         description:
                             'Totales y documentos agrupados por cliente.',
                         icon: Users,
+                        roles: roles.adminManager,
+                    },
+                    {
+                        title: 'Cobros por método',
+                        href: '/reports/payment-methods',
+                        description:
+                            'Efectivo, Yappy y otros métodos: cobros, devoluciones y neto.',
+                        icon: Landmark,
+                        roles: roles.adminManager,
+                    },
+                    {
+                        title: 'Efectivo y bancos',
+                        href: '/reports/cash-position',
+                        description:
+                            'Disponible, saldos históricos y depósitos bancarios.',
+                        icon: Landmark,
+                        roles: roles.adminManager,
+                    },
+                    {
+                        title: 'Ventas por renglón',
+                        href: '/reports/sales-lines',
+                        description:
+                            'Totales, marcas, categorías y utilidad de cada artículo.',
+                        icon: BarChart3,
                         roles: roles.adminManager,
                     },
                     {
@@ -991,6 +1002,27 @@ export const resolveModuleBreadcrumbs = (
     }
 
     const currentPath = normalizeNavigationPath(currentUrl);
+    if (
+        module.id === 'sales' &&
+        ['/sales-orders', '/sales-quotes', '/quotes'].some((prefix) =>
+            pathMatchesModulePattern(currentPath, prefix),
+        )
+    ) {
+        const breadcrumbs: BreadcrumbItem[] = [
+            moduleBreadcrumb,
+            { title: 'Transacciones', href: '/transactions' },
+        ];
+        const lastSegment = currentPath.split('/').filter(Boolean).at(-1);
+        if (lastSegment === 'edit') {
+            breadcrumbs.push({ title: 'Editar' });
+        } else if (lastSegment === 'create') {
+            breadcrumbs.push({ title: 'Crear' });
+        } else if (lastSegment && /^\d+$/.test(lastSegment)) {
+            breadcrumbs.push({ title: 'Detalle' });
+        }
+        return breadcrumbs;
+    }
+
     const matchingAction = module.sections
         .flatMap((section) => section.actions)
         .filter((action) => pathMatchesModulePattern(currentPath, action.href))

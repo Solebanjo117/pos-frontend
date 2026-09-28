@@ -53,6 +53,11 @@ vi.mock('@inertiajs/vue3', () => ({
 
 const global = {
     stubs: {
+        OperationalPaymentPanel: {
+            props: ['show', 'amountToCharge', 'allowedMethodCodes'],
+            emits: ['finish', 'cancel'],
+            template: '<div data-test="operational-panel" />',
+        },
         TransactionTraceDrawer: {
             props: ['open', 'type', 'id'],
             template:
@@ -97,9 +102,10 @@ const quote = {
     id: 19,
     quote_number: '0000000269',
     warehouse_id: 2,
-    customer: { id: 3 },
-    user: { id: 7 },
+    customer: { id: 3, name: 'Publico general' },
+    user: { id: 7, name: 'Admin' },
     notes: 'Entregar hoy',
+    created_at: '2026-08-25T09:45:00.000Z',
     subtotal: 10,
     tax_amount: 0,
     discount_amount: 0,
@@ -344,6 +350,10 @@ describe('CashierQueue sale table and POS handoff', () => {
                 quote_number: '0000000269',
                 customer_id: 3,
                 seller_id: 7,
+                customer_name: 'Publico general',
+                seller_name: 'Admin',
+                created_at: '2026-08-25T09:45:00.000Z',
+                notes: 'Entregar hoy',
                 items: [
                     expect.objectContaining({
                         id: 31,
@@ -445,4 +455,43 @@ describe('CashierQueue sale table and POS handoff', () => {
         await flushPromises();
         expect(mocks.completeEntry).toHaveBeenCalledWith(22, {});
     });
+});
+
+it('opens the shared panel for fixed expenses and forwards every payment account and reference', async () => {
+    mocks.apiGet.mockResolvedValue({
+        data: [
+            { code: 'cash', liquidity_bucket: 'cash' },
+            { code: 'yappy', liquidity_bucket: 'bank' },
+        ],
+    });
+    mocks.openEntry.mockResolvedValue({});
+    mocks.completeEntry.mockResolvedValue({});
+    mocks.entries.value = [];
+    const wrapper = mount(CashierQueue, { global });
+    const expense = {
+        ...entry,
+        id: 44,
+        entry_type: 'expense_payment',
+        fixed_cash_amount: true,
+        source: { ...entry.source, description: 'Gasto' },
+    };
+    const vm = wrapper.vm as any;
+    await vm.processEntry(expense);
+    await flushPromises();
+    expect(wrapper.find('[data-test="operational-panel"]').exists()).toBe(true);
+    const payments = [
+        { method: 'cash', amount: 4 },
+        {
+            method: 'yappy',
+            amount: 6,
+            reference_number: 'Y-44',
+            financial_account_id: 41,
+        },
+    ];
+    await vm.finishOperationalPayments(payments);
+    expect(mocks.completeEntry).toHaveBeenCalledWith(
+        44,
+        expect.objectContaining({ payments, final_amount: 10 }),
+    );
+    wrapper.unmount();
 });

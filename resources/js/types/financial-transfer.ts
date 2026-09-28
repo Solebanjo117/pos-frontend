@@ -1,5 +1,8 @@
 export type FinancialAccountType = 'cash' | 'bank' | 'petty_cash' | 'other';
-export type MoneyEndpointType = 'financial_account' | 'pos_session';
+export type MoneyEndpointType =
+    | 'financial_account'
+    | 'pos_session'
+    | 'warehouse_cash';
 
 export interface MoneyAccountOption {
     endpoint_type: MoneyEndpointType;
@@ -8,6 +11,7 @@ export interface MoneyAccountOption {
     name: string;
     masked_number: string | null;
     balance: number;
+    initialized?: boolean;
     currency: string;
     allow_negative_balance: boolean;
 }

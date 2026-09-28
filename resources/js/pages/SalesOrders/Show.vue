@@ -21,11 +21,11 @@ import {
 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
-import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
-import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
+import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useUsers } from '@/composables/useUsers';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -151,6 +151,16 @@ const returnsTotal = computed(() =>
 );
 const paidTotal = computed(
     () => operationalDetail.value?.ar_context.amount_paid ?? 0,
+);
+const hasEffectivePayment = computed(
+    () =>
+        paidTotal.value > 0 ||
+        payments.value.some(
+            (payment) =>
+                payment.method === 'store_credit' &&
+                !payment.is_refund &&
+                payment.amount > 0,
+        ),
 );
 const amountDue = computed(
     () => operationalDetail.value?.ar_context.amount_due ?? 0,
@@ -410,7 +420,12 @@ const updatePostSaleItem = async (
     item: SalesOrderOperationalItem,
     payload: Record<string, unknown>,
 ): Promise<void> => {
-    if (!item.added_after_sale || savingItemIds.value.has(item.id)) return;
+    if (
+        !item.added_after_sale ||
+        hasEffectivePayment.value ||
+        savingItemIds.value.has(item.id)
+    )
+        return;
     setItemSaving(item.id, true);
     try {
         await updateOrderItem(item.id, payload);
@@ -724,10 +739,20 @@ onMounted(async () => {
                             v-if="canActOnConfirmedOrder"
                             type="button"
                             class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-200 dark:hover:bg-muted"
-                            @click="openProductPicker"
+                            @click="
+                                hasEffectivePayment
+                                    ? router.visit(
+                                          `/sales-orders/${props.id}/edit`,
+                                      )
+                                    : openProductPicker()
+                            "
                         >
                             <Plus :size="16" />
-                            Agregar item
+                            {{
+                                hasEffectivePayment
+                                    ? 'Ampliar venta'
+                                    : 'Agregar item'
+                            }}
                         </button>
                         <button
                             v-if="currentSalesOrder?.status !== 'cancelled'"
@@ -988,6 +1013,16 @@ onMounted(async () => {
                 v-if="activeTab === 'items'"
                 class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
             >
+                <p
+                    v-if="
+                        hasEffectivePayment &&
+                        items.some((item) => item.added_after_sale)
+                    "
+                    class="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800"
+                >
+                    Las líneas cobradas se corrigen mediante Devoluciones. Para
+                    agregar artículos, usa Ampliar venta.
+                </p>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead
@@ -1074,7 +1109,10 @@ onMounted(async () => {
                                 </td>
                                 <td class="px-3 py-3 text-right">
                                     <input
-                                        v-if="item.added_after_sale"
+                                        v-if="
+                                            item.added_after_sale &&
+                                            !hasEffectivePayment
+                                        "
                                         :value="item.quantity"
                                         type="number"
                                         min="1"
@@ -1097,7 +1135,10 @@ onMounted(async () => {
                                 </td>
                                 <td class="px-3 py-3 text-right">
                                     <input
-                                        v-if="item.added_after_sale"
+                                        v-if="
+                                            item.added_after_sale &&
+                                            !hasEffectivePayment
+                                        "
                                         :value="item.unit_price"
                                         type="number"
                                         min="0"

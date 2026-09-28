@@ -5,6 +5,7 @@ export const QUEUE_ENTRY_TYPE = {
     cashIn: 'cash_in_request',
     cashOut: 'cash_out_request',
     funding: 'funding_request',
+    purchase: 'purchase_payment',
 } as const;
 
 export type QueueEntryKind = keyof typeof QUEUE_ENTRY_TYPE;

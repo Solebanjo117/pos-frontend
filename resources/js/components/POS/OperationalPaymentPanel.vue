@@ -60,6 +60,7 @@ const props = withDefaults(
         loading?: boolean;
         error?: string | null;
         allowPartial?: boolean;
+        exactAmount?: boolean;
         allowedMethodCodes?: string[];
         includeSupplierCredit?: boolean;
         paymentContext?: PaymentMethodContext;
@@ -81,6 +82,7 @@ const props = withDefaults(
         loading: false,
         error: null,
         allowPartial: false,
+        exactAmount: false,
         allowedMethodCodes: undefined,
         includeSupplierCredit: false,
         paymentContext: undefined,
@@ -134,7 +136,7 @@ const effectiveAllowedMethods = computed(() => {
 });
 
 const isAllowedMethod = (code: string): boolean => {
-    if (!effectiveAllowedMethods.value.length) {
+    if (props.allowedMethodCodes === undefined) {
         return true;
     }
 
@@ -213,7 +215,12 @@ const resetPayments = () => {
     payments.value = {};
     paymentReferences.value = {};
     paymentNotes.value = {};
-    paymentAccountIds.value = {};
+    paymentAccountIds.value = Object.fromEntries(
+        dynamicMethods.value.map((method) => [
+            method.code,
+            method.default_financial_account_id ?? null,
+        ]),
+    );
     activeMethodCode.value = null;
     referenceNumber.value = '';
     notes.value = '';
@@ -400,6 +407,17 @@ const dynamicMethods = computed(() =>
     }),
 );
 
+watch(
+    dynamicMethods,
+    (methods) => {
+        for (const method of methods) {
+            if (!(method.code in paymentAccountIds.value))
+                paymentAccountIds.value[method.code] =
+                    method.default_financial_account_id ?? null;
+        }
+    },
+    { immediate: true },
+);
 const activePaymentCodes = computed(() => {
     const codes = new Set(dynamicMethods.value.map((method) => method.code));
 
@@ -536,6 +554,11 @@ const canFinish = computed(() => {
         return false;
     }
 
+    if (
+        props.exactAmount &&
+        roundMoney(totalPaid.value) !== roundMoney(props.amountToCharge)
+    )
+        return false;
     if (props.allowPartial) {
         return totalPaid.value > 0;
     }
@@ -556,9 +579,19 @@ const canFinish = computed(() => {
         return false;
     }
 
+    if (
+        dynamicMethods.value.some(
+            (method) =>
+                method.requires_reference &&
+                getPaymentAmount(method.code) > 0 &&
+                !getPaymentReference(method.code).trim(),
+        )
+    )
+        return false;
     const bankPaymentWithoutAccount = dynamicMethods.value.some(
         (method) =>
             method.liquidity_bucket === 'bank' &&
+            method.requires_financial_account !== false &&
             getPaymentAmount(method.code) > 0 &&
             !paymentAccountIds.value[method.code],
     );
@@ -1119,7 +1152,19 @@ const handleCancel = () => {
                                     <label
                                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >
-                                        Cuenta destino
+                                        {{
+                                            isPurchaseMode
+                                                ? 'Cuenta financiera'
+                                                : 'Cuenta destino'
+                                        }}
+                                        <span
+                                            v-if="
+                                                selectedDynamicMethod.requires_financial_account ===
+                                                false
+                                            "
+                                            class="text-xs text-muted-foreground"
+                                            >(opcional)</span
+                                        >
                                     </label>
                                     <select
                                         v-model.number="
@@ -1130,7 +1175,12 @@ const handleCancel = () => {
                                         class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                                     >
                                         <option :value="null">
-                                            Selecciona una cuenta
+                                            {{
+                                                selectedDynamicMethod.requires_financial_account ===
+                                                false
+                                                    ? 'Pendiente de asignar cuenta'
+                                                    : 'Selecciona una cuenta'
+                                            }}
                                         </option>
                                         <option
                                             v-for="account in financialAccounts"

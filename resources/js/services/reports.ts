@@ -9,6 +9,8 @@ import type {
     CustomerReferenceReport,
     SalesByClientFilters,
     SalesByClientReport,
+    SalesByProductFilters,
+    SalesByProductReport,
     DailyFinancialSummary,
     BalanceSheetReport,
     CapitalMovement,
@@ -164,6 +166,18 @@ export const ReportsApiService = {
                 responseType: 'blob',
             },
         );
+        return response.data;
+    },
+
+    /**
+     * Get sales by product report
+     */
+    async getSalesByProduct(
+        filters: SalesByProductFilters,
+    ): Promise<SalesByProductReport> {
+        const response = await apiClient.get('/reports/sales-by-product', {
+            params: filters,
+        });
         return response.data;
     },
 

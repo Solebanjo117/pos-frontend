@@ -28,6 +28,7 @@ const importConfig: ImporterConfig = {
             type: 'searchable',
             required: true,
             searchableEndpoint: '/vehicle-makes/all',
+            createsMissing: true,
         },
         { key: 'model', label: 'Modelo (MODEL)', type: 'text', required: true },
         {
@@ -41,25 +42,25 @@ const importConfig: ImporterConfig = {
             key: 'generation',
             label: 'Generacion',
             type: 'text',
-            placeholder: 'P10',
+            placeholder: 'Opcional',
         },
         {
             key: 'code',
             label: 'Chasis (CODE)',
             type: 'text',
-            placeholder: 'P10',
+            placeholder: 'Opcional',
         },
         {
             key: 'engine',
             label: 'Motor (ENGINE)',
             type: 'text',
-            placeholder: '1NZFE',
+            placeholder: 'Opcional',
         },
         {
             key: 'displacement',
             label: 'Cilindrada',
             type: 'text',
-            placeholder: '1.5L',
+            placeholder: 'Opcional',
         },
         {
             key: 'fuel_type',
@@ -76,9 +77,9 @@ const importConfig: ImporterConfig = {
             key: 'aspiration',
             label: 'Aspiracion',
             type: 'text',
-            placeholder: 'Turbo',
+            placeholder: 'Opcional',
         },
-        { key: 'vin', label: 'VIN', type: 'text', placeholder: 'MR2BT9F3...' },
+        { key: 'vin', label: 'VIN', type: 'text', placeholder: 'Opcional' },
     ],
 };
 </script>

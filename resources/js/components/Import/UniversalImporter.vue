@@ -72,6 +72,10 @@ import type {
     DetectedColumn,
     VehicleCandidate,
 } from '@/types/import';
+import {
+    rowActionType,
+    withPendingSearchableOptions,
+} from '@/utils/importPreview';
 
 const toast = useToast();
 
@@ -2495,7 +2499,7 @@ const previewRowToEditedRow = (row: any, index: number): ImportRow => ({
     __errors: row.errors ?? [],
     __local_errors: [],
     __warnings: row.warnings ?? row.data?.__warnings ?? [],
-    __action_type: row.action_type ?? row.data?.action_type ?? 'invalid',
+    __action_type: row.action_type ?? row.data?.action_type ?? undefined,
     __resolution_type:
         row.resolution_type ?? row.data?.resolution_type ?? undefined,
     __change_preview: row.change_preview ?? row.data?.change_preview ?? [],
@@ -2957,12 +2961,19 @@ const getOptionsForColumn = (col: any) => {
         }));
     }
     if (col.type === 'searchable' && col.searchableEndpoint) {
-        return (searchableOptions.value[col.searchableEndpoint] ?? []).map(
-            (item: any) => ({
-                value: item.id ?? item.name,
-                label: item.name ?? item.label ?? String(item.id),
-            }),
-        );
+        const options = (
+            searchableOptions.value[col.searchableEndpoint] ?? []
+        ).map((item: any) => ({
+            value: item.id ?? item.name,
+            label: item.name ?? item.label ?? String(item.id),
+        }));
+
+        return col.createsMissing
+            ? withPendingSearchableOptions(
+                  options,
+                  editedRows.value.map((row) => row[col.key]),
+              )
+            : options;
     }
     return [];
 };
@@ -4270,13 +4281,14 @@ const actionTypeLabel = (actionType: string | undefined): string => {
         unchanged: 'Sin cambios',
         conflict: 'Conflicto',
         invalid: 'Invalida',
+        ready: 'Lista',
     };
 
     return labels[actionType ?? ''] ?? 'Revisar';
 };
 
 const actionTypeClass = (actionType: string | undefined): string => {
-    if (actionType === 'create') {
+    if (actionType === 'create' || actionType === 'ready') {
         return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300';
     }
     if (actionType === 'update') {
@@ -6752,13 +6764,13 @@ const formatFileSize = (bytes: number) => {
                                                                 class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
                                                                 :class="
                                                                     actionTypeClass(
-                                                                        row.__action_type,
+                                                                        rowActionType(row),
                                                                     )
                                                                 "
                                                             >
                                                                 {{
                                                                     actionTypeLabel(
-                                                                        row.__action_type,
+                                                                        rowActionType(row),
                                                                     )
                                                                 }}
                                                             </span>
@@ -6900,13 +6912,13 @@ const formatFileSize = (bytes: number) => {
                                             class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
                                             :class="
                                                 actionTypeClass(
-                                                    row.__action_type,
+                                                    rowActionType(row),
                                                 )
                                             "
                                         >
                                             {{
                                                 actionTypeLabel(
-                                                    row.__action_type,
+                                                    rowActionType(row),
                                                 )
                                             }}
                                         </span>

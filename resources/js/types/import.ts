@@ -5,7 +5,8 @@ export type ImportActionType =
     | 'update'
     | 'unchanged'
     | 'conflict'
-    | 'invalid';
+    | 'invalid'
+    | 'ready';
 
 export type ProductImportResolutionType =
     | 'existing'
@@ -34,7 +35,7 @@ export interface ImportRow {
     __valid: boolean;
     __errors: string[];
     __warnings: string[];
-    __action_type: ImportActionType;
+    __action_type?: ImportActionType;
     __resolution_type?: ProductImportResolutionType;
     __change_preview: ChangePreviewItem[];
     __conflicts: ConflictItem[];

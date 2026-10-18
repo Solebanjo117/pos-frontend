@@ -18,6 +18,8 @@ export interface ImportColumn {
     searchableEndpoint?: string;
     placeholder?: string;
     creatable?: boolean;
+    /** El importador crea el registro si el texto no coincide con una opción existente. */
+    createsMissing?: boolean;
     /** If set, this column renders as an action button (modal trigger) instead of an input */
     actionType?: 'attributes' | 'variants' | 'compatibility';
 }

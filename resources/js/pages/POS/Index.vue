@@ -117,8 +117,6 @@ const {
     updateItemPrice,
     reorderCart,
     clearCart,
-    validateCartStock,
-    getStockWarnings,
     processSale,
     shippingCost,
     logAction,
@@ -1021,14 +1019,6 @@ const performSearch = async (
                 selectedProductIds.value = new Set([products.value[0].id]);
             }
             showProductsModal.value = true;
-        } else if (!showModal) {
-            // Silent initial load — products are fetched but modal stays closed
-        } else {
-            // No results
-            console.warn(
-                'No products found for',
-                trimmedQuery || '(búsqueda vacía)',
-            );
         }
     } catch (err) {
         console.error('POS search error:', err);
@@ -1319,14 +1309,6 @@ const handleUnifiedPaymentFinish = async (
     // Clear any previous payment errors before attempting new payment
     error.value = null;
 
-    if (!isQuoteSession.value && !validateCartStock('sale')) {
-        toast.error(
-            error.value || 'Stock insuficiente para completar la venta.',
-            6000,
-        );
-        return;
-    }
-
     // Validate standard items have valid product_id (custom lines are allowed to be null)
     const invalidItems = cart.value.filter(
         (item: any) =>
@@ -1412,33 +1394,6 @@ const quoteTotalHasChanged = computed(
         ) >= 0.01,
 );
 
-/**
- * Las advertencias de stock son informativas: nunca bloquean la acción.
- * En modo cajero se omiten porque el stock ya quedó reservado al enviar la
- * cotización a Caja y avisar al cajero solo sería ruido.
- */
-const notifyStockWarnings = (issues: string[]): void => {
-    if (isStrictCashier.value || issues.length === 0) {
-        return;
-    }
-
-    toast.warning(`Advertencia de stock: ${issues.join(' ')}`, 6000);
-};
-
-/** Convierte las advertencias de stock que devuelve la API en un aviso no bloqueante. */
-const notifyApiStockWarnings = (apiWarnings: unknown): void => {
-    if (!Array.isArray(apiWarnings) || apiWarnings.length === 0) {
-        return;
-    }
-
-    notifyStockWarnings(
-        apiWarnings.map((warning: any) =>
-            typeof warning?.message === 'string'
-                ? warning.message
-                : JSON.stringify(warning),
-        ),
-    );
-};
 
 const returnToCashierQueue = () => {
     if (isStrictCashier.value) {
@@ -1559,13 +1514,11 @@ const handleSaveQuoteChanges = async () => {
         );
         return;
     }
-    // Collect stock warnings but do NOT block — show as advisory
-    notifyStockWarnings(getStockWarnings());
     saveQuoteChangesLoading.value = true;
     try {
         const items = buildQuoteItems();
 
-        const res = await apiClient.put(`/sales-quotes/${quoteId}`, {
+        await apiClient.put(`/sales-quotes/${quoteId}`, {
             customer_id: customer_id.value ?? null,
             customer_vehicle_id: customer_vehicle_id.value ?? null,
             warehouse_id: currentWarehouseId.value ?? null,
@@ -1573,7 +1526,6 @@ const handleSaveQuoteChanges = async () => {
         });
 
         toast.success('Cotización actualizada correctamente.');
-        notifyApiStockWarnings(res.data?.warnings);
         searchInput.value?.focus();
     } catch (e: any) {
         toast.error(
@@ -1613,8 +1565,6 @@ const handleSaveQuote = async () => {
         );
         return;
     }
-    // Collect stock warnings but do NOT block — show as advisory
-    notifyStockWarnings(getStockWarnings());
     saveQuoteLoading.value = true;
     try {
         const items = buildQuoteItems();
@@ -1632,7 +1582,6 @@ const handleSaveQuote = async () => {
         clearCart();
 
         toast.success(`Cotización ${quoteNumber} guardada correctamente.`);
-        notifyApiStockWarnings(res.data?.warnings || res.data?.data?.warnings);
 
         // Navegar descarta la pantalla actual: sigue siendo una decisión del usuario.
         const shouldNavigate = confirm(
@@ -1710,7 +1659,6 @@ const handleQuoteDestination = async (
         return;
     }
 
-    const stockIssues = getStockWarnings();
     const destinationMessage =
         destination === 'send-to-deposit'
             ? 'Se guardará la cotización y se creará una orden pendiente para bodega.'
@@ -1720,9 +1668,6 @@ const handleQuoteDestination = async (
     if (!confirm(`${destinationMessage}\n\n¿Deseas continuar?`)) {
         return;
     }
-
-    // El aviso de stock se muestra al continuar: un diálogo nativo taparía el toast.
-    notifyStockWarnings(stockIssues);
 
     quoteDestinationLoading.value = destination;
     let savedQuoteId: number | undefined;
@@ -2365,6 +2310,7 @@ onUnmounted(() => {
                 <div class="flex items-center gap-3">
                     <button
                         @click="router.visit('/sales-quotes')"
+                        aria-label="Volver a Transacciones"
                         class="rounded-lg p-2 transition hover:bg-purple-700"
                     >
                         <svg

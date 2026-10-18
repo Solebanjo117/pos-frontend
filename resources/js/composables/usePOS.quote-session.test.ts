@@ -232,4 +232,37 @@ describe('usePOS quote sessions', () => {
 
         wrapper.unmount();
     });
+
+    it('completes a sale without alerting the stock warnings returned by the API', async () => {
+        const { usePOS } = await import('./usePOS');
+        const { salesOrdersService } = await import('@/services/sales-orders');
+        vi.mocked(salesOrdersService.create).mockResolvedValue({
+            data: { id: 81, order_number: '2610110001' },
+            warnings: [{ message: 'Filtro de aceite: sin stock disponible.' }],
+        } as any);
+        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        let pos: ReturnType<typeof usePOS>;
+        const Harness = defineComponent({
+            setup() {
+                pos = usePOS();
+                return () => h('div');
+            },
+        });
+        const wrapper = mount(Harness);
+
+        const lowStockQuote = quote(5);
+        lowStockQuote.items[0].warehouse_id = 1;
+        pos!.loadQuoteAsSession(lowStockQuote);
+        pos!.activeSession.value.cart[0].available_stock = 0;
+
+        const result = await pos!.processSale([{ method: 'cash', amount: 50 }]);
+
+        expect(result).toBeTruthy();
+        expect(salesOrdersService.create).toHaveBeenCalledOnce();
+        expect(alertSpy).not.toHaveBeenCalled();
+        expect(pos!.error.value).toBeNull();
+
+        wrapper.unmount();
+        alertSpy.mockRestore();
+    });
 });

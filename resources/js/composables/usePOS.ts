@@ -48,7 +48,6 @@ interface AddCustomLinePayload {
     notes?: string;
 }
 
-type StockValidationContext = 'sale' | 'quote';
 
 // ============================================
 // MULTI-CART SESSION TYPES
@@ -383,57 +382,6 @@ export function usePOS() {
         return normalizeTaxPercent(candidate);
     };
 
-    const getAvailableStock = (item: CartItem): number | null => {
-        if (item.is_custom_line) return null;
-        const rawStock = Number(item.available_stock);
-        if (!Number.isFinite(rawStock)) return null;
-        return Math.max(0, Math.floor(rawStock));
-    };
-
-    const formatStockIssue = (
-        item: CartItem,
-        available: number,
-        requested: number,
-    ): string => {
-        const sku = item.product_sku ? ` (${item.product_sku})` : '';
-        if (available <= 0) {
-            return `${item.product_name}${sku}: sin stock disponible.`;
-        }
-        return `${item.product_name}${sku}: disponible ${available}, solicitado ${requested}.`;
-    };
-
-    const getStockWarnings = (): string[] => {
-        const issues: string[] = [];
-
-        for (const item of cart.value) {
-            if (item.is_custom_line) continue;
-
-            const available = getAvailableStock(item);
-            if (available === null) continue;
-
-            const requested = Number(item.quantity) || 0;
-            if (available <= 0 || requested > available) {
-                issues.push(formatStockIssue(item, available, requested));
-            }
-        }
-
-        return issues;
-    };
-
-    const validateCartStock = (
-        context: StockValidationContext = 'sale',
-    ): boolean => {
-        const issues = getStockWarnings();
-
-        if (issues.length > 0) {
-            // No longer blocking — just set a non-blocking warning message
-            const actionLabel = context === 'quote' ? 'cotizar' : 'cobrar';
-            error.value = `Advertencia de stock antes de ${actionLabel}:\n- ${issues.join('\n- ')}\n\nSe procederá de todas formas.`;
-        }
-
-        return true;
-    };
-
     const activeInventoryForVariant = (variant: any, warehouseId?: number) => {
         const inventory = variant?.inventory ?? [];
 
@@ -484,16 +432,6 @@ export function usePOS() {
         if (existingItem) {
             if (typeof availableStock === 'number') {
                 existingItem.available_stock = availableStock;
-                const targetQty = existingItem.quantity + quantity;
-                if (availableStock <= 0 || targetQty > availableStock) {
-                    // Warn but do NOT block — allow adding with stock warning
-                    const msg = formatStockIssue(
-                        existingItem,
-                        availableStock,
-                        targetQty,
-                    );
-                    console.warn(`[POS] Stock warning: ${msg}`);
-                }
             }
 
             existingItem.quantity += quantity;
@@ -542,17 +480,6 @@ export function usePOS() {
                 tax_amount: 0,
                 total: 0,
             };
-
-            const newItemStock = getAvailableStock(newItem);
-            if (
-                newItemStock !== null &&
-                (newItemStock <= 0 || quantity > newItemStock)
-            ) {
-                // Warn but do NOT block — allow adding with stock warning
-                console.warn(
-                    `[POS] Stock warning: ${formatStockIssue(newItem, newItemStock, quantity)}`,
-                );
-            }
 
             recalculateItem(newItem);
             cart.value.push(newItem);
@@ -633,17 +560,6 @@ export function usePOS() {
     const updateQuantity = (itemId: string, quantity: number) => {
         const item = cart.value.find((i) => i.id === itemId);
         if (item && quantity > 0) {
-            const available = getAvailableStock(item);
-            if (
-                available !== null &&
-                (available <= 0 || quantity > available)
-            ) {
-                // Warn but do NOT block
-                console.warn(
-                    `[POS] Stock warning: ${formatStockIssue(item, available, quantity)}`,
-                );
-            }
-
             const oldQty = item.quantity;
             item.quantity = quantity;
             recalculateItem(item);
@@ -945,13 +861,6 @@ export function usePOS() {
             return false;
         }
 
-        if (
-            !activeSession.value.source_quote_id &&
-            !validateCartStock('sale')
-        ) {
-            return false;
-        }
-
         // Validate payments vs total
         if (!paymentsArray || paymentsArray.length === 0) {
             // Legacy check
@@ -1046,21 +955,6 @@ export function usePOS() {
             pendingCheckoutFingerprint.value = null;
             pendingCheckoutKey.value = null;
 
-            // Show stock warnings from API as visible alert
-            const apiWarnings = createdOrderResult?.warnings;
-            if (
-                apiWarnings &&
-                Array.isArray(apiWarnings) &&
-                apiWarnings.length > 0
-            ) {
-                const warningMsgs = apiWarnings
-                    .map((w: any) => w.message || JSON.stringify(w))
-                    .join('\n- ');
-                alert(
-                    `Venta procesada con advertencias de stock:\n\n- ${warningMsgs}`,
-                );
-            }
-
             const createdOrder = createdOrderResult?.data || createdOrderResult;
 
             // After successful sale: remove the completed session and switch
@@ -1137,10 +1031,6 @@ export function usePOS() {
         ) {
             error.value =
                 'Selecciona una sucursal válida para todos los artículos antes de guardar.';
-            return false;
-        }
-
-        if (!validateCartStock('sale')) {
             return false;
         }
 
@@ -1367,8 +1257,6 @@ export function usePOS() {
         updateItemNotes,
         reorderCart,
         clearCart,
-        validateCartStock,
-        getStockWarnings,
         processSale,
         saveDraft,
         loadQuoteAsSession,

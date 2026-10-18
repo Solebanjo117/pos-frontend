@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
     checkSession: vi.fn(),
     sessionOpen: true,
     transition: vi.fn(),
+    warehouseId: 1 as number | null,
+    routerOn: vi.fn<
+        (event: string, listener: (event: unknown) => boolean) => () => void
+    >(() => vi.fn()),
 }));
 
 vi.mock('@inertiajs/vue3', () => ({
@@ -23,7 +27,7 @@ vi.mock('@inertiajs/vue3', () => ({
     }),
     router: {
         visit: mocks.visit,
-        on: vi.fn(() => vi.fn()),
+        on: mocks.routerOn,
     },
 }));
 
@@ -66,8 +70,8 @@ vi.mock('@/composables/usePosSettings', () => ({
         isClientMode: () => false,
         getDefaultWarehouse: vi.fn(),
         getDefaultWarehouseId: vi.fn(() => 1),
-        currentWarehouseId: ref(1),
-        settings: ref({ default_warehouse_id: 1 }),
+        currentWarehouseId: ref(mocks.warehouseId),
+        settings: ref({ default_warehouse_id: mocks.warehouseId }),
     }),
 }));
 
@@ -192,11 +196,124 @@ async function mountPos(props: Record<string, unknown> = {}) {
     return { wrapper, toast: useToast() };
 }
 
+describe('independent new quote entry', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.clearAllMocks();
+        mocks.role = 'seller';
+        mocks.warehouseId = 2;
+        mocks.sessionOpen = false;
+        localStorage.clear();
+        sessionStorage.clear();
+        mocks.apiGet.mockResolvedValue({ data: { data: [] } });
+        mocks.apiPut.mockResolvedValue({
+            data: {
+                data: {
+                    id: 29,
+                    quote_number: 'COT-SYNTHETIC',
+                    draft_revision: 1,
+                    status: 'draft',
+                },
+            },
+        });
+        (window as any).__page = {
+            props: { auth: { user: { id: 55, role: 'seller' } } },
+        };
+    });
+
+    it('opens the POS in quote mode from the existing editor', async () => {
+        const { default: Editor } = await import('../SalesQuotes/Editor.vue');
+        const { default: PosIndex } = await import('./Index.vue');
+        const wrapper = mount(Editor, { shallow: true });
+
+        expect(wrapper.getComponent(PosIndex).props()).toMatchObject({
+            quoteMode: true,
+            quoteId: undefined,
+            editMode: false,
+            returnMode: false,
+        });
+        wrapper.unmount();
+    }, 15000);
+
+    it('saves a draft in the active branch before returning to Transactions', async () => {
+        const { wrapper } = await mountPos({ quoteMode: true });
+        const pos = wrapper.vm as unknown as {
+            addCustomLine: (payload: {
+                description: string;
+                quantity: number;
+                unit_price: number;
+            }) => void;
+            activeSession: { quote_status?: string };
+        };
+        expect(wrapper.text()).toContain('NUEVA COTIZACIÓN');
+        expect(mocks.checkSession).not.toHaveBeenCalled();
+        expect(wrapper.find('cash-register-status-stub').exists()).toBe(false);
+
+        pos.addCustomLine({
+            description: 'Servicio sintético',
+            quantity: 1,
+            unit_price: 25,
+        });
+        await flushPromises();
+        await wrapper
+            .get('button[aria-label="Volver a Transacciones"]')
+            .trigger('click');
+        expect(mocks.visit).toHaveBeenCalledWith('/sales-quotes');
+
+        const beforeNavigation = mocks.routerOn.mock.calls.find(
+            ([event]) => event === 'before',
+        )?.[1] as unknown as (event: unknown) => boolean;
+        expect(
+            beforeNavigation({
+                detail: { visit: { url: '/sales-quotes', method: 'get' } },
+            }),
+        ).toBe(false);
+        await flushPromises();
+
+        expect(mocks.apiPut).toHaveBeenCalledWith(
+            expect.stringMatching(/^\/sales-quotes\/drafts\//),
+            expect.objectContaining({
+                warehouse_id: 2,
+                quote_id: null,
+                expected_revision: 0,
+                items: [
+                    expect.objectContaining({
+                        warehouse_id: 2,
+                        is_custom_line: true,
+                    }),
+                ],
+            }),
+        );
+        expect(pos.activeSession.quote_status).toBe('draft');
+        expect(mocks.visit).toHaveBeenLastCalledWith(
+            '/sales-quotes',
+            expect.objectContaining({ method: 'get' }),
+        );
+        expect(mocks.apiPost).not.toHaveBeenCalled();
+        expect(mocks.transition).not.toHaveBeenCalled();
+        expect(mocks.checkSession).not.toHaveBeenCalled();
+        wrapper.unmount();
+    }, 15000);
+
+    it('requires a branch before saving a new quote', async () => {
+        mocks.warehouseId = null;
+        const { wrapper } = await mountPos({ quoteMode: true });
+        expect(wrapper.text()).toContain(
+            'Selecciona una sucursal antes de crear la cotización.',
+        );
+        expect(mocks.apiPut).not.toHaveBeenCalled();
+        expect(mocks.apiPost).not.toHaveBeenCalled();
+        expect(mocks.checkSession).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+});
+
 describe('POS quote session banner', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
         mocks.role = 'admin';
+        mocks.warehouseId = 1;
         mocks.sessionOpen = true;
         mocks.apiGet.mockResolvedValue({ data: { data: [] } });
         mocks.apiPut.mockResolvedValue({ data: { data: { id: 19 } } });
@@ -259,6 +376,7 @@ describe('POS post-sale edit session', () => {
         vi.resetModules();
         vi.clearAllMocks();
         mocks.role = 'admin';
+        mocks.warehouseId = 1;
         mocks.sessionOpen = false;
         localStorage.clear();
         mocks.apiGet.mockImplementation(async (url: string) => {
@@ -307,6 +425,7 @@ describe('POS stock warnings are advisory, never blocking', () => {
         vi.resetModules();
         vi.clearAllMocks();
         mocks.role = 'admin';
+        mocks.warehouseId = 1;
         mocks.sessionOpen = true;
         mocks.apiGet.mockImplementation(async (url: string) => {
             if (url === '/sales-quotes/19') {
@@ -352,9 +471,15 @@ describe('POS stock warnings are advisory, never blocking', () => {
         seedQuoteSession();
     });
 
-    it('saves quote changes without a confirm and warns through a toast', async () => {
+    it('saves quote changes without a confirm or a stock warning', async () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
         const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        mocks.apiPut.mockResolvedValue({
+            data: {
+                data: { id: 19 },
+                warnings: [{ message: 'Filtro de aceite: sin stock disponible.' }],
+            },
+        });
         const { wrapper, toast } = await mountPos();
 
         await wrapper
@@ -368,13 +493,9 @@ describe('POS stock warnings are advisory, never blocking', () => {
             '/sales-quotes/19',
             expect.objectContaining({ customer_id: 3 }),
         );
-        expect(toast.toasts.value.map((entry) => entry.type)).toEqual(
-            expect.arrayContaining(['warning', 'success']),
-        );
-        expect(
-            toast.toasts.value.find((entry) => entry.type === 'warning')
-                ?.message,
-        ).toContain('Filtro de aceite');
+        expect(toast.toasts.value.map((entry) => entry.type)).toEqual([
+            'success',
+        ]);
 
         wrapper.unmount();
         confirmSpy.mockRestore();

@@ -396,12 +396,6 @@ const handlePurchaseSuccess = (result: {
                                                 : `Stock: ${getStockLimit(item)}`
                                         }}
                                     </span>
-                                    <span
-                                        v-if="isOutOfStock(item)"
-                                        class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-500 dark:bg-red-900/20"
-                                    >
-                                        Se venderá sin descontar
-                                    </span>
                                 </div>
                             </td>
 

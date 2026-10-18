@@ -65,6 +65,37 @@ If Vitest, Vue Test Utils or jsdom cannot be resolved, treat the local `node_mod
 - **Error handling**: API client dispatches `api:forbidden` (403), `api:server-error` (500), and `api:network-error` custom events on `window`. Handle via `useToast` or custom listeners.
 - **Auth flow**: Cookie-based (Sanctum-style) with CSRF token from `<meta>` tag. 401 responses auto-redirect to `/login`.
 
+## Additional Skills
+
+Installed on 2026-10-06 in the user-level `$CODEX_HOME/skills` directory (default: `~/.codex/skills`). Use the configured directory when it differs from the default links below.
+
+Before working in a relevant domain, read the matching `SKILL.md` and the references its workflow requires. Load only applicable skills. Explicit user instructions and project conventions take precedence over generic skill advice.
+
+| Skill | When to use |
+|-------|-------------|
+| [vue-best-practices](../../.codex/skills/vue-best-practices/SKILL.md) | Vue 3 components, TypeScript, reactivity, props/events, and composables. |
+| [vue-testing-best-practices](../../.codex/skills/vue-testing-best-practices/SKILL.md) | Vitest and Vue Test Utils coverage, asynchronous behavior, component mocks, and E2E test design. |
+| [supabase-postgres-best-practices](../../.codex/skills/supabase-postgres-best-practices/SKILL.md) | PostgreSQL schema, migrations, indexes, query plans, connection management, and concurrency. |
+| [web-design-guidelines](../../.codex/skills/web-design-guidelines/SKILL.md) | UI accessibility and UX reviews: keyboard/focus behavior, forms, responsive layout, and interaction states. |
+| [vite](../../.codex/skills/vite/SKILL.md) | Vite configuration, build failures, plugins, assets, and SSR; check the installed project version. |
+| [webapp-testing](../../.codex/skills/webapp-testing/SKILL.md) | Browser verification, screenshots, browser logs, and integration flows using Python and Playwright. |
+
+- Keep the existing Laravel and Pest skills active for their domains. PostgreSQL guidance must preserve Eloquent relationships, warehouse isolation, cookie/CSRF authentication, idempotency, activity logging, and SQLite-compatible ordinary tests. Verify PostgreSQL locking and concurrency separately in an isolated test database; installing a skill does not authorize applying migrations or modifying live data.
+- For frontend work, apply `hermex-operations-ui` and `tailwindcss-development` alongside the relevant Vue skills. Reuse existing components and composables; generic skill examples do not authorize changing the framework, dependencies, routing, or business contracts.
+- Use each project's manifest and lockfile as the version authority; a skill may describe a newer minor release. Browser checks complement Pest/Vitest and must be reported separately from automated tests.
+- Browser verification must use the existing Herd-served application. Do not start or stop HTTP servers merely because a skill helper suggests it. Verify the available Python/Playwright runtime before use; skill installation does not install those dependencies. Use test data for mutating browser checks.
+
+- Follow the [reusable UI catalog](docs/COMPONENTES-UI.md) and its existing HermeX Operations UI guide before changing screens. Preserve shared date-range behavior, filter persistence, permissions, and warehouse context.
+
+## Reusable UI Components (required)
+
+Before implementing or changing a screen, consult [the reusable UI catalog](docs/COMPONENTES-UI.md), then inspect the relevant component and a real consumer. Reuse suitable components proactively; the user does not need to request this explicitly. Prefer a compatible extension of a shared component when a requirement is missing, instead of creating a screen-specific variant.
+
+- Keep the catalog current when adding, moving, removing, or changing a reusable component: record its verified path, use cases, important props/events/slots, and an existing consumer. The source code and tests remain authoritative.
+- For report periods, reuse `DateRangeInput.vue` or its finance wrapper `ReportPeriod.vue`. Keep the range control visible in reports that use it, preserve both dates and synchronize applied filters across tabs, requests and exports. Distinguish a date range from a single `as_of` cutoff; see the catalog's financial-report contract.
+- For UI code changes, verify desktop/mobile layout, overflow, keyboard/focus behavior, labels, dialog closing, loading/error/empty states, and filter persistence with relevant tests and synthetic data. Reusing a component alone does not prove accessibility or visual correctness.
+- Use the existing HermeX Operations UI guide linked in the catalog; do not duplicate its design rules here. Preserve role checks, warehouse context, and domain-specific behavior when reusing components.
+
 ## Frontend Style
 
 - 4-space indentation (YAML: 2-space)

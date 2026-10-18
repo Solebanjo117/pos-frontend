@@ -47,7 +47,7 @@ async function loadTransfer(): Promise<void> {
 }
 
 async function reverseTransfer(): Promise<void> {
-    if (reason.value.trim().length < 3) return;
+    if (reversing.value || reason.value.trim().length < 3) return;
     reversing.value = true;
     try {
         const reversal = await financialTransfersService.reverse(
@@ -225,6 +225,61 @@ onMounted(loadTransfer);
                             </dd>
                         </div>
                     </dl>
+                    <div
+                        v-if="transfer.deposit_allocations?.length"
+                        class="mt-5 space-y-3 border-t pt-4"
+                    >
+                        <h2 class="font-semibold">
+                            Asignaciones del depósito ·
+                            {{ transfer.collection_date_from }} a
+                            {{ transfer.collection_date_to }}
+                        </h2>
+                        <p class="text-sm text-muted-foreground">
+                            Las asignaciones liberadas conservan su historial y
+                            vuelven a estar disponibles para otro depósito.
+                        </p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr>
+                                        <th class="p-2 text-left">Fuente</th>
+                                        <th class="p-2 text-right">Importe</th>
+                                        <th class="p-2 text-left">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="allocation in transfer.deposit_allocations"
+                                        :key="allocation.id"
+                                    >
+                                        <td class="p-2">
+                                            {{
+                                                allocation.source_scope ===
+                                                'receipts'
+                                                    ? 'Recibo de cliente'
+                                                    : 'Cobro de venta'
+                                            }}
+                                            #{{ allocation.source_id }}
+                                        </td>
+                                        <td class="p-2 text-right font-mono">
+                                            {{
+                                                formatCurrency(
+                                                    allocation.amount,
+                                                )
+                                            }}
+                                        </td>
+                                        <td class="p-2">
+                                            {{
+                                                allocation.released_at
+                                                    ? 'Liberada por reversa'
+                                                    : 'Depositada'
+                                            }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </section>
             </template>
         </PageShell>

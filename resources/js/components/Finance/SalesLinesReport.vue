@@ -2,6 +2,8 @@
 import { Link } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 import apiClient from '@/services/api/client';
+import { validateFinancialReportDates } from '@/utils/financialReport';
+import type { FinancialReportFilters } from '@/utils/financialReport';
 import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
 import {
     downloadMoneyReport,
@@ -9,13 +11,24 @@ import {
     reportPeriod,
 } from '@/utils/moneyReports';
 import ReportPeriod from './ReportPeriod.vue';
-const props = withDefaults(defineProps<{ initialGroup?: string }>(), {
-    initialGroup: 'line',
-});
+const props = withDefaults(
+    defineProps<{
+        initialGroup?: string;
+        initialFilters?: FinancialReportFilters;
+    }>(),
+    {
+        initialGroup: 'line',
+    },
+);
+const emit = defineEmits<{ 'filters-applied': [FinancialReportFilters] }>();
 const filters = ref({
     ...reportPeriod(),
+    date_from: props.initialFilters?.date_from ?? reportPeriod().date_from,
+    date_to: props.initialFilters?.date_to ?? reportPeriod().date_to,
     group_by: props.initialGroup,
-    warehouse_id: '',
+    warehouse_id: props.initialFilters?.warehouse_id
+        ? String(props.initialFilters.warehouse_id)
+        : '',
     search: '',
     product_id: '',
     brand_id: '',
@@ -60,6 +73,14 @@ const metrics = computed(() =>
     }).map(([key, label]) => ({ label, value: result.value.summary[key] })),
 );
 async function load(reset = false) {
+    const validation = validateFinancialReportDates(
+        filters.value.date_from,
+        filters.value.date_to,
+    );
+    if (validation) {
+        error.value = validation;
+        return;
+    }
     if (reset) {
         filters.value.page = 1;
         cache.clear();
@@ -86,6 +107,11 @@ async function load(reset = false) {
         if (version === requestVersion) {
             result.value = data;
             appliedFilters.value = requestedFilters;
+            emit('filters-applied', {
+                date_from: requestedFilters.date_from,
+                date_to: requestedFilters.date_to,
+                warehouse_id: Number(requestedFilters.warehouse_id) || null,
+            });
         }
     } catch (e: any) {
         error.value =
@@ -125,6 +151,26 @@ function label(row: any) {
         row.seller_name
     );
 }
+watch(
+    () => props.initialFilters,
+    (value) => {
+        if (!value) return;
+        const warehouse = value.warehouse_id ? String(value.warehouse_id) : '';
+        if (
+            filters.value.date_from === value.date_from &&
+            filters.value.date_to === value.date_to &&
+            filters.value.warehouse_id === warehouse
+        )
+            return;
+        Object.assign(filters.value, {
+            date_from: value.date_from,
+            date_to: value.date_to,
+            warehouse_id: warehouse,
+        });
+        void load(true);
+    },
+    { deep: true },
+);
 function changePage(page: number) {
     const target = Math.max(
         1,

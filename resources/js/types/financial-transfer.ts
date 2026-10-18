@@ -47,4 +47,14 @@ export interface FinancialTransfer {
     has_receipt: boolean;
     reversal_of?: { id: number; folio: string } | null;
     reversed_by?: { id: number; folio: string } | null;
+    collection_date_from?: string | null;
+    collection_date_to?: string | null;
+    deposit_allocations?: Array<{
+        id: number;
+        source_scope: string;
+        source_id: number;
+        amount: number | string;
+        released_at: string | null;
+        released_by_transfer_id: number | null;
+    }>;
 }

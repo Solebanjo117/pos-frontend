@@ -189,7 +189,7 @@ async function submit(): Promise<void> {
             to_endpoint_id: selectedTo.value.endpoint_id,
             amount: Number(form.value.amount),
             business_datetime: isAdmin.value
-                ? form.value.business_datetime
+                ? new Date(form.value.business_datetime).toISOString()
                 : undefined,
             reference: form.value.reference.trim(),
             notes: form.value.notes.trim(),

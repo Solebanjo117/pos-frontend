@@ -1,15 +1,37 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import apiClient from '@/services/api/client';
+import { validateFinancialReportDates } from '@/utils/financialReport';
 import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
 import { downloadMoneyReport, reportPeriod } from '@/utils/moneyReports';
+import CashDepositPanel from './CashDepositPanel.vue';
 import ReportPeriod from './ReportPeriod.vue';
 
-const props = withDefaults(defineProps<{ reportMode?: boolean }>(), {
-    reportMode: false,
-});
+const props = withDefaults(
+    defineProps<{
+        reportMode?: boolean;
+        initialFilters?: {
+            date_from: string;
+            date_to: string;
+            warehouse_id: number | null;
+        };
+    }>(),
+    {
+        reportMode: false,
+    },
+);
+const emit = defineEmits<{
+    'cash-deposited': [];
+    'filters-applied': [
+        filters: {
+            date_from: string;
+            date_to: string;
+            warehouse_id: number | null;
+        },
+    ];
+}>();
 const { isAdmin, isManager } = useAuth();
 const filterOptions = ref<{
     methods: any[];
@@ -18,10 +40,16 @@ const filterOptions = ref<{
     warehouses: any[];
 }>({ methods: [], operators: [], sessions: [], warehouses: [] });
 const filters = ref({
-    warehouse_id: '',
+    warehouse_id: props.initialFilters?.warehouse_id
+        ? String(props.initialFilters.warehouse_id)
+        : '',
     scope: 'sales',
-    date_from: props.reportMode ? reportPeriod().date_from : '',
-    date_to: props.reportMode ? reportPeriod().date_to : '',
+    date_from:
+        props.initialFilters?.date_from ??
+        (props.reportMode ? reportPeriod().date_from : ''),
+    date_to:
+        props.initialFilters?.date_to ??
+        (props.reportMode ? reportPeriod().date_to : ''),
     method: '',
     pos_session_id: '',
     user_id: '',
@@ -30,6 +58,7 @@ const filters = ref({
 const appliedFilters = ref<Record<string, unknown>>({});
 const rows = ref<any[]>([]);
 const summary = ref<any[]>([]);
+const warnings = ref<string[]>([]);
 const accounts = ref<Array<{ endpoint_id: number; name: string }>>([]);
 const accountSelection = ref<Record<string, number>>({});
 const availability = ref<any>(null);
@@ -39,10 +68,22 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref<string | null>(null);
 const reconciliation = ref({ amount: 0, cutoff_at: '', reason: '' });
-async function load() {
+let requestVersion = 0;
+async function load(preserveAvailability = false) {
+    if (props.reportMode) {
+        const validation = validateFinancialReportDates(
+            filters.value.date_from,
+            filters.value.date_to,
+        );
+        if (validation) {
+            error.value = validation;
+            return;
+        }
+    }
+    const version = ++requestVersion;
     rows.value = [];
     summary.value = [];
-    availability.value = null;
+    if (!preserveAvailability) availability.value = null;
     loading.value = true;
     error.value = null;
     const params = Object.fromEntries(
@@ -62,18 +103,26 @@ async function load() {
                 },
             }),
         ]);
+        if (version !== requestVersion) return;
         rows.value = movements.data.data;
+        warnings.value = movements.data.warnings || [];
         filterOptions.value = movements.data.filter_options;
         lastPage.value = movements.data.last_page;
         summary.value = totals.data.data;
         availability.value = cash.data.data;
         appliedFilters.value = { ...params };
+        emit('filters-applied', {
+            date_from: String(params.date_from || ''),
+            date_to: String(params.date_to || ''),
+            warehouse_id: Number(availability.value.warehouse_id) || null,
+        });
     } catch (exception: any) {
+        if (version !== requestVersion) return;
         error.value =
             exception.response?.data?.message ||
             'No se pudieron cargar los movimientos.';
     } finally {
-        loading.value = false;
+        if (version === requestVersion) loading.value = false;
     }
 }
 async function download(format: 'csv' | 'xlsx') {
@@ -86,6 +135,10 @@ async function download(format: 'csv' | 'xlsx') {
     } catch {
         error.value = 'No se pudo exportar el reporte.';
     }
+}
+function afterDeposit(): void {
+    emit('cash-deposited');
+    void load(true);
 }
 async function assign(row: any) {
     const id = accountSelection.value[`${row.scope}-${row.id}`];
@@ -130,6 +183,27 @@ function documentUrl(row: any): string | null {
     if (row.scope === 'purchases') return `/purchase-orders/${row.document_id}`;
     return null;
 }
+watch(
+    () => props.initialFilters,
+    (value) => {
+        if (!value) return;
+        const warehouse = value.warehouse_id ? String(value.warehouse_id) : '';
+        if (
+            filters.value.date_from === value.date_from &&
+            filters.value.date_to === value.date_to &&
+            filters.value.warehouse_id === warehouse
+        )
+            return;
+        Object.assign(filters.value, {
+            date_from: value.date_from,
+            date_to: value.date_to,
+            warehouse_id: warehouse,
+        });
+        page.value = 1;
+        void load();
+    },
+    { deep: true },
+);
 onMounted(async () => {
     await load();
     if (isManager.value) {
@@ -181,6 +255,14 @@ onMounted(async () => {
             class="rounded-md border border-red-300 p-3 text-sm text-red-600"
         >
             {{ error }}
+        </p>
+        <p
+            v-for="warning in warnings"
+            :key="warning"
+            role="status"
+            class="rounded-md border border-amber-300 p-3 text-sm text-amber-800"
+        >
+            {{ warning }}
         </p>
         <form
             class="flex flex-wrap items-end gap-3 rounded-md border p-3"
@@ -323,6 +405,18 @@ onMounted(async () => {
                 </p>
             </article>
         </div>
+        <CashDepositPanel
+            v-if="
+                isManager &&
+                availability?.warehouse_id &&
+                appliedFilters.date_from &&
+                appliedFilters.date_to
+            "
+            :warehouse-id="Number(availability.warehouse_id)"
+            :date-from="String(appliedFilters.date_from)"
+            :date-to="String(appliedFilters.date_to)"
+            @deposited="afterDeposit"
+        />
         <div class="overflow-x-auto rounded-md border">
             <table class="w-full text-sm">
                 <thead class="bg-muted">
@@ -344,14 +438,22 @@ onMounted(async () => {
                                 >{{ row.document_number }}</Link
                             ><span v-else
                                 >{{
-                                    row.document_number.includes('Expense')
-                                        ? 'Gasto'
-                                        : 'Aportación'
+                                    row.scope === 'receipts'
+                                        ? row.document_number
+                                        : row.document_number.includes(
+                                                'Expense',
+                                            )
+                                          ? 'Gasto'
+                                          : 'Aportación'
                                 }}
                                 #{{ row.document_id }}</span
                             >
                             <p class="text-xs text-muted-foreground">
-                                {{ formatReportDateTime(row.created_at) }}
+                                {{
+                                    formatReportDateTime(
+                                        row.business_datetime || row.created_at,
+                                    )
+                                }}
                             </p>
                         </td>
                         <td class="p-3">

@@ -46,6 +46,10 @@ const changePerPage = (event: Event): void => {
 };
 
 const warningLabels: Record<string, string> = {
+    cash_balance_not_reconciled_at_cutoff:
+        'El efectivo no está conciliado en la fecha de corte.',
+    consolidated_bank_currency_conversion_unavailable:
+        'Hay cuentas en otra moneda sin conversión; revise cada saldo por separado.',
     inventory_historical_value_uses_current_fifo_lot_availability:
         'Inventario historico estimado con disponibilidad FIFO actual.',
     metric_not_supported: 'Este indicador aun no tiene desglose disponible.',

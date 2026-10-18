@@ -259,6 +259,12 @@ const kpis = computed(() => {
 });
 
 const warningLabels: Record<string, string> = {
+    bank_is_operational_payment_bucket:
+        'Banco del resumen refleja flujos de la sucursal. Consulte las cuentas bancarias para ver sus saldos actuales consolidados.',
+    cash_balance_not_reconciled_at_cutoff:
+        'El efectivo no está conciliado en la fecha de corte.',
+    consolidated_bank_currency_conversion_unavailable:
+        'Hay cuentas en otra moneda sin conversión; revise cada saldo por separado.',
     inventory_historical_value_uses_current_fifo_lot_availability:
         'Inventario historico estimado con disponibilidad FIFO actual.',
 };
@@ -418,6 +424,24 @@ const selectTab = (tab: ReportTab): void => {
         '',
         `${url.pathname}${url.search}${url.hash}`,
     );
+};
+
+const applyMoneyFilters = (value: DrilldownFilters): void => {
+    const changed =
+        financialReportFilterKey(filters.value) !==
+        financialReportFilterKey(value);
+    filters.value = { ...filters.value, ...value };
+    window.history.replaceState(
+        window.history.state,
+        '',
+        buildFinancialReportUrl(window.location.href, filters.value),
+    );
+    if (changed) void loadReports();
+};
+
+const refreshAfterDeposit = (): void => {
+    reportReloadQueued.value = true;
+    void loadReports();
 };
 
 const applyBalanceDate = async (): Promise<void> => {
@@ -830,15 +854,26 @@ watch(currentWarehouseId, (value) => {
                     <SalesLinesReport
                         v-if="activeTab === 'line_profitability'"
                         initial-group="brand"
+                        :initial-filters="filters"
+                        @filters-applied="applyMoneyFilters"
                     />
 
                     <SalesLinesReport
                         v-if="activeTab === 'sales'"
                         initial-group="line"
+                        :initial-filters="filters"
+                        @filters-applied="applyMoneyFilters"
                     /><CashPaymentsReport
                         v-if="activeTab === 'collections'"
                         report-mode
-                    /><CashPositionReport v-if="activeTab === 'cash'" />
+                        :initial-filters="filters"
+                        @filters-applied="applyMoneyFilters"
+                        @cash-deposited="refreshAfterDeposit"
+                    /><CashPositionReport
+                        v-if="activeTab === 'cash'"
+                        :initial-filters="filters"
+                        @filters-applied="applyMoneyFilters"
+                    />
 
                     <div
                         v-if="activeTab === 'credits'"

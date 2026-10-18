@@ -3,7 +3,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import CashPositionReport from '@/components/Finance/CashPositionReport.vue';
 import SalesLinesReport from '@/components/Finance/SalesLinesReport.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import type * as ReportsModule from '@/composables/useReports';
 import apiClient from '@/services/api/client';
 import Financial from './Financial.vue';
@@ -210,6 +212,74 @@ describe('Reporte financiero: pestanas de rentabilidad y ventas', () => {
         expect(labels).toContain('Ventas');
     });
 
+    it('conserva el rango aplicado al pasar de efectivo a Resumen y Ventas', async () => {
+        const previous = vi.mocked(apiClient.get).getMockImplementation()!;
+        vi.mocked(apiClient.get).mockImplementation(async (url, config) => {
+            if (url === '/reports/cash-position')
+                return {
+                    data: {
+                        data: [],
+                        summary: {
+                            initialized: true,
+                            warehouse_id: 2,
+                            closing_balance: 100,
+                        },
+                        categories: [],
+                        warnings: [],
+                        meta: {},
+                    },
+                } as any;
+            if (url === '/cash/payment-movements')
+                return {
+                    data: {
+                        filter_options: {
+                            warehouses: [],
+                            methods: [],
+                            operators: [],
+                            sessions: [],
+                        },
+                    },
+                } as any;
+            return previous(url, config);
+        });
+        const wrapper = await mountAt(
+            '?tab=cash&date_from=2026-08-01&date_to=2026-08-15',
+        );
+        const cash = wrapper.getComponent(CashPositionReport);
+        await cash.get('select[aria-label="Consulta"]').setValue('period');
+        const picker = cash.getComponent(DateRangeInput);
+        picker.vm.$emit('update:from', '2026-08-05');
+        picker.vm.$emit('update:to', '2026-08-12');
+        await flushPromises();
+        await cash.get('form').trigger('submit');
+        await flushPromises();
+        await wrapper
+            .findAll('nav button')
+            .find((b) => b.text() === 'Resumen Diario')!
+            .trigger('click');
+        await flushPromises();
+        expect(wrapper.getComponent(DateRangeInput).props()).toMatchObject({
+            from: '2026-08-05',
+            to: '2026-08-12',
+        });
+        await wrapper
+            .findAll('nav button')
+            .find((b) => b.text() === 'Ventas')!
+            .trigger('click');
+        await flushPromises();
+        expect(wrapper.getComponent(DateRangeInput).props()).toMatchObject({
+            from: '2026-08-05',
+            to: '2026-08-12',
+        });
+        expect(apiClient.get).toHaveBeenCalledWith('/reports/sales-lines', {
+            params: expect.objectContaining({
+                date_from: '2026-08-05',
+                date_to: '2026-08-12',
+            }),
+        });
+        wrapper.unmount();
+    });
+
     it('no consulta los endpoints nuevos mientras la pestana no este activa', async () => {
         await mountAt('');
 
@@ -297,12 +367,10 @@ describe('Reporte financiero: pestanas de rentabilidad y ventas', () => {
         mocks.brandProfitabilityReport.value = brandRows;
         const wrapper = await mountAt('?tab=line_profitability');
 
-        // Al montar con la pestana activa el rango vigente se recarga una vez.
-        expect(
-            vi
-                .mocked(apiClient.get)
-                .mock.calls.filter(([url]) => url === '/reports/sales-lines'),
-        ).toHaveLength(1);
+        // El resultado se carga con la sucursal activa una vez resuelta.
+        expect(apiClient.get).toHaveBeenCalledWith('/reports/sales-lines', {
+            params: expect.objectContaining({ warehouse_id: '2' }),
+        });
 
         await wrapper.find('select[aria-label="Agrupar"]').setValue('category');
         await flushPromises();

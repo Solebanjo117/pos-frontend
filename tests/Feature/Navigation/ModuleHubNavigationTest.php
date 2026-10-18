@@ -87,3 +87,28 @@ it('keeps representative operational routes unchanged', function () {
     $this->actingAs($admin)->get(route('purchase-orders.index'))->assertOk();
     $this->actingAs($admin)->get(route('reports.financial'))->assertOk();
 });
+
+it('opens the existing POS quote editor only for quote creators', function (string $role) {
+    $user = User::factory()->create(['role' => $role, 'is_active' => true]);
+
+    $this->actingAs($user)->get(route('quotes.create'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('SalesQuotes/Editor')->missing('quoteId'));
+})->with(['admin', 'manager', 'seller']);
+
+it('does not broaden access to quote creation', function (string $role) {
+    $user = User::factory()->create(['role' => $role, 'is_active' => true]);
+
+    $this->actingAs($user)->get(route('quotes.create'))->assertForbidden();
+})->with(['buyer', 'assistant', 'cashier']);
+
+it('redirects guests away from quote creation', function () {
+    $this->get(route('quotes.create'))->assertRedirect(route('login'));
+});
+
+it('keeps both histories and the editor return route in Transactions', function () {
+    $seller = User::factory()->create(['role' => 'seller', 'is_active' => true]);
+
+    $this->actingAs($seller)->get(route('sales-orders.index'))->assertRedirect('/transactions?type=order');
+    $this->get(route('sales-quotes.index'))->assertRedirect('/transactions?type=quote');
+});

@@ -276,16 +276,10 @@ onMounted(async () => {
             <div class="flex flex-wrap gap-2">
                 <Link
                     v-if="canCreateQuote"
-                    href="/sales-quotes/create"
+                    href="/quotes/create"
                     class="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
                 >
                     <Plus :size="16" /> Nueva cotización
-                </Link>
-                <Link
-                    href="/sales-orders/create"
-                    class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-                >
-                    <Plus :size="16" /> Nueva orden
                 </Link>
             </div>
         </div>

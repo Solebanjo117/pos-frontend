@@ -167,4 +167,25 @@ describe('Transactions index', () => {
             expect.objectContaining({ type: 'quote', page: 1 }),
         );
     });
+
+    it.each(['admin', 'manager', 'seller', 'buyer', 'assistant'])(
+        'removes new order and keeps quote creation within permissions for %s',
+        async (role) => {
+            mocks.role = role;
+            const wrapper = mount(TransactionsIndex);
+            await flushPromises();
+
+            expect(
+                wrapper.find('a[href="/sales-orders/create"]').exists(),
+            ).toBe(false);
+            expect(wrapper.text()).not.toContain('Nueva orden');
+            const quoteLink = wrapper.find('a[href="/quotes/create"]');
+            expect(quoteLink.exists()).toBe(
+                ['admin', 'manager', 'seller'].includes(role),
+            );
+            if (quoteLink.exists())
+                expect(quoteLink.text()).toBe('Nueva cotización');
+            wrapper.unmount();
+        },
+    );
 });

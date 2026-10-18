@@ -94,6 +94,7 @@ const roles = {
     inventory: ['admin', 'manager', 'buyer', 'assistant'] as AppRole[],
     purchasing: ['admin', 'manager', 'buyer'] as AppRole[],
     sales: ['admin', 'manager', 'buyer', 'seller', 'assistant'] as AppRole[],
+    quoteCreation: ['admin', 'manager', 'seller'] as AppRole[],
 };
 
 export const moduleDefinitions: ModuleDefinition[] = [
@@ -228,7 +229,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     {
         id: 'sales',
         title: 'Ventas',
-        description: 'Transacciones y seguimiento comercial.',
+        description: 'Transacciones, cotizaciones y seguimiento comercial.',
         href: '/sales',
         icon: ShoppingCart,
         activePaths: [
@@ -249,6 +250,19 @@ export const moduleDefinitions: ModuleDefinition[] = [
                             'Órdenes, cotizaciones, pagos y seguimiento.',
                         icon: ClipboardList,
                         roles: roles.sales,
+                    },
+                ],
+            },
+            {
+                title: 'Cotizaciones',
+                actions: [
+                    {
+                        title: 'Nueva cotización',
+                        href: '/quotes/create',
+                        description:
+                            'Preparar una nueva propuesta para un cliente.',
+                        icon: Plus,
+                        roles: roles.quoteCreation,
                     },
                 ],
             },

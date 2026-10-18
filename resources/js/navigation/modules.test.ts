@@ -32,6 +32,7 @@ describe('module route resolution', () => {
         ['/customers/42', 'customers'],
         ['/settings/pricing-formulas', 'settings'],
         ['/transactions?type=quote', 'sales'],
+        ['/quotes/create', 'sales'],
     ])('assigns %s to %s', (path, moduleId) => {
         expect(findModuleForPath(path)?.id).toBe(moduleId);
     });
@@ -90,16 +91,50 @@ describe('role and feature filtering', () => {
 });
 
 describe('sales navigation', () => {
-    it('shows one transaction entry for orders and quotes', () => {
-        for (const role of ['admin', 'seller', 'buyer'] as const) {
+    it('keeps one history and an independent quote creation entry', () => {
+        for (const role of ['admin', 'manager', 'seller'] as const) {
             const sales = getVisibleModuleById('sales', role, features);
             const actions = sales?.sections.flatMap(
                 (section) => section.actions,
             );
             expect(actions?.map((action) => action.href)).toEqual([
                 '/transactions',
+                '/quotes/create',
+            ]);
+            expect(actions?.map((action) => action.title)).toEqual([
+                'Transacciones',
+                'Nueva cotización',
             ]);
         }
+    });
+
+    it.each(['buyer', 'assistant'])(
+        'keeps %s limited to the transaction history',
+        (role) => {
+            const sales = getVisibleModuleById('sales', role, features);
+            expect(
+                sales?.sections.flatMap((section) =>
+                    section.actions.map((action) => action.href),
+                ),
+            ).toEqual(['/transactions']);
+        },
+    );
+
+    it('does not expose sales creation to cashiers or unauthenticated users', () => {
+        for (const role of ['cashier', null]) {
+            expect(
+                getVisibleModuleById('sales', role, features),
+            ).toBeUndefined();
+        }
+    });
+
+    it('keeps supplier purchase creation in Purchases', () => {
+        const purchases = getVisibleModuleById('purchases', 'buyer', features);
+        expect(
+            purchases?.sections.flatMap((section) =>
+                section.actions.map((action) => action.href),
+            ),
+        ).toContain('/purchase-orders/create');
     });
 });
 describe('module breadcrumbs', () => {

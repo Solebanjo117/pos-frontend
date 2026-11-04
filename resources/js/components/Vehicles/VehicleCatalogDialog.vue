@@ -1,15 +1,8 @@
 <script setup lang="ts">
 import { Plus, Trash2 } from 'lucide-vue-next';
-import { computed, reactive, watch } from 'vue';
+import { computed, reactive, watch, useId } from 'vue';
+import AppModal from '@/components/ui/AppModal.vue';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogScrollContent,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SearchableSelect, {
@@ -383,353 +376,351 @@ const submit = () => {
             })),
     });
 };
+
+// Id único por instancia: los botones del pie envían el formulario con form="...".
+const formId = useId();
 </script>
 
 <template>
-    <Dialog :open="open" @update:open="(value) => !value && emit('close')">
-        <DialogScrollContent class="max-h-[90vh] sm:max-w-2xl">
-            <DialogHeader>
-                <DialogTitle>{{ title }}</DialogTitle>
-                <DialogDescription>{{ description }}</DialogDescription>
-            </DialogHeader>
+    <AppModal
+        :open="open"
+        :title="title"
+        :description="description"
+        size="md"
+        @close="emit('close')"
+    >
+        <form :id="formId" class="space-y-5" @submit.prevent="submit">
+            <div v-if="tab === 'makes'" class="space-y-2">
+                <Label for="vehicle-make-name">Nombre de la marca</Label>
+                <Input
+                    id="vehicle-make-name"
+                    v-model="form.name"
+                    required
+                    autocomplete="off"
+                    placeholder="Ej: Toyota"
+                />
+            </div>
 
-            <form class="space-y-5" @submit.prevent="submit">
-                <div v-if="tab === 'makes'" class="space-y-2">
-                    <Label for="vehicle-make-name">Nombre de la marca</Label>
-                    <Input
-                        id="vehicle-make-name"
-                        v-model="form.name"
-                        required
-                        autocomplete="off"
-                        placeholder="Ej: Toyota"
+            <template v-else-if="tab === 'models'">
+                <div class="space-y-2">
+                    <Label>Marca</Label>
+                    <SearchableSelect
+                        :model-value="form.make_id"
+                        :options="makeOptions"
+                        placeholder="Selecciona una marca"
+                        @update:model-value="handleMakeChange"
                     />
                 </div>
-
-                <template v-else-if="tab === 'models'">
+                <div class="space-y-2">
+                    <Label for="vehicle-model-name">Modelo</Label>
+                    <Input
+                        id="vehicle-model-name"
+                        v-model="form.name"
+                        required
+                        placeholder="Ej: COROLLA"
+                        class="uppercase"
+                    />
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
                     <div class="space-y-2">
-                        <Label>Marca</Label>
-                        <SearchableSelect
-                            :model-value="form.make_id"
-                            :options="makeOptions"
-                            placeholder="Selecciona una marca"
-                            @update:model-value="handleMakeChange"
-                        />
-                    </div>
-                    <div class="space-y-2">
-                        <Label for="vehicle-model-name">Modelo</Label>
+                        <Label for="vehicle-year-from">Año desde</Label>
                         <Input
-                            id="vehicle-model-name"
-                            v-model="form.name"
+                            id="vehicle-year-from"
+                            v-model.number="form.year_from"
+                            type="number"
+                            min="1900"
+                            :max="currentYear + 2"
                             required
-                            placeholder="Ej: COROLLA"
-                            class="uppercase"
                         />
                     </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div class="space-y-2">
-                            <Label for="vehicle-year-from">Año desde</Label>
-                            <Input
-                                id="vehicle-year-from"
-                                v-model.number="form.year_from"
-                                type="number"
-                                min="1900"
-                                :max="currentYear + 2"
-                                required
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label for="vehicle-year-to">Año hasta</Label>
-                            <Input
-                                id="vehicle-year-to"
-                                :model-value="form.year_to ?? ''"
-                                @update:model-value="
-                                    form.year_to =
-                                        $event === '' ? null : Number($event)
-                                "
-                                type="number"
-                                min="1900"
-                                :max="currentYear + 2"
-                                :required="!hasOpenYearRange"
-                            />
-                        </div>
-                    </div>
                     <div class="space-y-2">
-                        <div class="flex items-center justify-between">
-                            <Label for="vehicle-chassis-code">Chasis</Label>
-                            <button
-                                type="button"
-                                class="text-xs font-medium text-teal-700 hover:underline dark:text-teal-300"
-                                @click="toggleNewChassis"
-                            >
-                                {{
-                                    form.new_chassis
-                                        ? 'Elegir uno existente'
-                                        : '+ Nuevo código'
-                                }}
-                            </button>
-                        </div>
+                        <Label for="vehicle-year-to">Año hasta</Label>
                         <Input
-                            v-if="form.new_chassis"
-                            id="vehicle-chassis-code"
-                            v-model="form.generation"
-                            maxlength="20"
-                            placeholder="Código de chasis (ej: E110)"
-                            class="uppercase"
-                        />
-                        <SearchableSelect
-                            v-else
-                            v-model="form.chassis_id"
-                            :options="chassisOptions"
-                            :clearable="true"
-                            :disabled="!form.make_id"
-                            :placeholder="
-                                form.make_id
-                                    ? 'Sin chasis'
-                                    : 'Primero elige la marca'
+                            id="vehicle-year-to"
+                            :model-value="form.year_to ?? ''"
+                            @update:model-value="
+                                form.year_to =
+                                    $event === '' ? null : Number($event)
                             "
-                            aria-label="Chasis"
+                            type="number"
+                            min="1900"
+                            :max="currentYear + 2"
+                            :required="!hasOpenYearRange"
                         />
                     </div>
-                </template>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <Label for="vehicle-chassis-code">Chasis</Label>
+                        <button
+                            type="button"
+                            class="text-xs font-medium text-teal-700 hover:underline dark:text-teal-300"
+                            @click="toggleNewChassis"
+                        >
+                            {{
+                                form.new_chassis
+                                    ? 'Elegir uno existente'
+                                    : '+ Nuevo código'
+                            }}
+                        </button>
+                    </div>
+                    <Input
+                        v-if="form.new_chassis"
+                        id="vehicle-chassis-code"
+                        v-model="form.generation"
+                        maxlength="20"
+                        placeholder="Código de chasis (ej: E110)"
+                        class="uppercase"
+                    />
+                    <SearchableSelect
+                        v-else
+                        v-model="form.chassis_id"
+                        :options="chassisOptions"
+                        :clearable="true"
+                        :disabled="!form.make_id"
+                        :placeholder="
+                            form.make_id
+                                ? 'Sin chasis'
+                                : 'Primero elige la marca'
+                        "
+                        aria-label="Chasis"
+                    />
+                </div>
+            </template>
 
-                <template v-else-if="tab === 'engines'">
+            <template v-else-if="tab === 'engines'">
+                <div class="space-y-2">
+                    <Label>Marca</Label>
+                    <SearchableSelect
+                        :model-value="form.make_id"
+                        :options="makeOptions"
+                        placeholder="Selecciona una marca"
+                        @update:model-value="handleMakeChange"
+                    />
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
                     <div class="space-y-2">
-                        <Label>Marca</Label>
-                        <SearchableSelect
-                            :model-value="form.make_id"
-                            :options="makeOptions"
-                            placeholder="Selecciona una marca"
-                            @update:model-value="handleMakeChange"
+                        <Label for="vehicle-engine-code">Código</Label>
+                        <Input
+                            id="vehicle-engine-code"
+                            v-model="form.engine_code"
+                            required
+                            placeholder="Ej: 2ZR-FE"
                         />
                     </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div class="space-y-2">
-                            <Label for="vehicle-engine-code">Código</Label>
-                            <Input
-                                id="vehicle-engine-code"
-                                v-model="form.engine_code"
-                                required
-                                placeholder="Ej: 2ZR-FE"
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label for="vehicle-engine-nickname"
-                                >Apodo (opcional)</Label
-                            >
-                            <Input
-                                id="vehicle-engine-nickname"
-                                v-model="form.nickname"
-                                placeholder="Ej: CABALLITO"
-                            />
-                        </div>
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-4">
-                        <div class="space-y-2">
-                            <Label for="vehicle-engine-displacement"
-                                >Cilindrada</Label
-                            >
-                            <Input
-                                id="vehicle-engine-displacement"
-                                v-model="form.displacement"
-                                placeholder="Ej: 1.8L"
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label for="vehicle-engine-valves">Válvulas</Label>
-                            <Input
-                                id="vehicle-engine-valves"
-                                v-model="form.valves"
-                                placeholder="Ej: 16V"
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label for="vehicle-engine-cam"
-                                >Árbol de levas</Label
-                            >
-                            <select
-                                id="vehicle-engine-cam"
-                                v-model="form.cam_type"
-                                class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-                            >
-                                <option value="">—</option>
-                                <option value="SOHC">SOHC</option>
-                                <option value="DOHC">DOHC</option>
-                                <option value="OHV">OHV</option>
-                            </select>
-                        </div>
-                        <div class="space-y-2">
-                            <Label for="vehicle-engine-cylinders"
-                                >Cilindros</Label
-                            >
-                            <Input
-                                id="vehicle-engine-cylinders"
-                                v-model="form.cylinders"
-                                type="number"
-                                min="1"
-                                max="16"
-                                placeholder="Ej: 4"
-                            />
-                        </div>
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div class="space-y-2">
-                            <Label for="vehicle-engine-fuel">Combustible</Label>
-                            <select
-                                id="vehicle-engine-fuel"
-                                v-model="form.fuel_type"
-                                class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-                            >
-                                <option value="Gasoline">Gasolina</option>
-                                <option value="Diesel">Diésel</option>
-                                <option value="Hybrid">Híbrido</option>
-                                <option value="Electric">Eléctrico</option>
-                            </select>
-                        </div>
-                        <div class="space-y-2">
-                            <Label for="vehicle-engine-aspiration"
-                                >Aspiración</Label
-                            >
-                            <Input
-                                id="vehicle-engine-aspiration"
-                                v-model="form.aspiration"
-                                placeholder="Ej: Turbo"
-                            />
-                        </div>
-                    </div>
-                    <fieldset class="space-y-2">
-                        <legend class="text-sm font-medium">
-                            Modelos relacionados
-                        </legend>
-                        <div
-                            class="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2"
+                    <div class="space-y-2">
+                        <Label for="vehicle-engine-nickname"
+                            >Apodo (opcional)</Label
                         >
-                            <label
-                                v-for="model in modelsForEngine"
-                                :key="model.id"
-                                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                            >
-                                <input
-                                    type="checkbox"
-                                    :checked="form.model_ids.includes(model.id)"
-                                    @change="toggleModel(model.id)"
-                                />
-                                <span>{{ model.name }}</span>
-                                <span class="text-muted-foreground"
-                                    >{{ model.year_from }}-{{
-                                        model.year_to ?? 'Presente'
-                                    }}</span
-                                >
-                            </label>
-                            <p
-                                v-if="modelsForEngine.length === 0"
-                                class="p-2 text-sm text-muted-foreground"
-                            >
-                                Selecciona una marca para ver sus modelos.
-                            </p>
-                        </div>
-                    </fieldset>
-                </template>
-
-                <template v-else>
+                        <Input
+                            id="vehicle-engine-nickname"
+                            v-model="form.nickname"
+                            placeholder="Ej: CABALLITO"
+                        />
+                    </div>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-4">
+                    <div class="space-y-2">
+                        <Label for="vehicle-engine-displacement"
+                            >Cilindrada</Label
+                        >
+                        <Input
+                            id="vehicle-engine-displacement"
+                            v-model="form.displacement"
+                            placeholder="Ej: 1.8L"
+                        />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="vehicle-engine-valves">Válvulas</Label>
+                        <Input
+                            id="vehicle-engine-valves"
+                            v-model="form.valves"
+                            placeholder="Ej: 16V"
+                        />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="vehicle-engine-cam">Árbol de levas</Label>
+                        <select
+                            id="vehicle-engine-cam"
+                            v-model="form.cam_type"
+                            class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                        >
+                            <option value="">—</option>
+                            <option value="SOHC">SOHC</option>
+                            <option value="DOHC">DOHC</option>
+                            <option value="OHV">OHV</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="vehicle-engine-cylinders">Cilindros</Label>
+                        <Input
+                            id="vehicle-engine-cylinders"
+                            v-model="form.cylinders"
+                            type="number"
+                            min="1"
+                            max="16"
+                            placeholder="Ej: 4"
+                        />
+                    </div>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        <Label for="vehicle-engine-fuel">Combustible</Label>
+                        <select
+                            id="vehicle-engine-fuel"
+                            v-model="form.fuel_type"
+                            class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                        >
+                            <option value="Gasoline">Gasolina</option>
+                            <option value="Diesel">Diésel</option>
+                            <option value="Hybrid">Híbrido</option>
+                            <option value="Electric">Eléctrico</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="vehicle-engine-aspiration"
+                            >Aspiración</Label
+                        >
+                        <Input
+                            id="vehicle-engine-aspiration"
+                            v-model="form.aspiration"
+                            placeholder="Ej: Turbo"
+                        />
+                    </div>
+                </div>
+                <fieldset class="space-y-2">
+                    <legend class="text-sm font-medium">
+                        Modelos relacionados
+                    </legend>
                     <div
-                        v-if="pairLocked"
-                        class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+                        class="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2"
                     >
-                        {{ row?.delete_block_reason }} El modelo y el motor no
-                        pueden trasladarse desde esta configuración.
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div class="space-y-2">
-                            <Label>Modelo</Label>
-                            <SearchableSelect
-                                :model-value="form.model_id"
-                                :options="modelOptions"
-                                :disabled="pairLocked"
-                                placeholder="Selecciona un modelo"
-                                @update:model-value="handleModelChange"
-                            />
-                        </div>
-                        <div class="space-y-2">
-                            <Label>Motor</Label>
-                            <SearchableSelect
-                                :model-value="form.engine_id"
-                                :options="engineOptions"
-                                :disabled="pairLocked || !form.model_id"
-                                placeholder="Selecciona un motor"
-                                @update:model-value="handleEngineChange"
-                            />
-                        </div>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex items-center justify-between">
-                            <Label>VIN registrados</Label>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                @click="addVin"
-                            >
-                                <Plus class="mr-2 h-4 w-4" />Agregar VIN
-                            </Button>
-                        </div>
-                        <div
-                            v-for="(vin, index) in form.vins"
-                            :key="vin.id ?? `new-${index}`"
-                            class="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_auto]"
+                        <label
+                            v-for="model in modelsForEngine"
+                            :key="model.id"
+                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                         >
-                            <Input
-                                v-model="vin.vin"
-                                :disabled="vin.linked"
-                                maxlength="40"
-                                placeholder="VIN"
-                                class="font-mono uppercase"
+                            <input
+                                type="checkbox"
+                                :checked="form.model_ids.includes(model.id)"
+                                @change="toggleModel(model.id)"
                             />
-                            <Input
-                                v-model="vin.notes"
-                                maxlength="255"
-                                placeholder="Notas opcionales"
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                :disabled="vin.linked"
-                                :title="
-                                    vin.linked
-                                        ? 'Este VIN está vinculado a un cliente'
-                                        : 'Eliminar VIN'
-                                "
-                                @click="removeVin(index)"
+                            <span>{{ model.name }}</span>
+                            <span class="text-muted-foreground"
+                                >{{ model.year_from }}-{{
+                                    model.year_to ?? 'Presente'
+                                }}</span
                             >
-                                <Trash2 class="h-4 w-4 text-destructive" />
-                            </Button>
-                        </div>
+                        </label>
                         <p
-                            v-if="form.vins.length === 0"
-                            class="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground"
+                            v-if="modelsForEngine.length === 0"
+                            class="p-2 text-sm text-muted-foreground"
                         >
-                            La configuración puede guardarse sin VIN.
+                            Selecciona una marca para ver sus modelos.
                         </p>
                     </div>
-                </template>
+                </fieldset>
+            </template>
 
-                <p v-if="error" class="text-sm text-destructive" role="alert">
-                    {{ error }}
-                </p>
-
-                <DialogFooter>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        @click="emit('close')"
+            <template v-else>
+                <div
+                    v-if="pairLocked"
+                    class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+                >
+                    {{ row?.delete_block_reason }} El modelo y el motor no
+                    pueden trasladarse desde esta configuración.
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        <Label>Modelo</Label>
+                        <SearchableSelect
+                            :model-value="form.model_id"
+                            :options="modelOptions"
+                            :disabled="pairLocked"
+                            placeholder="Selecciona un modelo"
+                            @update:model-value="handleModelChange"
+                        />
+                    </div>
+                    <div class="space-y-2">
+                        <Label>Motor</Label>
+                        <SearchableSelect
+                            :model-value="form.engine_id"
+                            :options="engineOptions"
+                            :disabled="pairLocked || !form.model_id"
+                            placeholder="Selecciona un motor"
+                            @update:model-value="handleEngineChange"
+                        />
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <Label>VIN registrados</Label>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            @click="addVin"
+                        >
+                            <Plus class="mr-2 h-4 w-4" />Agregar VIN
+                        </Button>
+                    </div>
+                    <div
+                        v-for="(vin, index) in form.vins"
+                        :key="vin.id ?? `new-${index}`"
+                        class="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_auto]"
                     >
-                        Cancelar
-                    </Button>
-                    <Button type="submit" :disabled="processing || !canSubmit">
-                        {{ processing ? 'Guardando…' : 'Guardar' }}
-                    </Button>
-                </DialogFooter>
-            </form>
-        </DialogScrollContent>
-    </Dialog>
+                        <Input
+                            v-model="vin.vin"
+                            :disabled="vin.linked"
+                            maxlength="40"
+                            placeholder="VIN"
+                            class="font-mono uppercase"
+                        />
+                        <Input
+                            v-model="vin.notes"
+                            maxlength="255"
+                            placeholder="Notas opcionales"
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            :disabled="vin.linked"
+                            :title="
+                                vin.linked
+                                    ? 'Este VIN está vinculado a un cliente'
+                                    : 'Eliminar VIN'
+                            "
+                            @click="removeVin(index)"
+                        >
+                            <Trash2 class="h-4 w-4 text-destructive" />
+                        </Button>
+                    </div>
+                    <p
+                        v-if="form.vins.length === 0"
+                        class="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground"
+                    >
+                        La configuración puede guardarse sin VIN.
+                    </p>
+                </div>
+            </template>
+
+            <p v-if="error" class="text-sm text-destructive" role="alert">
+                {{ error }}
+            </p>
+        </form>
+
+        <template #footer>
+            <Button type="button" variant="outline" @click="emit('close')">
+                Cancelar
+            </Button>
+            <Button
+                type="submit"
+                :form="formId"
+                :disabled="processing || !canSubmit"
+            >
+                {{ processing ? 'Guardando…' : 'Guardar' }}
+            </Button>
+        </template>
+    </AppModal>
 </template>

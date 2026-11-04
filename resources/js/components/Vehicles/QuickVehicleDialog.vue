@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch, useId } from 'vue';
+import AppModal from '@/components/ui/AppModal.vue';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogScrollContent,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SearchableSelect, {
@@ -312,256 +305,250 @@ const toggleClass =
     'text-xs font-medium text-teal-700 hover:underline dark:text-teal-300';
 const selectClass =
     'h-10 w-full rounded-lg border border-input bg-background px-3 text-sm';
+
+// Id único por instancia: los botones del pie envían el formulario con form="...".
+const formId = useId();
 </script>
 
 <template>
-    <Dialog :open="open" @update:open="(value) => !value && emit('close')">
-        <DialogScrollContent class="max-h-[90vh] sm:max-w-2xl">
-            <DialogHeader>
-                <DialogTitle>Agregar vehículo</DialogTitle>
-                <DialogDescription>
-                    Se registra en el catálogo de vehículos y queda asignado a
-                    este producto.
-                </DialogDescription>
-            </DialogHeader>
-
-            <form class="space-y-5" @submit.prevent="submit">
-                <!-- Marca -->
-                <section class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <Label>Marca</Label>
-                        <button
-                            type="button"
-                            :class="toggleClass"
-                            @click="setNewMake(!form.newMake)"
-                        >
-                            {{
-                                form.newMake
-                                    ? 'Elegir una existente'
-                                    : '+ Nueva marca'
-                            }}
-                        </button>
-                    </div>
-                    <Input
-                        v-if="form.newMake"
-                        id="quick-vehicle-make"
-                        v-model="form.makeName"
-                        placeholder="Ej: TOYOTA"
-                    />
-                    <SearchableSelect
-                        v-else
-                        :model-value="form.makeId"
-                        :options="makeOptions"
-                        placeholder="Selecciona una marca"
-                        aria-label="Marca"
-                        @update:model-value="onMakeChange"
-                    />
-                </section>
-
-                <!-- Modelo -->
-                <section class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <Label>Modelo y chasis</Label>
-                        <button
-                            v-if="!form.newMake"
-                            type="button"
-                            :class="toggleClass"
-                            @click="form.newModel = !form.newModel"
-                        >
-                            {{
-                                form.newModel
-                                    ? 'Elegir uno existente'
-                                    : '+ Nuevo modelo'
-                            }}
-                        </button>
-                    </div>
-                    <div v-if="form.newModel" class="grid gap-3 sm:grid-cols-4">
-                        <Input
-                            id="quick-vehicle-model"
-                            v-model="form.modelName"
-                            class="uppercase sm:col-span-2"
-                            placeholder="Modelo (ej: COROLLA)"
-                        />
-                        <div class="space-y-1">
-                            <Input
-                                v-if="form.newChassis"
-                                id="quick-vehicle-chassis-code"
-                                v-model="form.generation"
-                                maxlength="20"
-                                class="uppercase"
-                                placeholder="Código de chasis (ej: E110)"
-                            />
-                            <SearchableSelect
-                                v-else
-                                :model-value="form.chassisId"
-                                :options="chassisOptions"
-                                :clearable="true"
-                                placeholder="Chasis"
-                                aria-label="Chasis"
-                                @update:model-value="
-                                    (value) =>
-                                        (form.chassisId = value
-                                            ? Number(value)
-                                            : null)
-                                "
-                            />
-                            <button
-                                v-if="!form.newMake"
-                                type="button"
-                                :class="toggleClass"
-                                @click="
-                                    form.newChassis = !form.newChassis;
-                                    form.chassisId = null;
-                                    form.generation = '';
-                                "
-                            >
-                                {{
-                                    form.newChassis
-                                        ? 'Elegir uno existente'
-                                        : '+ Nuevo código'
-                                }}
-                            </button>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            <Input
-                                id="quick-vehicle-year-from"
-                                v-model="form.yearFrom"
-                                type="number"
-                                min="1900"
-                                aria-label="Año desde"
-                            />
-                            <span class="text-gray-400">-</span>
-                            <Input
-                                id="quick-vehicle-year-to"
-                                v-model="form.yearTo"
-                                type="number"
-                                min="1900"
-                                aria-label="Año hasta"
-                            />
-                        </div>
-                    </div>
-                    <SearchableSelect
-                        v-else
-                        :model-value="form.modelId"
-                        :options="modelOptions"
-                        :disabled="!form.makeId"
-                        placeholder="Selecciona un modelo"
-                        aria-label="Modelo"
-                        @update:model-value="
-                            (value) =>
-                                (form.modelId = value ? Number(value) : null)
-                        "
-                    />
-                </section>
-
-                <!-- Motor -->
-                <section class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <Label>Motor</Label>
-                        <button
-                            v-if="!form.newMake"
-                            type="button"
-                            :class="toggleClass"
-                            @click="form.newEngine = !form.newEngine"
-                        >
-                            {{
-                                form.newEngine
-                                    ? 'Elegir uno existente'
-                                    : '+ Nuevo motor'
-                            }}
-                        </button>
-                    </div>
-                    <div v-if="form.newEngine" class="space-y-3">
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <Input
-                                id="quick-vehicle-engine-code"
-                                v-model="form.engineCode"
-                                placeholder="Código (ej: 1ZZFE)"
-                            />
-                            <Input
-                                id="quick-vehicle-engine-nickname"
-                                v-model="form.nickname"
-                                placeholder="Apodo opcional (ej: CABALLITO)"
-                            />
-                        </div>
-                        <div class="grid gap-3 sm:grid-cols-5">
-                            <Input
-                                id="quick-vehicle-engine-displacement"
-                                v-model="form.displacement"
-                                placeholder="Cilindrada (1.8L)"
-                            />
-                            <Input
-                                id="quick-vehicle-engine-valves"
-                                v-model="form.valves"
-                                placeholder="Válvulas (16V)"
-                            />
-                            <select
-                                id="quick-vehicle-engine-cam"
-                                v-model="form.camType"
-                                :class="selectClass"
-                                aria-label="Árbol de levas"
-                            >
-                                <option value="">Árbol —</option>
-                                <option value="SOHC">SOHC</option>
-                                <option value="DOHC">DOHC</option>
-                                <option value="OHV">OHV</option>
-                            </select>
-                            <Input
-                                id="quick-vehicle-engine-cylinders"
-                                v-model="form.cylinders"
-                                type="number"
-                                min="1"
-                                max="16"
-                                placeholder="Cilindros"
-                            />
-                            <select
-                                id="quick-vehicle-engine-fuel"
-                                v-model="form.fuelType"
-                                :class="selectClass"
-                                aria-label="Combustible"
-                            >
-                                <option value="Gasoline">Gasolina</option>
-                                <option value="Diesel">Diésel</option>
-                                <option value="Hybrid">Híbrido</option>
-                                <option value="Electric">Eléctrico</option>
-                            </select>
-                        </div>
-                    </div>
-                    <SearchableSelect
-                        v-else
-                        :model-value="form.engineId"
-                        :options="engineOptions"
-                        :disabled="!form.makeId"
-                        placeholder="Selecciona un motor"
-                        aria-label="Motor"
-                        @update:model-value="
-                            (value) =>
-                                (form.engineId = value ? Number(value) : null)
-                        "
-                    />
-                </section>
-
-                <p
-                    v-if="errorMessage"
-                    role="alert"
-                    class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
-                >
-                    {{ errorMessage }}
-                </p>
-
-                <DialogFooter>
-                    <Button
+    <AppModal
+        :open="open"
+        title="Agregar vehículo"
+        description="Se registra en el catálogo de vehículos y queda asignado a este producto."
+        size="lg"
+        @close="emit('close')"
+    >
+        <form :id="formId" class="space-y-5" @submit.prevent="submit">
+            <!-- Marca -->
+            <section class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <Label>Marca</Label>
+                    <button
                         type="button"
-                        variant="outline"
-                        @click="emit('close')"
+                        :class="toggleClass"
+                        @click="setNewMake(!form.newMake)"
                     >
-                        Cancelar
-                    </Button>
-                    <Button type="submit" :disabled="!canSubmit">
-                        {{ saving ? 'Guardando…' : 'Agregar y asignar' }}
-                    </Button>
-                </DialogFooter>
-            </form>
-        </DialogScrollContent>
-    </Dialog>
+                        {{
+                            form.newMake
+                                ? 'Elegir una existente'
+                                : '+ Nueva marca'
+                        }}
+                    </button>
+                </div>
+                <Input
+                    v-if="form.newMake"
+                    id="quick-vehicle-make"
+                    v-model="form.makeName"
+                    placeholder="Ej: TOYOTA"
+                />
+                <SearchableSelect
+                    v-else
+                    :model-value="form.makeId"
+                    :options="makeOptions"
+                    placeholder="Selecciona una marca"
+                    aria-label="Marca"
+                    @update:model-value="onMakeChange"
+                />
+            </section>
+
+            <!-- Modelo -->
+            <section class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <Label>Modelo y chasis</Label>
+                    <button
+                        v-if="!form.newMake"
+                        type="button"
+                        :class="toggleClass"
+                        @click="form.newModel = !form.newModel"
+                    >
+                        {{
+                            form.newModel
+                                ? 'Elegir uno existente'
+                                : '+ Nuevo modelo'
+                        }}
+                    </button>
+                </div>
+                <div v-if="form.newModel" class="grid gap-3 sm:grid-cols-4">
+                    <Input
+                        id="quick-vehicle-model"
+                        v-model="form.modelName"
+                        class="uppercase sm:col-span-2"
+                        placeholder="Modelo (ej: COROLLA)"
+                    />
+                    <div class="space-y-1">
+                        <Input
+                            v-if="form.newChassis"
+                            id="quick-vehicle-chassis-code"
+                            v-model="form.generation"
+                            maxlength="20"
+                            class="uppercase"
+                            placeholder="Código de chasis (ej: E110)"
+                        />
+                        <SearchableSelect
+                            v-else
+                            :model-value="form.chassisId"
+                            :options="chassisOptions"
+                            :clearable="true"
+                            placeholder="Chasis"
+                            aria-label="Chasis"
+                            @update:model-value="
+                                (value) =>
+                                    (form.chassisId = value
+                                        ? Number(value)
+                                        : null)
+                            "
+                        />
+                        <button
+                            v-if="!form.newMake"
+                            type="button"
+                            :class="toggleClass"
+                            @click="
+                                form.newChassis = !form.newChassis;
+                                form.chassisId = null;
+                                form.generation = '';
+                            "
+                        >
+                            {{
+                                form.newChassis
+                                    ? 'Elegir uno existente'
+                                    : '+ Nuevo código'
+                            }}
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <Input
+                            id="quick-vehicle-year-from"
+                            v-model="form.yearFrom"
+                            type="number"
+                            min="1900"
+                            aria-label="Año desde"
+                        />
+                        <span class="text-gray-400">-</span>
+                        <Input
+                            id="quick-vehicle-year-to"
+                            v-model="form.yearTo"
+                            type="number"
+                            min="1900"
+                            aria-label="Año hasta"
+                        />
+                    </div>
+                </div>
+                <SearchableSelect
+                    v-else
+                    :model-value="form.modelId"
+                    :options="modelOptions"
+                    :disabled="!form.makeId"
+                    placeholder="Selecciona un modelo"
+                    aria-label="Modelo"
+                    @update:model-value="
+                        (value) => (form.modelId = value ? Number(value) : null)
+                    "
+                />
+            </section>
+
+            <!-- Motor -->
+            <section class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <Label>Motor</Label>
+                    <button
+                        v-if="!form.newMake"
+                        type="button"
+                        :class="toggleClass"
+                        @click="form.newEngine = !form.newEngine"
+                    >
+                        {{
+                            form.newEngine
+                                ? 'Elegir uno existente'
+                                : '+ Nuevo motor'
+                        }}
+                    </button>
+                </div>
+                <div v-if="form.newEngine" class="space-y-3">
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <Input
+                            id="quick-vehicle-engine-code"
+                            v-model="form.engineCode"
+                            placeholder="Código (ej: 1ZZFE)"
+                        />
+                        <Input
+                            id="quick-vehicle-engine-nickname"
+                            v-model="form.nickname"
+                            placeholder="Apodo opcional (ej: CABALLITO)"
+                        />
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-5">
+                        <Input
+                            id="quick-vehicle-engine-displacement"
+                            v-model="form.displacement"
+                            placeholder="Cilindrada (1.8L)"
+                        />
+                        <Input
+                            id="quick-vehicle-engine-valves"
+                            v-model="form.valves"
+                            placeholder="Válvulas (16V)"
+                        />
+                        <select
+                            id="quick-vehicle-engine-cam"
+                            v-model="form.camType"
+                            :class="selectClass"
+                            aria-label="Árbol de levas"
+                        >
+                            <option value="">Árbol —</option>
+                            <option value="SOHC">SOHC</option>
+                            <option value="DOHC">DOHC</option>
+                            <option value="OHV">OHV</option>
+                        </select>
+                        <Input
+                            id="quick-vehicle-engine-cylinders"
+                            v-model="form.cylinders"
+                            type="number"
+                            min="1"
+                            max="16"
+                            placeholder="Cilindros"
+                        />
+                        <select
+                            id="quick-vehicle-engine-fuel"
+                            v-model="form.fuelType"
+                            :class="selectClass"
+                            aria-label="Combustible"
+                        >
+                            <option value="Gasoline">Gasolina</option>
+                            <option value="Diesel">Diésel</option>
+                            <option value="Hybrid">Híbrido</option>
+                            <option value="Electric">Eléctrico</option>
+                        </select>
+                    </div>
+                </div>
+                <SearchableSelect
+                    v-else
+                    :model-value="form.engineId"
+                    :options="engineOptions"
+                    :disabled="!form.makeId"
+                    placeholder="Selecciona un motor"
+                    aria-label="Motor"
+                    @update:model-value="
+                        (value) =>
+                            (form.engineId = value ? Number(value) : null)
+                    "
+                />
+            </section>
+
+            <p
+                v-if="errorMessage"
+                role="alert"
+                class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
+            >
+                {{ errorMessage }}
+            </p>
+        </form>
+
+        <template #footer>
+            <Button type="button" variant="outline" @click="emit('close')">
+                Cancelar
+            </Button>
+            <Button type="submit" :form="formId" :disabled="!canSubmit">
+                {{ saving ? 'Guardando…' : 'Agregar y asignar' }}
+            </Button>
+        </template>
+    </AppModal>
 </template>

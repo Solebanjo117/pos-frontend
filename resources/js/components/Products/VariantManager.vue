@@ -1,17 +1,11 @@
 <script setup lang="ts">
 import { CircleDollarSign } from 'lucide-vue-next';
-import { ref, computed, nextTick, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, watch, useId } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import AppModal from '@/components/ui/AppModal.vue';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-} from '@/components/ui/dialog';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
@@ -1036,6 +1030,9 @@ onMounted(async () => {
         initWarehouse().catch(() => {});
     }
 });
+
+// Id único por instancia: los botones del pie envían el formulario con form="...".
+const formId = useId();
 </script>
 
 <template>
@@ -1317,481 +1314,457 @@ onMounted(async () => {
         </div>
 
         <!-- Create/Edit Modal -->
-        <Dialog :open="showModal" @update:open="handleVariantModalOpenChange">
-            <DialogContent
-                class="max-h-[90vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] overflow-x-auto overflow-y-auto sm:max-w-[calc(100vw-3rem)] xl:max-w-7xl 2xl:max-w-[88rem]"
+        <AppModal
+            :open="showModal"
+            :title="editingVariant ? 'Editar Variante' : 'Nueva Variante'"
+            description="Marca, precios e inventario de esta variante."
+            size="xl"
+            @update:open="handleVariantModalOpenChange"
+        >
+            <!-- Formulario Modal con .stop para evitar burbujeo al padre Create.vue -->
+            <form
+                :id="formId"
+                @submit.prevent.stop="handleSubmit"
+                class="space-y-4 py-4"
             >
-                <DialogHeader>
-                    <DialogTitle>{{
-                        editingVariant ? 'Editar Variante' : 'Nueva Variante'
-                    }}</DialogTitle>
-                    <DialogDescription>
-                        Marca, precios e inventario de esta variante.
-                    </DialogDescription>
-                </DialogHeader>
-                <!-- Formulario Modal con .stop para evitar burbujeo al padre Create.vue -->
-                <form
-                    @submit.prevent.stop="handleSubmit"
-                    class="space-y-4 py-4"
+                <section
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                 >
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="mb-3 flex items-center justify-between gap-3"
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <h4
+                            class="text-sm font-semibold text-gray-900 dark:text-white"
                         >
-                            <h4
-                                class="text-sm font-semibold text-gray-900 dark:text-white"
+                            Datos
+                        </h4>
+                        <span
+                            v-if="editingVariant"
+                            class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-muted dark:text-gray-300"
+                        >
+                            {{ currentWarehouseName || 'Almacen actual' }}
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+                        <div class="md:col-span-5">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Producto</label
                             >
-                                Datos
-                            </h4>
-                            <span
-                                v-if="editingVariant"
-                                class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-muted dark:text-gray-300"
-                            >
-                                {{ currentWarehouseName || 'Almacen actual' }}
-                            </span>
+                            <input
+                                :value="productName || 'Producto Base'"
+                                type="text"
+                                readonly
+                                class="block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                            />
                         </div>
 
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
-                            <div class="md:col-span-5">
+                        <div class="md:col-span-4">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Marca</label
+                            >
+                            <div class="flex gap-1">
+                                <SearchableSelect
+                                    :options="brandOptions"
+                                    :model-value="form.brand_id"
+                                    @update:model-value="
+                                        (v) => (form.brand_id = v as number)
+                                    "
+                                    placeholder="-- Selecciona marca --"
+                                    :loading="loadingBrands"
+                                />
+                                <button
+                                    type="button"
+                                    @click="openBrandModal"
+                                    class="flex-shrink-0 rounded-md border border-gray-300 bg-white p-2 text-gray-500 transition hover:border-blue-400 hover:text-blue-600 dark:border-border dark:bg-muted dark:hover:text-blue-400"
+                                    title="Crear nueva marca"
+                                >
+                                    <svg
+                                        class="h-4 w-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M12 4v16m8-8H4"
+                                        />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Estado</label
+                            >
+                            <select
+                                v-model="form.status"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                            >
+                                <option value="active">Activo</option>
+                                <option value="discontinued">
+                                    Discontinuado
+                                </option>
+                            </select>
+                        </div>
+
+                        <div v-if="editingVariant" class="md:col-span-3">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Stock actual</label
+                            >
+                            <input
+                                :value="
+                                    getVariantStockForWarehouse(
+                                        editingVariant,
+                                        currentWarehouseId,
+                                    )
+                                "
+                                type="number"
+                                readonly
+                                class="block w-full rounded-md border-gray-200 bg-gray-100 text-right shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                <section
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <h4
+                        class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"
+                    >
+                        Códigos comerciales
+                    </h4>
+                    <ProductCodesEditor
+                        ref="productCodesRef"
+                        v-model="form.codes"
+                        :exclude-variant-id="editingVariant?.id"
+                        :disabled="processing"
+                    />
+                </section>
+
+                <section
+                    v-if="!editingVariant && form.initial_inventory[0]"
+                    class="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/10"
+                >
+                    <div
+                        class="mb-3 flex flex-wrap items-center justify-between gap-2"
+                    >
+                        <h4
+                            class="text-sm font-semibold text-gray-900 dark:text-white"
+                        >
+                            Stock inicial
+                        </h4>
+                        <span
+                            v-if="hasInitialStockForNewVariant"
+                            class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                        >
+                            Lote inicial
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+                        <div class="md:col-span-7">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Almacen</label
+                            >
+                            <select
+                                v-model.number="
+                                    form.initial_inventory[0].warehouse_id
+                                "
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                            >
+                                <option
+                                    v-for="warehouse in warehouses"
+                                    :key="warehouse.id"
+                                    :value="warehouse.id"
+                                >
+                                    {{ warehouse.name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-5">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Cantidad inicial</label
+                            >
+                            <input
+                                v-model.number="
+                                    form.initial_inventory[0].stock_available
+                                "
+                                type="number"
+                                step="1"
+                                min="0"
+                                class="block w-full rounded-md border-gray-300 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═══ Pricing Section ═══ -->
+                <section
+                    class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-muted/30"
+                >
+                    <h4
+                        class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white"
+                    >
+                        <CircleDollarSign class="h-4 w-4 text-gray-500" />
+                        Costos y precio
+                    </h4>
+
+                    <!-- Tax type toggle fue removido: ahora ITBM siempre es numérico y modificable con default de tienda -->
+
+                    <!-- Costos: Base + ITBM% + Misceláneos => Costo Total -->
+                    <div
+                        class="space-y-3 rounded-lg border border-dashed border-gray-200 bg-white p-3 dark:border-border dark:bg-card"
+                    >
+                        <div
+                            class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
+                        >
+                            <div class="md:col-span-3">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Producto</label
                                 >
-                                <input
-                                    :value="productName || 'Producto Base'"
-                                    type="text"
-                                    readonly
-                                    class="block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
-                                />
+                                    Costo base
+                                </label>
+                                <div class="relative mt-1">
+                                    <span
+                                        class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
+                                        >$</span
+                                    >
+                                    <input
+                                        v-model.number="form.pricing.cost_base"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        @input="markHeaderSyncDirty"
+                                        :title="
+                                            props.categoryFormula
+                                                ? `Al cambiar el costo total, se recalculará precio usando: ${props.categoryFormula}`
+                                                : 'Costo base antes de impuestos y extras'
+                                        "
+                                        class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    />
+                                </div>
                             </div>
 
-                            <div class="md:col-span-4">
+                            <div class="md:col-span-2">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Marca</label
+                                    >ITBM costo</label
                                 >
-                                <div class="flex gap-1">
-                                    <SearchableSelect
-                                        :options="brandOptions"
-                                        :model-value="form.brand_id"
-                                        @update:model-value="
-                                            (v) => (form.brand_id = v as number)
-                                        "
-                                        placeholder="-- Selecciona marca --"
-                                        :loading="loadingBrands"
-                                    />
-                                    <button
-                                        type="button"
-                                        @click="openBrandModal"
-                                        class="flex-shrink-0 rounded-md border border-gray-300 bg-white p-2 text-gray-500 transition hover:border-blue-400 hover:text-blue-600 dark:border-border dark:bg-muted dark:hover:text-blue-400"
-                                        title="Crear nueva marca"
-                                    >
-                                        <svg
-                                            class="h-4 w-4"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M12 4v16m8-8H4"
-                                            />
-                                        </svg>
-                                    </button>
-                                </div>
+                                <input
+                                    v-model.number="form.pricing.cost_tax_rate"
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    max="100"
+                                    @input="markHeaderSyncDirty"
+                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                />
                             </div>
 
                             <div class="md:col-span-3">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Estado</label
+                                    >Miscelaneos total</label
                                 >
-                                <select
-                                    v-model="form.status"
-                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="active">Activo</option>
-                                    <option value="discontinued">
-                                        Discontinuado
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div v-if="editingVariant" class="md:col-span-3">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Stock actual</label
-                                >
-                                <input
-                                    :value="
-                                        getVariantStockForWarehouse(
-                                            editingVariant,
-                                            currentWarehouseId,
-                                        )
-                                    "
-                                    type="number"
-                                    readonly
-                                    class="block w-full rounded-md border-gray-200 bg-gray-100 text-right shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
-                                />
-                            </div>
-                        </div>
-                    </section>
-
-                    <section
-                        class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                    >
-                        <h4
-                            class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"
-                        >
-                            Códigos comerciales
-                        </h4>
-                        <ProductCodesEditor
-                            ref="productCodesRef"
-                            v-model="form.codes"
-                            :exclude-variant-id="editingVariant?.id"
-                            :disabled="processing"
-                        />
-                    </section>
-
-                    <section
-                        v-if="!editingVariant && form.initial_inventory[0]"
-                        class="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/10"
-                    >
-                        <div
-                            class="mb-3 flex flex-wrap items-center justify-between gap-2"
-                        >
-                            <h4
-                                class="text-sm font-semibold text-gray-900 dark:text-white"
-                            >
-                                Stock inicial
-                            </h4>
-                            <span
-                                v-if="hasInitialStockForNewVariant"
-                                class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                            >
-                                Lote inicial
-                            </span>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
-                            <div class="md:col-span-7">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Almacen</label
-                                >
-                                <select
-                                    v-model.number="
-                                        form.initial_inventory[0].warehouse_id
-                                    "
-                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option
-                                        v-for="warehouse in warehouses"
-                                        :key="warehouse.id"
-                                        :value="warehouse.id"
+                                <div class="relative mt-1">
+                                    <span
+                                        class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
+                                        >$</span
                                     >
-                                        {{ warehouse.name }}
-                                    </option>
-                                </select>
+                                    <input
+                                        v-model.number="
+                                            form.pricing.cost_miscellaneous
+                                        "
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        @input="markHeaderSyncDirty"
+                                        class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    />
+                                </div>
                             </div>
 
-                            <div class="md:col-span-5">
+                            <div class="md:col-span-4">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Cantidad inicial</label
+                                    >Costo total</label
+                                >
+                                <div class="relative mt-1">
+                                    <span
+                                        class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
+                                        >$</span
+                                    >
+                                    <input
+                                        :value="getFormCostTotal().toFixed(2)"
+                                        type="text"
+                                        readonly
+                                        class="block w-full rounded-md border-gray-200 bg-gray-100 pl-7 dark:border-border dark:bg-muted/30 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
+                        >
+                            <div class="md:col-span-3">
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >% ITBM Venta</label
                                 >
                                 <input
-                                    v-model.number="
-                                        form.initial_inventory[0]
-                                            .stock_available
-                                    "
+                                    v-model.number="form.pricing.sale_tax_rate"
                                     type="number"
                                     step="1"
                                     min="0"
-                                    class="block w-full rounded-md border-gray-300 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    max="100"
+                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
                                 />
                             </div>
-                        </div>
-                    </section>
 
-                    <!-- ═══ Pricing Section ═══ -->
-                    <section
-                        class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-muted/30"
-                    >
-                        <h4
-                            class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white"
-                        >
-                            <CircleDollarSign class="h-4 w-4 text-gray-500" />
-                            Costos y precio
-                        </h4>
-
-                        <!-- Tax type toggle fue removido: ahora ITBM siempre es numérico y modificable con default de tienda -->
-
-                        <!-- Costos: Base + ITBM% + Misceláneos => Costo Total -->
-                        <div
-                            class="space-y-3 rounded-lg border border-dashed border-gray-200 bg-white p-3 dark:border-border dark:bg-card"
-                        >
-                            <div
-                                class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
-                            >
-                                <div class="md:col-span-3">
-                                    <label
-                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            <div class="md:col-span-9">
+                                <label
+                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >
+                                    Precio de Venta
+                                    <span
+                                        v-if="props.categoryFormula"
+                                        class="ml-1 text-xs font-semibold text-blue-500"
                                     >
-                                        Costo base
-                                    </label>
-                                    <div class="relative mt-1">
-                                        <span
-                                            class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
-                                            >$</span
+                                        · Fórmula:
+                                        <code
+                                            class="rounded bg-blue-50 px-1 font-mono dark:bg-blue-900/20"
+                                            >{{ props.categoryFormula }}</code
                                         >
-                                        <input
-                                            v-model.number="
-                                                form.pricing.cost_base
-                                            "
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            @input="markHeaderSyncDirty"
-                                            :title="
-                                                props.categoryFormula
-                                                    ? `Al cambiar el costo total, se recalculará precio usando: ${props.categoryFormula}`
-                                                    : 'Costo base antes de impuestos y extras'
-                                            "
-                                            class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div class="md:col-span-2">
-                                    <label
-                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >ITBM costo</label
-                                    >
-                                    <input
-                                        v-model.number="
-                                            form.pricing.cost_tax_rate
-                                        "
-                                        type="number"
-                                        step="1"
-                                        min="0"
-                                        max="100"
-                                        @input="markHeaderSyncDirty"
-                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                    />
-                                </div>
-
-                                <div class="md:col-span-3">
-                                    <label
-                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >Miscelaneos total</label
-                                    >
-                                    <div class="relative mt-1">
-                                        <span
-                                            class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
-                                            >$</span
-                                        >
-                                        <input
-                                            v-model.number="
-                                                form.pricing.cost_miscellaneous
-                                            "
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            @input="markHeaderSyncDirty"
-                                            class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div class="md:col-span-4">
-                                    <label
-                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >Costo total</label
-                                    >
-                                    <div class="relative mt-1">
-                                        <span
-                                            class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
-                                            >$</span
-                                        >
-                                        <input
-                                            :value="
-                                                getFormCostTotal().toFixed(2)
-                                            "
-                                            type="text"
-                                            readonly
-                                            class="block w-full rounded-md border-gray-200 bg-gray-100 pl-7 dark:border-border dark:bg-muted/30 dark:text-white"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div
-                                class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
-                            >
-                                <div class="md:col-span-3">
-                                    <label
-                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >% ITBM Venta</label
-                                    >
-                                    <input
-                                        v-model.number="
-                                            form.pricing.sale_tax_rate
-                                        "
-                                        type="number"
-                                        step="1"
-                                        min="0"
-                                        max="100"
-                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                    />
-                                </div>
-
-                                <div class="md:col-span-9">
-                                    <label
-                                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >
-                                        Precio de Venta
-                                        <span
-                                            v-if="props.categoryFormula"
-                                            class="ml-1 text-xs font-semibold text-blue-500"
-                                        >
-                                            · Fórmula:
-                                            <code
-                                                class="rounded bg-blue-50 px-1 font-mono dark:bg-blue-900/20"
-                                                >{{
-                                                    props.categoryFormula
-                                                }}</code
-                                            >
-                                        </span>
-                                    </label>
-                                    <PricingFormula
-                                        :cost="getFormCostTotal()"
-                                        :tax-rate="
-                                            Number(
-                                                form.pricing.sale_tax_rate ??
-                                                    form.pricing.tax_rate,
-                                            ) || defaultTaxRate()
-                                        "
-                                        :model-value="form.pricing_formula"
-                                        :price="
-                                            Number(form.pricing.base_price) || 0
-                                        "
-                                        @update:model-value="
-                                            (v) => (form.pricing_formula = v)
-                                        "
-                                        @update:price="onFormulaTotalChange"
-                                    />
-                                    <!-- Botón recalcular por categoría si el usuario editó manualmente -->
-                                    <button
-                                        v-if="
-                                            priceManuallyEdited &&
-                                            (props.categoryFormula ||
-                                                (props.categoryMargin != null &&
-                                                    props.categoryMargin > 0))
-                                        "
-                                        type="button"
-                                        @click="recalculatePriceFromCategory"
-                                        class="mt-1 flex items-center gap-1 text-xs text-gray-400 transition hover:text-indigo-600 dark:hover:text-indigo-400"
-                                        :title="
-                                            props.categoryFormula
-                                                ? `Fórmula: ${props.categoryFormula}`
-                                                : `Margen de categoría: ${props.categoryMargin}%`
-                                        "
-                                    >
-                                        &#8635; Recalcular por categor&iacute;a
-                                    </button>
-                                </div>
+                                    </span>
+                                </label>
+                                <PricingFormula
+                                    :cost="getFormCostTotal()"
+                                    :tax-rate="
+                                        Number(
+                                            form.pricing.sale_tax_rate ??
+                                                form.pricing.tax_rate,
+                                        ) || defaultTaxRate()
+                                    "
+                                    :model-value="form.pricing_formula"
+                                    :price="
+                                        Number(form.pricing.base_price) || 0
+                                    "
+                                    @update:model-value="
+                                        (v) => (form.pricing_formula = v)
+                                    "
+                                    @update:price="onFormulaTotalChange"
+                                />
+                                <!-- Botón recalcular por categoría si el usuario editó manualmente -->
+                                <button
+                                    v-if="
+                                        priceManuallyEdited &&
+                                        (props.categoryFormula ||
+                                            (props.categoryMargin != null &&
+                                                props.categoryMargin > 0))
+                                    "
+                                    type="button"
+                                    @click="recalculatePriceFromCategory"
+                                    class="mt-1 flex items-center gap-1 text-xs text-gray-400 transition hover:text-indigo-600 dark:hover:text-indigo-400"
+                                    :title="
+                                        props.categoryFormula
+                                            ? `Fórmula: ${props.categoryFormula}`
+                                            : `Margen de categoría: ${props.categoryMargin}%`
+                                    "
+                                >
+                                    &#8635; Recalcular por categor&iacute;a
+                                </button>
                             </div>
                         </div>
-                    </section>
-
-                    <!-- Error display -->
-                    <div v-if="error" class="mt-2 text-sm text-red-500">
-                        {{ error }}
                     </div>
+                </section>
 
-                    <div class="mt-6 flex justify-end space-x-3">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="requestCloseModal()"
-                        >
-                            Cancelar
-                        </Button>
-                        <Button type="submit" :disabled="processing">
-                            {{ submitButtonLabel }}
-                        </Button>
-                    </div>
+                <!-- Error display -->
+                <div v-if="error" class="mt-2 text-sm text-red-500">
+                    {{ error }}
+                </div>
 
-                    <VariantFifoHistoryPanel
-                        v-if="modalHistoryVariant?.id && props.productId"
-                        ref="variantHistoryPanel"
-                        :product-id="props.productId"
-                        :variant="modalHistoryVariant"
-                        :warehouses="warehouses"
-                        :initial-warehouse-id="currentWarehouseId"
-                        :header-sync="modalLotSyncState"
-                        @updated="handleHistoryPanelUpdated"
-                    />
-                </form>
-            </DialogContent>
-        </Dialog>
+                <VariantFifoHistoryPanel
+                    v-if="modalHistoryVariant?.id && props.productId"
+                    ref="variantHistoryPanel"
+                    :product-id="props.productId"
+                    :variant="modalHistoryVariant"
+                    :warehouses="warehouses"
+                    :initial-warehouse-id="currentWarehouseId"
+                    :header-sync="modalLotSyncState"
+                    @updated="handleHistoryPanelUpdated"
+                />
+            </form>
+
+            <template #footer>
+                <Button
+                    type="button"
+                    variant="outline"
+                    @click="requestCloseModal()"
+                >
+                    Cancelar
+                </Button>
+                <Button type="submit" :form="formId" :disabled="processing">
+                    {{ submitButtonLabel }}
+                </Button>
+            </template>
+        </AppModal>
 
         <!-- Brand Creation Mini-Modal -->
-        <Dialog
+        <AppModal
             :open="showBrandModal"
-            @update:open="
-                (v) => {
-                    if (!v) showBrandModal = false;
-                }
-            "
+            title="Nueva Marca"
+            size="sm"
+            @close="showBrandModal = false"
         >
-            <DialogContent class="sm:max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>Nueva Marca</DialogTitle>
-                </DialogHeader>
-                <div class="space-y-4 pt-2">
-                    <p
-                        v-if="brandError"
-                        class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+            <div class="space-y-4">
+                <p
+                    v-if="brandError"
+                    class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+                >
+                    {{ brandError }}
+                </p>
+                <div>
+                    <label
+                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >Nombre de la Marca
+                        <span class="text-red-500">*</span></label
                     >
-                        {{ brandError }}
-                    </p>
-                    <div>
-                        <label
-                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >Nombre de la Marca
-                            <span class="text-red-500">*</span></label
-                        >
-                        <input
-                            v-model="newBrandName"
-                            type="text"
-                            @keyup.enter="submitNewBrand"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                            placeholder="Ej: Bosch, NGK, BERU..."
-                        />
-                    </div>
-                    <div class="flex justify-end gap-3">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="showBrandModal = false"
-                            >Cancelar</Button
-                        >
-                        <Button
-                            type="button"
-                            @click="submitNewBrand"
-                            :disabled="creatingBrand"
-                        >
-                            {{ creatingBrand ? 'Creando...' : 'Crear Marca' }}
-                        </Button>
-                    </div>
+                    <input
+                        v-model="newBrandName"
+                        type="text"
+                        @keyup.enter="submitNewBrand"
+                        class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                        placeholder="Ej: Bosch, NGK, BERU..."
+                    />
                 </div>
-            </DialogContent>
-        </Dialog>
+            </div>
+
+            <template #footer>
+                <Button
+                    type="button"
+                    variant="outline"
+                    @click="showBrandModal = false"
+                    >Cancelar</Button
+                >
+                <Button
+                    type="button"
+                    @click="submitNewBrand"
+                    :disabled="creatingBrand"
+                >
+                    {{ creatingBrand ? 'Creando...' : 'Crear Marca' }}
+                </Button>
+            </template>
+        </AppModal>
     </div>
 </template>

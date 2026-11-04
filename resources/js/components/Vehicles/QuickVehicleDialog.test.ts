@@ -11,6 +11,12 @@ vi.mock('@/services/api/client', () => ({
 }));
 
 const stubs = {
+    AppModal: {
+        props: ['open', 'title', 'description', 'size'],
+        emits: ['close', 'update:open'],
+        template:
+            '<div v-if="open"><h2>{{ title }}</h2><p>{{ description }}</p><slot /><footer><slot name="footer" /></footer></div>',
+    },
     Dialog: { template: '<div><slot /></div>' },
     DialogScrollContent: { template: '<div><slot /></div>' },
     DialogHeader: { template: '<header><slot /></header>' },

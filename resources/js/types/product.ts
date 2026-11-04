@@ -154,12 +154,18 @@ export interface OemReference {
 
 export interface VehicleCompatibility {
     id?: number;
+    scope_type?: string | null;
+    make_id?: number | null;
+    model_id?: number | null;
     engine_id?: number | null;
     chassis_id?: number | null;
     make?: string | null;
     model?: string | null;
+    generation?: string | null;
     year_range?: string | null;
     engine?: string | null;
+    engine_code?: string | null;
+    raw_vehicle_text?: string | null;
     chassis?: {
         id: number;
         code: string;
@@ -422,12 +428,10 @@ export interface ProductDetail extends Product {
 }
 
 // API Request Types
+/** Compatibilidad al guardar: vehículos exactos (modelo + motor) e ids de asignaciones anteriores que se conservan. */
 export interface ProductVehicleCompatibilityPayload {
-    engines: Array<{ engine_id: number }>;
-    chassis: Array<{ chassis_id: number }>;
-    all_engines: boolean;
-    all_chassis: boolean;
-    model_id?: number | null;
+    vehicles: Array<{ model_id: number; engine_id: number }>;
+    keep_ids: number[];
 }
 
 export interface CreateProductRequest {
@@ -534,6 +538,8 @@ export interface ProductFilters {
     search?: string;
     has_stock?: boolean;
     vehicle_engine_id?: number;
+    vehicle_model_id?: number;
+    vehicle_chassis_id?: number;
     strict_fitment?: boolean;
     warehouse_id?: number;
     per_page?: number;

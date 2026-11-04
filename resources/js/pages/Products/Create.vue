@@ -7,9 +7,7 @@ import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import type { PendingImage } from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
-import type { DraftCompatData } from '@/components/Products/VehicleCompatSection.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
-import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -34,9 +32,12 @@ import {
     normalizeInitialInventoryPayload,
     normalizePricingPayload,
     normalizeProductAttributesPayload,
-    normalizeVehicleCompatibilityPayload,
-    toPositiveInt,
 } from '@/utils/productPayload';
+import {
+    emptyCompatDraft,
+    vehicleCompatibilityPayload as buildVehicleCompatibilityPayload,
+    type DraftCompatData,
+} from '@/utils/vehicleFitment';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -416,76 +417,9 @@ const onNameInput = () => {
 };
 
 // === Vehicle compatibility (draft mode via component) ===
-const vehicleCompatRef = ref<InstanceType<typeof VehicleCompatSection> | null>(
-    null,
-);
-const vehicleModalsRef = ref<InstanceType<typeof VehicleInlineModals> | null>(
-    null,
-);
-const vehicleModalType = ref<
-    'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null
->(null);
-
-const vehicleCompat = ref<DraftCompatData>({
-    engines: [],
-    chassis: [],
-    allEngines: false,
-    allChassis: false,
-    isUniversal: false,
-    modelId: null,
-    makeId: null,
-});
-
-const openVehicleInline = (
-    type: 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis',
-) => {
-    vehicleModalType.value = type;
-    vehicleModalsRef.value?.open(type);
-};
-
-const closeVehicleInline = () => {
-    vehicleModalType.value = null;
-};
-
-const onMakeCreated = (make: { id: number; name: string }) => {
-    vehicleCompatRef.value?.addMake(make);
-    vehicleModalType.value = null;
-};
-
-const onModelCreated = (model: any) => {
-    vehicleCompatRef.value?.addModel(model);
-    vehicleModalType.value = null;
-};
-
-const onEngineCreated = (engine: any) => {
-    vehicleCompatRef.value?.addEngine(engine);
-    vehicleModalType.value = null;
-};
-
-const onChassisCreated = (chassis: any) => {
-    vehicleCompatRef.value?.addChassisToList(chassis);
-};
+const vehicleCompat = ref<DraftCompatData>(emptyCompatDraft());
 
 // === Name preview helpers ===
-const formatYearRange = (
-    model?: {
-        year_from?: number;
-        year_to?: number;
-        generation?: string;
-    } | null,
-): string => {
-    const from = model?.year_from;
-    const to = model?.year_to;
-    if (from && to) return from === to ? `${from}` : `${from}-${to}`;
-    if (from) return `${from}`;
-    if (to) return `${to}`;
-    return '';
-};
-
-const getModelChassis = (model?: { generation?: string } | null): string => {
-    return String(model?.generation ?? '').trim();
-};
-
 const engineCategoryKeywords = [
     'motor',
     'piston',
@@ -575,63 +509,22 @@ const namePreview = computed(() => {
         isEngineCategory(name),
     );
 
-    const addedEngines = vehicleCompat.value.engines;
-    const addedChassis = vehicleCompat.value.chassis;
-    const allEnginesFlag = vehicleCompat.value.allEngines;
-    const allChassisFlag = vehicleCompat.value.allChassis;
-
-    const selectedMake =
-        vehicleCompatRef.value?.vehicleMakes?.find(
-            (m) => m.id === vehicleCompatRef.value?.selectedMakeId,
-        )?.name || '';
-    const selectedModel = vehicleCompatRef.value?.vehicleModels?.find(
-        (m) => m.id === vehicleCompatRef.value?.selectedModelId,
-    );
-    const selectedModelName = selectedModel?.name || '';
-    const selectedYear = formatYearRange(selectedModel);
-    const selectedChassis = getModelChassis(selectedModel);
-
-    const chassisLabels = addedChassis
-        .map((entry) => buildChassisLevelLabel(entry))
-        .filter(Boolean);
-    const engineLabels = addedEngines
-        .map((entry) =>
-            engineCategory
-                ? buildEngineLevelLabel(entry)
-                : buildChassisLevelLabel(entry),
-        )
-        .filter(Boolean);
-
-    if (allChassisFlag && selectedModelName) {
-        const allChassisLabel = buildChassisLevelLabel({
-            make: selectedMake,
-            model: selectedModelName,
-            year: selectedYear,
-            chassis: selectedChassis || 'todos los chasis',
-        });
-        if (allChassisLabel) chassisLabels.push(allChassisLabel);
-    }
-
-    if (allEnginesFlag && selectedModelName) {
-        const allEnginesLabel = engineCategory
-            ? buildEngineLevelLabel({
-                  make: selectedMake,
-                  engine: 'todos los motores',
-                  model: selectedModelName,
-                  year: selectedYear,
-                  chassis: selectedChassis || 'todos los chasis',
-              })
-            : buildChassisLevelLabel({
-                  make: selectedMake,
-                  model: selectedModelName,
-                  year: selectedYear,
-                  chassis: selectedChassis,
-              });
-        if (allEnginesLabel) engineLabels.push(allEnginesLabel);
-    }
-
     const compatibilityLabels = [
-        ...new Set([...chassisLabels, ...engineLabels]),
+        ...new Set(
+            vehicleCompat.value.vehicles
+                .map((vehicle) => {
+                    const entry = {
+                        make: vehicle.make,
+                        model: vehicle.model,
+                        year: vehicle.years,
+                        engine: vehicle.engine,
+                    };
+                    return engineCategory
+                        ? buildEngineLevelLabel(entry)
+                        : buildChassisLevelLabel(entry);
+                })
+                .filter(Boolean),
+        ),
     ];
     if (compatibilityLabels.length === 0) return categoryName;
 
@@ -902,19 +795,8 @@ const onDraftVariantsChanged = (variants: any[]) => {
     pendingVariants.value = variants;
 };
 
-const resolveVehicleModelId = (): number | null => {
-    return (
-        toPositiveInt(vehicleCompatRef.value?.selectedModelId) ??
-        toPositiveInt(vehicleCompat.value.modelId)
-    );
-};
-
-const vehicleCompatibilityPayload = () => {
-    return normalizeVehicleCompatibilityPayload(
-        vehicleCompat.value,
-        vehicleCompatRef.value?.selectedModelId,
-    );
-};
+const vehicleCompatibilityPayload = () =>
+    buildVehicleCompatibilityPayload(vehicleCompat.value);
 
 const handleSubmit = async () => {
     validationErrors.value = {};
@@ -932,17 +814,6 @@ const handleSubmit = async () => {
     if (form.value.brand_id && normalizedInitialInventory.length === 0) {
         toast.error(
             'Debes seleccionar un almacén cuando creas una variante con marca',
-        );
-        return;
-    }
-
-    // Require model selection when "todos los motores" or "todos los chasis" is checked.
-    if (
-        (vehicleCompat.value.allEngines || vehicleCompat.value.allChassis) &&
-        !resolveVehicleModelId()
-    ) {
-        toast.error(
-            'Debes seleccionar un modelo de vehículo antes de marcar "todos los motores" o "todos los chasis".',
         );
         return;
     }
@@ -1613,10 +1484,7 @@ const readinessItems = computed(() => [
                     <!-- SECTION 4: Compatibilidad Vehicular -->
                     <VehicleCompatSection
                         id="compatibilidad"
-                        ref="vehicleCompatRef"
-                        mode="draft"
                         v-model="vehicleCompat"
-                        @open-inline="openVehicleInline"
                     />
 
                     <!-- SECTION 5: Variantes -->
@@ -2075,7 +1943,7 @@ const readinessItems = computed(() => [
             </div>
         </div>
 
-        <!-- Inline Creation Modal (Category & Brand only — vehicle modals use VehicleInlineModals) -->
+        <!-- Inline Creation Modal (Category & Brand) -->
         <Dialog
             :open="inlineModal !== null"
             @update:open="
@@ -2157,18 +2025,5 @@ const readinessItems = computed(() => [
                 </form>
             </DialogContent>
         </Dialog>
-
-        <!-- Vehicle Inline Modals -->
-        <VehicleInlineModals
-            ref="vehicleModalsRef"
-            :current-modal="vehicleModalType"
-            :selected-make-id="vehicleCompatRef?.selectedMakeId ?? null"
-            :selected-model-id="vehicleCompatRef?.selectedModelId ?? null"
-            @close="closeVehicleInline"
-            @make-created="onMakeCreated"
-            @model-created="onModelCreated"
-            @engine-created="onEngineCreated"
-            @chassis-created="onChassisCreated"
-        />
     </AppLayout>
 </template>

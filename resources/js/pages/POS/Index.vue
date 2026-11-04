@@ -936,6 +936,26 @@ const modalSort = ref<string | undefined>(undefined);
 const modalCategoryIds = ref<number[] | undefined>(undefined);
 const modalBrandIds = ref<number[] | undefined>(undefined);
 
+// Vehículo para filtrar la búsqueda: el del cliente seleccionado o, si no hay, el vehículo de catálogo
+// elegido en la cabecera. Se envía el modelo para distinguir vehículos que comparten motor.
+const vehicleSearchFilter = () => {
+    const customerVehicle = selectedCustomerVehicle.value;
+    if (customerVehicle?.vehicle_engine_id) {
+        return {
+            vehicle_engine_id: customerVehicle.vehicle_engine_id,
+            vehicle_model_id: customerVehicle.vehicle_model_id || undefined,
+            vehicle_chassis_id: customerVehicle.vehicle_chassis_id ?? undefined,
+        };
+    }
+    if (catalogVehicle.value?.engine_id) {
+        return {
+            vehicle_engine_id: catalogVehicle.value.engine_id,
+            vehicle_model_id: catalogVehicle.value.model_id,
+        };
+    }
+    return {};
+};
+
 // Build filters
 const buildFilters = () => ({
     search: searchQuery.value || undefined,
@@ -953,9 +973,7 @@ const buildFilters = () => ({
     min_price: modalMinPrice.value,
     max_price: modalMaxPrice.value,
     in_stock: modalInStock.value || undefined,
-    vehicle_engine_id: selectedCustomerVehicle.value?.vehicle_engine_id,
-    vehicle_chassis_id:
-        selectedCustomerVehicle.value?.vehicle_chassis_id ?? undefined,
+    ...vehicleSearchFilter(),
     sort: modalSort.value || undefined,
     per_page: 20,
 });
@@ -1393,7 +1411,6 @@ const quoteTotalHasChanged = computed(
             Number(quoteSessionInfo.value.confirmedTotal) - cartTotal.value,
         ) >= 0.01,
 );
-
 
 const returnToCashierQueue = () => {
     if (isStrictCashier.value) {

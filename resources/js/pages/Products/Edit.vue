@@ -9,7 +9,6 @@ import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
-import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes';
 import { useProducts } from '@/composables/useProducts';
@@ -25,8 +24,13 @@ import {
     normalizeAlternativesPayload,
     normalizeOemReferencesPayload,
     normalizeProductAttributesPayload,
-    normalizeVehicleCompatibilityPayload,
 } from '@/utils/productPayload';
+import {
+    draftFromCompatibility,
+    emptyCompatDraft,
+    vehicleCompatibilityPayload as buildVehicleCompatibilityPayload,
+    type DraftCompatData,
+} from '@/utils/vehicleFitment';
 
 const props = defineProps<{
     productId: number;
@@ -45,29 +49,6 @@ interface DraftAlternative {
     sku: string;
     name: string;
     relationship_type: 'compatible' | 'substitute' | 'upgrade';
-}
-
-interface DraftCompatData {
-    engines: Array<{
-        engine_id: number;
-        make: string;
-        model: string;
-        engine: string;
-        year: string;
-        chassis: string;
-    }>;
-    chassis: Array<{
-        chassis_id: number;
-        make: string;
-        model: string;
-        year: string;
-        chassis: string;
-    }>;
-    allEngines: boolean;
-    allChassis: boolean;
-    isUniversal: boolean;
-    modelId?: number | null;
-    makeId?: number | null;
 }
 
 const { currentProduct, updateProduct, fetchProduct, loading, error } =
@@ -128,15 +109,7 @@ const draftIdCounter = ref(-1000);
 const draftAttributes = ref<EditableProductAttribute[]>([]);
 const draftOemReferences = ref<DraftOemReference[]>([]);
 const draftAlternatives = ref<DraftAlternative[]>([]);
-const draftCompatibility = ref<DraftCompatData>({
-    engines: [],
-    chassis: [],
-    allEngines: false,
-    allChassis: false,
-    isUniversal: false,
-    modelId: null,
-    makeId: null,
-});
+const draftCompatibility = ref<DraftCompatData>(emptyCompatDraft());
 
 const categoryOptions = computed(() =>
     categories.value.map((c) => ({
@@ -188,11 +161,6 @@ const normalizeAttributeOptions = (options: unknown): string[] => {
     return options
         .map((option) => String(option ?? '').trim())
         .filter((option) => option !== '');
-};
-
-const formatYearRange = (yearRange: string | null | undefined): string => {
-    if (!yearRange) return '';
-    return yearRange;
 };
 
 const normalizeDraftAttributes = (
@@ -276,50 +244,6 @@ const normalizeDraftAlternatives = (
             relationship_type:
                 alternative.relationship_type as DraftAlternative['relationship_type'],
         }));
-};
-
-const normalizeDraftCompatibility = (
-    compatibility: any[] = [],
-    isUniversal = false,
-): DraftCompatData => {
-    const scopedCompatibility = compatibility.find(
-        (item) => (item.all_engines || item.all_chassis) && item.model_id,
-    );
-    const scopedModel = scopedCompatibility?.model ?? null;
-    const scopedMake = scopedCompatibility?.make ?? scopedModel?.make ?? null;
-
-    return {
-        engines: compatibility
-            .filter((item) => item.engine_id)
-            .map((item) => ({
-                engine_id: Number(item.engine_id),
-                make: String(item.make ?? ''),
-                model: String(item.model ?? ''),
-                engine: String(item.engine ?? ''),
-                year: formatYearRange(item.year_range),
-                chassis: String(item.chassis?.code ?? item.chassis ?? ''),
-            })),
-        chassis: compatibility
-            .filter((item) => item.chassis_id)
-            .map((item) => ({
-                chassis_id: Number(item.chassis_id),
-                make: String(item.make ?? ''),
-                model: String(item.model ?? ''),
-                year: formatYearRange(item.year_range),
-                chassis: String(item.chassis?.code ?? item.chassis ?? ''),
-            })),
-        allEngines: compatibility.some((item) => item.all_engines),
-        allChassis: compatibility.some((item) => item.all_chassis),
-        isUniversal,
-        modelId: scopedCompatibility?.model_id
-            ? Number(scopedCompatibility.model_id)
-            : null,
-        makeId:
-            scopedCompatibility?.make_id ??
-            scopedMake?.id ??
-            scopedModel?.make_id ??
-            null,
-    };
 };
 
 const extraCategoryOptions = computed(() => {
@@ -576,7 +500,7 @@ const initializeProductDraft = async () => {
     draftAlternatives.value = normalizeDraftAlternatives(
         currentProduct.value.alternatives ?? [],
     );
-    draftCompatibility.value = normalizeDraftCompatibility(
+    draftCompatibility.value = draftFromCompatibility(
         currentProduct.value.compatibility ?? [],
         currentProduct.value.is_universal ?? false,
     );
@@ -656,12 +580,8 @@ const metadataPayload = (): UpdateProductRequest => {
     };
 };
 
-const vehicleCompatibilityPayload = () => {
-    return normalizeVehicleCompatibilityPayload(
-        draftCompatibility.value,
-        vehicleCompatRef.value?.selectedModelId,
-    );
-};
+const vehicleCompatibilityPayload = () =>
+    buildVehicleCompatibilityPayload(draftCompatibility.value);
 
 const handleSubmit = async () => {
     validationErrors.value = {};
@@ -757,47 +677,6 @@ const handleRegenerateName = async () => {
     } finally {
         regenerating.value = false;
     }
-};
-
-// === Vehicle Inline Modals ===
-const vehicleCompatRef = ref<InstanceType<typeof VehicleCompatSection> | null>(
-    null,
-);
-const vehicleModalsRef = ref<InstanceType<typeof VehicleInlineModals> | null>(
-    null,
-);
-const vehicleModalType = ref<
-    'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null
->(null);
-
-const openVehicleInline = (
-    type: 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis',
-) => {
-    vehicleModalType.value = type;
-    vehicleModalsRef.value?.open(type);
-};
-
-const closeVehicleInline = () => {
-    vehicleModalType.value = null;
-};
-
-const onMakeCreated = (make: { id: number; name: string }) => {
-    vehicleCompatRef.value?.addMake(make);
-    vehicleModalType.value = null;
-};
-
-const onModelCreated = (model: any) => {
-    vehicleCompatRef.value?.addModel(model);
-    vehicleModalType.value = null;
-};
-
-const onEngineCreated = (engine: any) => {
-    vehicleCompatRef.value?.addEngine(engine);
-    vehicleModalType.value = null;
-};
-
-const onChassisCreated = (chassis: any) => {
-    vehicleCompatRef.value?.addChassisToList(chassis);
 };
 
 const workbenchSections = [
@@ -1296,11 +1175,7 @@ const validationErrorItems = computed(() =>
                         <!-- SECTION 4: Compatibilidad Vehicular -->
                         <VehicleCompatSection
                             id="compatibilidad"
-                            ref="vehicleCompatRef"
                             v-model="draftCompatibility"
-                            mode="draft"
-                            :product-id="props.productId"
-                            @open-inline="openVehicleInline"
                         />
 
                         <!-- SECTION 5: Variantes -->
@@ -1505,16 +1380,4 @@ const validationErrorItems = computed(() =>
             </div>
         </div>
     </AppLayout>
-    <!-- Vehicle Inline Modals -->
-    <VehicleInlineModals
-        ref="vehicleModalsRef"
-        :current-modal="vehicleModalType"
-        :selected-make-id="vehicleCompatRef?.selectedMakeId ?? null"
-        :selected-model-id="vehicleCompatRef?.selectedModelId ?? null"
-        @close="closeVehicleInline"
-        @make-created="onMakeCreated"
-        @model-created="onModelCreated"
-        @engine-created="onEngineCreated"
-        @chassis-created="onChassisCreated"
-    />
 </template>

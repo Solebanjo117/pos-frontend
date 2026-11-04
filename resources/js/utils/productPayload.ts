@@ -1,7 +1,4 @@
-import type {
-    ProductVehicleCompatibilityPayload,
-    ProductAttributeType,
-} from '@/types/product';
+import type { ProductAttributeType } from '@/types/product';
 
 type RefLike<T> = { value: T };
 
@@ -119,41 +116,6 @@ export const normalizeProductAttributesPayload = <
             (attribute): attribute is NormalizedProductAttribute =>
                 attribute !== null,
         );
-
-export const normalizeVehicleCompatibilityPayload = (
-    compatibility: {
-        engines?: Array<{ engine_id?: unknown }>;
-        chassis?: Array<{ chassis_id?: unknown }>;
-        allEngines?: unknown;
-        allChassis?: unknown;
-        all_engines?: unknown;
-        all_chassis?: unknown;
-        modelId?: unknown;
-        model_id?: unknown;
-    },
-    exposedModelId?: unknown,
-): ProductVehicleCompatibilityPayload => {
-    const modelId =
-        toPositiveInt(exposedModelId) ??
-        toPositiveInt(compatibility.modelId) ??
-        toPositiveInt(compatibility.model_id);
-
-    return {
-        engines: normalizeIdArray(
-            compatibility.engines?.map((engine) => engine.engine_id),
-        ).map((engineId) => ({ engine_id: engineId })),
-        chassis: normalizeIdArray(
-            compatibility.chassis?.map((chassis) => chassis.chassis_id),
-        ).map((chassisId) => ({ chassis_id: chassisId })),
-        all_engines: Boolean(
-            compatibility.allEngines ?? compatibility.all_engines,
-        ),
-        all_chassis: Boolean(
-            compatibility.allChassis ?? compatibility.all_chassis,
-        ),
-        ...(modelId ? { model_id: modelId } : {}),
-    };
-};
 
 export const normalizePricingPayload = (
     pricing: Record<string, unknown>,

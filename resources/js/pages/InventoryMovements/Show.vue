@@ -30,8 +30,8 @@ const props = defineProps<{
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
-    { title: 'Detalle', href: `/inventory-movements/${props.id}` },
+    { title: 'Movimientos', href: '/inventory/movements' },
+    { title: 'Detalle', href: `/inventory/movements/${props.id}` },
 ];
 
 const {
@@ -172,12 +172,12 @@ function lotValue(lot: NonNullable<InventoryMovement['fifo_lots']>[number]) {
 }
 
 function goBack(): void {
-    router.visit('/inventory');
+    router.visit('/inventory/movements');
 }
 
 function viewProduct(id?: number): void {
     if (id) {
-        router.visit(`/products/${id}`);
+        router.visit(`/inventory/products/${id}`);
     }
 }
 
@@ -700,7 +700,7 @@ function openReference(): void {
                                                 class="font-medium text-blue-600 hover:underline dark:text-primary"
                                                 @click="
                                                     router.visit(
-                                                        `/inventory-movements/${movement.id}`,
+                                                        `/inventory/movements/${movement.id}`,
                                                     )
                                                 "
                                             >

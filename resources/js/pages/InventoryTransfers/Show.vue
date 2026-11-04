@@ -18,7 +18,7 @@ const props = defineProps<{ transferId: number }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Transferencias', href: '/inventory-transfers' },
+    { title: 'Transferencias', href: '/inventory/transfers' },
     { title: 'Detalle', href: '#' },
 ];
 
@@ -150,7 +150,7 @@ const formatDate = (date: string | null) => {
                     <div>
                         <div class="flex items-center gap-3">
                             <a
-                                href="/inventory-transfers"
+                                href="/inventory/transfers"
                                 class="text-2xl text-gray-400 hover:text-gray-600"
                                 >←</a
                             >

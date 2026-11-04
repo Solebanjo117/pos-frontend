@@ -341,14 +341,10 @@ export const moduleDefinitions: ModuleDefinition[] = [
         id: 'inventory',
         title: 'Inventario',
         description: 'Productos, existencias, movimientos y catálogos.',
-        href: '/inventory/overview',
+        href: '/inventory',
         icon: Warehouse,
         activePaths: [
-            '/inventory/overview',
             '/inventory',
-            '/products',
-            '/inventory-movements',
-            '/inventory-transfers',
             '/returns',
             '/brands',
             '/categories',
@@ -360,7 +356,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 actions: [
                     {
                         title: 'Existencias',
-                        href: '/inventory',
+                        href: '/inventory/stock',
                         description:
                             'Consultar stock, lotes y valor disponible.',
                         icon: Boxes,
@@ -368,21 +364,21 @@ export const moduleDefinitions: ModuleDefinition[] = [
                     },
                     {
                         title: 'Productos',
-                        href: '/products',
+                        href: '/inventory/products',
                         description:
                             'Buscar y administrar el catálogo de artículos.',
                         icon: Package,
                     },
                     {
                         title: 'Nuevo producto',
-                        href: '/products/create',
+                        href: '/inventory/products/create',
                         description: 'Registrar un artículo en el catálogo.',
                         icon: Plus,
                         roles: roles.purchasing,
                     },
                     {
                         title: 'Importar productos',
-                        href: '/products/import',
+                        href: '/inventory/products/import',
                         description: 'Cargar artículos desde un archivo.',
                         icon: PackagePlus,
                         roles: roles.adminManager,
@@ -394,21 +390,21 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 actions: [
                     {
                         title: 'Movimientos',
-                        href: '/inventory-movements',
+                        href: '/inventory/movements',
                         description:
                             'Consultar entradas, salidas y trazabilidad.',
                         icon: History,
                     },
                     {
                         title: 'Registrar entrada',
-                        href: '/inventory-movements/inbound/create',
+                        href: '/inventory/movements/inbound/create',
                         description: 'Ingresar existencias manualmente.',
                         icon: PackagePlus,
                         roles: roles.inventory,
                     },
                     {
                         title: 'Transferencias',
-                        href: '/inventory-transfers',
+                        href: '/inventory/transfers',
                         description: 'Consultar movimientos entre bodegas.',
                         icon: Truck,
                     },
@@ -681,7 +677,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 actions: [
                     {
                         title: 'Movimientos de inventario',
-                        href: '/inventory-movements',
+                        href: '/inventory/movements',
                         description: 'Historial operativo por artículo.',
                         icon: History,
                         roles: roles.adminManager,
@@ -695,7 +691,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                     },
                     {
                         title: 'Transferencias',
-                        href: '/inventory-transfers',
+                        href: '/inventory/transfers',
                         description: 'Movimientos entre bodegas.',
                         icon: Truck,
                         roles: roles.adminManager,

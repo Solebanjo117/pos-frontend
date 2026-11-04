@@ -60,8 +60,8 @@ const selectedFifoVariantId = ref<number | null>(null);
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Productos', href: '/products' },
-    { title: 'Detalle', href: `/products/${props.productId}` },
+    { title: 'Productos', href: '/inventory/products' },
+    { title: 'Detalle', href: `/inventory/products/${props.productId}` },
 ];
 
 const product = computed<ProductDetail | null>(() => currentProduct.value);
@@ -432,7 +432,7 @@ async function handleDuplicate() {
         }
 
         toast.success('Producto duplicado. Ajusta los campos necesarios.');
-        window.location.href = `/products/${duplicatedProductId}/edit`;
+        window.location.href = `/inventory/products/${duplicatedProductId}/edit`;
     } catch (err: any) {
         toast.error(
             err.response?.data?.message || 'Error al duplicar producto',
@@ -469,7 +469,7 @@ watch(effectiveImages, () => {
                     <div class="min-w-0">
                         <div class="mb-2 flex flex-wrap items-center gap-2">
                             <Link
-                                href="/products"
+                                href="/inventory/products"
                                 class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-50 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted"
                             >
                                 <ArrowLeft :size="15" />
@@ -524,7 +524,7 @@ watch(effectiveImages, () => {
                         </button>
                         <Link
                             v-if="canManageProducts"
-                            :href="`/products/${productId}/edit`"
+                            :href="`/inventory/products/${productId}/edit`"
                             class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
                         >
                             <Pencil :size="16" />
@@ -1473,7 +1473,7 @@ watch(effectiveImages, () => {
                                 <Link
                                     v-for="attribute in attributes"
                                     :key="`${attribute.name}-${attribute.value}`"
-                                    :href="`/products?attribute_value=${encodeURIComponent(String(attribute.value))}`"
+                                    :href="`/inventory/products?attribute_value=${encodeURIComponent(String(attribute.value))}`"
                                     class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm hover:border-emerald-200 hover:bg-emerald-50 dark:border-border dark:bg-muted/30"
                                 >
                                     <span class="block text-xs text-gray-500">{{
@@ -1510,7 +1510,7 @@ watch(effectiveImages, () => {
                                 <Link
                                     v-for="reference in oemReferences"
                                     :key="`${reference.manufacturer}-${reference.oem_code}`"
-                                    :href="`/products?oem_code=${encodeURIComponent(reference.oem_code)}`"
+                                    :href="`/inventory/products?oem_code=${encodeURIComponent(reference.oem_code)}`"
                                     class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm hover:border-emerald-200 hover:bg-emerald-50 dark:border-border dark:bg-muted/30"
                                 >
                                     <span
@@ -1633,7 +1633,7 @@ watch(effectiveImages, () => {
                                     >
                                         <td class="px-4 py-3">
                                             <Link
-                                                :href="`/products/${alternative.id}`"
+                                                :href="`/inventory/products/${alternative.id}`"
                                                 class="font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
                                             >
                                                 {{ alternative.name }}

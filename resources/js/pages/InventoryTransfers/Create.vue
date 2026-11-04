@@ -17,8 +17,8 @@ import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Transferencias', href: '/inventory-transfers' },
-    { title: 'Nueva Transferencia', href: '/inventory-transfers/create' },
+    { title: 'Transferencias', href: '/inventory/transfers' },
+    { title: 'Nueva Transferencia', href: '/inventory/transfers/create' },
 ];
 
 interface Warehouse {
@@ -348,7 +348,7 @@ const submit = async () => {
             <!-- Submit -->
             <div class="flex justify-end gap-3">
                 <a
-                    href="/inventory-transfers"
+                    href="/inventory/transfers"
                     class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300"
                 >
                     Cancelar

@@ -29,10 +29,10 @@ interface OutboundItem {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
+    { title: 'Movimientos', href: '/inventory/movements' },
     {
         title: 'Nueva Salida Masiva',
-        href: '/inventory-movements/outbound/create',
+        href: '/inventory/movements/outbound/create',
     },
 ];
 
@@ -369,7 +369,7 @@ const handleSubmit = async () => {
 
         successMessage.value = 'Salida masiva registrada exitosamente';
         setTimeout(() => {
-            router.visit('/inventory-movements');
+            router.visit('/inventory/movements');
         }, 1500);
     } catch (err: any) {
         globalError.value = error.value || 'Error al procesar salida';
@@ -377,7 +377,7 @@ const handleSubmit = async () => {
 };
 
 const cancel = () => {
-    router.visit('/inventory-movements');
+    router.visit('/inventory/movements');
 };
 </script>
 
@@ -700,7 +700,7 @@ const cancel = () => {
                                                         </button>
                                                     </div>
                                                     <a
-                                                        :href="`/products/${item.product_id}/edit`"
+                                                        :href="`/inventory/products/${item.product_id}/edit`"
                                                         target="_blank"
                                                         class="mt-1 flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400 dark:text-primary"
                                                     >

@@ -29,10 +29,10 @@ interface TransferItem {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
+    { title: 'Movimientos', href: '/inventory/movements' },
     {
         title: 'Nueva Transferencia',
-        href: '/inventory-movements/transfer/create',
+        href: '/inventory/movements/transfer/create',
     },
 ];
 
@@ -383,7 +383,7 @@ const handleSubmit = async () => {
 
         successMessage.value = 'Transferencias registradas exitosamente';
         setTimeout(() => {
-            router.visit('/inventory-movements');
+            router.visit('/inventory/movements');
         }, 1500);
     } catch (err: any) {
         globalError.value = error.value || 'Error al procesar transferencia';
@@ -391,7 +391,7 @@ const handleSubmit = async () => {
 };
 
 const cancel = () => {
-    router.visit('/inventory-movements');
+    router.visit('/inventory/movements');
 };
 </script>
 

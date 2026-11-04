@@ -18,7 +18,7 @@ import { type BreadcrumbItem } from '@/types';
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Transferencias', href: '/inventory-transfers' },
+    { title: 'Transferencias', href: '/inventory/transfers' },
 ];
 
 interface Transfer {
@@ -105,7 +105,7 @@ const totalItems = (items: any[]) =>
                     </p>
                 </div>
                 <a
-                    href="/inventory-transfers/create"
+                    href="/inventory/transfers/create"
                     class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
                 >
                     <Plus :size="16" />
@@ -253,7 +253,7 @@ const totalItems = (items: any[]) =>
                             </td>
                             <td class="px-4 py-3 text-center">
                                 <a
-                                    :href="`/inventory-transfers/${t.id}`"
+                                    :href="`/inventory/transfers/${t.id}`"
                                     class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:text-primary"
                                 >
                                     <Eye :size="16" />

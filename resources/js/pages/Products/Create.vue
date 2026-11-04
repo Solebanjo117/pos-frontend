@@ -41,8 +41,8 @@ import {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Productos', href: '/products' },
-    { title: 'Crear Producto', href: '/products/create' },
+    { title: 'Productos', href: '/inventory/products' },
+    { title: 'Crear Producto', href: '/inventory/products/create' },
 ];
 
 const { createProduct, loading, error } = useProducts();
@@ -1087,7 +1087,7 @@ const handleSubmit = async () => {
         successMessage.value = 'Producto creado exitosamente';
         toast.success('Producto creado exitosamente');
         setTimeout(() => {
-            window.location.href = '/products';
+            window.location.href = '/inventory/products';
         }, 1000);
     } catch (err: any) {
         if (err.response?.data?.errors) {
@@ -1102,7 +1102,7 @@ const handleSubmit = async () => {
 };
 
 const cancel = () => {
-    window.location.href = '/products';
+    window.location.href = '/inventory/products';
 };
 
 const validationErrorItems = computed(() =>

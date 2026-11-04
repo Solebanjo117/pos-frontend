@@ -131,7 +131,7 @@ interface Filters {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Inventario', href: '/inventory' },
+    { title: 'Existencias', href: '/inventory/stock' },
 ];
 
 const { hasRole } = useAuth();
@@ -374,7 +374,7 @@ function goToPage(page: number): void {
 }
 
 function viewMovement(id: number): void {
-    router.visit(`/inventory-movements/${id}`);
+    router.visit(`/inventory/movements/${id}`);
 }
 
 function viewInventoryProduct(
@@ -393,7 +393,7 @@ function viewInventoryProduct(
     }
 
     const query = params.toString();
-    router.visit(`/inventory/products/${productId}${query ? `?${query}` : ''}`);
+    router.visit(`/inventory/stock/${productId}${query ? `?${query}` : ''}`);
 }
 
 function historyKey(row: InventoryRow): string {
@@ -486,7 +486,7 @@ function pageItemLabel(): string {
 </script>
 
 <template>
-    <Head title="Inventario" />
+    <Head title="Existencias" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="space-y-5 p-4">
@@ -497,7 +497,7 @@ function pageItemLabel(): string {
                     <h1
                         class="text-2xl font-semibold text-gray-950 dark:text-white"
                     >
-                        Inventario
+                        Existencias
                     </h1>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Stock operativo, lotes y movimientos por variante.
@@ -514,7 +514,7 @@ function pageItemLabel(): string {
                     </a>
                     <!--
                         Futuro: habilitar transferencia desde inventario cuando el flujo quede aprobado.
-                        <a href="/inventory-movements/transfer/create">Nueva Transferencia</a>
+                        <a href="/inventory/movements/transfer/create">Nueva Transferencia</a>
                     -->
                 </div>
             </div>

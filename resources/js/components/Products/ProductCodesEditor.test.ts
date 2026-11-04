@@ -113,7 +113,7 @@ describe('ProductCodesEditor', () => {
                         name: 'Producto existente',
                         matched_code: '4550319155',
                         primary_code: '45503-19155',
-                        url: '/products/27/edit',
+                        url: '/inventory/products/27/edit',
                     },
                 ],
             },
@@ -129,7 +129,9 @@ describe('ProductCodesEditor', () => {
         await nextTick();
 
         expect(wrapper.text()).toContain('Producto existente');
-        expect(wrapper.get('a').attributes('href')).toBe('/products/27/edit');
+        expect(wrapper.get('a').attributes('href')).toBe(
+            '/inventory/products/27/edit',
+        );
         expect(
             (
                 editor.vm as unknown as { hasConflicts: () => boolean }

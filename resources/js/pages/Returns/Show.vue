@@ -385,7 +385,7 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                                     class="font-medium text-cyan-700 hover:underline"
                                     @click="
                                         router.visit(
-                                            `/products/${item.product_id}`,
+                                            `/inventory/products/${item.product_id}`,
                                         )
                                     "
                                 >
@@ -525,7 +525,7 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                                     class="inline-flex items-center gap-1 text-cyan-700 hover:underline"
                                     @click="
                                         router.visit(
-                                            `/inventory-movements/${movement.id}`,
+                                            `/inventory/movements/${movement.id}`,
                                         )
                                     "
                                 >

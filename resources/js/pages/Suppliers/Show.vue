@@ -1146,7 +1146,7 @@ const removeVariant = async (variantId?: number | null) => {
                                     <td class="px-3 py-2">
                                         <Link
                                             v-if="item.product_id"
-                                            :href="`/products/${item.product_id}`"
+                                            :href="`/inventory/products/${item.product_id}`"
                                             class="font-semibold text-indigo-600 hover:underline"
                                         >
                                             {{
@@ -1430,7 +1430,7 @@ const removeVariant = async (variantId?: number | null) => {
                                 </span>
                                 <span>
                                     <Link
-                                        :href="`/products/${group.product_id}`"
+                                        :href="`/inventory/products/${group.product_id}`"
                                         class="font-medium text-emerald-600 hover:underline dark:text-emerald-400"
                                         @click.stop
                                     >

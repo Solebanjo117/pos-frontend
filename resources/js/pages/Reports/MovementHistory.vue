@@ -315,7 +315,7 @@ const inventoryProductHref = (productId: number, variantId?: number | null) => {
 
     const query = params.toString();
 
-    return `/inventory/products/${productId}${query ? `?${query}` : ''}`;
+    return `/inventory/stock/${productId}${query ? `?${query}` : ''}`;
 };
 
 const sourceHref = (movement: {
@@ -327,7 +327,7 @@ const sourceHref = (movement: {
     const id = movement.reference_id;
 
     if (!id) {
-        return `/inventory-movements/${movement.id}`;
+        return `/inventory/movements/${movement.id}`;
     }
 
     if (type.includes('purchase')) {
@@ -339,10 +339,10 @@ const sourceHref = (movement: {
     }
 
     if (type.includes('transfer')) {
-        return `/inventory-transfers/${id}`;
+        return `/inventory/transfers/${id}`;
     }
 
-    return `/inventory-movements/${movement.id}`;
+    return `/inventory/movements/${movement.id}`;
 };
 
 const sourceLabel = (movement: {

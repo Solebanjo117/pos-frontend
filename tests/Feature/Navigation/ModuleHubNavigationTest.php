@@ -112,3 +112,48 @@ it('keeps both histories and the editor return route in Transactions', function 
     $this->actingAs($seller)->get(route('sales-orders.index'))->assertRedirect('/transactions?type=order');
     $this->get(route('sales-quotes.index'))->assertRedirect('/transactions?type=quote');
 });
+
+it('serves every inventory screen under the /inventory hierarchy', function () {
+    $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+
+    $screens = [
+        '/inventory' => 'Inventory/Overview',
+        '/inventory/stock' => 'Inventory/Inventory',
+        '/inventory/stock/5' => 'Inventory/ProductMovements',
+        '/inventory/waste' => 'Inventory/Waste',
+        '/inventory/products/import' => 'Products/Import',
+        '/inventory/movements' => 'InventoryMovements/Index',
+        '/inventory/movements/inbound/create' => 'InventoryMovements/CreateInbound',
+        '/inventory/movements/3' => 'InventoryMovements/Show',
+        '/inventory/transfers' => 'InventoryTransfers/Index',
+        '/inventory/transfers/create' => 'InventoryTransfers/Create',
+        '/inventory/transfers/7' => 'InventoryTransfers/Show',
+    ];
+
+    foreach ($screens as $url => $component) {
+        $this->actingAs($admin)->get($url)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component($component));
+    }
+});
+
+it('redirects legacy inventory urls keeping the query string', function (string $legacy, string $target) {
+    $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+
+    $this->actingAs($admin)->get($legacy)->assertRedirect($target);
+})->with([
+    ['/inventory/overview', '/inventory'],
+    ['/products', '/inventory/products'],
+    ['/products/5/edit?variant=2', '/inventory/products/5/edit?variant=2'],
+    ['/products?oem_code=ABC-1', '/inventory/products?oem_code=ABC-1'],
+    ['/inventory-movements/3', '/inventory/movements/3'],
+    ['/inventory-movements/inbound/create', '/inventory/movements/inbound/create'],
+    ['/inventory-transfers', '/inventory/transfers'],
+]);
+
+it('keeps stock screens restricted to inventory roles', function () {
+    $seller = User::factory()->create(['role' => 'seller', 'is_active' => true]);
+
+    $this->actingAs($seller)->get('/inventory')->assertOk();
+    $this->actingAs($seller)->get('/inventory/stock')->assertForbidden();
+});

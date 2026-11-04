@@ -216,7 +216,7 @@ const getExpiryColor = (dateString: string | null) => {
                 </p>
                 <div class="mt-4 flex gap-2">
                     <a
-                        href="/inventory-movements"
+                        href="/inventory/movements"
                         class="text-sm text-blue-600 hover:underline dark:text-primary"
                     >
                         &larr; Ver Historial de Movimientos (Bitácora)

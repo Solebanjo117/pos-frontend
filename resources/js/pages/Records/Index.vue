@@ -60,7 +60,7 @@ async function loadRecent() {
                 description: movement.product?.name || 'Artículo',
                 amount: 0,
                 occurred_at: movement.created_at,
-                href: `/inventory-movements/${movement.id}`,
+                href: `/inventory/movements/${movement.id}`,
             })),
         ]
             .sort(

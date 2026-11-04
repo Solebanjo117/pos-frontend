@@ -35,7 +35,7 @@ interface WarehouseOption {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
+    { title: 'Movimientos', href: '/inventory/movements' },
 ];
 
 const {
@@ -160,7 +160,7 @@ function viewMovement(id: number): void {
 }
 
 function viewProduct(id: number): void {
-    router.visit(`/products/${id}`);
+    router.visit(`/inventory/products/${id}`);
 }
 
 function referenceLabel(type?: string | null): string {
@@ -290,14 +290,14 @@ function formatNumber(value: number): string {
                         Refrescar
                     </button>
                     <a
-                        href="/inventory-movements/inbound/create"
+                        href="/inventory/movements/inbound/create"
                         class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
                     >
                         <PackagePlus class="h-4 w-4" />
                         Entrada
                     </a>
                     <a
-                        href="/inventory-movements/outbound/create"
+                        href="/inventory/movements/outbound/create"
                         class="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-200 dark:hover:bg-red-950"
                     >
                         <PackageMinus class="h-4 w-4" />
@@ -305,7 +305,7 @@ function formatNumber(value: number): string {
                     </a>
                     <a
                         v-if="!isSingleWarehouseMode()"
-                        href="/inventory-movements/transfer/create"
+                        href="/inventory/movements/transfer/create"
                         class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-border dark:text-gray-100 dark:hover:bg-muted"
                     >
                         <ArrowLeftRight class="h-4 w-4" />

@@ -32,10 +32,10 @@ interface InboundItem {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
+    { title: 'Movimientos', href: '/inventory/movements' },
     {
         title: 'Nueva Entrada Masiva',
-        href: '/inventory-movements/inbound/create',
+        href: '/inventory/movements/inbound/create',
     },
 ];
 
@@ -453,7 +453,7 @@ const handleSubmit = async () => {
 
         successMessage.value = 'Entrada masiva registrada exitosamente';
         setTimeout(() => {
-            router.visit('/inventory-movements');
+            router.visit('/inventory/movements');
         }, 1500);
     } catch (err) {
         // Error handled in composable
@@ -462,7 +462,7 @@ const handleSubmit = async () => {
 };
 
 const cancel = () => {
-    router.visit('/inventory-movements');
+    router.visit('/inventory/movements');
 };
 </script>
 
@@ -877,7 +877,7 @@ const cancel = () => {
                                                         </button>
                                                     </div>
                                                     <a
-                                                        :href="`/products/${item.product_id}/edit`"
+                                                        :href="`/inventory/products/${item.product_id}/edit`"
                                                         target="_blank"
                                                         class="mt-1 flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400 dark:text-primary"
                                                     >

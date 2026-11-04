@@ -44,7 +44,7 @@ const reportLink = computed(() => {
     if (adjustment.value.type === 'accounts_receivable') return '/ar';
     if (adjustment.value.type === 'accounts_payable')
         return '/accounts-payable';
-    if (adjustment.value.type === 'inventory') return '/inventory';
+    if (adjustment.value.type === 'inventory') return '/inventory/stock';
     return '/reports/financial';
 });
 const canReverse = computed(

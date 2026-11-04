@@ -286,7 +286,7 @@ const inventoryProductHref = (product: {
 
     const query = params.toString();
 
-    return `/inventory/products/${product.id}${query ? `?${query}` : ''}`;
+    return `/inventory/stock/${product.id}${query ? `?${query}` : ''}`;
 };
 </script>
 

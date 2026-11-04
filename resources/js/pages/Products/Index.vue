@@ -102,7 +102,7 @@ const handleSortChange = async (sortVal: string) => {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Productos', href: '/products' },
+    { title: 'Productos', href: '/inventory/products' },
 ];
 
 const {
@@ -692,7 +692,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     </a>
 
                     <a
-                        href="/products/import"
+                        href="/inventory/products/import"
                         class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
                     >
                         <Upload class="h-4 w-4" />
@@ -727,7 +727,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
 
                     <!-- New Product Button -->
                     <a
-                        href="/products/create"
+                        href="/inventory/products/create"
                         class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
                     >
                         <svg
@@ -1495,7 +1495,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                     </button>
                                                     <a
                                                         v-if="canManageProducts"
-                                                        :href="`/products/${product.id}/edit`"
+                                                        :href="`/inventory/products/${product.id}/edit`"
                                                         class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
                                                     >
                                                         Editar
@@ -1726,7 +1726,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                             v-if="
                                                                                 canManageProducts
                                                                             "
-                                                                            :href="`/products/${product.id}/edit?variant=${variant.id}`"
+                                                                            :href="`/inventory/products/${product.id}/edit?variant=${variant.id}`"
                                                                             class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
                                                                         >
                                                                             Editar

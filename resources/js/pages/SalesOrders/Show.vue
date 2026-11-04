@@ -1053,7 +1053,7 @@ onMounted(async () => {
                                         class="text-left font-semibold text-indigo-600 hover:underline"
                                         @click="
                                             router.visit(
-                                                `/products/${item.product_id}`,
+                                                `/inventory/products/${item.product_id}`,
                                             )
                                         "
                                     >
@@ -1420,7 +1420,7 @@ onMounted(async () => {
                                     class="font-mono font-semibold text-indigo-600 hover:underline"
                                     @click="
                                         router.visit(
-                                            `/inventory-movements/${movement.id}`,
+                                            `/inventory/movements/${movement.id}`,
                                         )
                                     "
                                 >

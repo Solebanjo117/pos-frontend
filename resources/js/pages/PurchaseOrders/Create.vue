@@ -1670,7 +1670,7 @@ watch(
                                                         as-child
                                                     >
                                                         <a
-                                                            :href="`/products/${(item as any).product_id}`"
+                                                            :href="`/inventory/products/${(item as any).product_id}`"
                                                             target="_blank"
                                                             class="flex items-center gap-2"
                                                         >

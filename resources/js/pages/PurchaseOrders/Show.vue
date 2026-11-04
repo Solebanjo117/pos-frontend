@@ -845,7 +845,7 @@ onMounted(async () => {
                                             <td class="px-3 py-2">
                                                 <Link
                                                     v-if="item.product"
-                                                    :href="`/products/${item.product.id}`"
+                                                    :href="`/inventory/products/${item.product.id}`"
                                                     class="font-semibold text-green-700 hover:underline dark:text-green-300"
                                                 >
                                                     {{ item.product.name }}

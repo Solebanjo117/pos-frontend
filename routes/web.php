@@ -90,41 +90,81 @@ Route::middleware(['auth'])->get('/changelog', function () {
     return Inertia::render('Changelog/Index');
 })->name('changelog.index');
 
-// Product Routes
-Route::middleware(['auth'])->prefix('products')->name('products.')->group(function () {
-    Route::get('/', [App\Http\Controllers\ProductController::class, 'index'])->name('index');
-    Route::get('/create', [App\Http\Controllers\ProductController::class, 'create'])
-        ->name('create')
-        ->middleware('role:admin,manager,buyer');
-    Route::get('/import', function () {
-        return Inertia::render('Products/Import');
-    })->name('import')->middleware('role:admin,manager');
-    Route::get('/{product}', [App\Http\Controllers\ProductController::class, 'show'])->name('show');
-    Route::get('/{product}/edit', [App\Http\Controllers\ProductController::class, 'edit'])
-        ->name('edit')
-        ->middleware('role:admin,manager,buyer');
-});
-
-// Inventory Routes
-Route::middleware(['auth'])->get('/inventory/overview', function () {
-    return Inertia::render('Inventory/Overview');
-})->name('inventory.overview');
-
-Route::middleware(['auth', 'role:admin,manager,buyer,assistant'])->prefix('inventory')->name('inventory.')->group(function () {
+// Inventory Routes — todo el módulo Inventario vive bajo /inventory
+Route::middleware(['auth'])->prefix('inventory')->group(function () {
     Route::get('/', function () {
-        return Inertia::render('Inventory/Inventory');
-    })->name('index');
+        return Inertia::render('Inventory/Overview');
+    })->name('inventory.overview');
 
-    Route::get('/products/{productId}', function ($productId) {
-        return Inertia::render('Inventory/ProductMovements', [
-            'productId' => (int) $productId,
-        ]);
-    })->name('products.show');
+    Route::middleware('role:admin,manager,buyer,assistant')->name('inventory.')->group(function () {
+        Route::get('/stock', function () {
+            return Inertia::render('Inventory/Inventory');
+        })->name('stock');
+        Route::get('/stock/{productId}', function ($productId) {
+            return Inertia::render('Inventory/ProductMovements', [
+                'productId' => (int) $productId,
+            ]);
+        })->name('stock.show');
+        Route::get('/waste', function () {
+            return Inertia::render('Inventory/Waste');
+        })->name('waste');
+    });
 
-    Route::get('/waste', function () {
-        return Inertia::render('Inventory/Waste');
-    })->name('waste');
+    Route::prefix('products')->name('products.')->group(function () {
+        Route::get('/', [App\Http\Controllers\ProductController::class, 'index'])->name('index');
+        Route::get('/create', [App\Http\Controllers\ProductController::class, 'create'])
+            ->name('create')
+            ->middleware('role:admin,manager,buyer');
+        Route::get('/import', function () {
+            return Inertia::render('Products/Import');
+        })->name('import')->middleware('role:admin,manager');
+        Route::get('/{product}', [App\Http\Controllers\ProductController::class, 'show'])->name('show');
+        Route::get('/{product}/edit', [App\Http\Controllers\ProductController::class, 'edit'])
+            ->name('edit')
+            ->middleware('role:admin,manager,buyer');
+    });
+
+    Route::prefix('movements')->name('inventory-movements.')->group(function () {
+        Route::get('/', function () {
+            return Inertia::render('InventoryMovements/Index');
+        })->name('index');
+        Route::get('/inbound/create', function () {
+            return Inertia::render('InventoryMovements/CreateInbound');
+        })->name('inbound.create')->middleware('role:admin,manager,buyer,assistant');
+        Route::get('/outbound/create', function () {
+            return Inertia::render('InventoryMovements/CreateOutbound');
+        })->name('outbound.create')->middleware('role:admin,manager');
+        Route::get('/transfer/create', function () {
+            return Inertia::render('InventoryMovements/CreateTransfer');
+        })->name('transfer.create')->middleware('role:admin,manager');
+        Route::get('/{id}', function ($id) {
+            return Inertia::render('InventoryMovements/Show', ['id' => $id]);
+        })->name('show');
+    });
+
+    Route::prefix('transfers')->name('inventory-transfers.')->group(function () {
+        Route::get('/', function () {
+            return Inertia::render('InventoryTransfers/Index');
+        })->name('index');
+        Route::get('/create', function () {
+            return Inertia::render('InventoryTransfers/Create');
+        })->name('create')->middleware('role:admin,manager');
+        Route::get('/{id}', function ($id) {
+            return Inertia::render('InventoryTransfers/Show', ['transferId' => (int) $id]);
+        })->name('show');
+    });
 });
+
+// Redirecciones desde las URLs anteriores del módulo Inventario (favoritos y enlaces guardados)
+$redirectLegacyInventoryUrl = fn (string $target) => function (Illuminate\Http\Request $request, ?string $path = null) use ($target) {
+    $query = $request->getQueryString();
+
+    return redirect($target.($path !== null ? '/'.$path : '').($query ? '?'.$query : ''));
+};
+Route::get('/inventory/overview', $redirectLegacyInventoryUrl('/inventory'));
+Route::get('/products/{path?}', $redirectLegacyInventoryUrl('/inventory/products'))->where('path', '.*');
+Route::get('/inventory-movements/{path?}', $redirectLegacyInventoryUrl('/inventory/movements'))->where('path', '.*');
+Route::get('/inventory-transfers/{path?}', $redirectLegacyInventoryUrl('/inventory/transfers'))->where('path', '.*');
 
 // Warehouse Routes
 Route::middleware(['auth'])->prefix('warehouses')->name('warehouses.')->group(function () {
@@ -144,38 +184,6 @@ Route::middleware(['auth'])->prefix('warehouses')->name('warehouses.')->group(fu
     Route::get('/{id}/edit', function ($id) {
         return Inertia::render('Warehouses/Edit', ['warehouseId' => (int) $id]);
     })->name('edit');
-});
-
-// Inventory Movements routes
-Route::middleware(['auth'])->group(function () {
-    Route::get('/inventory-movements', function () {
-        return Inertia::render('InventoryMovements/Index');
-    });
-    Route::get('/inventory-movements/inbound/create', function () {
-        return Inertia::render('InventoryMovements/CreateInbound');
-    })->middleware('role:admin,manager,buyer,assistant');
-    Route::get('/inventory-movements/outbound/create', function () {
-        return Inertia::render('InventoryMovements/CreateOutbound');
-    })->middleware('role:admin,manager');
-    Route::get('/inventory-movements/transfer/create', function () {
-        return Inertia::render('InventoryMovements/CreateTransfer');
-    })->middleware('role:admin,manager');
-    Route::get('/inventory-movements/{id}', function ($id) {
-        return Inertia::render('InventoryMovements/Show', ['id' => $id]);
-    });
-});
-
-// Inventory Transfers routes
-Route::middleware(['auth'])->prefix('inventory-transfers')->name('inventory-transfers.')->group(function () {
-    Route::get('/', function () {
-        return Inertia::render('InventoryTransfers/Index');
-    })->name('index');
-    Route::get('/create', function () {
-        return Inertia::render('InventoryTransfers/Create');
-    })->name('create')->middleware('role:admin,manager');
-    Route::get('/{id}', function ($id) {
-        return Inertia::render('InventoryTransfers/Show', ['transferId' => (int) $id]);
-    })->name('show');
 });
 
 // Reports routes

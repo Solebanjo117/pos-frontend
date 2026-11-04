@@ -12,8 +12,8 @@ const features = { workOrdersEnabled: true };
 describe('module route resolution', () => {
     it('normalizes query strings, fragments and absolute URLs', () => {
         expect(normalizeNavigationPath('/pos?cash_action=in')).toBe('/pos');
-        expect(normalizeNavigationPath('/products/12/#history')).toBe(
-            '/products/12',
+        expect(normalizeNavigationPath('/inventory/products/12/#history')).toBe(
+            '/inventory/products/12',
         );
         expect(
             normalizeNavigationPath(
@@ -28,7 +28,7 @@ describe('module route resolution', () => {
         ['/warehouses/queue', 'queues'],
         ['/reports/financial', 'finance'],
         ['/reports/sales-by-product', 'reports'],
-        ['/products/42/edit', 'inventory'],
+        ['/inventory/products/42/edit', 'inventory'],
         ['/customers/42', 'customers'],
         ['/settings/pricing-formulas', 'settings'],
         ['/transactions?type=quote', 'sales'],
@@ -140,12 +140,12 @@ describe('sales navigation', () => {
 describe('module breadcrumbs', () => {
     it('prepends the module hub and preserves supplied detail context', () => {
         expect(
-            resolveModuleBreadcrumbs('/products/42/edit', [
+            resolveModuleBreadcrumbs('/inventory/products/42/edit', [
                 { title: 'Dashboard', href: '/dashboard' },
                 { title: 'Editar producto' },
             ]),
         ).toEqual([
-            { title: 'Inventario', href: '/inventory/overview' },
+            { title: 'Inventario', href: '/inventory' },
             { title: 'Editar producto' },
         ]);
     });
@@ -159,10 +159,45 @@ describe('module breadcrumbs', () => {
     });
 
     it('derives edit context for nested operational routes', () => {
-        expect(resolveModuleBreadcrumbs('/products/42/edit', [])).toEqual([
-            { title: 'Inventario', href: '/inventory/overview' },
-            { title: 'Productos', href: '/products' },
+        expect(
+            resolveModuleBreadcrumbs('/inventory/products/42/edit', []),
+        ).toEqual([
+            { title: 'Inventario', href: '/inventory' },
+            { title: 'Productos', href: '/inventory/products' },
             { title: 'Editar' },
+        ]);
+    });
+
+    it('keeps the inventory hub breadcrumb singular', () => {
+        expect(
+            resolveModuleBreadcrumbs('/inventory', [
+                { title: 'Inventario', href: '/inventory' },
+            ]),
+        ).toEqual([{ title: 'Inventario', href: '/inventory' }]);
+    });
+
+    it('nests every inventory screen under the inventory hub', () => {
+        expect(resolveModuleBreadcrumbs('/inventory/stock', [])).toEqual([
+            { title: 'Inventario', href: '/inventory' },
+            { title: 'Existencias', href: '/inventory/stock' },
+        ]);
+        expect(resolveModuleBreadcrumbs('/inventory/products', [])).toEqual([
+            { title: 'Inventario', href: '/inventory' },
+            { title: 'Productos', href: '/inventory/products' },
+        ]);
+        expect(
+            resolveModuleBreadcrumbs('/inventory/movements/inbound/create', []),
+        ).toEqual([
+            { title: 'Inventario', href: '/inventory' },
+            {
+                title: 'Registrar entrada',
+                href: '/inventory/movements/inbound/create',
+            },
+        ]);
+        expect(resolveModuleBreadcrumbs('/inventory/transfers/7', [])).toEqual([
+            { title: 'Inventario', href: '/inventory' },
+            { title: 'Transferencias', href: '/inventory/transfers' },
+            { title: 'Detalle' },
         ]);
     });
 

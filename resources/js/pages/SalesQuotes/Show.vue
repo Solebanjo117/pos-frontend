@@ -531,7 +531,7 @@ onMounted(fetchDetail);
                                             item.product?.id &&
                                             !item.is_custom_line
                                         "
-                                        :href="`/products/${item.product.id}`"
+                                        :href="`/inventory/products/${item.product.id}`"
                                         class="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300"
                                     >
                                         {{ itemTitle(item) }}

@@ -57,10 +57,10 @@ const error = ref<string | null>(null);
 
 const breadcrumbs = computed<BreadcrumbItem[]>(() => [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Inventario', href: '/inventory' },
+    { title: 'Existencias', href: '/inventory/stock' },
     {
         title: product.value?.name ?? 'Producto',
-        href: `/inventory/products/${props.productId}`,
+        href: `/inventory/stock/${props.productId}`,
     },
 ]);
 
@@ -370,7 +370,7 @@ function selectVariant(variant: ProductVariant): void {
     window.history.replaceState(
         {},
         '',
-        `/inventory/products/${props.productId}?${query.toString()}`,
+        `/inventory/stock/${props.productId}?${query.toString()}`,
     );
 }
 
@@ -394,7 +394,7 @@ function applyWarehouseFilter(): void {
     window.history.replaceState(
         {},
         '',
-        `/inventory/products/${props.productId}?${query.toString()}`,
+        `/inventory/stock/${props.productId}?${query.toString()}`,
     );
 }
 
@@ -404,7 +404,7 @@ function refreshPage(): void {
 }
 
 function goBackToInventory(): void {
-    router.visit('/inventory');
+    router.visit('/inventory/stock');
 }
 
 function statusLabel(status: VariantStatus): string {
@@ -468,14 +468,14 @@ function statusClass(status: VariantStatus): string {
 
                 <div class="flex flex-wrap gap-2">
                     <Link
-                        :href="`/products/${productId}`"
+                        :href="`/inventory/products/${productId}`"
                         class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-border dark:text-gray-100 dark:hover:bg-muted"
                     >
                         <Box class="h-4 w-4" />
                         Ver producto
                     </Link>
                     <Link
-                        :href="`/products/${productId}/edit`"
+                        :href="`/inventory/products/${productId}/edit`"
                         class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
                     >
                         <Pencil class="h-4 w-4" />

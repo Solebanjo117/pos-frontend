@@ -79,8 +79,8 @@ const archiving = ref(false);
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Productos', href: '/products' },
-    { title: 'Editar', href: `/products/${props.productId}/edit` },
+    { title: 'Productos', href: '/inventory/products' },
+    { title: 'Editar', href: `/inventory/products/${props.productId}/edit` },
 ];
 
 const form = ref<UpdateProductRequest>({
@@ -700,7 +700,7 @@ const handleArchive = async () => {
     try {
         await productsApi.deleteProduct(props.productId);
         toast.success('Producto archivado correctamente');
-        window.location.href = '/products';
+        window.location.href = '/inventory/products';
     } catch (err: any) {
         toast.error(
             err.response?.data?.message || 'Error al archivar producto',
@@ -711,7 +711,7 @@ const handleArchive = async () => {
 };
 
 const cancel = () => {
-    window.location.href = '/products';
+    window.location.href = '/inventory/products';
 };
 
 const handleDuplicate = async () => {
@@ -727,7 +727,7 @@ const handleDuplicate = async () => {
         }
 
         toast.success('Producto duplicado. Ajusta los campos necesarios.');
-        window.location.href = `/products/${duplicatedProductId}/edit`;
+        window.location.href = `/inventory/products/${duplicatedProductId}/edit`;
     } catch (err: any) {
         toast.error(
             err.response?.data?.message || 'Error al duplicar producto',

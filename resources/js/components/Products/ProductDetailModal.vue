@@ -83,7 +83,7 @@ interface VehicleRow {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const deepLink = (param: string, value: string | number) =>
-    `/products?${param}=${encodeURIComponent(String(value))}`;
+    `/inventory/products?${param}=${encodeURIComponent(String(value))}`;
 
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', {

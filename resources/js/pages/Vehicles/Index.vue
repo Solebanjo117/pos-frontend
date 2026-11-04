@@ -659,7 +659,7 @@ onBeforeUnmount(() => {
                                             <button
                                                 @click="changeSort('years')"
                                             >
-                                                Años / Generación
+                                                Años / Chasis
                                             </button>
                                         </th>
                                         <th class="px-4 py-3">Vehículos</th>

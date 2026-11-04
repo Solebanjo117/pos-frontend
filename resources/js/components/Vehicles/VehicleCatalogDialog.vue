@@ -29,6 +29,8 @@ interface ChassisOption {
     id: number;
     code: string;
     name?: string | null;
+    model?: { make?: { id: number } | null } | null;
+    models?: Array<{ make?: { id: number } | null }>;
 }
 
 const props = defineProps<{
@@ -59,6 +61,7 @@ const form = reactive({
     year_to: currentYear as number | null,
     generation: '',
     chassis_id: null as number | null,
+    new_chassis: false,
     engine_code: '',
     nickname: '',
     displacement: '',
@@ -135,13 +138,40 @@ const engineOptions = computed<SelectOption[]>(() => {
                 .join(' • '),
         }));
 });
-const chassisOptions = computed<SelectOption[]>(() =>
-    props.chassis.map((chassis) => ({
-        value: chassis.id,
-        label: chassis.code,
-        sublabel: chassis.name ?? undefined,
-    })),
-);
+const chassisBelongsToMake = (chassis: ChassisOption, makeId: number) =>
+    chassis.model?.make?.id === makeId ||
+    (chassis.models ?? []).some((model) => model.make?.id === makeId);
+
+// Solo los chasis de la marca elegida (P15 de Nissan no es P15 de otra marca).
+const chassisOptions = computed<SelectOption[]>(() => {
+    const makeId = Number(form.make_id);
+    if (!makeId) return [];
+    const seen = new Set<string>();
+    return props.chassis
+        .filter(
+            (chassis) =>
+                chassis.id === form.chassis_id ||
+                chassisBelongsToMake(chassis, makeId),
+        )
+        .filter((chassis) => {
+            const code = chassis.code.toUpperCase();
+            if (seen.has(code) && chassis.id !== form.chassis_id) return false;
+            seen.add(code);
+            return true;
+        })
+        .sort((left, right) => left.code.localeCompare(right.code))
+        .map((chassis) => ({
+            value: chassis.id,
+            label: chassis.code,
+            sublabel: chassis.name ?? undefined,
+        }));
+});
+
+const toggleNewChassis = () => {
+    form.new_chassis = !form.new_chassis;
+    form.chassis_id = null;
+    form.generation = '';
+};
 const modelsForEngine = computed(() =>
     props.models.filter(
         (model) => !form.make_id || model.make_id === Number(form.make_id),
@@ -192,6 +222,7 @@ const handleMakeChange = (value: string | number | null) => {
     form.model_id = null;
     form.engine_id = null;
     form.model_ids = [];
+    form.chassis_id = null;
 };
 
 const handleModelChange = (value: string | number | null) => {
@@ -218,6 +249,7 @@ const resetForm = () => {
         year_to: currentYear,
         generation: '',
         chassis_id: null,
+        new_chassis: false,
         engine_code: '',
         nickname: '',
         displacement: '',
@@ -238,8 +270,20 @@ const resetForm = () => {
         form.make_id = row.make_id;
         form.year_from = row.year_from;
         form.year_to = row.year_to;
-        form.generation = row.generation ?? '';
-        form.chassis_id = row.chassis?.[0]?.id ?? null;
+        // El chasis actual del modelo es su código (generation); se busca entre los chasis de la marca.
+        const code = (row.generation ?? '').toUpperCase();
+        const current =
+            row.chassis?.find(
+                (chassis) => chassis.code.toUpperCase() === code,
+            ) ??
+            props.chassis.find(
+                (chassis) =>
+                    chassis.code.toUpperCase() === code &&
+                    chassisBelongsToMake(chassis, row.make_id),
+            );
+        form.chassis_id = code ? (current?.id ?? null) : null;
+        form.new_chassis = Boolean(code) && !current;
+        form.generation = form.new_chassis ? code : '';
     } else if (props.tab === 'engines') {
         const row = props.row as VehicleEngineRow;
         form.make_id = row.make_id;
@@ -302,8 +346,11 @@ const submit = () => {
             name: form.name.trim(),
             year_from: Number(form.year_from),
             ...(form.year_to === null ? {} : { year_to: Number(form.year_to) }),
-            generation: form.generation.trim() || null,
-            chassis_id: form.chassis_id,
+            // Un solo dato: chasis existente (chassis_id) o código nuevo (generation).
+            generation: form.new_chassis
+                ? form.generation.trim().toUpperCase() || null
+                : null,
+            chassis_id: form.new_chassis ? null : form.chassis_id,
         });
         return;
     }
@@ -374,7 +421,8 @@ const submit = () => {
                             id="vehicle-model-name"
                             v-model="form.name"
                             required
-                            placeholder="Ej: Corolla"
+                            placeholder="Ej: COROLLA"
+                            class="uppercase"
                         />
                     </div>
                     <div class="grid gap-4 sm:grid-cols-2">
@@ -405,25 +453,42 @@ const submit = () => {
                             />
                         </div>
                     </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div class="space-y-2">
-                            <Label>Chasis configurado</Label>
-                            <SearchableSelect
-                                v-model="form.chassis_id"
-                                :options="chassisOptions"
-                                :clearable="true"
-                                placeholder="Sin chasis"
-                            />
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <Label for="vehicle-chassis-code">Chasis</Label>
+                            <button
+                                type="button"
+                                class="text-xs font-medium text-teal-700 hover:underline dark:text-teal-300"
+                                @click="toggleNewChassis"
+                            >
+                                {{
+                                    form.new_chassis
+                                        ? 'Elegir uno existente'
+                                        : '+ Nuevo código'
+                                }}
+                            </button>
                         </div>
-                        <div class="space-y-2">
-                            <Label for="vehicle-generation">Generación</Label>
-                            <Input
-                                id="vehicle-generation"
-                                v-model="form.generation"
-                                maxlength="20"
-                                placeholder="Ej: E170"
-                            />
-                        </div>
+                        <Input
+                            v-if="form.new_chassis"
+                            id="vehicle-chassis-code"
+                            v-model="form.generation"
+                            maxlength="20"
+                            placeholder="Código de chasis (ej: E110)"
+                            class="uppercase"
+                        />
+                        <SearchableSelect
+                            v-else
+                            v-model="form.chassis_id"
+                            :options="chassisOptions"
+                            :clearable="true"
+                            :disabled="!form.make_id"
+                            :placeholder="
+                                form.make_id
+                                    ? 'Sin chasis'
+                                    : 'Primero elige la marca'
+                            "
+                            aria-label="Chasis"
+                        />
                     </div>
                 </template>
 

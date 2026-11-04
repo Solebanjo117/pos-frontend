@@ -48,6 +48,7 @@ const currentYear = new Date().getFullYear();
 const makes = ref<MakeOption[]>([]);
 const models = ref<ModelOption[]>([]);
 const engines = ref<EngineOption[]>([]);
+const chassisList = ref<Array<{ id: number; code: string }>>([]);
 const saving = ref(false);
 const errorMessage = ref<string | null>(null);
 
@@ -59,6 +60,8 @@ const form = reactive({
     modelId: null as number | null,
     modelName: '',
     generation: '',
+    newChassis: false,
+    chassisId: null as number | null,
     yearFrom: currentYear as number | string,
     yearTo: currentYear as number | string,
     newEngine: false,
@@ -87,6 +90,8 @@ const reset = () => {
         modelId: null,
         modelName: '',
         generation: '',
+        newChassis: false,
+        chassisId: null,
         yearFrom: currentYear,
         yearTo: currentYear,
         newEngine: false,
@@ -101,6 +106,7 @@ const reset = () => {
     });
     models.value = [];
     engines.value = [];
+    chassisList.value = [];
     errorMessage.value = null;
 };
 
@@ -110,14 +116,29 @@ const loadMakes = async () => {
 };
 
 const loadMakeChildren = async (makeId: number) => {
-    const [modelsResponse, enginesResponse] = await Promise.all([
-        apiClient.get(`/vehicle-makes/${makeId}/models`),
-        apiClient.get('/vehicle-engines', {
-            params: { make_id: makeId, per_page: 500 },
-        }),
-    ]);
+    const [modelsResponse, enginesResponse, chassisResponse] =
+        await Promise.all([
+            apiClient.get(`/vehicle-makes/${makeId}/models`),
+            apiClient.get('/vehicle-engines', {
+                params: { make_id: makeId, per_page: 500 },
+            }),
+            apiClient.get('/vehicle-chassis', {
+                params: { make_id: makeId, per_page: 500 },
+            }),
+        ]);
     models.value = modelsResponse.data.data ?? [];
     engines.value = enginesResponse.data.data ?? [];
+    const seen = new Set<string>();
+    chassisList.value = (chassisResponse.data.data ?? [])
+        .filter((chassis: { code: string }) => {
+            const code = chassis.code.toUpperCase();
+            if (seen.has(code)) return false;
+            seen.add(code);
+            return true;
+        })
+        .sort((left: { code: string }, right: { code: string }) =>
+            left.code.localeCompare(right.code),
+        );
 };
 
 watch(
@@ -138,6 +159,7 @@ const onMakeChange = (value: string | number | null) => {
     form.engineId = null;
     models.value = [];
     engines.value = [];
+    chassisList.value = [];
     if (form.makeId) {
         loadMakeChildren(form.makeId).catch(() => {
             errorMessage.value = 'No se pudieron cargar modelos y motores.';
@@ -150,8 +172,11 @@ const setNewMake = (value: boolean) => {
     form.makeId = null;
     form.newModel = value || form.newModel;
     form.newEngine = value || form.newEngine;
+    form.newChassis = value || form.newChassis;
+    form.chassisId = null;
     models.value = [];
     engines.value = [];
+    chassisList.value = [];
 };
 
 const makeOptions = computed<SelectOption[]>(() =>
@@ -164,6 +189,13 @@ const modelOptions = computed<SelectOption[]>(() =>
         sublabel: `${model.year_from}-${model.year_to ?? 'Presente'}`,
     })),
 );
+const chassisOptions = computed<SelectOption[]>(() =>
+    chassisList.value.map((chassis) => ({
+        value: chassis.id,
+        label: chassis.code,
+    })),
+);
+
 const engineOptions = computed<SelectOption[]>(() =>
     engines.value.map((engine) => ({
         value: engine.id,
@@ -209,7 +241,11 @@ const submit = async () => {
             const { data } = await apiClient.post('/vehicle-models', {
                 make_id: makeId,
                 name: form.modelName.trim().toUpperCase(),
-                generation: form.generation.trim() || null,
+                // Un solo dato de chasis: uno existente o un código nuevo.
+                chassis_id: form.newChassis ? null : form.chassisId,
+                generation: form.newChassis
+                    ? form.generation.trim().toUpperCase() || null
+                    : null,
                 year_from: Number(form.yearFrom),
                 year_to: Number(form.yearTo),
             });
@@ -325,7 +361,7 @@ const selectClass =
                 <!-- Modelo -->
                 <section class="space-y-2">
                     <div class="flex items-center justify-between">
-                        <Label>Modelo y generación</Label>
+                        <Label>Modelo y chasis</Label>
                         <button
                             v-if="!form.newMake"
                             type="button"
@@ -343,14 +379,49 @@ const selectClass =
                         <Input
                             id="quick-vehicle-model"
                             v-model="form.modelName"
-                            class="sm:col-span-2"
+                            class="uppercase sm:col-span-2"
                             placeholder="Modelo (ej: COROLLA)"
                         />
-                        <Input
-                            id="quick-vehicle-generation"
-                            v-model="form.generation"
-                            placeholder="Generación (ej: E110)"
-                        />
+                        <div class="space-y-1">
+                            <Input
+                                v-if="form.newChassis"
+                                id="quick-vehicle-chassis-code"
+                                v-model="form.generation"
+                                maxlength="20"
+                                class="uppercase"
+                                placeholder="Código de chasis (ej: E110)"
+                            />
+                            <SearchableSelect
+                                v-else
+                                :model-value="form.chassisId"
+                                :options="chassisOptions"
+                                :clearable="true"
+                                placeholder="Chasis"
+                                aria-label="Chasis"
+                                @update:model-value="
+                                    (value) =>
+                                        (form.chassisId = value
+                                            ? Number(value)
+                                            : null)
+                                "
+                            />
+                            <button
+                                v-if="!form.newMake"
+                                type="button"
+                                :class="toggleClass"
+                                @click="
+                                    form.newChassis = !form.newChassis;
+                                    form.chassisId = null;
+                                    form.generation = '';
+                                "
+                            >
+                                {{
+                                    form.newChassis
+                                        ? 'Elegir uno existente'
+                                        : '+ Nuevo código'
+                                }}
+                            </button>
+                        </div>
                         <div class="flex items-center gap-1">
                             <Input
                                 id="quick-vehicle-year-from"

@@ -306,4 +306,70 @@ describe('VehicleCatalogDialog', () => {
         });
         expect(wrapper.emitted('save')?.[0]?.[0]).not.toHaveProperty('year_to');
     });
+
+    describe('chasis del modelo', () => {
+        const chassis = [
+            { id: 11, code: 'E110', model: { make: { id: 1 } } },
+            { id: 12, code: 'E120', models: [{ make: { id: 1 } }] },
+            { id: 13, code: 'RD1', model: { make: { id: 5 } } },
+        ];
+
+        it('lists only the chassis of the chosen make and sends the selected one', async () => {
+            const wrapper = mount(VehicleCatalogDialog, {
+                props: { ...baseProps, tab: 'models', chassis },
+                global: { stubs },
+            });
+            const [makeSelect, chassisSelect] = wrapper.findAll('select');
+
+            await makeSelect.setValue('1');
+            expect(
+                chassisSelect.findAll('option').map((option) => option.text()),
+            ).toEqual(['E110', 'E120']);
+
+            await wrapper.get('#vehicle-model-name').setValue('Corolla');
+            await chassisSelect.setValue('12');
+            await wrapper.get('form').trigger('submit');
+
+            expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+                make_id: 1,
+                chassis_id: 12,
+                generation: null,
+            });
+        });
+
+        it('creates a new chassis code in uppercase', async () => {
+            const wrapper = mount(VehicleCatalogDialog, {
+                props: { ...baseProps, tab: 'models', chassis },
+                global: { stubs },
+            });
+
+            await wrapper.findAll('select')[0].setValue('1');
+            await wrapper.get('#vehicle-model-name').setValue('Corolla');
+            await wrapper
+                .findAll('button')
+                .find((button) => button.text() === '+ Nuevo código')!
+                .trigger('click');
+            await wrapper.get('#vehicle-chassis-code').setValue(' e140 ');
+            await wrapper.get('form').trigger('submit');
+
+            expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+                chassis_id: null,
+                generation: 'E140',
+            });
+        });
+
+        it('shows the current chassis of the model when editing', async () => {
+            const row = { ...baseProps.models[0], generation: 'E120' };
+            const wrapper = mount(VehicleCatalogDialog, {
+                props: { ...baseProps, tab: 'models', row, chassis },
+                global: { stubs },
+            });
+            await nextTick();
+
+            expect(
+                (wrapper.findAll('select')[1].element as HTMLSelectElement)
+                    .value,
+            ).toBe('12');
+        });
+    });
 });

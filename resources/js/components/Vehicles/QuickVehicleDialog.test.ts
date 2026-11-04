@@ -60,8 +60,21 @@ const catalogGet = (pairedEngineIds: number[] = []) =>
                 },
             };
         }
+        if (url === '/vehicle-chassis') {
+            return {
+                data: {
+                    data: [
+                        { id: 50, code: 'E110' },
+                        { id: 51, code: 'E120' },
+                    ],
+                },
+            };
+        }
         if (url === '/vehicle-models/7/engines') {
             return { data: { data: pairedEngineIds.map((id) => ({ id })) } };
+        }
+        if (/^\/vehicle-models\/\d+\/engines$/.test(url)) {
+            return { data: { data: [] } };
         }
         throw new Error(`GET inesperado ${url}`);
     });
@@ -152,7 +165,7 @@ describe('QuickVehicleDialog', () => {
         await clickButton(wrapper, '+ Nueva marca');
         await wrapper.get('#quick-vehicle-make').setValue('mitsubishi');
         await wrapper.get('#quick-vehicle-model').setValue('montero');
-        await wrapper.get('#quick-vehicle-generation').setValue('V20');
+        await wrapper.get('#quick-vehicle-chassis-code').setValue('v20');
         await wrapper.get('#quick-vehicle-year-from').setValue('1991');
         await wrapper.get('#quick-vehicle-year-to').setValue('1999');
         await wrapper.get('#quick-vehicle-engine-code').setValue('6G72');
@@ -166,6 +179,10 @@ describe('QuickVehicleDialog', () => {
             '/vehicle-models',
             '/vehicle-engines',
         ]);
+        expect(mocks.post).toHaveBeenCalledWith(
+            '/vehicle-models',
+            expect.objectContaining({ chassis_id: null, generation: 'V20' }),
+        );
         expect(mocks.post).toHaveBeenCalledWith(
             '/vehicle-engines',
             expect.objectContaining({
@@ -207,5 +224,41 @@ describe('QuickVehicleDialog', () => {
             'No se pudo guardar la marca: Ya existe una marca con ese nombre.',
         );
         expect(wrapper.emitted('created')).toBeUndefined();
+    });
+
+    it('creates a new model on an existing chassis of the make', async () => {
+        catalogGet();
+        mocks.post.mockImplementation(async (url: string, body: any) => {
+            if (url === '/vehicle-models') {
+                return {
+                    data: { data: { id: 21, ...body, generation: 'E120' } },
+                };
+            }
+            return { data: { data: {} } };
+        });
+        const wrapper = mountDialog();
+        await flushPromises();
+
+        await wrapper.get('select[aria-label="Marca"]').setValue('1');
+        await flushPromises();
+        await clickButton(wrapper, '+ Nuevo modelo');
+        await wrapper.get('#quick-vehicle-model').setValue('sprinter');
+        await wrapper.get('select[aria-label="Chasis"]').setValue('51');
+        await wrapper.get('select[aria-label="Motor"]').setValue('9');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(mocks.post).toHaveBeenCalledWith(
+            '/vehicle-models',
+            expect.objectContaining({
+                name: 'SPRINTER',
+                chassis_id: 51,
+                generation: null,
+            }),
+        );
+        expect(wrapper.emitted('created')?.[0]?.[0]).toMatchObject({
+            model_id: 21,
+            generation: 'E120',
+        });
     });
 });

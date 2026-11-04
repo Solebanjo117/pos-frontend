@@ -46,36 +46,77 @@ const instanceUid = getCurrentInstance()?.uid ?? 0
 const dropdownId = `searchable-select-listbox-${instanceUid}`
 const searchInputId = `searchable-select-search-${instanceUid}`
 
-// Detect if this component is inside a Radix Dialog (focus trap)
-const insideDialog = ref(false)
+// Dentro de un diálogo (trampa de foco de reka-ui) la lista se lleva al propio diálogo, no al body,
+// para que el buscador reciba el foco. En ambos casos la lista FLOTA: no empuja el contenido ni
+// provoca el scroll del modal.
+const dialogEl = ref<HTMLElement | null>(null)
+const insideDialog = computed(() => dialogEl.value !== null)
 onMounted(() => {
-    insideDialog.value = !!containerRef.value?.closest('[role="dialog"]')
+    dialogEl.value = containerRef.value?.closest<HTMLElement>('[role="dialog"]') ?? null
 })
+const teleportTarget = computed<HTMLElement | string>(() => dialogEl.value ?? 'body')
 
-const { bottom, left, width, update: updateBounds } = useElementBounding(containerRef)
+const { top, bottom, left, width, update: updateBounds } = useElementBounding(containerRef)
 
 // La lista nunca es más angosta que 224 px, aunque el botón sí lo sea (p. ej. "Marca" junto a un botón "+").
 const MIN_DROPDOWN_WIDTH = 224
 const dropdownWidth = computed(() => `${Math.max(width.value, MIN_DROPDOWN_WIDTH)}px`)
 
+// Alto de referencia (buscador + lista) para decidir hacia dónde abrir antes de medir.
+const ESTIMATED_DROPDOWN_HEIGHT = 280
+const GAP = 4
+const VIEWPORT_MARGIN = 8
+const dropdownHeight = ref(ESTIMATED_DROPDOWN_HEIGHT)
+const viewportHeight = ref(typeof window === 'undefined' ? 800 : window.innerHeight)
+
+const spaceBelow = computed(() => viewportHeight.value - bottom.value - GAP - VIEWPORT_MARGIN)
+const spaceAbove = computed(() => top.value - GAP - VIEWPORT_MARGIN)
+// Se abre hacia arriba solo si abajo no cabe y arriba hay más espacio.
+const opensUpward = computed(
+    () => spaceBelow.value < dropdownHeight.value && spaceAbove.value > spaceBelow.value,
+)
+// Si no cabe completa en ningún lado, la lista se acorta (el buscador mide ~52 px).
+const listMaxHeight = computed(() => {
+    const available = (opensUpward.value ? spaceAbove.value : spaceBelow.value) - 52
+    return `${Math.max(96, Math.min(224, available))}px`
+})
+
 const dropdownStyle = computed(() => {
-    if (insideDialog.value) {
-        // When inside a dialog, don't teleport — use absolute positioning
-        return { width: dropdownWidth.value }
+    const height = Math.min(dropdownHeight.value, opensUpward.value ? spaceAbove.value : spaceBelow.value)
+    // Coordenadas en pantalla del borde superior de la lista.
+    const viewportTop = opensUpward.value ? top.value - GAP - height : bottom.value + GAP
+
+    if (dialogEl.value) {
+        // El diálogo tiene transform, así que es el bloque contenedor: coordenadas relativas a él.
+        const rect = dialogEl.value.getBoundingClientRect()
+        return {
+            top: `${viewportTop - rect.top + dialogEl.value.scrollTop}px`,
+            left: `${left.value - rect.left + dialogEl.value.scrollLeft}px`,
+            width: dropdownWidth.value,
+        }
     }
+
     return {
-        top: `${bottom.value + 4}px`,
+        top: `${viewportTop}px`,
         left: `${left.value}px`,
         width: dropdownWidth.value,
     }
 })
 
+const refreshPosition = () => {
+    updateBounds()
+    viewportHeight.value = window.innerHeight
+    nextTick(() => {
+        if (dropdownRef.value) dropdownHeight.value = dropdownRef.value.offsetHeight || ESTIMATED_DROPDOWN_HEIGHT
+    })
+}
+
 useEventListener('scroll', () => {
-    if (isOpen.value) updateBounds()
+    if (isOpen.value) refreshPosition()
 }, { capture: true, passive: true })
 
 useEventListener('resize', () => {
-    if (isOpen.value) updateBounds()
+    if (isOpen.value) refreshPosition()
 }, { passive: true })
 
 const selectedLabel = computed(() => {
@@ -118,7 +159,8 @@ const open = () => {
     isOpen.value = true
     searchQuery.value = ''
     highlightedIndex.value = -1
-    updateBounds()
+    dropdownHeight.value = ESTIMATED_DROPDOWN_HEIGHT
+    refreshPosition()
     nextTick(() => inputRef.value?.focus())
 }
 
@@ -221,7 +263,7 @@ watch(searchQuery, (value) => {
         </svg>
 
         <!-- Dropdown -->
-        <Teleport to="body" :disabled="insideDialog">
+        <Teleport :to="teleportTarget">
             <Transition
                 enter-active-class="transition duration-100 ease-out"
                 enter-from-class="opacity-0 scale-95"
@@ -238,8 +280,9 @@ watch(searchQuery, (value) => {
                     :style="dropdownStyle"
                     @pointerdown.stop
                     @mousedown.stop
+                    :data-placement="opensUpward ? 'top' : 'bottom'"
                     :class="insideDialog
-                        ? 'absolute left-0 top-full mt-1 z-[9999] rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden'
+                        ? 'absolute z-[9999] pointer-events-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden'
                         : 'fixed z-[9999] pointer-events-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden'
                     "
                 >
@@ -265,7 +308,7 @@ watch(searchQuery, (value) => {
                 </div>
 
                 <!-- Options list -->
-                <ul ref="listRef" class="max-h-56 overflow-x-hidden overflow-y-auto py-1">
+                <ul ref="listRef" class="overflow-x-hidden overflow-y-auto py-1" :style="{ maxHeight: listMaxHeight }">
                     <li
                         v-for="(opt, idx) in filteredOptions"
                         :key="String(opt.value)"

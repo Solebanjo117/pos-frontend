@@ -55,10 +55,11 @@ const onOpenChange = (value: boolean) => {
 
 <template>
     <Dialog :open="open" @update:open="onOpenChange">
+        <!-- Sin overflow-hidden: las listas desplegables flotan por encima y pueden salir del cuadro. -->
         <DialogContent
             :show-close-button="false"
             :class="[
-                'flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden p-0',
+                'flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-0 p-0',
                 sizeClass,
             ]"
         >

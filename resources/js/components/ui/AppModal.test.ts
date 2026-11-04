@@ -32,7 +32,8 @@ describe('AppModal', () => {
 
         const body = dialog().querySelector('[data-test="body"]')!.parentElement!;
         expect(body.className).toContain('overflow-y-auto');
-        expect(dialog().className).toContain('overflow-hidden');
+        // El cuadro no recorta: las listas desplegables pueden flotar por fuera.
+        expect(dialog().className).not.toContain('overflow-hidden');
         expect(dialog().querySelector('footer [data-test="save"]')).not.toBeNull();
         wrapper.unmount();
     });

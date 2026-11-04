@@ -884,7 +884,6 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                 <option value="discontinued">
                                     Discontinuado
                                 </option>
-                                <option value="pending">Pendiente</option>
                             </select>
                         </div>
 

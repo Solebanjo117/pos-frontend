@@ -190,7 +190,7 @@ export interface Product {
     name: string;
     description?: string;
     image_url?: string | null;
-    status: 'active' | 'discontinued' | 'pending';
+    status: 'active' | 'discontinued';
     batch_tracking: boolean;
     is_universal?: boolean;
     category_id?: number;
@@ -439,7 +439,7 @@ export interface CreateProductRequest {
     category_id?: number | null;
     extra_category_ids?: number[];
     engine_id?: number; // R21: motor as reusable entity
-    status?: 'active' | 'discontinued' | 'pending';
+    status?: 'active' | 'discontinued';
     batch_tracking?: boolean;
     alternate_code?: string; // alternate identifier
     pricing_formula?: string; // Excel-like pricing formula
@@ -490,7 +490,7 @@ export interface UpdateProductRequest {
     engine_id?: number; // R21: motor as reusable entity
     name?: string;
     description?: string;
-    status?: 'active' | 'discontinued' | 'pending';
+    status?: 'active' | 'discontinued';
     batch_tracking?: boolean;
     is_universal?: boolean;
     pricing?: {
@@ -527,7 +527,7 @@ export interface UpdateProductRequest {
 }
 
 export interface ProductFilters {
-    status?: 'active' | 'discontinued' | 'pending';
+    status?: 'active' | 'discontinued';
     brand_id?: number | number[];
     category_id?: number | number[];
     product_line_id?: number;

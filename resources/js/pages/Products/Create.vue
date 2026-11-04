@@ -1123,8 +1123,7 @@ const workbenchSections = [
 
 const statusLabels: Record<string, string> = {
     active: 'Activo',
-    pending: 'Pendiente',
-    discontinued: 'Descontinuado',
+    discontinued: 'Discontinuado',
 };
 
 const primaryCategoryName = computed(() => {
@@ -1216,7 +1215,7 @@ const readinessItems = computed(() => [
                         <span
                             class="rounded-md bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
                         >
-                            {{ statusLabels[form.status ?? 'pending'] }}
+                            {{ statusLabels[form.status ?? 'active'] }}
                         </span>
                     </div>
                     <h1
@@ -1490,7 +1489,6 @@ const readinessItems = computed(() => [
                                     class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                                 >
                                     <option value="active">Activo</option>
-                                    <option value="pending">Pendiente</option>
                                     <option value="discontinued">
                                         Descontinuado
                                     </option>

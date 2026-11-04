@@ -1418,7 +1418,6 @@ onMounted(async () => {
                                     <option value="discontinued">
                                         Discontinuado
                                     </option>
-                                    <option value="pending">Pendiente</option>
                                 </select>
                             </div>
 

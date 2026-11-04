@@ -495,7 +495,6 @@ const handleSubmit = async () => {
                         >
                             <option value="active">Activo</option>
                             <option value="discontinued">Discontinuado</option>
-                            <option value="pending">Pendiente</option>
                         </select>
                     </div>
                 </div>

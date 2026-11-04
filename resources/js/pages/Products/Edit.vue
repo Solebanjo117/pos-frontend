@@ -812,8 +812,7 @@ const workbenchSections = [
 
 const statusLabels: Record<string, string> = {
     active: 'Activo',
-    pending: 'Pendiente',
-    discontinued: 'Descontinuado',
+    discontinued: 'Discontinuado',
 };
 
 const editCategoryName = computed(() => {
@@ -949,7 +948,7 @@ const validationErrorItems = computed(() =>
                                     : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
                             "
                         >
-                            {{ statusLabels[form.status ?? 'pending'] }}
+                            {{ statusLabels[form.status ?? 'active'] }}
                         </span>
                     </div>
                     <h1
@@ -1280,9 +1279,6 @@ const validationErrorItems = computed(() =>
                                             </option>
                                             <option value="discontinued">
                                                 Discontinuado
-                                            </option>
-                                            <option value="pending">
-                                                Pendiente
                                             </option>
                                         </select>
                                     </div>

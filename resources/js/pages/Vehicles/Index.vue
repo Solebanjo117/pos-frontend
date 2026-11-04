@@ -869,7 +869,7 @@ onBeforeUnmount(() => {
                                             <span
                                                 v-else
                                                 class="text-muted-foreground"
-                                                >Sin VIN</span
+                                                >No posee VIN registrado</span
                                             >
                                         </td>
                                     </template>
@@ -1040,7 +1040,7 @@ onBeforeUnmount(() => {
                                             .length === 0
                                     "
                                     class="text-sm text-muted-foreground"
-                                    >Sin VIN</span
+                                    >No posee VIN registrado</span
                                 >
                             </div>
                             <div

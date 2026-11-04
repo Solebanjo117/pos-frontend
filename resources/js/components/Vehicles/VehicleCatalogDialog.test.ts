@@ -190,6 +190,49 @@ describe('VehicleCatalogDialog', () => {
         });
     });
 
+    it('sends the full engine sheet with valves cam type cylinders and nickname', async () => {
+        const wrapper = mount(VehicleCatalogDialog, {
+            props: { ...baseProps, tab: 'engines' },
+            global: { stubs },
+        });
+
+        await wrapper.findAll('select')[0].setValue('1');
+        await wrapper.get('#vehicle-engine-code').setValue('2L');
+        await wrapper.get('#vehicle-engine-nickname').setValue(' buzo ');
+        await wrapper.get('#vehicle-engine-displacement').setValue('2.4L');
+        await wrapper.get('#vehicle-engine-valves').setValue('8V');
+        await wrapper.get('#vehicle-engine-cam').setValue('SOHC');
+        await wrapper.get('#vehicle-engine-cylinders').setValue('4');
+        await wrapper.get('form').trigger('submit');
+
+        expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+            engine_code: '2L',
+            nickname: 'buzo',
+            displacement: '2.4L',
+            valves: '8V',
+            cam_type: 'SOHC',
+            cylinders: 4,
+        });
+    });
+
+    it('sends empty engine sheet fields as null', async () => {
+        const wrapper = mount(VehicleCatalogDialog, {
+            props: { ...baseProps, tab: 'engines' },
+            global: { stubs },
+        });
+
+        await wrapper.findAll('select')[0].setValue('1');
+        await wrapper.get('#vehicle-engine-code').setValue('1NZFE');
+        await wrapper.get('form').trigger('submit');
+
+        expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+            nickname: null,
+            valves: null,
+            cam_type: null,
+            cylinders: null,
+        });
+    });
+
     it('locks the pair and linked VIN while preserving its data', async () => {
         const wrapper = mount(VehicleCatalogDialog, {
             props: {

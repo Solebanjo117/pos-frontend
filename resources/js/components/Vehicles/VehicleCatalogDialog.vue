@@ -23,6 +23,7 @@ import type {
     VehicleMakeRow,
     VehicleModelRow,
 } from '@/composables/useVehicleCatalog';
+import { engineSheet } from '@/composables/useVehicleCatalog';
 
 interface ChassisOption {
     id: number;
@@ -59,7 +60,11 @@ const form = reactive({
     generation: '',
     chassis_id: null as number | null,
     engine_code: '',
+    nickname: '',
     displacement: '',
+    valves: '',
+    cam_type: '',
+    cylinders: '' as string | number,
     fuel_type: 'Gasoline',
     aspiration: '',
     vins: [] as Array<{
@@ -117,10 +122,12 @@ const engineOptions = computed<SelectOption[]>(() => {
         .filter((engine) => !makeId || engine.make_id === Number(makeId))
         .map((engine) => ({
             value: engine.id,
-            label: engine.engine_code,
+            label: engine.nickname
+                ? `${engine.engine_code} (${engine.nickname})`
+                : engine.engine_code,
             sublabel: [
                 engine.make?.name,
-                engine.displacement,
+                engineSheet(engine),
                 engine.fuel_type,
                 engine.aspiration,
             ]
@@ -212,7 +219,11 @@ const resetForm = () => {
         generation: '',
         chassis_id: null,
         engine_code: '',
+        nickname: '',
         displacement: '',
+        valves: '',
+        cam_type: '',
+        cylinders: '',
         fuel_type: 'Gasoline',
         aspiration: '',
         vins: [],
@@ -235,7 +246,11 @@ const resetForm = () => {
         form.model_ids =
             row.model_ids ?? row.models?.map((model) => model.id) ?? [];
         form.engine_code = row.engine_code;
+        form.nickname = row.nickname ?? '';
         form.displacement = row.displacement ?? '';
+        form.valves = row.valves ?? '';
+        form.cam_type = row.cam_type ?? '';
+        form.cylinders = row.cylinders ?? '';
         form.fuel_type = row.fuel_type ?? 'Gasoline';
         form.aspiration = row.aspiration ?? '';
     } else {
@@ -297,7 +312,14 @@ const submit = () => {
             make_id: form.make_id,
             model_ids: form.model_ids,
             engine_code: form.engine_code.trim(),
+            nickname: form.nickname.trim() || null,
             displacement: form.displacement.trim() || null,
+            valves: form.valves.trim() || null,
+            cam_type: form.cam_type || null,
+            cylinders:
+                String(form.cylinders).trim() === ''
+                    ? null
+                    : Number(form.cylinders),
             fuel_type: form.fuel_type,
             aspiration: form.aspiration.trim() || null,
         });
@@ -426,13 +448,61 @@ const submit = () => {
                             />
                         </div>
                         <div class="space-y-2">
+                            <Label for="vehicle-engine-nickname"
+                                >Apodo (opcional)</Label
+                            >
+                            <Input
+                                id="vehicle-engine-nickname"
+                                v-model="form.nickname"
+                                placeholder="Ej: CABALLITO"
+                            />
+                        </div>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-4">
+                        <div class="space-y-2">
                             <Label for="vehicle-engine-displacement"
-                                >Desplazamiento</Label
+                                >Cilindrada</Label
                             >
                             <Input
                                 id="vehicle-engine-displacement"
                                 v-model="form.displacement"
                                 placeholder="Ej: 1.8L"
+                            />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="vehicle-engine-valves">Válvulas</Label>
+                            <Input
+                                id="vehicle-engine-valves"
+                                v-model="form.valves"
+                                placeholder="Ej: 16V"
+                            />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="vehicle-engine-cam"
+                                >Árbol de levas</Label
+                            >
+                            <select
+                                id="vehicle-engine-cam"
+                                v-model="form.cam_type"
+                                class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                            >
+                                <option value="">—</option>
+                                <option value="SOHC">SOHC</option>
+                                <option value="DOHC">DOHC</option>
+                                <option value="OHV">OHV</option>
+                            </select>
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="vehicle-engine-cylinders"
+                                >Cilindros</Label
+                            >
+                            <Input
+                                id="vehicle-engine-cylinders"
+                                v-model="form.cylinders"
+                                type="number"
+                                min="1"
+                                max="16"
+                                placeholder="Ej: 4"
                             />
                         </div>
                     </div>

@@ -357,7 +357,7 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                             <input
                                 v-model="search"
                                 type="search"
-                                placeholder="Buscar por marca, modelo, chasis, motor o año (ej: 1ZZ, corolla e110, 2005)"
+                                placeholder="Buscar por marca, modelo, chasis, motor, año o VIN (ej: 1ZZ, corolla e110, 2005)"
                                 class="h-10 w-full rounded-lg border border-gray-300 bg-white pr-3 pl-9 text-sm dark:border-border dark:bg-background"
                                 aria-label="Buscar vehículos"
                             />
@@ -414,6 +414,7 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                                         Marca / Modelo / Años
                                     </th>
                                     <th class="px-3 py-2">Motor</th>
+                                    <th class="px-3 py-2">VIN registrados</th>
                                 </tr>
                             </thead>
                             <tbody
@@ -468,10 +469,28 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                                             >{{ rowSheet(row) }}</span
                                         >
                                     </td>
+                                    <td class="px-3 py-2">
+                                        <div
+                                            v-if="row.vins.length"
+                                            class="flex flex-wrap gap-1"
+                                        >
+                                            <span
+                                                v-for="vin in row.vins"
+                                                :key="vin.id ?? vin.vin"
+                                                class="rounded border border-gray-200 px-1.5 py-0.5 font-mono text-xs text-gray-700 dark:border-border dark:text-gray-300"
+                                                >{{ vin.vin }}</span
+                                            >
+                                        </div>
+                                        <span
+                                            v-else
+                                            class="text-xs text-gray-400 italic dark:text-gray-500"
+                                            >No posee VIN registrado</span
+                                        >
+                                    </td>
                                 </tr>
                                 <tr v-if="!loading && results.length === 0">
                                     <td
-                                        colspan="3"
+                                        colspan="4"
                                         class="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
                                     >
                                         No hay vehículos que coincidan.

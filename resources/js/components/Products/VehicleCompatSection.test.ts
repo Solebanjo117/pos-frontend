@@ -260,4 +260,31 @@ describe('VehicleCompatSection', () => {
         await link.trigger('click');
         expect(mocks.visit).toHaveBeenCalledWith('/vehicles?tab=vehicles');
     });
+
+    it('shows the registered VINs of each vehicle or that it has none', async () => {
+        mocks.get.mockResolvedValueOnce({
+            data: {
+                data: [
+                    {
+                        ...row(7, 'COROLLA', 'E120'),
+                        vins: [{ id: 1, vin: 'JTDBR32E720123456' }],
+                        vins_count: 1,
+                    },
+                    row(8, 'RAV4', 'A20'),
+                ],
+                meta: { total: 2 },
+            },
+        });
+        const wrapper = mountSection({
+            vehicles: [],
+            legacy: [],
+            isUniversal: false,
+        });
+        await flushPromises();
+
+        expect(wrapper.find('thead').text()).toContain('VIN registrados');
+        const [withVin, withoutVin] = wrapper.findAll('tbody tr');
+        expect(withVin.text()).toContain('JTDBR32E720123456');
+        expect(withoutVin.text()).toContain('No posee VIN registrado');
+    });
 });

@@ -106,13 +106,6 @@ const productCodesModel = computed({
     set: (codes) => (form.value.codes = codes),
 });
 
-const computed_total = computed(() => {
-    const p = form.value.pricing;
-    const base = Number(p.base_price) || 0;
-    const rate = Number((p as any).sale_tax_rate ?? p.tax_rate) || 0;
-    return Number((base * (1 + rate / 100)).toFixed(2));
-});
-
 const validationErrors = ref<Record<string, string[]>>({});
 const successMessage = ref('');
 const categories = ref<Category[]>([]);
@@ -997,52 +990,12 @@ const statusLabels: Record<string, string> = {
     discontinued: 'Discontinuado',
 };
 
-const primaryCategoryName = computed(() => {
-    return categoryNameById((form.value as any).category_id) || 'Sin categoria';
-});
-
 const initialStockTotal = computed(() =>
     (form.value.initial_inventory ?? []).reduce(
         (total, item) => total + (Number(item.stock_available) || 0),
         0,
     ),
 );
-
-const summaryMetrics = computed(() => [
-    {
-        label: 'Categoria',
-        value: primaryCategoryName.value,
-        tone: 'indigo',
-    },
-    {
-        label: 'Codigo',
-        value: primaryCommercialCode.value || 'Sin código',
-        tone: primaryCommercialCode.value ? 'gray' : 'amber',
-    },
-    {
-        label: 'Variantes',
-        value:
-            pendingVariants.value.length > 0
-                ? `${pendingVariants.value.length} adicionales`
-                : 'Base',
-        tone: 'gray',
-    },
-    {
-        label: 'Stock inicial',
-        value: initialStockTotal.value.toLocaleString('es-MX'),
-        tone: initialStockTotal.value > 0 ? 'emerald' : 'amber',
-    },
-    {
-        label: 'Costo',
-        value: `$${Number(form.value.pricing.cost || 0).toFixed(2)}`,
-        tone: 'gray',
-    },
-    {
-        label: 'Precio',
-        value: `$${Number(computed_total.value || 0).toFixed(2)}`,
-        tone: 'emerald',
-    },
-]);
 
 const readinessItems = computed(() => [
     {
@@ -1116,36 +1069,6 @@ const readinessItems = computed(() => [
                     >
                         {{ loading ? 'Creando...' : 'Crear Producto' }}
                     </button>
-                </div>
-            </div>
-
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                <div
-                    v-for="metric in summaryMetrics"
-                    :key="metric.label"
-                    class="rounded-lg border bg-white p-3 shadow-sm dark:border-border dark:bg-card"
-                    :class="{
-                        'border-amber-200 dark:border-amber-900/60':
-                            metric.tone === 'amber',
-                        'border-emerald-200 dark:border-emerald-900/60':
-                            metric.tone === 'emerald',
-                        'border-indigo-200 dark:border-indigo-900/60':
-                            metric.tone === 'indigo',
-                        'border-gray-200': metric.tone === 'gray',
-                    }"
-                >
-                    <p
-                        class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                    >
-                        {{ metric.label }}
-                    </p>
-                    <p
-                        class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white"
-                        :class="{ 'font-mono': metric.label === 'Codigo' }"
-                        :title="metric.value"
-                    >
-                        {{ metric.value }}
-                    </p>
                 </div>
             </div>
 

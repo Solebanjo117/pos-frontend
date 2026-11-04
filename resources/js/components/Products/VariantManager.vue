@@ -1340,12 +1340,12 @@ const formId = useId();
                             v-if="editingVariant"
                             class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-muted dark:text-gray-300"
                         >
-                            {{ currentWarehouseName || 'Almacen actual' }}
+                            {{ currentWarehouseName || 'Almacén actual' }}
                         </span>
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
-                        <div class="md:col-span-5">
+                        <div class="md:col-span-4">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >Producto</label
@@ -1354,7 +1354,7 @@ const formId = useId();
                                 :value="productName || 'Producto Base'"
                                 type="text"
                                 readonly
-                                class="block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                                class="h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
                             />
                         </div>
 
@@ -1363,8 +1363,9 @@ const formId = useId();
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >Marca</label
                             >
-                            <div class="flex gap-1">
+                            <div class="flex gap-2">
                                 <SearchableSelect
+                                    class="min-w-0 flex-1"
                                     :options="brandOptions"
                                     :model-value="form.brand_id"
                                     @update:model-value="
@@ -1376,8 +1377,9 @@ const formId = useId();
                                 <button
                                     type="button"
                                     @click="openBrandModal"
-                                    class="flex-shrink-0 rounded-md border border-gray-300 bg-white p-2 text-gray-500 transition hover:border-blue-400 hover:text-blue-600 dark:border-border dark:bg-muted dark:hover:text-blue-400"
+                                    class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-input text-muted-foreground transition hover:border-ring hover:text-foreground dark:bg-input/30"
                                     title="Crear nueva marca"
+                                    aria-label="Crear nueva marca"
                                 >
                                     <svg
                                         class="h-4 w-4"
@@ -1396,14 +1398,14 @@ const formId = useId();
                             </div>
                         </div>
 
-                        <div class="md:col-span-3">
+                        <div class="md:col-span-4">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >Estado</label
                             >
                             <select
                                 v-model="form.status"
-                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                             >
                                 <option value="active">Activo</option>
                                 <option value="discontinued">
@@ -1426,7 +1428,7 @@ const formId = useId();
                                 "
                                 type="number"
                                 readonly
-                                class="block w-full rounded-md border-gray-200 bg-gray-100 text-right shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                                class="h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 text-right text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
                             />
                         </div>
                     </div>
@@ -1472,13 +1474,13 @@ const formId = useId();
                         <div class="md:col-span-7">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >Almacen</label
+                                >Almacén</label
                             >
                             <select
                                 v-model.number="
                                     form.initial_inventory[0].warehouse_id
                                 "
-                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                             >
                                 <option
                                     v-for="warehouse in warehouses"
@@ -1502,7 +1504,7 @@ const formId = useId();
                                 type="number"
                                 step="1"
                                 min="0"
-                                class="block w-full rounded-md border-gray-300 text-right shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-right text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                             />
                         </div>
                     </div>
@@ -1550,7 +1552,7 @@ const formId = useId();
                                                 ? `Al cambiar el costo total, se recalculará precio usando: ${props.categoryFormula}`
                                                 : 'Costo base antes de impuestos y extras'
                                         "
-                                        class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                        class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                                     />
                                 </div>
                             </div>
@@ -1567,14 +1569,14 @@ const formId = useId();
                                     min="0"
                                     max="100"
                                     @input="markHeaderSyncDirty"
-                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                                 />
                             </div>
 
                             <div class="md:col-span-3">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Miscelaneos total</label
+                                    >Misceláneos total</label
                                 >
                                 <div class="relative mt-1">
                                     <span
@@ -1589,7 +1591,7 @@ const formId = useId();
                                         step="0.01"
                                         min="0"
                                         @input="markHeaderSyncDirty"
-                                        class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                        class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                                     />
                                 </div>
                             </div>
@@ -1608,7 +1610,7 @@ const formId = useId();
                                         :value="getFormCostTotal().toFixed(2)"
                                         type="text"
                                         readonly
-                                        class="block w-full rounded-md border-gray-200 bg-gray-100 pl-7 dark:border-border dark:bg-muted/30 dark:text-white"
+                                        class="h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 pl-7 text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
                                     />
                                 </div>
                             </div>
@@ -1628,7 +1630,7 @@ const formId = useId();
                                     step="1"
                                     min="0"
                                     max="100"
-                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                                 />
                             </div>
 

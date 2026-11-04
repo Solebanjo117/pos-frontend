@@ -491,7 +491,7 @@ const handleSubmit = async () => {
                         >
                         <select
                             v-model="form.status"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                            class="mt-1 h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                         >
                             <option value="active">Activo</option>
                             <option value="discontinued">Discontinuado</option>
@@ -537,7 +537,7 @@ const handleSubmit = async () => {
                                     :value="productName || 'Producto Base'"
                                     type="text"
                                     readonly
-                                    class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100 shadow-sm dark:border-border dark:bg-muted/30 dark:text-white"
+                                    class="mt-1 h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
                                 />
                             </div>
 
@@ -556,7 +556,7 @@ const handleSubmit = async () => {
                                         type="number"
                                         step="0.01"
                                         min="0"
-                                        class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                        class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                                     />
                                 </div>
                             </div>
@@ -572,7 +572,7 @@ const handleSubmit = async () => {
                                     step="1"
                                     min="0"
                                     max="100"
-                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                                 />
                             </div>
 
@@ -593,7 +593,7 @@ const handleSubmit = async () => {
                                         type="number"
                                         step="0.01"
                                         min="0"
-                                        class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                        class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                                     />
                                 </div>
                             </div>
@@ -612,7 +612,7 @@ const handleSubmit = async () => {
                                         :value="getFormCostTotal().toFixed(2)"
                                         type="text"
                                         readonly
-                                        class="block w-full rounded-md border-gray-200 bg-gray-100 pl-7 dark:border-border dark:bg-muted/30 dark:text-white"
+                                        class="h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 pl-7 text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
                                     />
                                 </div>
                             </div>
@@ -632,7 +632,7 @@ const handleSubmit = async () => {
                                     step="1"
                                     min="0"
                                     max="100"
-                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                                 />
                             </div>
 

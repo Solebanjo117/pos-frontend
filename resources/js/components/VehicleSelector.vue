@@ -392,7 +392,7 @@ const emitChange = () => {
                     v-model="selectedMakeId"
                     :disabled="loadingMakes"
                     @change="onMakeChange"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 sm:text-sm dark:border-border dark:bg-muted dark:text-white"
+                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                 >
                     <option value="">
                         {{ loadingMakes ? 'Cargando...' : 'Selecciona Marca' }}
@@ -417,7 +417,7 @@ const emitChange = () => {
                     v-model="selectedModelId"
                     :disabled="!selectedMakeId || loadingModels"
                     @change="onModelChange"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 sm:text-sm dark:border-border dark:bg-muted dark:text-white"
+                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                 >
                     <option value="">
                         {{
@@ -449,7 +449,7 @@ const emitChange = () => {
                     v-model="selectedYear"
                     :disabled="!selectedModelId"
                     @change="emitChange"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 sm:text-sm dark:border-border dark:bg-muted dark:text-white"
+                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                 >
                     <option value="">Selecciona Año</option>
                     <option
@@ -472,7 +472,7 @@ const emitChange = () => {
                     v-model="selectedEngineId"
                     :disabled="!selectedModelId || loadingEngines"
                     @change="emitChange"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 sm:text-sm dark:border-border dark:bg-muted dark:text-white"
+                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
                 >
                     <option value="">Selecciona Motor</option>
                     <option

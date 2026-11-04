@@ -509,14 +509,10 @@ const initializeProductDraft = async () => {
     metadataInitialized.value = true;
 };
 
-onMounted(async () => {
-    const params = new URLSearchParams(window.location.search);
-    const variantParam = Number(params.get('variant'));
-    initialEditVariantId.value =
-        Number.isInteger(variantParam) && variantParam > 0
-            ? variantParam
-            : null;
+// Hasta terminar la primera carga se muestra "Cargando producto…" (nunca el formulario vacío).
+const initialLoading = ref(true);
 
+const loadCategories = async () => {
     loadingCategories.value = true;
     try {
         const response = await apiClient.get('/categories');
@@ -529,9 +525,25 @@ onMounted(async () => {
     } finally {
         loadingCategories.value = false;
     }
+};
 
-    await fetchProduct(props.productId);
-    await initializeProductDraft();
+onMounted(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const variantParam = Number(params.get('variant'));
+    initialEditVariantId.value =
+        Number.isInteger(variantParam) && variantParam > 0
+            ? variantParam
+            : null;
+
+    try {
+        // Categorías y producto a la vez; el borrador necesita ambos.
+        await Promise.all([loadCategories(), fetchProduct(props.productId)]);
+        await initializeProductDraft();
+    } catch {
+        /* el error de carga se muestra en la página */
+    } finally {
+        initialLoading.value = false;
+    }
 });
 
 watch(selectedCategoryId, async (newCategoryId) => {
@@ -938,7 +950,10 @@ const validationErrorItems = computed(() =>
             </div>
 
             <!-- Loading -->
-            <div v-if="loading && !currentProduct" class="py-12 text-center">
+            <div
+                v-if="initialLoading || (loading && !currentProduct)"
+                class="py-12 text-center"
+            >
                 <div
                     class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
                 ></div>

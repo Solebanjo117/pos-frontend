@@ -415,9 +415,12 @@ const toggleRow = (productId: number) => {
 };
 
 // Fetch products on mount — read any URL query params for deep linking
+// Hasta terminar la primera carga se muestra "Cargando productos…" (nunca "No hay productos").
+// Las recargas posteriores mantienen la tabla visible y solo la atenúan.
+const hasLoadedOnce = ref(false);
+
 onMounted(async () => {
     await initWarehouse();
-    await Promise.all([fetchCategories(), fetchBrandsList()]);
     loadColumnWidths();
     const params = new URLSearchParams(window.location.search);
     if (params.has('search')) filters.value.search = params.get('search') ?? '';
@@ -432,7 +435,15 @@ onMounted(async () => {
     if (params.has('oem_code'))
         filters.value.oem_code = params.get('oem_code') ?? undefined;
     filters.value.warehouse_id = currentWarehouseId.value || undefined;
-    await fetchProducts(buildFetchFilters());
+    try {
+        await Promise.all([
+            fetchCategories(),
+            fetchBrandsList(),
+            fetchProducts(buildFetchFilters()),
+        ]);
+    } finally {
+        hasLoadedOnce.value = true;
+    }
 });
 
 onUnmounted(() => {
@@ -442,6 +453,7 @@ onUnmounted(() => {
 
 // Watch warehouse changes
 watch(currentWarehouseId, (newId) => {
+    if (!hasLoadedOnce.value) return;
     if (filters.value.warehouse_id !== newId) {
         filters.value.warehouse_id = newId || undefined;
         fetchProducts(buildFetchFilters());
@@ -953,8 +965,8 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     </div>
                 </div>
 
-                <!-- Loading State -->
-                <div v-if="loading" class="py-12 text-center">
+                <!-- Loading State (solo primera carga) -->
+                <div v-if="!hasLoadedOnce" class="py-12 text-center">
                     <div
                         class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
                     ></div>
@@ -1014,10 +1026,22 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     <!-- Products Table -->
                     <div
                         ref="tableContainerRef"
-                        class="min-w-0 flex-1 overflow-x-auto rounded-lg bg-white shadow dark:bg-card"
+                        class="relative min-w-0 flex-1 overflow-x-auto rounded-lg bg-white shadow transition-opacity dark:bg-card"
+                        :class="{ 'opacity-60': loading }"
+                        :aria-busy="loading"
                     >
                         <div
-                            v-if="products.length === 0"
+                            v-if="loading"
+                            class="absolute top-2 right-3 z-10 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-gray-600 shadow dark:bg-card dark:text-gray-300"
+                            role="status"
+                        >
+                            <span
+                                class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-blue-600 border-r-transparent dark:border-primary"
+                            ></span>
+                            Actualizando…
+                        </div>
+                        <div
+                            v-if="products.length === 0 && !loading"
                             class="py-12 text-center"
                         >
                             <svg

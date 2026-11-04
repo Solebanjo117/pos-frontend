@@ -182,7 +182,8 @@ type ProductsTableColumn =
     | 'expander'
     | 'image'
     | 'sku'
-    | 'product'
+    | 'category'
+    | 'vehicle'
     | 'attributes'
     | 'stock'
     | 'actions';
@@ -193,7 +194,8 @@ const tableColumns: ProductsTableColumn[] = [
     'expander',
     'image',
     'sku',
-    'product',
+    'category',
+    'vehicle',
     'attributes',
     'stock',
     'actions',
@@ -202,7 +204,8 @@ const defaultColumnWidths: Record<ProductsTableColumn, number> = {
     expander: 56,
     image: 72,
     sku: 170,
-    product: 360,
+    category: 170,
+    vehicle: 230,
     attributes: 280,
     stock: 92,
     actions: 150,
@@ -211,7 +214,8 @@ const minColumnWidths: Record<ProductsTableColumn, number> = {
     expander: 44,
     image: 64,
     sku: 130,
-    product: 240,
+    category: 120,
+    vehicle: 160,
     attributes: 180,
     stock: 84,
     actions: 120,
@@ -1150,64 +1154,40 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                             ></span>
                                         </th>
                                         <th
-                                            @click="toggleSort('name')"
-                                            :style="getColumnStyle('product')"
-                                            class="relative cursor-pointer px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-900 uppercase transition-colors select-none hover:bg-gray-100 dark:text-white dark:hover:bg-muted/50"
+                                            :style="getColumnStyle('category')"
+                                            class="relative px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-900 uppercase dark:text-white"
                                         >
-                                            <span
-                                                class="inline-flex items-center gap-1"
-                                            >
-                                                Producto
-                                                <svg
-                                                    v-if="sortField === 'name'"
-                                                    class="h-3 w-3"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        v-if="
-                                                            sortDirection ===
-                                                            'asc'
-                                                        "
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M5 15l7-7 7 7"
-                                                    />
-                                                    <path
-                                                        v-else
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M19 9l-7 7-7-7"
-                                                    />
-                                                </svg>
-                                                <svg
-                                                    v-else
-                                                    class="h-3 w-3 opacity-30"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                                    />
-                                                </svg>
-                                            </span>
+                                            Categoría
                                             <span
                                                 :class="
                                                     getResizeHandleClass(
-                                                        'product',
+                                                        'category',
                                                     )
                                                 "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
-                                                        'product',
+                                                        'category',
+                                                    )
+                                                "
+                                                @click.stop.prevent
+                                            ></span>
+                                        </th>
+                                        <th
+                                            :style="getColumnStyle('vehicle')"
+                                            class="relative px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-900 uppercase dark:text-white"
+                                        >
+                                            Carro
+                                            <span
+                                                :class="
+                                                    getResizeHandleClass(
+                                                        'vehicle',
+                                                    )
+                                                "
+                                                @mousedown.stop.prevent="
+                                                    startColumnResize(
+                                                        $event,
+                                                        'vehicle',
                                                     )
                                                 "
                                                 @click.stop.prevent
@@ -1296,7 +1276,8 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 class="px-6 py-4 text-sm"
                                             >
                                                 <button
-                                                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                                    type="button"
+                                                    class="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                                                 >
                                                     <svg
                                                         v-if="
@@ -1392,37 +1373,90 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                             </td>
                                             <td
                                                 :style="
-                                                    getColumnStyle('product')
+                                                    getColumnStyle('category')
                                                 "
-                                                class="px-6 py-4 align-top"
+                                                class="px-6 py-4 text-sm break-words whitespace-normal text-gray-900 dark:text-white"
                                             >
-                                                <div
-                                                    class="flex min-w-0 items-start gap-2"
+                                                <span v-if="product.category">{{
+                                                    product.category.name
+                                                }}</span>
+                                                <span
+                                                    v-else
+                                                    class="text-xs text-gray-400"
+                                                    >—</span
                                                 >
-                                                    <div
-                                                        class="min-w-0 text-sm leading-snug font-medium break-words whitespace-normal text-gray-900 dark:text-white"
+                                            </td>
+                                            <td
+                                                :style="
+                                                    getColumnStyle('vehicle')
+                                                "
+                                                class="px-6 py-4 text-sm"
+                                            >
+                                                <span
+                                                    v-if="product.is_universal"
+                                                    class="inline-flex items-center gap-0.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-blue-500/10 ring-inset dark:bg-blue-900/30 dark:text-blue-400 dark:ring-blue-500/30"
+                                                    title="Compatible con todos los vehículos"
+                                                >
+                                                    🌐 Universal
+                                                </span>
+                                                <div
+                                                    v-else-if="
+                                                        product.vehicles?.length
+                                                    "
+                                                    class="flex flex-col gap-0.5"
+                                                    :title="
+                                                        product.vehicles
+                                                            .map((vehicle) =>
+                                                                vehicle.detail
+                                                                    ? `${vehicle.label} · ${vehicle.detail}`
+                                                                    : vehicle.label,
+                                                            )
+                                                            .join('\n')
+                                                    "
+                                                >
+                                                    <span
+                                                        v-for="vehicle in product.vehicles.slice(
+                                                            0,
+                                                            2,
+                                                        )"
+                                                        :key="
+                                                            vehicle.label +
+                                                            vehicle.detail
+                                                        "
+                                                        class="leading-snug break-words text-gray-900 dark:text-white"
                                                     >
-                                                        {{ product.name }}
-                                                    </div>
+                                                        {{ vehicle.label
+                                                        }}<span
+                                                            v-if="
+                                                                vehicle.detail
+                                                            "
+                                                            class="text-xs text-gray-500 dark:text-gray-400"
+                                                        >
+                                                            ·
+                                                            {{
+                                                                vehicle.detail
+                                                            }}</span
+                                                        >
+                                                    </span>
                                                     <span
                                                         v-if="
-                                                            product.is_universal
+                                                            product.vehicles
+                                                                .length > 2
                                                         "
-                                                        class="inline-flex flex-shrink-0 items-center gap-0.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-blue-500/10 ring-inset dark:bg-blue-900/30 dark:text-blue-400 dark:ring-blue-500/30"
-                                                        title="Universal"
+                                                        class="text-xs text-gray-500 dark:text-gray-400"
                                                     >
-                                                        🌐 Universal
+                                                        +{{
+                                                            product.vehicles
+                                                                .length - 2
+                                                        }}
+                                                        más
                                                     </span>
                                                 </div>
-                                                <div
-                                                    v-if="product.product_line"
-                                                    class="mt-1 min-w-0 text-sm leading-snug break-words whitespace-normal text-gray-500 dark:text-gray-400"
+                                                <span
+                                                    v-else
+                                                    class="text-xs text-gray-400"
+                                                    >—</span
                                                 >
-                                                    {{
-                                                        product.product_line
-                                                            .name
-                                                    }}
-                                                </div>
                                             </td>
                                             <td
                                                 :style="
@@ -1480,27 +1514,29 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 class="px-6 py-4 text-right text-sm font-medium"
                                                 @click.stop
                                             >
-                                                <template
+                                                <div
                                                     v-if="
                                                         archiveTab === 'active'
                                                     "
+                                                    class="flex flex-col items-end gap-1"
                                                 >
                                                     <button
+                                                        type="button"
                                                         @click="
                                                             openDetail(product)
                                                         "
-                                                        class="mr-3 font-medium text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:text-primary dark:hover:text-blue-300"
+                                                        class="cursor-pointer font-medium text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:text-primary dark:hover:text-blue-300"
                                                     >
                                                         Ver Detalle
                                                     </button>
                                                     <a
                                                         v-if="canManageProducts"
                                                         :href="`/inventory/products/${product.id}/edit`"
-                                                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
+                                                        class="cursor-pointer text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
                                                     >
                                                         Editar
                                                     </a>
-                                                </template>
+                                                </div>
                                                 <template
                                                     v-else-if="
                                                         canManageProducts
@@ -1538,7 +1574,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                             v-if="expandedRows.has(product.id)"
                                             class="bg-gray-50 dark:bg-muted"
                                         >
-                                            <td colspan="7" class="px-6 py-4">
+                                            <td colspan="8" class="px-6 py-4">
                                                 <div class="ml-12">
                                                     <h4
                                                         class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300"

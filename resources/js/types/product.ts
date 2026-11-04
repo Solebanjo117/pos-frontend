@@ -205,6 +205,11 @@ export interface Product {
         id: number;
         name: string;
     }>;
+    /** Vehículos compatibles resumidos (solo en el listado de productos). */
+    vehicles?: Array<{
+        label: string;
+        detail: string | null;
+    }>;
     pricing?: ProductPricing;
     // Variant information
     default_variant?: ProductVariant;

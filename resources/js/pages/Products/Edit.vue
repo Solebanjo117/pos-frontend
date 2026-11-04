@@ -706,14 +706,6 @@ const statusLabels: Record<string, string> = {
     discontinued: 'Discontinuado',
 };
 
-const editCategoryName = computed(() => {
-    return (
-        categoryNameById(selectedCategoryId.value) ||
-        currentProduct.value?.category?.name ||
-        'Sin categoria'
-    );
-});
-
 const editVariantCount = computed(() => {
     return (
         currentProduct.value?.variants_count ??
@@ -734,56 +726,6 @@ const editTotalStock = computed(() => {
         0,
     );
 });
-
-const editPrimaryPricing = computed(() => {
-    const pricing =
-        currentProduct.value?.default_variant?.pricing ??
-        currentProduct.value?.pricing ??
-        null;
-
-    return {
-        cost: Number(pricing?.cost ?? pricing?.cost_total ?? 0),
-        price: Number(
-            pricing?.current_sale_price ??
-                pricing?.base_price ??
-                pricing?.calculated_price ??
-                0,
-        ),
-    };
-});
-
-const summaryMetrics = computed(() => [
-    {
-        label: 'Categoria',
-        value: editCategoryName.value,
-        tone: 'indigo',
-    },
-    {
-        label: 'Codigo',
-        value: primaryCommercialCode.value || 'Sin código',
-        tone: primaryCommercialCode.value ? 'gray' : 'amber',
-    },
-    {
-        label: 'Variantes',
-        value: editVariantCount.value.toLocaleString('es-MX'),
-        tone: editVariantCount.value > 0 ? 'gray' : 'amber',
-    },
-    {
-        label: 'Stock',
-        value: editTotalStock.value.toLocaleString('es-MX'),
-        tone: editTotalStock.value > 0 ? 'emerald' : 'amber',
-    },
-    {
-        label: 'Costo',
-        value: `$${editPrimaryPricing.value.cost.toFixed(2)}`,
-        tone: 'gray',
-    },
-    {
-        label: 'Precio',
-        value: `$${editPrimaryPricing.value.price.toFixed(2)}`,
-        tone: 'emerald',
-    },
-]);
 
 const readinessItems = computed(() => [
     {
@@ -882,36 +824,6 @@ const validationErrorItems = computed(() =>
                     >
                         {{ loading ? 'Guardando...' : 'Guardar Cambios' }}
                     </button>
-                </div>
-            </div>
-
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                <div
-                    v-for="metric in summaryMetrics"
-                    :key="metric.label"
-                    class="rounded-lg border bg-white p-3 shadow-sm dark:border-border dark:bg-card"
-                    :class="{
-                        'border-amber-200 dark:border-amber-900/60':
-                            metric.tone === 'amber',
-                        'border-emerald-200 dark:border-emerald-900/60':
-                            metric.tone === 'emerald',
-                        'border-indigo-200 dark:border-indigo-900/60':
-                            metric.tone === 'indigo',
-                        'border-gray-200': metric.tone === 'gray',
-                    }"
-                >
-                    <p
-                        class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                    >
-                        {{ metric.label }}
-                    </p>
-                    <p
-                        class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white"
-                        :class="{ 'font-mono': metric.label === 'Codigo' }"
-                        :title="metric.value"
-                    >
-                        {{ metric.value }}
-                    </p>
                 </div>
             </div>
 

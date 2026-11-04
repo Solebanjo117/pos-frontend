@@ -5,11 +5,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DraftCompatData } from '@/utils/vehicleFitment';
 import VehicleCompatSection from './VehicleCompatSection.vue';
 
-const mocks = vi.hoisted(() => ({ get: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+    get: vi.fn(),
+    visit: vi.fn(),
+    role: 'admin',
+}));
 
 vi.mock('@/services/api/client', () => ({
     default: { get: mocks.get },
 }));
+
+vi.mock('@inertiajs/vue3', () => ({
+    usePage: () => ({ props: { auth: { user: { role: mocks.role } } } }),
+    router: { visit: mocks.visit },
+}));
+
+const QuickVehicleDialogStub = {
+    name: 'QuickVehicleDialog',
+    props: ['open'],
+    emits: ['close', 'created'],
+    template: '<div v-if="open" data-test="quick-dialog" />',
+};
 
 const row = (modelId: number, model: string, generation: string) => ({
     key: `${modelId}:9`,
@@ -30,7 +46,15 @@ const row = (modelId: number, model: string, generation: string) => ({
 });
 
 const mountSection = (modelValue: DraftCompatData) =>
-    mount(VehicleCompatSection, { props: { modelValue } });
+    mount(VehicleCompatSection, {
+        props: { modelValue },
+        global: { stubs: { QuickVehicleDialog: QuickVehicleDialogStub } },
+    });
+
+const buttonWithText = (
+    wrapper: ReturnType<typeof mountSection>,
+    text: string,
+) => wrapper.findAll('button').find((button) => button.text().includes(text));
 
 const lastEmitted = (wrapper: ReturnType<typeof mountSection>) =>
     wrapper.emitted('update:modelValue')?.at(-1)?.[0] as DraftCompatData;
@@ -38,6 +62,8 @@ const lastEmitted = (wrapper: ReturnType<typeof mountSection>) =>
 describe('VehicleCompatSection', () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        mocks.role = 'admin';
+        mocks.visit.mockReset();
         mocks.get.mockReset();
         mocks.get.mockResolvedValue({
             data: {
@@ -164,5 +190,74 @@ describe('VehicleCompatSection', () => {
             legacy: [],
             isUniversal: true,
         });
+    });
+
+    it('lets admins add a vehicle in a pop-up and assigns it to the product', async () => {
+        const wrapper = mountSection({
+            vehicles: [],
+            legacy: [],
+            isUniversal: false,
+        });
+        await flushPromises();
+        mocks.get.mockClear();
+
+        await buttonWithText(wrapper, 'Agregar vehículo')!.trigger('click');
+        expect(wrapper.find('[data-test="quick-dialog"]').exists()).toBe(true);
+
+        wrapper
+            .findComponent({ name: 'QuickVehicleDialog' })
+            .vm.$emit('created', {
+                model_id: 20,
+                engine_id: 30,
+                make: 'TOYOTA',
+                model: 'HILUX',
+                generation: 'N80',
+                years: '1990-2003',
+                engine: '2L (BUZO)',
+                engine_sheet: '2.4L 8V SOHC',
+            });
+        await flushPromises();
+
+        expect(lastEmitted(wrapper).vehicles).toEqual([
+            expect.objectContaining({ model_id: 20, engine_id: 30 }),
+        ]);
+        expect(wrapper.find('[data-test="quick-dialog"]').exists()).toBe(false);
+        expect(mocks.get).toHaveBeenCalledWith(
+            '/vehicle-configurations',
+            expect.anything(),
+        );
+    });
+
+    it('hides the add vehicle button for roles that cannot manage the catalog', async () => {
+        mocks.role = 'buyer';
+        const wrapper = mountSection({
+            vehicles: [],
+            legacy: [],
+            isUniversal: false,
+        });
+        await flushPromises();
+
+        expect(buttonWithText(wrapper, 'Agregar vehículo')).toBeUndefined();
+    });
+
+    it('opens the vehicle catalog in the same window only after confirming', async () => {
+        const confirm = vi.spyOn(window, 'confirm');
+        const wrapper = mountSection({
+            vehicles: [],
+            legacy: [],
+            isUniversal: false,
+        });
+        await flushPromises();
+        const link = wrapper.get('a[href="/vehicles?tab=vehicles"]');
+
+        expect(link.attributes('target')).toBeUndefined();
+
+        confirm.mockReturnValueOnce(false);
+        await link.trigger('click');
+        expect(mocks.visit).not.toHaveBeenCalled();
+
+        confirm.mockReturnValueOnce(true);
+        await link.trigger('click');
+        expect(mocks.visit).toHaveBeenCalledWith('/vehicles?tab=vehicles');
     });
 });

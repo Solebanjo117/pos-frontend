@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import {
-    Check,
-    ExternalLink,
-    Globe,
-    RefreshCw,
-    Search,
-    X,
-} from 'lucide-vue-next';
+import { router } from '@inertiajs/vue3';
+import { Check, Globe, Plus, RefreshCw, Search, X } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import QuickVehicleDialog from '@/components/Vehicles/QuickVehicleDialog.vue';
+import { useAuth } from '@/composables/useAuth';
+import { useToast } from '@/composables/useToast';
 import type { VehicleConfigurationRow } from '@/composables/useVehicleCatalog';
 import apiClient from '@/services/api/client';
 import {
@@ -15,6 +12,7 @@ import {
     fitmentKey,
     fitmentTitle,
     type DraftCompatData,
+    type VehicleFitmentEntry,
 } from '@/utils/vehicleFitment';
 
 export type { DraftCompatData } from '@/utils/vehicleFitment';
@@ -153,6 +151,31 @@ const removeLegacy = (id: number) => {
     });
 };
 
+// Registrar vehículos en el catálogo requiere los mismos roles que el módulo Vehículos.
+const { hasRole } = useAuth();
+const canManageCatalog = computed(() => hasRole(['admin', 'manager']));
+const toast = useToast();
+const showQuickAdd = ref(false);
+
+const onVehicleCreated = (vehicle: VehicleFitmentEntry) => {
+    showQuickAdd.value = false;
+    if (!selectedKeys.value.has(fitmentKey(vehicle))) {
+        update({ vehicles: [...props.modelValue.vehicles, vehicle] });
+    }
+    toast.success(`${fitmentTitle(vehicle)} agregado y asignado al producto.`);
+    fetchResults();
+};
+
+const goToCatalog = () => {
+    if (
+        window.confirm(
+            'Vas a salir de esta página. Si tienes cambios sin guardar en el producto, se perderán. ¿Continuar?',
+        )
+    ) {
+        router.visit('/vehicles?tab=vehicles');
+    }
+};
+
 const toggleUniversal = () => {
     if (props.modelValue.isUniversal) {
         update({ isUniversal: false });
@@ -238,15 +261,24 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                             : 'Marcar como Universal (TODOS)'
                     }}
                 </button>
-                <a
-                    href="/vehicles?tab=vehicles"
-                    target="_blank"
-                    rel="noopener"
-                    class="inline-flex items-center gap-1 text-xs text-teal-700 hover:underline dark:text-teal-300"
-                >
-                    Administrar catálogo de vehículos
-                    <ExternalLink class="h-3.5 w-3.5" />
-                </a>
+                <div class="flex items-center gap-3">
+                    <button
+                        v-if="canManageCatalog && !modelValue.isUniversal"
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
+                        @click="showQuickAdd = true"
+                    >
+                        <Plus class="h-4 w-4" />
+                        Agregar vehículo
+                    </button>
+                    <a
+                        href="/vehicles?tab=vehicles"
+                        class="text-xs text-teal-700 hover:underline dark:text-teal-300"
+                        @click.prevent="goToCatalog"
+                    >
+                        Administrar catálogo de vehículos
+                    </a>
+                </div>
             </div>
 
             <template v-if="!modelValue.isUniversal">
@@ -452,5 +484,11 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                 </div>
             </template>
         </div>
+
+        <QuickVehicleDialog
+            :open="showQuickAdd"
+            @close="showQuickAdd = false"
+            @created="onVehicleCreated"
+        />
     </div>
 </template>

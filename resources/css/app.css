@@ -83,6 +83,36 @@
     [role='button']:not(:disabled) {
         cursor: pointer;
     }
+
+    /* Barras de desplazamiento delgadas con los colores del tema (claro y oscuro). */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(
+                in oklab,
+                var(--muted-foreground) 45%,
+                transparent
+            )
+            transparent;
+    }
+
+    /* Navegadores sin scrollbar-color (Safari): mismo aspecto con los pseudoelementos WebKit. */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        border-radius: 9999px;
+        background: color-mix(
+            in oklab,
+            var(--muted-foreground) 45%,
+            transparent
+        );
+    }
 }
 
 @layer utilities {

@@ -358,7 +358,7 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                                 v-model="search"
                                 type="search"
                                 placeholder="Buscar por marca, modelo, chasis, motor, año o VIN (ej: 1ZZ, corolla e110, 2005)"
-                                class="h-10 w-full rounded-lg border border-gray-300 bg-white pr-3 pl-9 text-sm dark:border-border dark:bg-background"
+                                class="h-9 w-full rounded-md border border-gray-300 bg-white pr-3 pl-9 text-sm dark:border-border dark:bg-background"
                                 aria-label="Buscar vehículos"
                             />
                         </div>

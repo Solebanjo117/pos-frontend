@@ -543,7 +543,7 @@ const formId = useId();
                         <select
                             id="vehicle-engine-cam"
                             v-model="form.cam_type"
-                            class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm dark:bg-input/30"
                         >
                             <option value="">—</option>
                             <option value="SOHC">SOHC</option>
@@ -569,7 +569,7 @@ const formId = useId();
                         <select
                             id="vehicle-engine-fuel"
                             v-model="form.fuel_type"
-                            class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm dark:bg-input/30"
                         >
                             <option value="Gasoline">Gasolina</option>
                             <option value="Diesel">Diésel</option>

@@ -304,7 +304,7 @@ const submit = async () => {
 const toggleClass =
     'text-xs font-medium text-teal-700 hover:underline dark:text-teal-300';
 const selectClass =
-    'h-10 w-full rounded-lg border border-input bg-background px-3 text-sm';
+    'h-9 w-full rounded-md border border-input bg-background px-3 text-sm dark:bg-input/30';
 
 // Id único por instancia: los botones del pie envían el formulario con form="...".
 const formId = useId();

@@ -54,15 +54,19 @@ onMounted(() => {
 
 const { bottom, left, width, update: updateBounds } = useElementBounding(containerRef)
 
+// La lista nunca es más angosta que 224 px, aunque el botón sí lo sea (p. ej. "Marca" junto a un botón "+").
+const MIN_DROPDOWN_WIDTH = 224
+const dropdownWidth = computed(() => `${Math.max(width.value, MIN_DROPDOWN_WIDTH)}px`)
+
 const dropdownStyle = computed(() => {
     if (insideDialog.value) {
         // When inside a dialog, don't teleport — use absolute positioning
-        return { width: `${width.value}px` }
+        return { width: dropdownWidth.value }
     }
     return {
         top: `${bottom.value + 4}px`,
         left: `${left.value}px`,
-        width: `${width.value}px`,
+        width: dropdownWidth.value,
     }
 })
 
@@ -193,7 +197,7 @@ watch(searchQuery, (value) => {
             aria-haspopup="listbox"
             :aria-expanded="isOpen"
             :aria-controls="dropdownId"
-            class="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 pr-14 text-left text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 flex items-center justify-between gap-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
+            class="w-full h-9 rounded-md border border-gray-300 bg-white px-3 py-1.5 pr-14 text-left text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 flex items-center justify-between gap-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
         >
             <span class="truncate block" :class="selectedLabel ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'">
                 {{ loading ? loadingText : (selectedLabel || placeholder) }}
@@ -261,7 +265,7 @@ watch(searchQuery, (value) => {
                 </div>
 
                 <!-- Options list -->
-                <ul ref="listRef" class="max-h-48 overflow-y-auto py-1">
+                <ul ref="listRef" class="max-h-56 overflow-x-hidden overflow-y-auto py-1">
                     <li
                         v-for="(opt, idx) in filteredOptions"
                         :key="String(opt.value)"
@@ -269,15 +273,16 @@ watch(searchQuery, (value) => {
                         @mouseenter="highlightedIndex = idx"
                         role="option"
                         :aria-selected="opt.value === modelValue"
-                        class="cursor-pointer px-3 py-2 text-sm transition-colors"
+                        :title="opt.sublabel ? `${opt.label} — ${opt.sublabel}` : opt.label"
+                        class="flex min-w-0 cursor-pointer items-center gap-1 px-3 py-2 text-sm transition-colors"
                         :class="[
                             idx === highlightedIndex ? 'bg-blue-50 text-blue-700 dark:bg-primary/10 dark:text-primary' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-muted',
                             opt.value === modelValue ? 'font-semibold' : ''
                         ]"
                     >
-                        <span>{{ opt.label }}</span>
-                        <span v-if="opt.sublabel" class="ml-2 text-xs text-gray-400">{{ opt.sublabel }}</span>
-                        <svg v-if="opt.value === modelValue" class="inline ml-1 h-3.5 w-3.5 text-blue-500 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span class="truncate">{{ opt.label }}</span>
+                        <span v-if="opt.sublabel" class="ml-1 truncate text-xs text-gray-400">{{ opt.sublabel }}</span>
+                        <svg v-if="opt.value === modelValue" class="ml-auto h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
                     </li>

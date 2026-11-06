@@ -12,6 +12,8 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { ProductCode } from '@/types/product';
+import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
+import type { ItbmChoice } from '@/utils/itbm';
 
 type HeaderLotSyncState = {
     revision: number;
@@ -445,6 +447,29 @@ const markHeaderSyncDirty = () => {
     headerSyncRevision.value += 1;
 };
 
+// ITBM por variante: solo se elige si aplica (Sí/No). La tasa es la de la tienda (Ajustes > Tienda).
+const itbmChoice = itbmChoiceFromRate;
+const itbmRateFor = (choice: ItbmChoice): number =>
+    itbmRateFromChoice(choice, defaultTaxRate());
+const costItbmApplies = computed({
+    get: () => itbmChoice(form.value.pricing.cost_tax_rate),
+    set: (choice: ItbmChoice) => {
+        form.value.pricing.cost_tax_rate = itbmRateFor(choice);
+        markHeaderSyncDirty();
+    },
+});
+const saleItbmApplies = computed({
+    get: () =>
+        itbmChoice(
+            form.value.pricing.sale_tax_rate ?? form.value.pricing.tax_rate,
+        ),
+    set: (choice: ItbmChoice) => {
+        const rate = itbmRateFor(choice);
+        form.value.pricing.sale_tax_rate = rate;
+        form.value.pricing.tax_rate = rate;
+    },
+});
+
 const resolveSaleTaxRate = (pricing: any): number => {
     return toSafeTaxRate(pricing?.sale_tax_rate ?? pricing?.tax_rate);
 };
@@ -726,9 +751,10 @@ const openEditModal = (variant: any) => {
             cost: costTotal,
             cost_base: costBase,
             cost_miscellaneous: costMiscellaneous,
-            tax_rate: resolveSaleTaxRate(p),
-            sale_tax_rate: resolveSaleTaxRate(p ?? {}),
-            cost_tax_rate: resolveCostTaxRate(p ?? {}),
+            // Sí/No con la tasa vigente de la tienda (una tasa antigua distinta se ajusta).
+            tax_rate: itbmRateFor(itbmChoice(resolveSaleTaxRate(p))),
+            sale_tax_rate: itbmRateFor(itbmChoice(resolveSaleTaxRate(p ?? {}))),
+            cost_tax_rate: itbmRateFor(itbmChoice(resolveCostTaxRate(p ?? {}))),
             tax_type: (p as any)?.tax_type || 'standard',
             pricing_formula: p?.pricing_formula || '',
         },
@@ -781,10 +807,13 @@ const applyUpdatedLotToModal = (payload?: LotUpdatedPayload) => {
     const quantityAvailable = toSafeNumber(
         payload.summary?.stock_available ?? payload.lot.quantity_available,
     );
-    const costTaxRate =
-        unitCostBase > 0
-            ? toSafeTaxRate((taxPerUnit / unitCostBase) * 100)
-            : toSafeTaxRate(form.value.pricing.cost_tax_rate);
+    const costTaxRate = itbmRateFor(
+        itbmChoice(
+            unitCostBase > 0
+                ? (taxPerUnit / unitCostBase) * 100
+                : form.value.pricing.cost_tax_rate,
+        ),
+    );
 
     form.value.pricing.cost_base = unitCostBase;
     form.value.pricing.cost_miscellaneous = toSafeNumber(
@@ -849,11 +878,15 @@ const handleSubmit = async () => {
     if (productCodesRef.value?.hasConflicts()) return;
     processing.value = true;
     try {
-        const normalizedSaleTaxRate = toSafeTaxRate(
-            form.value.pricing.sale_tax_rate ?? form.value.pricing.tax_rate,
+        const normalizedSaleTaxRate = itbmRateFor(
+            itbmChoice(
+                form.value.pricing.sale_tax_rate ?? form.value.pricing.tax_rate,
+            ),
         );
-        const normalizedCostTaxRate = toSafeTaxRate(
-            form.value.pricing.cost_tax_rate ?? normalizedSaleTaxRate,
+        const normalizedCostTaxRate = itbmRateFor(
+            itbmChoice(
+                form.value.pricing.cost_tax_rate ?? normalizedSaleTaxRate,
+            ),
         );
         const normalizedCostBase = Math.max(
             0,
@@ -1521,7 +1554,7 @@ const formId = useId();
                         Costos y precio
                     </h4>
 
-                    <!-- Tax type toggle fue removido: ahora ITBM siempre es numérico y modificable con default de tienda -->
+                    <!-- ITBM: solo Sí/No por variante; la tasa se cambia en Ajustes > Tienda. -->
 
                     <!-- Costos: Base + ITBM% + Misceláneos => Costo Total -->
                     <div
@@ -1562,15 +1595,16 @@ const formId = useId();
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >ITBM costo</label
                                 >
-                                <input
-                                    v-model.number="form.pricing.cost_tax_rate"
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    max="100"
-                                    @input="markHeaderSyncDirty"
-                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                                />
+                                <select
+                                    v-model="costItbmApplies"
+                                    data-testid="cost-itbm-select"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-card"
+                                >
+                                    <option value="yes">
+                                        Sí ({{ defaultTaxRate() }}%)
+                                    </option>
+                                    <option value="no">No</option>
+                                </select>
                             </div>
 
                             <div class="md:col-span-3">
@@ -1622,16 +1656,18 @@ const formId = useId();
                             <div class="md:col-span-3">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >% ITBM Venta</label
+                                    >ITBM venta</label
                                 >
-                                <input
-                                    v-model.number="form.pricing.sale_tax_rate"
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    max="100"
-                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                                />
+                                <select
+                                    v-model="saleItbmApplies"
+                                    data-testid="sale-itbm-select"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-card"
+                                >
+                                    <option value="yes">
+                                        Sí ({{ defaultTaxRate() }}%)
+                                    </option>
+                                    <option value="no">No</option>
+                                </select>
                             </div>
 
                             <div class="md:col-span-9">
@@ -1652,12 +1688,7 @@ const formId = useId();
                                 </label>
                                 <PricingFormula
                                     :cost="getFormCostTotal()"
-                                    :tax-rate="
-                                        Number(
-                                            form.pricing.sale_tax_rate ??
-                                                form.pricing.tax_rate,
-                                        ) || defaultTaxRate()
-                                    "
+                                    :tax-rate="itbmRateFor(saleItbmApplies)"
                                     :model-value="form.pricing_formula"
                                     :price="
                                         Number(form.pricing.base_price) || 0

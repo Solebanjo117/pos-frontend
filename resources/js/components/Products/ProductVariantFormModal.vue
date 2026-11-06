@@ -16,6 +16,8 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { ProductCode } from '@/types/product';
+import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
+import type { ItbmChoice } from '@/utils/itbm';
 
 const props = defineProps<{
     open: boolean;
@@ -124,6 +126,29 @@ const resolveCostTaxRate = (pricing: any): number =>
     toSafeTaxRate(
         pricing?.cost_tax_rate ?? pricing?.sale_tax_rate ?? pricing?.tax_rate,
     );
+
+// ITBM por variante: solo se elige si aplica (Sí/No). La tasa es la de la tienda (Ajustes > Tienda).
+const itbmRateFor = (choice: ItbmChoice): number =>
+    itbmRateFromChoice(choice, defaultTaxRate());
+const normalizeItbmRate = (rate: unknown): number =>
+    itbmRateFor(itbmChoiceFromRate(rate));
+const costItbmApplies = computed({
+    get: () => itbmChoiceFromRate(form.value.pricing.cost_tax_rate),
+    set: (choice: ItbmChoice) => {
+        form.value.pricing.cost_tax_rate = itbmRateFor(choice);
+    },
+});
+const saleItbmApplies = computed({
+    get: () =>
+        itbmChoiceFromRate(
+            form.value.pricing.sale_tax_rate ?? form.value.pricing.tax_rate,
+        ),
+    set: (choice: ItbmChoice) => {
+        const rate = itbmRateFor(choice);
+        form.value.pricing.sale_tax_rate = rate;
+        form.value.pricing.tax_rate = rate;
+    },
+});
 
 const hasExplicitCostBase = (pricing: any): boolean =>
     pricing?.cost_base !== null &&
@@ -320,9 +345,9 @@ const loadAndPopulate = async () => {
                 }),
                 cost_base: costBase,
                 cost_miscellaneous: costMiscellaneous,
-                tax_rate: resolveSaleTaxRate(p),
-                sale_tax_rate: resolveSaleTaxRate(p),
-                cost_tax_rate: resolveCostTaxRate(p),
+                tax_rate: normalizeItbmRate(resolveSaleTaxRate(p)),
+                sale_tax_rate: normalizeItbmRate(resolveSaleTaxRate(p)),
+                cost_tax_rate: normalizeItbmRate(resolveCostTaxRate(p)),
                 tax_type: (p as any)?.tax_type || 'standard',
                 pricing_formula: p?.pricing_formula || '',
             },
@@ -353,10 +378,10 @@ const handleSubmit = async () => {
     if (productCodesRef.value?.hasConflicts()) return;
     processing.value = true;
     try {
-        const normalizedSaleTaxRate = toSafeTaxRate(
+        const normalizedSaleTaxRate = normalizeItbmRate(
             form.value.pricing.sale_tax_rate ?? form.value.pricing.tax_rate,
         );
-        const normalizedCostTaxRate = toSafeTaxRate(
+        const normalizedCostTaxRate = normalizeItbmRate(
             form.value.pricing.cost_tax_rate ?? normalizedSaleTaxRate,
         );
         const normalizedCostBase = Math.max(
@@ -564,16 +589,18 @@ const handleSubmit = async () => {
                             <div class="md:col-span-2">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >ITBM%</label
+                                    >ITBM costo</label
                                 >
-                                <input
-                                    v-model.number="form.pricing.cost_tax_rate"
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    max="100"
-                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                                />
+                                <select
+                                    v-model="costItbmApplies"
+                                    data-testid="cost-itbm-select"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-card"
+                                >
+                                    <option value="yes">
+                                        Sí ({{ defaultTaxRate() }}%)
+                                    </option>
+                                    <option value="no">No</option>
+                                </select>
                             </div>
 
                             <div class="md:col-span-2">
@@ -624,16 +651,18 @@ const handleSubmit = async () => {
                             <div class="md:col-span-3">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >% ITBM Venta</label
+                                    >ITBM venta</label
                                 >
-                                <input
-                                    v-model.number="form.pricing.sale_tax_rate"
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    max="100"
-                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                                />
+                                <select
+                                    v-model="saleItbmApplies"
+                                    data-testid="sale-itbm-select"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-card"
+                                >
+                                    <option value="yes">
+                                        Sí ({{ defaultTaxRate() }}%)
+                                    </option>
+                                    <option value="no">No</option>
+                                </select>
                             </div>
 
                             <div class="md:col-span-9">
@@ -654,12 +683,7 @@ const handleSubmit = async () => {
                                 </label>
                                 <PricingFormula
                                     :cost="getFormCostTotal()"
-                                    :tax-rate="
-                                        Number(
-                                            form.pricing.sale_tax_rate ??
-                                                form.pricing.tax_rate,
-                                        ) || defaultTaxRate()
-                                    "
+                                    :tax-rate="itbmRateFor(saleItbmApplies)"
                                     :model-value="form.pricing_formula"
                                     :price="
                                         Number(form.pricing.base_price) || 0

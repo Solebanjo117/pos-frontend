@@ -23,24 +23,55 @@ export interface VehicleFitmentEntry {
 export interface LegacyFitmentEntry {
     id: number;
     label: string;
+    /** Los registros "universal" no son un carro y no pueden ser el principal. */
+    canBeDefault?: boolean;
 }
 
 export interface DraftCompatData {
     vehicles: VehicleFitmentEntry[];
     legacy: LegacyFitmentEntry[];
     isUniversal: boolean;
+    /** Clave del carro principal (fitmentKey o legacyKey). Si falta o ya no existe, se usa el primero. */
+    defaultKey?: string | null;
 }
 
 export const emptyCompatDraft = (): DraftCompatData => ({
     vehicles: [],
     legacy: [],
     isUniversal: false,
+    defaultKey: null,
 });
 
 export const fitmentKey = (vehicle: {
     model_id: number;
     engine_id: number;
 }): string => `${vehicle.model_id}:${vehicle.engine_id}`;
+
+export const legacyKey = (record: { id: number }): string =>
+    `legacy:${record.id}`;
+
+/** Claves que pueden ser principal, en orden: vehículos exactos y luego asignaciones anteriores. */
+const defaultCandidates = (draft: DraftCompatData): string[] =>
+    draft.isUniversal
+        ? []
+        : [
+              ...draft.vehicles.map(fitmentKey),
+              ...draft.legacy
+                  .filter((record) => record.canBeDefault !== false)
+                  .map(legacyKey),
+          ];
+
+/**
+ * Carro principal efectivo: el elegido si sigue asignado; si no, el primero. Así siempre hay uno
+ * cuando el producto tiene carros (y ninguno si es universal o no tiene).
+ */
+export const effectiveDefaultKey = (draft: DraftCompatData): string | null => {
+    const candidates = defaultCandidates(draft);
+    if (draft.defaultKey && candidates.includes(draft.defaultKey)) {
+        return draft.defaultKey;
+    }
+    return candidates[0] ?? null;
+};
 
 const yearsLabel = (from?: number | null, to?: number | null): string => {
     if (from && to) return from === to ? String(from) : `${from}-${to}`;
@@ -126,9 +157,33 @@ export const draftFromCompatibility = (
             (record): record is VehicleCompatibility & { id: number } =>
                 record.scope_type !== 'vehicle' && Boolean(record.id),
         )
-        .map((record) => ({ id: record.id, label: legacyLabel(record) })),
+        .map((record) => ({
+            id: record.id,
+            label: legacyLabel(record),
+            canBeDefault: record.scope_type !== 'universal',
+        })),
     isUniversal,
+    defaultKey: defaultKeyFromRecords(records),
 });
+
+/** Clave del registro marcado como principal en lo guardado. */
+const defaultKeyFromRecords = (
+    records: VehicleCompatibility[],
+): string | null => {
+    const record = records.find((item) => item.is_default);
+    if (!record) return null;
+    if (
+        record.scope_type === 'vehicle' &&
+        record.model_id &&
+        record.engine_id
+    ) {
+        return fitmentKey({
+            model_id: Number(record.model_id),
+            engine_id: Number(record.engine_id),
+        });
+    }
+    return record.id ? legacyKey({ id: record.id }) : null;
+};
 
 /** Lo que se envía al guardar: vehículos exactos + ids de asignaciones anteriores que se conservan. */
 export const vehicleCompatibilityPayload = (
@@ -146,5 +201,18 @@ export const vehicleCompatibilityPayload = (
             })
             .map(({ model_id, engine_id }) => ({ model_id, engine_id })),
         keep_ids: draft.legacy.map((record) => record.id),
+        default: defaultPayload(draft),
     };
+};
+
+const defaultPayload = (
+    draft: DraftCompatData,
+): ProductVehicleCompatibilityPayload['default'] => {
+    const key = effectiveDefaultKey(draft);
+    if (!key) return null;
+    if (key.startsWith('legacy:')) return { id: Number(key.slice(7)) };
+    const vehicle = draft.vehicles.find((item) => fitmentKey(item) === key);
+    return vehicle
+        ? { model_id: vehicle.model_id, engine_id: vehicle.engine_id }
+        : null;
 };

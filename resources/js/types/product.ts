@@ -174,6 +174,8 @@ export interface VehicleCompatibility {
     } | null;
     all_engines?: boolean;
     all_chassis?: boolean;
+    /** Carro principal del producto (uno solo). */
+    is_default?: boolean;
     notes?: string;
 }
 
@@ -432,6 +434,8 @@ export interface ProductDetail extends Product {
 export interface ProductVehicleCompatibilityPayload {
     vehicles: Array<{ model_id: number; engine_id: number }>;
     keep_ids: number[];
+    /** Carro principal: un registro que se conserva ({id}) o un vehículo exacto ({model_id, engine_id}). */
+    default?: { id: number } | { model_id: number; engine_id: number } | null;
 }
 
 export interface CreateProductRequest {

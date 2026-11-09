@@ -287,4 +287,68 @@ describe('VehicleCompatSection', () => {
         expect(withVin.text()).toContain('JTDBR32E720123456');
         expect(withoutVin.text()).toContain('No posee VIN registrado');
     });
+
+    it('shows the default vehicle first with a filled star and lets you pick another one', async () => {
+        const corolla = {
+            model_id: 7,
+            engine_id: 9,
+            make: 'TOYOTA',
+            model: 'COROLLA',
+            generation: 'E120',
+            years: '2000-2005',
+            engine: '1ZZFE',
+            engine_sheet: '',
+        };
+        const rav4 = {
+            ...corolla,
+            model_id: 8,
+            model: 'RAV4',
+            generation: 'A20',
+        };
+        const wrapper = mountSection({
+            vehicles: [corolla, rav4],
+            legacy: [
+                {
+                    id: 5,
+                    label: 'Universal (todos los vehículos)',
+                    canBeDefault: false,
+                },
+            ],
+            isUniversal: false,
+            defaultKey: '8:9',
+        });
+        await flushPromises();
+
+        const chips = wrapper.findAll('[data-testid="assigned-vehicles"] > li');
+        expect(chips[0].text()).toContain('RAV4');
+        expect(chips[0].attributes('data-default')).toBe('true');
+        expect(chips[0].text()).toContain('principal');
+        // El registro universal no puede ser principal: no tiene estrella.
+        expect(
+            wrapper.findAll('[data-testid="default-vehicle-star"]'),
+        ).toHaveLength(2);
+
+        await chips[1]
+            .get('[data-testid="default-vehicle-star"]')
+            .trigger('click');
+
+        expect(lastEmitted(wrapper).defaultKey).toBe('7:9');
+    });
+
+    it('treats the first vehicle as default when none was chosen', async () => {
+        const wrapper = mountSection({
+            vehicles: [],
+            legacy: [
+                { id: 5, label: 'Texto: Corolla AE100' },
+                { id: 6, label: 'Texto: Hilux' },
+            ],
+            isUniversal: false,
+        });
+        await flushPromises();
+
+        const stars = wrapper.findAll('[data-testid="default-vehicle-star"]');
+        expect(stars[0].attributes('aria-pressed')).toBe('true');
+        expect(stars[1].attributes('aria-pressed')).toBe('false');
+        expect(wrapper.text()).toContain('La estrella marca el carro');
+    });
 });

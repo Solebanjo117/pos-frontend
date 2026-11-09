@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { Check, Globe, Plus, RefreshCw, Search, X } from 'lucide-vue-next';
+import {
+    Check,
+    Globe,
+    Plus,
+    RefreshCw,
+    Search,
+    Star,
+    X,
+} from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import QuickVehicleDialog from '@/components/Vehicles/QuickVehicleDialog.vue';
 import { useAuth } from '@/composables/useAuth';
@@ -8,10 +16,13 @@ import { useToast } from '@/composables/useToast';
 import type { VehicleConfigurationRow } from '@/composables/useVehicleCatalog';
 import apiClient from '@/services/api/client';
 import {
+    effectiveDefaultKey,
     fitmentFromConfiguration,
     fitmentKey,
     fitmentTitle,
+    legacyKey,
     type DraftCompatData,
+    type LegacyFitmentEntry,
     type VehicleFitmentEntry,
 } from '@/utils/vehicleFitment';
 
@@ -63,6 +74,36 @@ const unselectedResults = computed(() =>
 
 const update = (patch: Partial<DraftCompatData>) =>
     emit('update:modelValue', { ...props.modelValue, ...patch });
+
+// Carro principal: siempre hay uno si el producto tiene carros; va primero en la lista.
+const defaultKey = computed(() => effectiveDefaultKey(props.modelValue));
+
+type AssignedChip =
+    | { key: string; kind: 'vehicle'; vehicle: VehicleFitmentEntry }
+    | { key: string; kind: 'legacy'; record: LegacyFitmentEntry };
+
+const assignedChips = computed<AssignedChip[]>(() => {
+    const chips: AssignedChip[] = [
+        ...props.modelValue.vehicles.map((vehicle) => ({
+            key: fitmentKey(vehicle),
+            kind: 'vehicle' as const,
+            vehicle,
+        })),
+        ...props.modelValue.legacy.map((record) => ({
+            key: legacyKey(record),
+            kind: 'legacy' as const,
+            record,
+        })),
+    ];
+    const index = chips.findIndex((chip) => chip.key === defaultKey.value);
+    if (index > 0) chips.unshift(...chips.splice(index, 1));
+    return chips;
+});
+
+const canBeDefault = (chip: AssignedChip) =>
+    chip.kind === 'vehicle' || chip.record.canBeDefault !== false;
+
+const setDefault = (key: string) => update({ defaultKey: key });
 
 const fetchResults = async () => {
     const current = ++requestId;
@@ -295,51 +336,111 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                     >
                         Ningún vehículo asignado. Búscalos abajo y márcalos.
                     </p>
-                    <ul v-else class="flex flex-wrap gap-2">
+                    <p
+                        v-if="assignedCount > 1"
+                        class="mb-2 text-xs text-gray-500 dark:text-gray-400"
+                    >
+                        La estrella marca el carro
+                        <span class="font-medium">principal</span>: es el que se
+                        muestra en el listado y en el título del producto.
+                    </p>
+                    <ul
+                        v-if="assignedCount > 0"
+                        class="flex flex-wrap gap-2"
+                        data-testid="assigned-vehicles"
+                    >
                         <li
-                            v-for="vehicle in modelValue.vehicles"
-                            :key="fitmentKey(vehicle)"
-                            class="inline-flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 py-1 pr-1 pl-3 text-sm dark:border-teal-800 dark:bg-teal-900/20"
+                            v-for="chip in assignedChips"
+                            :key="chip.key"
+                            class="inline-flex items-center gap-1 rounded-lg border py-1 pr-1 pl-1 text-sm"
+                            :class="[
+                                chip.kind === 'vehicle'
+                                    ? 'border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-900/20'
+                                    : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20',
+                                chip.key === defaultKey
+                                    ? 'ring-2 ring-amber-400 dark:ring-amber-500'
+                                    : '',
+                            ]"
+                            :data-default="chip.key === defaultKey"
+                            :title="
+                                chip.kind === 'legacy'
+                                    ? 'Asignación anterior: se conserva tal cual. Puedes quitarla y volver a asignar el vehículo exacto.'
+                                    : undefined
+                            "
                         >
-                            <span class="text-gray-900 dark:text-white">
-                                {{ fitmentTitle(vehicle) }}
+                            <button
+                                v-if="canBeDefault(chip)"
+                                type="button"
+                                class="rounded p-1 transition-colors"
+                                :class="
+                                    chip.key === defaultKey
+                                        ? 'text-amber-500'
+                                        : 'text-gray-300 hover:text-amber-500 dark:text-gray-600'
+                                "
+                                :aria-pressed="chip.key === defaultKey"
+                                :aria-label="
+                                    chip.key === defaultKey
+                                        ? 'Carro principal'
+                                        : 'Marcar como carro principal'
+                                "
+                                :title="
+                                    chip.key === defaultKey
+                                        ? 'Carro principal'
+                                        : 'Marcar como carro principal'
+                                "
+                                data-testid="default-vehicle-star"
+                                @click="setDefault(chip.key)"
+                            >
+                                <Star
+                                    class="h-3.5 w-3.5"
+                                    :fill="
+                                        chip.key === defaultKey
+                                            ? 'currentColor'
+                                            : 'none'
+                                    "
+                                />
+                            </button>
+                            <span v-else class="w-1.5" />
+
+                            <span
+                                v-if="chip.kind === 'vehicle'"
+                                class="text-gray-900 dark:text-white"
+                            >
+                                {{ fitmentTitle(chip.vehicle) }}
                                 <span
-                                    v-if="vehicle.years"
+                                    v-if="chip.vehicle.years"
                                     class="text-gray-500 dark:text-gray-400"
-                                    >({{ vehicle.years }})</span
+                                    >({{ chip.vehicle.years }})</span
                                 >
                                 <span
                                     class="ml-1 font-mono text-xs text-teal-700 dark:text-teal-300"
-                                    >{{ vehicle.engine }}</span
+                                    >{{ chip.vehicle.engine }}</span
                                 >
                             </span>
-                            <button
-                                type="button"
-                                class="rounded p-1 text-gray-400 hover:bg-white hover:text-red-600 dark:hover:bg-muted"
-                                :aria-label="`Quitar ${fitmentTitle(vehicle)}`"
-                                @click="removeVehicle(fitmentKey(vehicle))"
-                            >
-                                <X class="h-3.5 w-3.5" />
-                            </button>
-                        </li>
-                        <li
-                            v-for="record in modelValue.legacy"
-                            :key="`legacy-${record.id}`"
-                            class="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 py-1 pr-1 pl-3 text-sm dark:border-amber-800 dark:bg-amber-900/20"
-                            title="Asignación anterior: se conserva tal cual. Puedes quitarla y volver a asignar el vehículo exacto."
-                        >
-                            <span class="text-gray-900 dark:text-white">{{
-                                record.label
-                            }}</span>
+                            <template v-else>
+                                <span class="text-gray-900 dark:text-white">{{
+                                    chip.record.label
+                                }}</span>
+                                <span
+                                    class="rounded bg-amber-100 px-1.5 text-[10px] text-amber-800 uppercase dark:bg-amber-900/40 dark:text-amber-300"
+                                    >anterior</span
+                                >
+                            </template>
                             <span
-                                class="rounded bg-amber-100 px-1.5 text-[10px] text-amber-800 uppercase dark:bg-amber-900/40 dark:text-amber-300"
-                                >anterior</span
+                                v-if="chip.key === defaultKey"
+                                class="ml-1 rounded bg-amber-100 px-1.5 text-[10px] font-medium text-amber-800 uppercase dark:bg-amber-900/40 dark:text-amber-300"
+                                >principal</span
                             >
+
                             <button
                                 type="button"
                                 class="rounded p-1 text-gray-400 hover:bg-white hover:text-red-600 dark:hover:bg-muted"
-                                :aria-label="`Quitar ${record.label}`"
-                                @click="removeLegacy(record.id)"
+                                :aria-label="`Quitar ${chip.kind === 'vehicle' ? fitmentTitle(chip.vehicle) : chip.record.label}`"
+                                @click="
+                                    chip.kind === 'vehicle'
+                                        ? removeVehicle(chip.key)
+                                        : removeLegacy(chip.record.id)
+                                "
                             >
                                 <X class="h-3.5 w-3.5" />
                             </button>

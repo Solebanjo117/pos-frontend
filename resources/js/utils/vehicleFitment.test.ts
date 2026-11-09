@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { VehicleConfigurationRow } from '@/composables/useVehicleCatalog';
 import {
     draftFromCompatibility,
+    effectiveDefaultKey,
     fitmentFromConfiguration,
+    fitmentKey,
     fitmentTitle,
+    legacyKey,
     vehicleCompatibilityPayload,
 } from './vehicleFitment';
 
@@ -94,10 +97,16 @@ describe('vehicle fitment helpers', () => {
             years: '1998-1999',
         });
         expect(draft.legacy).toEqual([
-            { id: 2, label: 'Texto: Corolla AE100' },
-            { id: 3, label: 'Toda la marca TOYOTA' },
-            { id: 4, label: 'TOYOTA YARIS · todos los motores' },
+            { id: 2, label: 'Texto: Corolla AE100', canBeDefault: true },
+            { id: 3, label: 'Toda la marca TOYOTA', canBeDefault: true },
+            {
+                id: 4,
+                label: 'TOYOTA YARIS · todos los motores',
+                canBeDefault: true,
+            },
         ]);
+        // Sin carro marcado como principal en lo guardado.
+        expect(draft.defaultKey).toBeNull();
     });
 
     it('sends unique exact vehicles and the previous assignments to keep', () => {
@@ -112,6 +121,69 @@ describe('vehicle fitment helpers', () => {
         ).toEqual({
             vehicles: [{ model_id: 7, engine_id: 9 }],
             keep_ids: [2],
+            // Sin principal elegido se envía el primero.
+            default: { model_id: 7, engine_id: 9 },
         });
+    });
+
+    it('reads the saved default vehicle and sends the chosen one', () => {
+        const draft = draftFromCompatibility(
+            [
+                {
+                    id: 1,
+                    scope_type: 'vehicle',
+                    model_id: 7,
+                    engine_id: 9,
+                    make: 'TOYOTA',
+                    model: 'COROLLA',
+                },
+                {
+                    id: 2,
+                    scope_type: 'raw',
+                    raw_vehicle_text: 'Corolla AE100',
+                    is_default: true,
+                },
+            ],
+            false,
+        );
+
+        expect(draft.defaultKey).toBe(legacyKey({ id: 2 }));
+        expect(effectiveDefaultKey(draft)).toBe('legacy:2');
+        expect(vehicleCompatibilityPayload(draft).default).toEqual({ id: 2 });
+
+        const chosen = {
+            ...draft,
+            defaultKey: fitmentKey({ model_id: 7, engine_id: 9 }),
+        };
+        expect(vehicleCompatibilityPayload(chosen).default).toEqual({
+            model_id: 7,
+            engine_id: 9,
+        });
+    });
+
+    it('falls back to the first vehicle when the default was removed, and has none when universal', () => {
+        const vehicle = fitmentFromConfiguration(corollaRow);
+        const draft = {
+            vehicles: [vehicle],
+            legacy: [
+                { id: 5, label: 'Universal', canBeDefault: false },
+                { id: 6, label: 'Texto: Hilux' },
+            ],
+            isUniversal: false,
+            defaultKey: 'legacy:99',
+        };
+
+        expect(effectiveDefaultKey(draft)).toBe(fitmentKey(vehicle));
+        expect(effectiveDefaultKey({ ...draft, vehicles: [] })).toBe(
+            'legacy:6',
+        );
+        expect(effectiveDefaultKey({ ...draft, isUniversal: true })).toBeNull();
+        expect(
+            vehicleCompatibilityPayload({
+                vehicles: [],
+                legacy: [],
+                isUniversal: false,
+            }).default,
+        ).toBeNull();
     });
 });

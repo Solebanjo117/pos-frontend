@@ -5,6 +5,7 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { Product } from '@/types/product';
+import { productDetailTitle } from '@/utils/productDetailTitle';
 
 interface Props {
     product: Product;
@@ -512,6 +513,26 @@ const groupedVehicles = computed(() => {
     return Array.from(groups.values());
 });
 
+// Título de la cabecera: categoría · carro por defecto (el primero compatible).
+const defaultVehicleLabel = computed(() => {
+    const fromList = props.product.vehicles?.[0]?.label;
+    if (fromList) return fromList;
+    const first = groupedVehicles.value[0];
+    if (!first) return null;
+    const years = [first.year_from, first.year_to].filter(Boolean).join('-');
+    return [first.make, first.model, years]
+        .filter((part) => part && part !== '—')
+        .join(' ');
+});
+const headerTitle = computed(() =>
+    productDetailTitle({
+        categoryName: props.product.category?.name,
+        defaultVehicle: defaultVehicleLabel.value,
+        isUniversal: Boolean(props.product.is_universal),
+        productName: props.product.name,
+    }),
+);
+
 // ── OEM + Alternatives ────────────────────────────────────────────────────────
 const oemData = ref<OemReference[]>([]);
 const alternativesData = ref<AlternativeRecord[]>([]);
@@ -608,18 +629,20 @@ const handleViewAlternative = async (altId: number) => {
         @click.self="emit('close')"
     >
         <div
-            class="relative max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-card"
+            class="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-card"
         >
             <!-- Header -->
             <div
-                class="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-border dark:bg-card/95"
+                class="z-10 flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-4 dark:border-border dark:bg-card"
             >
-                <div>
+                <div class="min-w-0">
                     <div class="flex items-center gap-2">
                         <h2
-                            class="text-xl font-bold text-gray-900 dark:text-white"
+                            class="truncate text-xl font-bold text-gray-900 dark:text-white"
+                            data-testid="product-detail-title"
+                            :title="headerTitle"
                         >
-                            {{ product.name }}
+                            {{ headerTitle }}
                         </h2>
                         <span
                             v-if="product.is_universal"
@@ -628,6 +651,13 @@ const handleViewAlternative = async (altId: number) => {
                             >🌐 Universal</span
                         >
                     </div>
+                    <p
+                        v-if="headerTitle !== product.name"
+                        class="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400"
+                        data-testid="product-detail-name"
+                    >
+                        {{ product.name }}
+                    </p>
                     <p
                         v-if="product.sku_base && !blindMode"
                         class="mt-0.5 font-mono text-xs text-gray-400"
@@ -759,7 +789,11 @@ const handleViewAlternative = async (altId: number) => {
                 </div>
             </div>
 
-            <div class="space-y-6 p-6">
+            <!-- Solo el cuerpo se desplaza; la cabecera queda fija arriba. -->
+            <div
+                class="min-h-0 flex-1 space-y-6 overflow-y-auto p-6"
+                data-testid="product-detail-body"
+            >
                 <!-- ══════════════════════════════════════════════════════ -->
                 <!--  TOP PANEL: Photo (left) + Variants (right)          -->
                 <!-- ══════════════════════════════════════════════════════ -->

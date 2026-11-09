@@ -74,4 +74,47 @@ describe('ProductDetailModal header toggles', () => {
         expect(localStorage.getItem('product_blind_mode')).toBe('true');
         expect(localStorage.getItem('product_include_itbm')).toBe('false');
     });
+
+    it('titula con la categoría y el carro por defecto, y deja el nombre debajo', async () => {
+        const wrapper = mount(ProductDetailModal, {
+            props: {
+                product: {
+                    ...product,
+                    category: { id: 3, name: 'Filtro de aceite' },
+                    vehicles: [
+                        {
+                            label: 'TOYOTA COROLLA E110 1995-2002',
+                            detail: '4A-FE',
+                        },
+                        { label: 'NISSAN SENTRA', detail: null },
+                    ],
+                },
+            },
+        });
+        await flushPromises();
+
+        expect(wrapper.get('[data-testid="product-detail-title"]').text()).toBe(
+            'Filtro de aceite · TOYOTA COROLLA E110 1995-2002',
+        );
+        expect(wrapper.get('[data-testid="product-detail-name"]').text()).toBe(
+            'Filtro de aceite',
+        );
+    });
+
+    it('solo el cuerpo se desplaza; la cabecera queda fuera del scroll', async () => {
+        const wrapper = mount(ProductDetailModal, { props: { product } });
+        await flushPromises();
+
+        const body = wrapper.get('[data-testid="product-detail-body"]');
+        const box = body.element.parentElement as HTMLElement;
+        const header = wrapper
+            .get('[data-testid="product-detail-title"]')
+            .element.closest('.shrink-0') as HTMLElement;
+
+        expect(body.classes()).toContain('overflow-y-auto');
+        expect(box.className).toContain('overflow-hidden');
+        expect(box.className).not.toContain('overflow-y-auto');
+        expect(header.parentElement).toBe(box);
+        expect(header.className).not.toContain('sticky');
+    });
 });

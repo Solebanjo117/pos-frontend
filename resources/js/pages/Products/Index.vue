@@ -8,6 +8,8 @@ import ProductFiltersComponent from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import type { SelectOption } from '@/components/ui/SearchableSelect.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useCategories } from '@/composables/useCategories';
 import { usePOS } from '@/composables/usePOS';
@@ -28,6 +30,20 @@ const canManageProducts = computed(() =>
 );
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 const { warehouses } = useWarehouses();
+
+// Opciones de la cabecera (null = "Todos").
+const statusFilterOptions: SelectOption[] = [
+    { value: null, label: 'Todos' },
+    { value: 'active', label: 'Activo' },
+    { value: 'discontinued', label: 'Discontinuado' },
+];
+const warehouseFilterOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'Todos' },
+    ...warehouses.value.map((w: { id: number; name: string }) => ({
+        value: w.id,
+        label: w.name,
+    })),
+]);
 const { categories, fetchCategories } = useCategories();
 const { brands, fetchBrands: fetchBrandsList } = useBrands();
 
@@ -865,7 +881,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 <div
                     class="mb-4 rounded-lg bg-white p-4 shadow dark:bg-card dark:shadow-gray-900/50"
                 >
-                    <div class="flex flex-wrap items-end gap-3">
+                    <div class="flex flex-wrap items-end gap-4">
                         <div class="min-w-[200px] flex-1">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
@@ -876,52 +892,62 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                 v-model="filters.search"
                                 type="text"
                                 placeholder="Nombre, SKU, VIN, OEM, categoría, marca, atributo..."
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
+                                class="h-9 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                                 @keyup.enter="applyFilters"
                             />
                         </div>
 
-                        <div class="w-36">
+                        <!-- Estado, Almacén y Orden: mismo selector, ancho y altura (36 px). -->
+                        <div class="w-44">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
                             >
                                 Estado
                             </label>
-                            <select
-                                v-model="filters.status"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="undefined">Todos</option>
-                                <option value="active">Activo</option>
-                                <option value="discontinued">
-                                    Discontinuado
-                                </option>
-                            </select>
+                            <SearchableSelect
+                                :options="statusFilterOptions"
+                                :model-value="filters.status ?? null"
+                                :searchable="false"
+                                aria-label="Filtrar por estado"
+                                data-testid="status-filter"
+                                @update:model-value="
+                                    (value) =>
+                                        (filters.status =
+                                            (value as ProductFilters['status']) ??
+                                            undefined)
+                                "
+                            />
                         </div>
 
                         <!-- Warehouse Filter -->
-                        <div class="w-40">
+                        <div class="w-44">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
                             >
                                 Almacén
                             </label>
-                            <select
-                                v-model="filters.warehouse_id"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="undefined">Todos</option>
-                                <option
-                                    v-for="w in warehouses"
-                                    :key="w.id"
-                                    :value="w.id"
-                                >
-                                    {{ w.name }}
-                                </option>
-                            </select>
+                            <SearchableSelect
+                                :options="warehouseFilterOptions"
+                                :model-value="filters.warehouse_id ?? null"
+                                :searchable="warehouseFilterOptions.length > 8"
+                                aria-label="Filtrar por almacén"
+                                data-testid="warehouse-filter"
+                                @update:model-value="
+                                    (value) =>
+                                        (filters.warehouse_id =
+                                            value === null
+                                                ? undefined
+                                                : Number(value))
+                                "
+                            />
                         </div>
 
-                        <div class="flex items-center gap-2">
+                        <div>
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
+                            >
+                                Ordenar
+                            </label>
                             <ProductSort
                                 :model-value="sidebarSortValue"
                                 @update:model-value="handleSortChange"
@@ -931,13 +957,13 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                         <div class="flex items-end gap-2">
                             <button
                                 @click="applyFilters"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:focus:ring-offset-gray-800"
+                                class="h-9 rounded-lg bg-blue-600 px-4 text-sm text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:focus:ring-offset-gray-800"
                             >
                                 Filtrar
                             </button>
                             <button
                                 @click="clearFilters"
-                                class="rounded-lg bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none dark:bg-muted dark:text-gray-100 dark:hover:bg-muted/80 dark:focus:ring-offset-gray-800"
+                                class="h-9 rounded-lg bg-gray-200 px-4 text-sm text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none dark:bg-muted dark:text-gray-100 dark:hover:bg-muted/80 dark:focus:ring-offset-gray-800"
                             >
                                 Limpiar
                             </button>
@@ -946,7 +972,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                 @click="
                                     showSidebarFilters = !showSidebarFilters
                                 "
-                                class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors md:hidden"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm transition-colors md:hidden"
                                 :class="
                                     showSidebarFilters
                                         ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'

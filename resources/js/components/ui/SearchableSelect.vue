@@ -19,6 +19,8 @@ const props = withDefaults(defineProps<{
     emptyResultsText?: string
     clearable?: boolean
     ariaLabel?: string
+    /** false = lista corta sin buscador (p. ej. Estado u Orden). */
+    searchable?: boolean
 }>(), {
     placeholder: '-- Selecciona --',
     disabled: false,
@@ -28,6 +30,7 @@ const props = withDefaults(defineProps<{
     emptyResultsText: '',
     clearable: false,
     ariaLabel: 'Selector con búsqueda',
+    searchable: true,
 })
 
 const emit = defineEmits<{
@@ -77,7 +80,7 @@ const opensUpward = computed(
 )
 // Si no cabe completa en ningún lado, la lista se acorta (el buscador mide ~52 px).
 const listMaxHeight = computed(() => {
-    const available = (opensUpward.value ? spaceAbove.value : spaceBelow.value) - 52
+    const available = (opensUpward.value ? spaceAbove.value : spaceBelow.value) - (props.searchable ? 52 : 0)
     return `${Math.max(96, Math.min(224, available))}px`
 })
 
@@ -158,10 +161,11 @@ const open = () => {
     if (props.disabled || props.loading) return
     isOpen.value = true
     searchQuery.value = ''
-    highlightedIndex.value = -1
+    // Sin buscador se resalta la opción elegida y el foco queda en el botón (flechas, Enter, Esc).
+    highlightedIndex.value = props.searchable ? -1 : props.options.findIndex(o => o.value === props.modelValue)
     dropdownHeight.value = ESTIMATED_DROPDOWN_HEIGHT
     refreshPosition()
-    nextTick(() => inputRef.value?.focus())
+    if (props.searchable) nextTick(() => inputRef.value?.focus())
 }
 
 const close = () => {
@@ -223,6 +227,7 @@ onUnmounted(() => document.removeEventListener('mousedown', handleClickOutside))
 
 // Reset highlight when search changes
 watch(searchQuery, (value) => {
+    if (!props.searchable) return
     highlightedIndex.value = 0
     emit('search', value)
 })
@@ -233,7 +238,8 @@ watch(searchQuery, (value) => {
         <!-- Trigger button -->
         <button
             type="button"
-            @click="open"
+            @click="isOpen && !searchable ? close() : open()"
+            @keydown="onKeydown"
             :disabled="disabled || loading"
             :aria-label="ariaLabel"
             aria-haspopup="listbox"
@@ -287,7 +293,7 @@ watch(searchQuery, (value) => {
                     "
                 >
                 <!-- Search input -->
-                <div class="p-2 border-b border-gray-100 dark:border-border">
+                <div v-if="searchable" class="p-2 border-b border-gray-100 dark:border-border">
                     <div class="relative">
                         <svg class="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

@@ -106,5 +106,50 @@ describe('SearchableSelect', () => {
         expect(listbox.className).toContain('absolute');
         wrapper.unmount();
     });
-});
 
+    it('without search box: highlights the current option and selects with the keyboard', async () => {
+        const wrapper = mount(SearchableSelect, {
+            attachTo: document.body,
+            props: {
+                options: [
+                    { value: null, label: 'Todos' },
+                    { value: 'active', label: 'Activo' },
+                    { value: 'discontinued', label: 'Discontinuado' },
+                ],
+                modelValue: 'active',
+                searchable: false,
+            },
+        });
+        const trigger = wrapper.get('button');
+
+        await trigger.trigger('click');
+        await flushPromises();
+
+        const listbox = document.body.querySelector('[role="listbox"]') as HTMLElement;
+        expect(listbox.querySelector('input')).toBeNull();
+        const highlighted = listbox.querySelector('li.bg-blue-50') as HTMLElement;
+        expect(highlighted.textContent).toContain('Activo');
+
+        await trigger.trigger('keydown', { key: 'ArrowDown' });
+        await trigger.trigger('keydown', { key: 'Enter' });
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([['discontinued']]);
+        expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+        wrapper.unmount();
+    });
+
+    it('without search box: clicking the field again closes the list', async () => {
+        const wrapper = mount(SearchableSelect, {
+            attachTo: document.body,
+            props: { options, modelValue: 1, searchable: false },
+        });
+
+        await wrapper.get('button').trigger('click');
+        expect(document.body.querySelector('[role="listbox"]')).not.toBeNull();
+        await wrapper.get('button').trigger('click');
+        await flushPromises();
+
+        expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+        wrapper.unmount();
+    });
+});

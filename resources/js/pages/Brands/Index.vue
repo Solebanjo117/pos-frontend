@@ -7,6 +7,7 @@ import { useBrands } from '@/composables/useBrands';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BrandFilters } from '@/types/brand';
+import { brandTierLabel, normalizeBrandTier } from '@/utils/brandTier';
 
 const { brands, loading, error, pagination, fetchBrands, deleteBrand } =
     useBrands();
@@ -133,7 +134,7 @@ onMounted(async () => {
                                 <th
                                     class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
                                 >
-                                    Sitio Web
+                                    Gama
                                 </th>
                                 <th
                                     class="px-6 py-3 text-center text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
@@ -184,12 +185,6 @@ onMounted(async () => {
                             >
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
-                                        <img
-                                            v-if="b.logo_url"
-                                            :src="b.logo_url"
-                                            :alt="b.name"
-                                            class="h-10 w-10 rounded bg-gray-100 object-contain dark:bg-muted"
-                                        />
                                         <div>
                                             <Link
                                                 :href="`/brands/${b.id}/edit`"
@@ -206,15 +201,18 @@ onMounted(async () => {
                                     {{ b.description || '—' }}
                                 </td>
                                 <td class="px-6 py-4 text-sm">
-                                    <a
-                                        v-if="b.website"
-                                        :href="b.website"
-                                        target="_blank"
-                                        class="text-blue-600 hover:underline dark:text-blue-400 dark:text-primary"
+                                    <span
+                                        data-testid="brand-tier-badge"
+                                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                        :class="
+                                            normalizeBrandTier(b.tier) ===
+                                            'premium'
+                                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                                : 'bg-gray-100 text-gray-700 dark:bg-muted dark:text-gray-300'
+                                        "
                                     >
-                                        {{ b.website }}
-                                    </a>
-                                    <span v-else class="text-gray-500">—</span>
+                                        {{ brandTierLabel(b.tier) }}
+                                    </span>
                                 </td>
                                 <td class="px-6 py-4 text-center">
                                     <span

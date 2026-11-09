@@ -1,9 +1,11 @@
+import type { BrandTier } from '@/utils/brandTier';
 import type { Supplier } from './supplier';
 
 export interface Brand {
     id: number;
     name: string;
     description?: string;
+    tier?: BrandTier;
     logo_url?: string;
     website?: string;
     status?: string;
@@ -25,8 +27,7 @@ export interface BrandFilters {
 export interface CreateBrandData {
     name: string;
     description?: string;
-    logo_url?: string;
-    website?: string;
+    tier: BrandTier;
     supplier_ids?: number[];
 }
 

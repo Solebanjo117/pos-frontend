@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import BrandTierPicker from '@/components/Brands/BrandTierPicker.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
@@ -17,8 +18,7 @@ const availableSuppliers = ref<Supplier[]>([]);
 const form = ref<CreateBrandData>({
     name: '',
     description: '',
-    logo_url: '',
-    website: '',
+    tier: 'standard',
     supplier_ids: [],
 });
 
@@ -114,37 +114,14 @@ function goBack() {
                     ></textarea>
                 </div>
 
-                <!-- Logo URL -->
+                <!-- Gama: cada marca es Standard o Premium -->
                 <div>
                     <label
                         class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                        URL del Logo
+                        Gama <span class="text-red-500">*</span>
                     </label>
-                    <input
-                        v-model="form.logo_url"
-                        type="url"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="https://ejemplo.com/logo.png"
-                    />
-                    <p class="mt-1 text-xs text-gray-500">
-                        Logo de la marca (opcional)
-                    </p>
-                </div>
-
-                <!-- Website -->
-                <div>
-                    <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                        Sitio Web
-                    </label>
-                    <input
-                        v-model="form.website"
-                        type="url"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="https://www.ejemplo.com"
-                    />
+                    <BrandTierPicker v-model="form.tier" />
                 </div>
 
                 <div>

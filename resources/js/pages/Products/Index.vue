@@ -16,7 +16,6 @@ import { usePOS } from '@/composables/usePOS';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 
-import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { productsApi } from '@/services/api/products';
 import { ReportsApiService } from '@/services/reports';
@@ -29,7 +28,6 @@ const canManageProducts = computed(() =>
     canManagePurchasingRecords((page.props.auth?.user as any)?.role),
 );
 const { currentWarehouseId, initWarehouse } = usePosSettings();
-const { warehouses } = useWarehouses();
 
 // Opciones de la cabecera (null = "Todos").
 const statusFilterOptions: SelectOption[] = [
@@ -37,13 +35,6 @@ const statusFilterOptions: SelectOption[] = [
     { value: 'active', label: 'Activo' },
     { value: 'discontinued', label: 'Discontinuado' },
 ];
-const warehouseFilterOptions = computed<SelectOption[]>(() => [
-    { value: null, label: 'Todos' },
-    ...warehouses.value.map((w: { id: number; name: string }) => ({
-        value: w.id,
-        label: w.name,
-    })),
-]);
 const { categories, fetchCategories } = useCategories();
 const { brands, fetchBrands: fetchBrandsList } = useBrands();
 
@@ -897,7 +888,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                             />
                         </div>
 
-                        <!-- Estado, Almacén y Orden: mismo selector, ancho y altura (36 px). -->
+                        <!-- Estado y Orden: mismo selector y altura (36 px). El almacén es siempre el actual. -->
                         <div class="w-44">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
@@ -915,29 +906,6 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                         (filters.status =
                                             (value as ProductFilters['status']) ??
                                             undefined)
-                                "
-                            />
-                        </div>
-
-                        <!-- Warehouse Filter -->
-                        <div class="w-44">
-                            <label
-                                class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
-                            >
-                                Almacén
-                            </label>
-                            <SearchableSelect
-                                :options="warehouseFilterOptions"
-                                :model-value="filters.warehouse_id ?? null"
-                                :searchable="warehouseFilterOptions.length > 8"
-                                aria-label="Filtrar por almacén"
-                                data-testid="warehouse-filter"
-                                @update:model-value="
-                                    (value) =>
-                                        (filters.warehouse_id =
-                                            value === null
-                                                ? undefined
-                                                : Number(value))
                                 "
                             />
                         </div>

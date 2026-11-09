@@ -644,79 +644,72 @@ const handleViewAlternative = async (altId: number) => {
                         }}
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <!-- Blind Mode Toggle -->
-                    <button
-                        @click="toggleBlindMode"
-                        :class="[
-                            'relative inline-flex h-7 w-14 shrink-0 items-center rounded-full transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none',
-                            blindMode
-                                ? 'bg-amber-500 focus:ring-amber-400'
-                                : 'bg-gray-300 focus:ring-gray-400 dark:bg-gray-600',
-                        ]"
-                        :title="
-                            blindMode
-                                ? 'Modo Cliente activo — muestra precio de venta'
-                                : 'Modo Normal — muestra toda la información'
-                        "
+                <div class="flex shrink-0 items-center gap-2">
+                    <!-- Interruptores con el mismo tamaño y estilo que los de Variantes -->
+                    <div
+                        class="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 dark:border-border dark:bg-muted/40"
                     >
                         <span
-                            :class="[
-                                'inline-flex h-5 w-5 transform items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-200',
-                                blindMode ? 'translate-x-8' : 'translate-x-1',
-                            ]"
+                            class="text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                            >Vista</span
                         >
-                            <svg
-                                v-if="blindMode"
-                                class="h-3 w-3 text-amber-500"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18"
-                                />
-                            </svg>
-                            <svg
-                                v-else
-                                class="h-3 w-3 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                />
-                            </svg>
-                        </span>
-                    </button>
-                    <span
-                        class="text-[10px] font-medium tracking-wider uppercase"
-                        :class="blindMode ? 'text-amber-500' : 'text-gray-400'"
-                        >{{ blindMode ? 'Cliente' : 'Normal' }}</span
-                    >
-
-                    <!-- ITBM toggle (available in both normal and client mode) -->
-                    <div class="ml-1 flex items-center gap-1.5">
                         <button
+                            type="button"
+                            role="switch"
+                            :aria-checked="blindMode"
+                            data-testid="blind-mode-toggle"
+                            @click="toggleBlindMode"
+                            :class="[
+                                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none',
+                                blindMode
+                                    ? 'bg-amber-500 focus:ring-amber-400'
+                                    : 'bg-gray-300 focus:ring-gray-400 dark:bg-gray-600',
+                            ]"
+                            :title="
+                                blindMode
+                                    ? 'Modo Cliente activo — muestra precio de venta'
+                                    : 'Modo Normal — muestra toda la información'
+                            "
+                        >
+                            <span
+                                :class="[
+                                    'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200',
+                                    blindMode
+                                        ? 'translate-x-5'
+                                        : 'translate-x-0.5',
+                                ]"
+                            />
+                        </button>
+                        <span
+                            class="w-11 text-[10px] font-medium"
+                            :class="
+                                blindMode
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-gray-500 dark:text-gray-300'
+                            "
+                            >{{ blindMode ? 'Cliente' : 'Normal' }}</span
+                        >
+                    </div>
+
+                    <!-- ITBM (en modo normal y cliente) -->
+                    <div
+                        class="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 dark:border-border dark:bg-muted/40"
+                    >
+                        <span
+                            class="text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                            >ITBM</span
+                        >
+                        <button
+                            type="button"
+                            role="switch"
+                            :aria-checked="includeITBM"
+                            data-testid="itbm-toggle"
                             @click="toggleIncludeITBM"
                             :class="[
-                                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none',
+                                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none',
                                 includeITBM
-                                    ? 'bg-green-500'
-                                    : 'bg-gray-300 dark:bg-gray-600',
+                                    ? 'bg-emerald-500 focus:ring-emerald-400'
+                                    : 'bg-gray-300 focus:ring-gray-400 dark:bg-gray-600',
                             ]"
                             :title="
                                 includeITBM
@@ -728,17 +721,19 @@ const handleViewAlternative = async (altId: number) => {
                                 :class="[
                                     'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200',
                                     includeITBM
-                                        ? 'translate-x-4'
+                                        ? 'translate-x-5'
                                         : 'translate-x-0.5',
                                 ]"
                             />
                         </button>
                         <span
-                            class="text-[10px] font-medium"
+                            class="w-11 text-[10px] font-medium"
                             :class="
-                                includeITBM ? 'text-green-500' : 'text-gray-400'
+                                includeITBM
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-gray-500 dark:text-gray-300'
                             "
-                            >ITBM</span
+                            >{{ includeITBM ? '+ITBM' : 'Sin ITBM' }}</span
                         >
                     </div>
 

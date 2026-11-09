@@ -12,7 +12,11 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { ProductCode } from '@/types/product';
-import { brandTierLabel, normalizeBrandTier } from '@/utils/brandTier';
+import {
+    brandOptionLabel,
+    brandTierLabel,
+    normalizeBrandTier,
+} from '@/utils/brandTier';
 import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
 import type { ItbmChoice } from '@/utils/itbm';
 
@@ -228,7 +232,7 @@ const fetchBrands = async () => {
 };
 
 const brandOptions = computed(() =>
-    brands.value.map((b) => ({ value: b.id, label: b.name })),
+    brands.value.map((b) => ({ value: b.id, label: brandOptionLabel(b) })),
 );
 
 const hasInitialStockForNewVariant = computed(

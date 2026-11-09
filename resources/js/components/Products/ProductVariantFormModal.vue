@@ -16,6 +16,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { ProductCode } from '@/types/product';
+import { brandOptionLabel } from '@/utils/brandTier';
 import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
 import type { ItbmChoice } from '@/utils/itbm';
 
@@ -55,7 +56,7 @@ const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
     null,
 );
 
-const brands = ref<{ id: number; name: string }[]>([]);
+const brands = ref<{ id: number; name: string; tier?: string }[]>([]);
 const loadingBrands = ref(false);
 
 const fetchBrands = async () => {
@@ -71,7 +72,7 @@ const fetchBrands = async () => {
 };
 
 const brandOptions = computed(() =>
-    brands.value.map((b) => ({ value: b.id, label: b.name })),
+    brands.value.map((b) => ({ value: b.id, label: brandOptionLabel(b) })),
 );
 
 // Inline brand creation

@@ -2,7 +2,11 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { brandTierLabel, normalizeBrandTier } from '@/utils/brandTier';
+import {
+    brandOptionLabel,
+    brandTierLabel,
+    normalizeBrandTier,
+} from '@/utils/brandTier';
 import BrandTierPicker from './BrandTierPicker.vue';
 
 describe('BrandTierPicker', () => {
@@ -36,5 +40,17 @@ describe('BrandTierPicker', () => {
         expect(normalizeBrandTier('otra')).toBe('standard');
         expect(brandTierLabel('premium')).toBe('Premium');
         expect(brandTierLabel(null)).toBe('Standard');
+    });
+
+    it('muestra la gama al lado del nombre en los selectores de marca', () => {
+        expect(brandOptionLabel({ name: '555', tier: 'premium' })).toBe(
+            '555 (Premium)',
+        );
+        expect(brandOptionLabel({ name: '777', tier: 'standard' })).toBe(
+            '777 (Standard)',
+        );
+        expect(brandOptionLabel({ name: 'Sin gama' })).toBe(
+            'Sin gama (Standard)',
+        );
     });
 });

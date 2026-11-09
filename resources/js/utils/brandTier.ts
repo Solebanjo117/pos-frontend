@@ -12,3 +12,9 @@ export const normalizeBrandTier = (tier: unknown): BrandTier =>
 
 export const brandTierLabel = (tier: unknown): string =>
     normalizeBrandTier(tier) === 'premium' ? 'Premium' : 'Standard';
+
+/** Nombre de la marca con su gama, para los selectores: "555 (Premium)". */
+export const brandOptionLabel = (brand: {
+    name: string;
+    tier?: unknown;
+}): string => `${brand.name} (${brandTierLabel(brand.tier)})`;

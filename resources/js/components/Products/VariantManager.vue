@@ -12,6 +12,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { ProductCode } from '@/types/product';
+import { brandTierLabel, normalizeBrandTier } from '@/utils/brandTier';
 import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
 import type { ItbmChoice } from '@/utils/itbm';
 
@@ -211,7 +212,7 @@ const handleVariantModalOpenChange = (isOpen: boolean) => {
     requestCloseModal();
 };
 
-const brands = ref<{ id: number; name: string }[]>([]);
+const brands = ref<{ id: number; name: string; tier?: string }[]>([]);
 const loadingBrands = ref(false);
 
 const fetchBrands = async () => {
@@ -1246,6 +1247,20 @@ const formId = useId();
                                 class="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                                 >Pendiente</span
                             >
+                            <!-- Gama de la marca, con el mismo estilo que el detalle del costo -->
+                            <div
+                                v-if="variant.brand"
+                                data-testid="variant-brand-tier"
+                                class="mt-0.5 text-[10px] font-normal"
+                                :class="
+                                    normalizeBrandTier(variant.brand.tier) ===
+                                    'premium'
+                                        ? 'text-amber-600 dark:text-amber-400'
+                                        : 'text-gray-400'
+                                "
+                            >
+                                {{ brandTierLabel(variant.brand.tier) }}
+                            </div>
                         </td>
                         <td
                             class="px-6 py-4 font-medium text-gray-900 dark:text-white"

@@ -6,5 +6,5 @@ defineOptions({ layout: AppLayout });
 </script>
 <template>
     <Head title="Ventas y rentabilidad" />
-    <main class="space-y-4 p-4 md:p-6"><Report /></main>
+    <main class="space-y-4"><Report /></main>
 </template>

@@ -17,7 +17,8 @@ const props = withDefaults(
 </script>
 
 <template>
-    <div :class="cn('flex flex-1 flex-col p-4 md:p-6', props.class)">
+    <!-- El margen interior lo pone el layout (.app-page). -->
+    <div :class="cn('flex flex-1 flex-col', props.class)">
         <div
             :class="
                 cn(

@@ -1019,7 +1019,7 @@ watch(
         :title="isEditing ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'"
     />
     <AppLayout>
-        <PurchaseOrderToolbar
+        <PurchaseOrderToolbar class="app-page-full-bleed"
             :title="toolbarTitle"
             :subtitle="toolbarSubtitle"
             status-label="Borrador"
@@ -1044,7 +1044,7 @@ watch(
             </template>
         </PurchaseOrderToolbar>
 
-        <div class="mx-auto w-full max-w-7xl space-y-4 p-3">
+        <div class="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
             <div
                 v-if="error"
                 class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"

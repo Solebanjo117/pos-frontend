@@ -470,7 +470,7 @@ const cancel = () => {
     <Head title="Nueva Entrada Masiva" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <div class="mx-auto w-full max-w-7xl">
                 <!-- Header -->
                 <div

@@ -294,7 +294,7 @@ const inventoryProductHref = (product: {
     <Head title="Reporte de Niveles de Stock" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-6 p-4">
+        <div class="space-y-6">
             <!-- Header -->
             <div
                 class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between dark:border-border dark:bg-card"

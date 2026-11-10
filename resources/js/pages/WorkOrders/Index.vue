@@ -178,9 +178,9 @@ onMounted(loadWorkOrders);
     <Head title="Ordenes de Trabajo" />
 
     <div
-        class="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100"
+        class="app-page-full-bleed min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100"
     >
-        <div class="space-y-5 p-4 sm:p-6">
+        <div class="space-y-5 p-4 md:p-6">
             <div
                 class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
             >

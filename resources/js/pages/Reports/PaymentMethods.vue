@@ -6,5 +6,5 @@ defineOptions({ layout: AppLayout });
 </script>
 <template>
     <Head title="Cobros por método" />
-    <main class="space-y-4 p-4 md:p-6"><Report report-mode /></main>
+    <main class="space-y-4"><Report report-mode /></main>
 </template>

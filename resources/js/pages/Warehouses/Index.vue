@@ -89,7 +89,7 @@ const formatUtilization = (warehouse: any) => {
     <Head title="Almacenes" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- Header -->
             <div class="mb-8 flex items-center justify-between">
                 <div>

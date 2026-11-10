@@ -665,7 +665,7 @@ watch(currentWarehouseId, (value) => {
     <Head title="Finanzas y Rentabilidad" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-3 p-4">
+        <div class="space-y-3">
             <FinanceReportShell
                 eyebrow="Reportes"
                 title="Finanzas y Rentabilidad"

@@ -88,7 +88,7 @@ const totalItems = (items: any[]) =>
 <template>
     <Head title="Transferencias de Inventario" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-6 p-4">
+        <div class="space-y-6">
             <!-- Header -->
             <div
                 class="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center"

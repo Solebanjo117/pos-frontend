@@ -337,7 +337,7 @@ onMounted(async () => {
     <Head title="Ventas por Cliente" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <FinanceReportShell
                 eyebrow="Reporte comercial"
                 title="Ventas por Cliente"

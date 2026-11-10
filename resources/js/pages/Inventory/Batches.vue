@@ -205,7 +205,7 @@ const getExpiryColor = (dateString: string | null) => {
     <Head title="Inventario de Lotes" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- Header -->
             <div class="mb-8">
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-white">

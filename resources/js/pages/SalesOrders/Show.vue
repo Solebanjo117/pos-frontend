@@ -601,10 +601,7 @@ onMounted(async () => {
     <Head :title="`Factura ${order?.order_number || ''}`" />
 
     <AppLayout>
-        <div
-            v-if="loading || operationalLoading"
-            class="p-8 text-sm text-gray-500"
-        >
+        <div v-if="loading || operationalLoading" class="text-sm text-gray-500">
             Cargando ficha operativa...
         </div>
 

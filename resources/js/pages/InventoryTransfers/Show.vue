@@ -137,7 +137,7 @@ const formatDate = (date: string | null) => {
 <template>
     <Head :title="`Transferencia ${transfer?.reference || ''}`" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto w-full max-w-4xl space-y-6 p-4">
+        <div class="mx-auto w-full max-w-4xl space-y-6">
             <div v-if="loading" class="py-12 text-center text-gray-500">
                 Cargando...
             </div>

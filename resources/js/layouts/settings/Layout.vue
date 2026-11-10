@@ -61,7 +61,8 @@ const sidebarNavItems = computed<NavItem[]>(() => [
 </script>
 
 <template>
-    <div class="px-4 py-5 md:px-6">
+    <!-- El margen interior lo pone el layout (.app-page). -->
+    <div>
         <div
             class="mb-5 flex flex-col gap-3 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between"
         >

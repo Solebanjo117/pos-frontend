@@ -457,7 +457,7 @@ onBeforeUnmount(() => {
 <template>
     <Head title="Administración de Vehículos" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+        <div class="mx-auto w-full max-w-7xl space-y-5">
             <header
                 class="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-center lg:justify-between"
             >

@@ -652,7 +652,7 @@ onMounted(async () => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div
-            class="min-h-[calc(100vh-4.25rem)] bg-slate-50 p-4 dark:bg-slate-950"
+            class="app-page-full-bleed min-h-[calc(100vh-4.25rem)] bg-slate-50 p-4 md:p-6 dark:bg-slate-950"
         >
             <div class="mx-auto w-full max-w-[1500px] space-y-4">
                 <div

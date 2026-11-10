@@ -158,7 +158,7 @@ const submit = async () => {
 <template>
     <Head title="Nueva Transferencia" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto w-full max-w-4xl space-y-6 p-4">
+        <div class="mx-auto w-full max-w-4xl space-y-6">
             <!-- Header -->
             <div>
                 <h1

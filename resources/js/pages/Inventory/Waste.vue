@@ -261,7 +261,7 @@ onMounted(async () => {
     <Head title="Registro de mermas" />
 
     <AppLayout>
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <div
                 class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
             >

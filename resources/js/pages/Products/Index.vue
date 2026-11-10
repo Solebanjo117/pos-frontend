@@ -628,7 +628,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
     <Head title="Productos" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- ========== PAGE HEADER with View Toggle ========== -->
             <div class="mb-6 flex items-center justify-between">
                 <div>

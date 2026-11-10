@@ -331,7 +331,7 @@ onMounted(async () => {
     <Head title="Cierre de Caja (Z-Report)" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <FinanceReportShell
                 eyebrow="Cierre diario"
                 title="Cierre de Caja / Z-Report"

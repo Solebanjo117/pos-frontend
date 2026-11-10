@@ -254,7 +254,7 @@ onMounted(async () => {
 <template>
     <Head title="Clientes" />
     <AppLayout :breadcrumbs="[{ title: 'Clientes', href: '/customers' }]">
-        <div class="space-y-5 p-1">
+        <div class="space-y-5">
             <header
                 class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >

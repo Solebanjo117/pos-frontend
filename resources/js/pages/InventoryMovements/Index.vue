@@ -252,7 +252,7 @@ function formatNumber(value: number): string {
     <Head title="Movimientos de inventario" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <div
                 class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 lg:flex-row lg:items-start lg:justify-between dark:border-border dark:bg-card"
             >

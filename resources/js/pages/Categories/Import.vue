@@ -101,7 +101,7 @@ const handleRowAction = (actionType: string, rowIdx: number) => {
 <template>
     <Head title="Importar Categorías" />
     <AppLayout>
-        <div class="p-4">
+        <div>
             <UniversalImporter
                 ref="importerRef"
                 :config="importConfig"

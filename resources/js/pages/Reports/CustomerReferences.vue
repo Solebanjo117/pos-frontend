@@ -125,7 +125,7 @@ onMounted(async () => {
     <Head title="Clientes y referencias" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-4 p-4">
+        <div class="space-y-4">
             <div
                 class="flex flex-col gap-3 border-b border-gray-200 pb-4 lg:flex-row lg:items-center lg:justify-between dark:border-border"
             >

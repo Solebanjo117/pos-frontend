@@ -574,7 +574,7 @@ onBeforeUnmount(() => {
     <Head title="Cierres de Caja" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <header
                 class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
             >

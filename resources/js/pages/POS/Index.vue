@@ -2195,7 +2195,7 @@ onUnmounted(() => {
     />
 
     <div
-        class="flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-[#F8F9FB] text-gray-900 dark:bg-background dark:text-foreground"
+        class="app-page-full-bleed flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-[#F8F9FB] text-gray-900 dark:bg-background dark:text-foreground"
         style="font-family: 'Inter', sans-serif"
     >
         <!-- Return Mode Header -->

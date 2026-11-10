@@ -265,3 +265,25 @@
         appearance: textfield;
     }
 }
+
+/*
+ * Margen interior estándar de todas las páginas (lo pone el layout, no cada página).
+ * Una página a pantalla completa (punto de venta, órdenes de trabajo, compras con barra fija…)
+ * marca su contenedor raíz con .app-page-full-bleed y maneja su propio espacio.
+ */
+@layer components {
+    .app-page {
+        padding: 1rem;
+    }
+
+    @media (width >= 48rem) {
+        .app-page {
+            padding: 1.5rem;
+        }
+    }
+
+    .app-page:has(> .app-page-full-bleed) {
+        padding: 0;
+    }
+}
+

@@ -291,7 +291,7 @@ const createVehicleCandidate = async (candidate: VehicleCreationCandidate) => {
 <template>
     <Head title="Importar Productos" />
     <AppLayout>
-        <div class="space-y-4 p-4">
+        <div class="space-y-4">
             <UniversalImporter
                 ref="importerRef"
                 :config="importConfig"

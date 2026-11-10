@@ -137,7 +137,7 @@ const formatCurrency = (value: number | null) => {
     <Head title="Inventario" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- Header -->
             <div class="mb-6 flex items-center justify-between">
                 <div>

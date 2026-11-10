@@ -221,7 +221,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <main class="space-y-4 p-4 md:p-6">
+    <main class="space-y-4">
         <header class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h1 class="text-xl font-semibold">

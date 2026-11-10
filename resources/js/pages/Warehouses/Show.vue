@@ -123,7 +123,7 @@ const getStockStatusColor = (item: any) => {
     <Head title="Detalle del Almacén" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- Loading State -->
             <div v-if="loading" class="py-12 text-center">
                 <div

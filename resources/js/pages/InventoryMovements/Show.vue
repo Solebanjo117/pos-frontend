@@ -192,7 +192,7 @@ function openReference(): void {
     <Head title="Detalle de movimiento" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <div
                 v-if="loading"
                 class="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-border dark:bg-card dark:text-gray-300"

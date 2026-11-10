@@ -458,8 +458,10 @@ watch(effectiveImages, () => {
     <Head :title="product?.name || 'Detalle del producto'" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-[calc(100vh-4rem)] bg-gray-50/60 dark:bg-background">
-            <div class="mx-auto w-full max-w-7xl space-y-4 p-4">
+        <div
+            class="app-page-full-bleed min-h-[calc(100vh-4rem)] bg-gray-50/60 dark:bg-background"
+        >
+            <div class="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
                 <div
                     class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
                 >

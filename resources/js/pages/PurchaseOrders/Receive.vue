@@ -234,6 +234,7 @@ async function handleSubmit() {
     <Head title="Recepcion de OC" />
     <AppLayout>
         <PurchaseOrderToolbar
+            class="app-page-full-bleed"
             title="Recepcion de OC"
             :subtitle="`${purchaseOrder?.po_number || purchaseOrderId} | ${purchaseOrder?.supplier?.name || 'OC diaria general'}`"
             :status-label="purchaseOrder?.status_label"
@@ -261,7 +262,7 @@ async function handleSubmit() {
         <div
             class="min-h-[calc(100vh-4.25rem)] bg-gray-50/60 dark:bg-background"
         >
-            <main class="mx-auto w-full max-w-7xl min-w-0 p-4">
+            <main class="mx-auto w-full max-w-7xl min-w-0 p-4 md:p-6">
                 <div
                     v-if="purchaseOrder"
                     class="mb-3 overflow-x-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm dark:border-border dark:bg-card"

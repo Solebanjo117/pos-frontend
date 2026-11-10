@@ -64,7 +64,7 @@ onUnmounted(() => {
 <template>
     <Head title="Agregar / Retirar" />
     <AppLayout :show-warehouse-selector="false">
-        <main class="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
+        <main class="mx-auto w-full max-w-3xl space-y-5">
             <header class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p

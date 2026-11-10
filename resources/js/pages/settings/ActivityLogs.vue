@@ -104,7 +104,7 @@ onMounted(() => fetchLogs());
 <template>
     <Head title="Bitácora de Actividad" />
 
-    <div class="mx-auto w-full max-w-6xl p-6">
+    <div class="mx-auto w-full max-w-6xl">
         <!-- Header -->
         <div class="mb-6">
             <h1

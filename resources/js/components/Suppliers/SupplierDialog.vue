@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import { Search } from 'lucide-vue-next';
 import { computed, ref, useId, watch } from 'vue';
 import AppModal from '@/components/ui/AppModal.vue';
 import { brandsService } from '@/services/brands';
@@ -51,6 +52,7 @@ async function hydrate() {
     error.value = null;
     fieldErrors.value = {};
     relationships.value = null;
+    brandSearch.value = '';
     try {
         brands.value = await brandsService.getAllActive();
         let supplier = props.supplier;
@@ -81,6 +83,23 @@ async function hydrate() {
         loading.value = false;
     }
 }
+// Buscador de "Marcas suministradas": sin distinguir mayúsculas ni tildes. Filtrar no quita
+// las marcas ya marcadas; solo las oculta de la lista.
+const brandSearch = ref('');
+const normalizeText = (value: string) =>
+    value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+const filteredBrands = computed(() => {
+    const query = normalizeText(brandSearch.value);
+    if (!query) return brands.value;
+    return brands.value.filter((brand) =>
+        normalizeText(brand.name).includes(query),
+    );
+});
+const selectedBrandCount = computed(() => form.value.brand_ids?.length ?? 0);
 function toggleBrand(id: number) {
     const ids = form.value.brand_ids ?? [];
     form.value.brand_ids = ids.includes(id)
@@ -237,11 +256,38 @@ watch(
                         calculan desde productos y compras.
                     </p>
                 </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="relative min-w-0 flex-1">
+                        <Search
+                            class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <input
+                            v-model="brandSearch"
+                            type="search"
+                            placeholder="Buscar marca..."
+                            aria-label="Buscar marca"
+                            data-testid="brand-search"
+                            class="h-9 w-full rounded-md border bg-background pr-3 pl-9 text-sm"
+                            @keydown.enter.prevent
+                        />
+                    </div>
+                    <span
+                        class="text-xs text-muted-foreground"
+                        data-testid="brand-selected-count"
+                        >{{ selectedBrandCount }} seleccionada(s)</span
+                    >
+                </div>
                 <div
                     class="grid max-h-48 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2 md:grid-cols-3"
                 >
+                    <p
+                        v-if="filteredBrands.length === 0"
+                        class="col-span-full text-sm text-muted-foreground"
+                    >
+                        Ninguna marca coincide con la búsqueda.
+                    </p>
                     <label
-                        v-for="brand in brands"
+                        v-for="brand in filteredBrands"
                         :key="brand.id"
                         class="flex items-center gap-2 text-sm"
                         ><input

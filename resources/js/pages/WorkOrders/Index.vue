@@ -15,6 +15,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWorkOrders } from '@/composables/useWorkOrders';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -307,9 +308,9 @@ onMounted(loadWorkOrders);
                     <Wrench
                         class="h-10 w-10 text-slate-300 dark:text-slate-600"
                     />
-                    <p class="mt-3 text-sm font-semibold">
-                        No hay ordenes con estos filtros.
-                    </p>
+                    <EmptyState compact class="mt-3"
+                        >No hay ordenes con estos filtros.</EmptyState
+                    >
                     <button
                         class="mt-4 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-950"
                         @click="newOrder"

@@ -19,6 +19,7 @@ import {
 import { Banknote } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -343,9 +344,7 @@ onMounted(() => fetchQuotes());
             <FileText
                 class="mx-auto mb-4 h-16 w-16 text-gray-300 dark:text-gray-600"
             />
-            <p class="text-gray-500 dark:text-gray-400">
-                No hay cotizaciones para mostrar.
-            </p>
+            <EmptyState compact>No hay cotizaciones para mostrar.</EmptyState>
             <Link
                 href="/sales-quotes/create"
                 class="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"

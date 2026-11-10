@@ -10,6 +10,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -451,11 +452,11 @@ onMounted(async () => {
                         </td>
                     </tr>
                     <tr v-else-if="rows.length === 0">
-                        <td
-                            colspan="7"
-                            class="px-3 py-8 text-center text-muted-foreground"
-                        >
-                            No hay transacciones para estos filtros.
+                        <td colspan="7">
+                            <EmptyState
+                                >No hay transacciones para estos
+                                filtros.</EmptyState
+                            >
                         </td>
                     </tr>
                     <tr

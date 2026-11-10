@@ -12,6 +12,7 @@ import {
     ChevronDown,
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import apiClient from '@/services/api/client';
 import type { User as UserType } from '@/types';
@@ -1088,12 +1089,12 @@ const refundMethodColor = (method: string, color: string) => {
                                                     0
                                                 "
                                             >
-                                                <td
-                                                    colspan="5"
-                                                    class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
-                                                >
-                                                    No hay artículos de esta
-                                                    factura que coincidan.
+                                                <td colspan="5">
+                                                    <EmptyState
+                                                        >No hay artículos de
+                                                        esta factura que
+                                                        coincidan.</EmptyState
+                                                    >
                                                 </td>
                                             </tr>
                                         </tbody>

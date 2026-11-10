@@ -44,6 +44,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import {
@@ -6815,11 +6816,9 @@ const formatFileSize = (bytes: number) => {
                             >
                                 <td
                                     :colspan="2 + productBaseColumns.length + 2"
-                                    class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
-                                >
-                                    No hay grupos para el filtro
-                                    {{ activeFilterLabel }}.
-                                </td>
+                                    
+                                ><EmptyState>No hay grupos para el filtro
+                                    {{ activeFilterLabel }}.</EmptyState></td>
                             </tr>
                         </tbody>
                     </table>
@@ -7529,13 +7528,8 @@ const formatFileSize = (bytes: number) => {
                                                         </tbody>
                                                     </table>
                                                 </div>
-                                                <div
-                                                    v-else
-                                                    class="px-3 py-3 text-gray-500 dark:text-gray-400"
-                                                >
-                                                    No hay cambios de campo para
-                                                    esta fila.
-                                                </div>
+                                                <EmptyState v-else>No hay cambios de campo para
+                                                    esta fila.</EmptyState>
                                             </div>
                                             <div
                                                 v-if="row.__conflicts?.length"
@@ -7564,11 +7558,9 @@ const formatFileSize = (bytes: number) => {
                                         editableColumns.length +
                                         actionColumns.length
                                     "
-                                    class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
-                                >
-                                    No hay filas para el filtro
-                                    {{ activeFilterLabel }}.
-                                </td>
+                                    
+                                ><EmptyState>No hay filas para el filtro
+                                    {{ activeFilterLabel }}.</EmptyState></td>
                             </tr>
                         </tbody>
                     </table>

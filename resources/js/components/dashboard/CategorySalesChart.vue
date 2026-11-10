@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { computed } from 'vue';
 import { Doughnut } from 'vue-chartjs';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import type { CategorySales } from '@/types/dashboard';
 
 // Register Chart.js components
@@ -128,11 +129,8 @@ const chartOptions = computed<ChartOptions<'doughnut'>>(() => ({
             :data="chartData"
             :options="chartOptions"
         />
-        <div
-            v-else
-            class="text-center text-sm text-gray-500 dark:text-gray-400"
+        <EmptyState v-else
+            >No hay datos de ventas por categoría en este periodo.</EmptyState
         >
-            No hay datos de ventas por categoría en este periodo.
-        </div>
     </div>
 </template>

@@ -11,6 +11,7 @@ import {
     Eye,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -135,7 +136,9 @@ const totalItems = (items: any[]) =>
             <!-- Empty -->
             <div v-else-if="transfers.length === 0" class="py-12 text-center">
                 <ArrowLeftRight :size="48" class="mx-auto mb-4 text-gray-300" />
-                <p class="text-gray-500">No hay transferencias registradas</p>
+                <EmptyState compact
+                    >No hay transferencias registradas</EmptyState
+                >
             </div>
 
             <!-- Table -->

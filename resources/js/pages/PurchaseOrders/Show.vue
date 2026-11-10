@@ -18,6 +18,7 @@ import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSecti
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -1504,12 +1505,9 @@ onMounted(async () => {
                                         Solicitar pago en Caja
                                     </button>
                                 </div>
-                                <p
-                                    v-if="payments.length === 0"
-                                    class="py-6 text-center text-sm text-gray-500"
+                                <EmptyState v-if="payments.length === 0"
+                                    >No hay pagos registrados.</EmptyState
                                 >
-                                    No hay pagos registrados.
-                                </p>
                                 <table v-else class="min-w-full text-sm">
                                     <thead
                                         class="border-b border-gray-200 text-xs text-gray-500 uppercase dark:border-border"

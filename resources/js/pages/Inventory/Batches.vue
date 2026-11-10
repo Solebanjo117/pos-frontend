@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -577,9 +578,9 @@ const getExpiryColor = (dateString: string | null) => {
                 v-else
                 class="rounded-lg bg-white p-12 text-center shadow dark:bg-card"
             >
-                <p class="text-gray-700 dark:text-gray-300">
-                    No se encontraron lotes activos.
-                </p>
+                <EmptyState compact
+                    >No se encontraron lotes activos.</EmptyState
+                >
                 <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
                     Ajusta los filtros o registra una nueva entrada de
                     inventario.

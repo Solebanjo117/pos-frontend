@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import ModuleSection from '@/components/modules/ModuleSection.vue';
 import PageShell from '@/components/PageShell.vue';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { ModuleId } from '@/navigation/modules';
 
@@ -72,9 +73,9 @@ const description = computed(
             v-else
             class="rounded-lg border border-dashed bg-card p-8 text-center"
         >
-            <p class="text-sm text-muted-foreground">
-                No hay accesos habilitados para tu rol.
-            </p>
+            <EmptyState compact
+                >No hay accesos habilitados para tu rol.</EmptyState
+            >
             <Button as-child variant="outline" class="mt-4">
                 <Link href="/dashboard">
                     <ArrowLeft class="size-4" />

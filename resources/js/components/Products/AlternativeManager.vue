@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import apiClient from '@/services/api/client';
 
@@ -218,12 +219,9 @@ onMounted(() => {
                 label="Cargando upsales..."
             />
 
-            <div
-                v-else-if="displayedAlternatives.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+            <EmptyState v-else-if="displayedAlternatives.length === 0"
+                >No hay upsales pendientes por vincular.</EmptyState
             >
-                No hay upsales pendientes por vincular.
-            </div>
 
             <table v-else class="w-full text-left text-sm">
                 <thead class="bg-gray-50 dark:bg-card">

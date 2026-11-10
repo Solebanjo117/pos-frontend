@@ -10,6 +10,7 @@ import {
     Filter,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -198,13 +199,11 @@ onMounted(() => fetchLogs());
 
         <!-- Log List -->
         <div v-else class="space-y-2">
-            <div
+            <EmptyState
                 v-if="logs.length === 0"
-                class="rounded-xl bg-white p-12 text-center text-gray-400 dark:bg-card"
+                class="rounded-xl bg-white dark:bg-card"
+                >No hay registros para los filtros seleccionados.</EmptyState
             >
-                <Activity class="mx-auto mb-3 h-12 w-12 opacity-30" />
-                No hay registros para los filtros seleccionados.
-            </div>
 
             <div
                 v-for="log in logs"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link2, ShieldAlert } from 'lucide-vue-next';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import type { TransactionTraceNode } from '@/types/transaction-trace';
 import DocumentReferenceLink from './DocumentReferenceLink.vue';
 
@@ -86,8 +87,6 @@ const relationLabel = (value?: string | null): string =>
                 />
             </div>
         </div>
-        <p v-else class="px-3 py-5 text-center text-sm text-slate-500">
-            No hay documentos relacionados.
-        </p>
+        <EmptyState v-else>No hay documentos relacionados.</EmptyState>
     </section>
 </template>

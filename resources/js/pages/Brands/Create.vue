@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import BrandTierPicker from '@/components/Brands/BrandTierPicker.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
@@ -147,12 +148,9 @@ function goBack() {
                             />
                             <span>{{ supplier.name }}</span>
                         </label>
-                        <p
-                            v-if="availableSuppliers.length === 0"
-                            class="text-sm text-gray-500 dark:text-gray-400"
+                        <EmptyState v-if="availableSuppliers.length === 0"
+                            >No hay proveedores activos disponibles.</EmptyState
                         >
-                            No hay proveedores activos disponibles.
-                        </p>
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {{ form.supplier_ids?.length || 0 }} proveedor(es)

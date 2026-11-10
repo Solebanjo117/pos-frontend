@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { operationalExpensesService } from '@/services/operational-expenses';
 import type {
@@ -124,11 +125,8 @@ onMounted(load);
                         </td>
                     </tr>
                     <tr v-else-if="expenses.length === 0">
-                        <td
-                            colspan="5"
-                            class="px-4 py-8 text-center text-gray-500"
-                        >
-                            No hay gastos relacionados.
+                        <td colspan="5">
+                            <EmptyState>No hay gastos relacionados.</EmptyState>
                         </td>
                     </tr>
                     <tr v-for="expense in expenses" v-else :key="expense.id">

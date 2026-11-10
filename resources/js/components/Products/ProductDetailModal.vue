@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -1284,9 +1285,9 @@ const handleViewAlternative = async (altId: number) => {
                                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                                         />
                                     </svg>
-                                    <p class="text-gray-500">
-                                        No hay marcas disponibles.
-                                    </p>
+                                    <EmptyState compact
+                                        >No hay marcas disponibles.</EmptyState
+                                    >
                                 </div>
                             </div>
 

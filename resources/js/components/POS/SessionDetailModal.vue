@@ -18,6 +18,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type {
@@ -823,12 +824,11 @@ const handlePrint = () => {
                                                     countableRows.length === 0
                                                 "
                                             >
-                                                <td
-                                                    colspan="7"
-                                                    class="px-4 py-6 text-center text-slate-500"
-                                                >
-                                                    No hay datos de
-                                                    conciliación.
+                                                <td colspan="7">
+                                                    <EmptyState
+                                                        >No hay datos de
+                                                        conciliación.</EmptyState
+                                                    >
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -1695,12 +1695,10 @@ const handlePrint = () => {
                                 </div>
                             </div>
                         </div>
-                        <div
-                            v-else
-                            class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                        <EmptyState v-else
+                            >No hay eventos normalizados para esta
+                            sesion.</EmptyState
                         >
-                            No hay eventos normalizados para esta sesion.
-                        </div>
                     </div>
 
                     <div
@@ -1810,11 +1808,11 @@ const handlePrint = () => {
                                         </td>
                                     </tr>
                                     <tr v-if="documentRows.length === 0">
-                                        <td
-                                            colspan="5"
-                                            class="px-4 py-6 text-center text-slate-500"
-                                        >
-                                            No hay documentos normalizados.
+                                        <td colspan="5">
+                                            <EmptyState
+                                                >No hay documentos
+                                                normalizados.</EmptyState
+                                            >
                                         </td>
                                     </tr>
                                 </tbody>

@@ -18,6 +18,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
@@ -771,9 +772,9 @@ watch(effectiveImages, () => {
                                         }}
                                     </p>
                                 </div>
-                                <p v-else class="text-sm text-gray-500">
-                                    No hay proveedores vinculados.
-                                </p>
+                                <EmptyState v-else
+                                    >No hay proveedores vinculados.</EmptyState
+                                >
                             </div>
                         </section>
                     </div>
@@ -1578,9 +1579,9 @@ watch(effectiveImages, () => {
                                 </p>
                             </div>
                         </div>
-                        <p v-else class="text-sm text-gray-500">
-                            No hay compatibilidad definida.
-                        </p>
+                        <EmptyState v-else
+                            >No hay compatibilidad definida.</EmptyState
+                        >
                     </section>
 
                     <section

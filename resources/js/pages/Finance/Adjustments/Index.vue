@@ -6,6 +6,7 @@ import FinanceAdjustmentModal from '@/components/Finance/FinanceAdjustmentModal.
 import PageShell from '@/components/PageShell.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { Input } from '@/components/ui/input';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -200,7 +201,9 @@ onMounted(async () => {
                     label="Cargando ajustes..."
                 />
                 <div v-else-if="rows.length === 0" class="p-12 text-center">
-                    <p class="font-medium">No hay ajustes para estos filtros</p>
+                    <EmptyState compact
+                        >No hay ajustes para estos filtros</EmptyState
+                    >
                     <p class="mt-1 text-sm text-muted-foreground">
                         Los ajustes confirmados aparecerán aquí con su folio y
                         asiento.

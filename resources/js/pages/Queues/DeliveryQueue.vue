@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { CheckCircle, Clock, Package, Truck, User } from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useDeliveryQueue,
@@ -122,9 +123,9 @@ const handleDelivered = async (order: DeliveryOrder) => {
             >
                 Sin pendientes
             </h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                No hay ordenes preparadas para entregar.
-            </p>
+            <EmptyState compact
+                >No hay ordenes preparadas para entregar.</EmptyState
+            >
         </div>
 
         <div

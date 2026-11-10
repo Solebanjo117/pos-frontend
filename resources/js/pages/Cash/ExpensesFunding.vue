@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3';
 import { Banknote, Clock3, Pencil, Plus, Send } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import {
@@ -350,12 +351,9 @@ onUnmounted(() => {
                                     </button>
                                 </div>
                             </div>
-                            <p
-                                v-if="fundingCategories.length === 0"
-                                class="px-3 py-4 text-center text-sm text-muted-foreground"
+                            <EmptyState v-if="fundingCategories.length === 0"
+                                >No hay categorías registradas.</EmptyState
                             >
-                                No hay categorías registradas.
-                            </p>
                         </div>
                     </section>
                     <label class="space-y-1.5 text-sm"

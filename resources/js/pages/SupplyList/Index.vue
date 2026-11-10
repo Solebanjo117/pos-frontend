@@ -18,6 +18,7 @@ import { ref, onMounted, computed } from 'vue';
 import ProductSearchModal from '@/components/POS/ProductSearchModal.vue';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -684,7 +685,10 @@ onMounted(async () => {
                 class="p-12 text-center text-gray-400"
             >
                 <Filter :size="48" class="mx-auto mb-3 opacity-40" />
-                <p>No hay ítems que coincidan con el filtro seleccionado.</p>
+                <EmptyState compact
+                    >No hay ítems que coincidan con el filtro
+                    seleccionado.</EmptyState
+                >
                 <button
                     @click="selectedSupplierFilter = null"
                     class="mt-3 text-sm text-indigo-600 hover:underline dark:text-primary"

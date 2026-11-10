@@ -4,6 +4,7 @@ import { PackageSearch, Package, CheckCircle, X } from 'lucide-vue-next';
 import { ref, onMounted, onUnmounted } from 'vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import SalesQueueCard from '@/components/Queues/SalesQueueCard.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useWarehouseQueue,
@@ -150,9 +151,10 @@ const handlePrepare = async (order: WarehouseOrder) => {
             >
                 Bodega al día
             </h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                No hay órdenes pendientes de preparación en este momento.
-            </p>
+            <EmptyState compact
+                >No hay órdenes pendientes de preparación en este
+                momento.</EmptyState
+            >
         </div>
 
         <!-- Cards Grid -->

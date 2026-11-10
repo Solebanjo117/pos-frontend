@@ -17,6 +17,7 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -1070,11 +1071,11 @@ onMounted(async () => {
                                 </td>
                             </tr>
                             <tr v-else-if="expenses.length === 0">
-                                <td
-                                    colspan="9"
-                                    class="px-3 py-8 text-center text-gray-500"
-                                >
-                                    No hay gastos para este filtro.
+                                <td colspan="9">
+                                    <EmptyState
+                                        >No hay gastos para este
+                                        filtro.</EmptyState
+                                    >
                                 </td>
                             </tr>
                             <template v-else>

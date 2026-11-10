@@ -12,6 +12,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
@@ -529,12 +530,9 @@ const handleCreateReturn = async (
 
         <section class="overflow-hidden rounded-lg border bg-white">
             <LoadingState v-if="loading" label="Cargando devoluciones..." />
-            <div
-                v-else-if="returns.length === 0"
-                class="p-8 text-center text-sm text-gray-500"
+            <EmptyState v-else-if="returns.length === 0"
+                >No hay devoluciones para el filtro seleccionado.</EmptyState
             >
-                No hay devoluciones para el filtro seleccionado.
-            </div>
             <div v-else class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50 text-xs text-gray-500 uppercase">

@@ -23,6 +23,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -1151,12 +1152,11 @@ onBeforeUnmount(() => {
                                 </td>
                             </tr>
                             <tr v-if="filteredSessions.length === 0">
-                                <td
-                                    colspan="7"
-                                    class="px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    No se encontraron cierres de caja con los
-                                    filtros seleccionados.
+                                <td colspan="7">
+                                    <EmptyState
+                                        >No se encontraron cierres de caja con
+                                        los filtros seleccionados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

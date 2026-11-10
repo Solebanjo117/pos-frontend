@@ -14,6 +14,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -787,12 +788,11 @@ function statusClass(status: VariantStatus): string {
                             </div>
                         </button>
 
-                        <div
+                        <EmptyState
                             v-if="filteredVariantRows.length === 0"
-                            class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500 dark:border-border"
+                            class="rounded-lg border border-dashed border-gray-300 dark:border-border"
+                            >No hay variantes para el filtro actual.</EmptyState
                         >
-                            No hay variantes para el filtro actual.
-                        </div>
                     </div>
                 </aside>
 
@@ -926,12 +926,12 @@ function statusClass(status: VariantStatus): string {
                         @updated="refreshPage"
                     />
 
-                    <div
+                    <EmptyState
                         v-else-if="!loading"
-                        class="rounded-lg border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500 dark:border-border dark:bg-card"
+                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        >No hay variante disponible para mostrar
+                        movimientos.</EmptyState
                     >
-                        No hay variante disponible para mostrar movimientos.
-                    </div>
                 </section>
             </div>
         </div>

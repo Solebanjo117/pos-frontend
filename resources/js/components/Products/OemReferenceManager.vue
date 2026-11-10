@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import apiClient from '@/services/api/client';
@@ -235,12 +236,9 @@ onMounted(() => {
                 label="Cargando referencias..."
             />
 
-            <div
-                v-else-if="displayedReferences.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+            <EmptyState v-else-if="displayedReferences.length === 0"
+                >No hay códigos alternos vinculados.</EmptyState
             >
-                No hay códigos alternos vinculados.
-            </div>
 
             <table v-else class="w-full text-left text-sm">
                 <thead class="bg-gray-50 dark:bg-card">

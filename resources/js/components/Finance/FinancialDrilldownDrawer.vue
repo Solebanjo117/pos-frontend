@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 import TraceableCell from '@/components/Traceability/TraceableCell.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import type { FinancialDrilldownReport } from '@/types/report';
 import type { TransactionTraceNode } from '@/types/transaction-trace';
@@ -319,12 +320,12 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                     </table>
                 </template>
 
-                <div
+                <EmptyState
                     v-else
-                    class="rounded-md border border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400"
+                    class="rounded-md border border-slate-200 dark:border-slate-800"
+                    >No hay registros para este indicador en el
+                    periodo.</EmptyState
                 >
-                    No hay registros para este indicador en el periodo.
-                </div>
             </div>
 
             <footer

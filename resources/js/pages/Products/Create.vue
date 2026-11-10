@@ -15,6 +15,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
@@ -1350,12 +1351,9 @@ const readinessItems = computed(() => [
                         <div
                             class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
                         >
-                            <div
-                                v-if="addedRefs.length === 0"
-                                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+                            <EmptyState v-if="addedRefs.length === 0"
+                                >No hay códigos alternos agregados.</EmptyState
                             >
-                                No hay códigos alternos agregados.
-                            </div>
                             <table v-else class="w-full text-left text-sm">
                                 <thead class="bg-gray-50 dark:bg-card">
                                     <tr>
@@ -1713,12 +1711,10 @@ const readinessItems = computed(() => [
                         <div
                             class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
                         >
-                            <div
-                                v-if="pendingUpsales.length === 0"
-                                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+                            <EmptyState v-if="pendingUpsales.length === 0"
+                                >No hay upsales pendientes por
+                                vincular.</EmptyState
                             >
-                                No hay upsales pendientes por vincular.
-                            </div>
                             <table v-else class="w-full text-left text-sm">
                                 <thead class="bg-gray-50 dark:bg-card">
                                     <tr>

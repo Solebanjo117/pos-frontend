@@ -16,6 +16,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Pagination from '@/components/Pagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { Input } from '@/components/ui/input';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import VehicleCatalogDialog from '@/components/Vehicles/VehicleCatalogDialog.vue';
@@ -589,7 +590,7 @@ onBeforeUnmount(() => {
                     class="flex min-h-64 flex-col items-center justify-center p-6 text-center"
                 >
                     <Car class="mb-3 h-10 w-10 text-muted-foreground" />
-                    <p class="font-medium">No hay resultados</p>
+                    <EmptyState compact>No hay resultados</EmptyState>
                     <p class="mt-1 text-sm text-muted-foreground">
                         Ajusta la búsqueda o registra un nuevo elemento.
                     </p>

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { Activity, Circle } from 'lucide-vue-next';
-import DocumentReferenceLink from './DocumentReferenceLink.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import type {
     TransactionTraceEvent,
     TransactionTraceNode,
 } from '@/types/transaction-trace';
+import DocumentReferenceLink from './DocumentReferenceLink.vue';
 
 defineProps<{
     events: TransactionTraceEvent[];
@@ -100,8 +101,6 @@ const formatMoney = (value: number): string =>
                 </div>
             </li>
         </ol>
-        <p v-else class="px-3 py-5 text-center text-sm text-slate-500">
-            No hay actividad registrada.
-        </p>
+        <EmptyState v-else>No hay actividad registrada.</EmptyState>
     </section>
 </template>

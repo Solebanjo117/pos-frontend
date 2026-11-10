@@ -10,6 +10,7 @@ import {
     Warehouse,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -925,11 +926,11 @@ function pageItemLabel(): string {
                                 </tr>
                             </template>
                             <tr v-if="inventoryRows.length === 0">
-                                <td
-                                    :colspan="showWarehouseColumn ? 9 : 8"
-                                    class="px-4 py-10 text-center text-sm text-gray-500"
-                                >
-                                    No se encontraron registros de inventario.
+                                <td :colspan="showWarehouseColumn ? 9 : 8">
+                                    <EmptyState
+                                        >No se encontraron registros de
+                                        inventario.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>
@@ -1057,11 +1058,10 @@ function pageItemLabel(): string {
                                 </td>
                             </tr>
                             <tr v-if="fifoLots.length === 0">
-                                <td
-                                    :colspan="lotsColspan"
-                                    class="px-4 py-10 text-center text-sm text-gray-500"
-                                >
-                                    No hay lotes abiertos.
+                                <td :colspan="lotsColspan">
+                                    <EmptyState
+                                        >No hay lotes abiertos.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>
@@ -1192,11 +1192,11 @@ function pageItemLabel(): string {
                                 </td>
                             </tr>
                             <tr v-if="movements.length === 0">
-                                <td
-                                    :colspan="movementsColspan"
-                                    class="px-4 py-10 text-center text-sm text-gray-500"
-                                >
-                                    No hay movimientos registrados.
+                                <td :colspan="movementsColspan">
+                                    <EmptyState
+                                        >No hay movimientos
+                                        registrados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

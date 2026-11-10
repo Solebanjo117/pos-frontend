@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -588,9 +589,9 @@ onMounted(async () => {
                     class="px-4 py-10 text-center"
                 >
                     <PackageSearch class="mx-auto h-8 w-8 text-gray-400" />
-                    <p class="mt-2 text-sm text-gray-500">
-                        No hay mermas registradas.
-                    </p>
+                    <EmptyState compact class="mt-2"
+                        >No hay mermas registradas.</EmptyState
+                    >
                 </div>
 
                 <div v-else class="overflow-x-auto">

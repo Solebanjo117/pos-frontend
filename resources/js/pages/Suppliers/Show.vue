@@ -24,6 +24,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -1943,7 +1944,7 @@ const removeVariant = async (variantId?: number | null) => {
                                 class="mx-auto mb-2 text-gray-300"
                                 :size="36"
                             />
-                            <p>No hay marcas asociadas a este proveedor</p>
+                            <EmptyState compact>No hay marcas asociadas a este proveedor</EmptyState>
                         </div>
                     </div>
                 </div>

@@ -13,6 +13,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import InventoryMovementDrawer from '@/components/Traceability/InventoryMovementDrawer.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -625,11 +626,11 @@ function formatNumber(value: number): string {
                                 </td>
                             </tr>
                             <tr v-if="movements.length === 0">
-                                <td
-                                    :colspan="tableColspan"
-                                    class="px-4 py-10 text-center text-sm text-gray-500"
-                                >
-                                    No hay movimientos registrados.
+                                <td :colspan="tableColspan">
+                                    <EmptyState
+                                        >No hay movimientos
+                                        registrados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

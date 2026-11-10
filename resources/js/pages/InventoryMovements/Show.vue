@@ -16,6 +16,7 @@ import { computed, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -731,11 +732,11 @@ function openReference(): void {
                                         </td>
                                     </tr>
                                     <tr v-if="relatedMovements.length === 0">
-                                        <td
-                                            colspan="4"
-                                            class="px-4 py-8 text-center text-sm text-gray-500"
-                                        >
-                                            No hay movimientos relacionados.
+                                        <td colspan="4">
+                                            <EmptyState
+                                                >No hay movimientos
+                                                relacionados.</EmptyState
+                                            >
                                         </td>
                                     </tr>
                                 </tbody>

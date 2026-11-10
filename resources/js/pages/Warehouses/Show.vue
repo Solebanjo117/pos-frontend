@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { Pencil } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -523,9 +524,9 @@ const getStockStatusColor = (item: any) => {
 
                     <!-- Empty Inventory -->
                     <div v-else class="py-8 text-center">
-                        <p class="text-gray-700 dark:text-gray-300">
-                            No hay productos en este almacén.
-                        </p>
+                        <EmptyState
+                            >No hay productos en este almacén.</EmptyState
+                        >
                     </div>
                 </div>
             </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import type { Product } from '@/types/product';
 import ProductCard from './ProductCard.vue';
@@ -363,10 +364,10 @@ const requestNextPage = () => {
                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                         />
                     </svg>
-                    <p class="mt-3 text-gray-500 dark:text-gray-400">
-                        No se encontraron productos con los filtros
-                        seleccionados
-                    </p>
+                    <EmptyState compact class="mt-3"
+                        >No se encontraron productos con los filtros
+                        seleccionados</EmptyState
+                    >
                 </div>
 
                 <!-- Products -->

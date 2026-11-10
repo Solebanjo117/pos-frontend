@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowRight, ClipboardCheck, Factory } from 'lucide-vue-next';
 import { onMounted, onUnmounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     usePurchaseOrderQueue,
@@ -92,9 +93,10 @@ const goToReceive = (id: number) => {
             >
                 Sin pedidos pendientes
             </h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                No hay ordenes de compra por recibir en este momento.
-            </p>
+            <EmptyState compact
+                >No hay ordenes de compra por recibir en este
+                momento.</EmptyState
+            >
         </div>
 
         <div v-else class="space-y-3">

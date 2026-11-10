@@ -11,6 +11,7 @@ import {
     RefreshCw,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -245,12 +246,11 @@ onMounted(fetchBackups);
                                 </td>
                             </tr>
                             <tr v-if="backups.length === 0">
-                                <td
-                                    colspan="4"
-                                    class="px-4 py-10 text-center text-muted-foreground"
-                                >
-                                    No hay backups disponibles. Crea el primero
-                                    con "Backup ahora".
+                                <td colspan="4">
+                                    <EmptyState
+                                        >No hay backups disponibles. Crea el
+                                        primero con "Backup ahora".</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

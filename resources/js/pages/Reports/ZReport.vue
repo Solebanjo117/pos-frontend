@@ -22,6 +22,7 @@ import FinanceAccountingPanel from '@/components/Finance/FinanceAccountingPanel.
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceMethodBars from '@/components/Finance/FinanceMethodBars.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -711,12 +712,11 @@ onMounted(async () => {
                                     </td>
                                 </tr>
                                 <tr v-if="!report.by_user?.length">
-                                    <td
-                                        colspan="6"
-                                        class="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
-                                    >
-                                        No hay sesiones de caja para los filtros
-                                        seleccionados.
+                                    <td colspan="6">
+                                        <EmptyState
+                                            >No hay sesiones de caja para los
+                                            filtros seleccionados.</EmptyState
+                                        >
                                     </td>
                                 </tr>
                             </tbody>

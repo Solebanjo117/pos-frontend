@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReorderableColumns } from '@/composables/useReorderableColumns';
@@ -536,11 +537,10 @@ watch(currentWarehouseId, async () => {
                             </td>
                         </tr>
                         <tr v-else-if="!loading && salesOrders.length === 0">
-                            <td
-                                colspan="7"
-                                class="px-4 py-12 text-center text-gray-500 dark:text-gray-400"
-                            >
-                                No se encontraron órdenes
+                            <td colspan="7">
+                                <EmptyState
+                                    >No se encontraron órdenes</EmptyState
+                                >
                             </td>
                         </tr>
                         <tr

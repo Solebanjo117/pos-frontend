@@ -19,6 +19,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import {
@@ -431,11 +432,11 @@ onMounted(async () => {
                                     </td>
                                 </tr>
                                 <tr v-else-if="customers.length === 0">
-                                    <td
-                                        :colspan="canManageCustomers ? 7 : 6"
-                                        class="px-4 py-10 text-center text-muted-foreground"
-                                    >
-                                        No se encontraron clientes.
+                                    <td :colspan="canManageCustomers ? 7 : 6">
+                                        <EmptyState
+                                            >No se encontraron
+                                            clientes.</EmptyState
+                                        >
                                     </td>
                                 </tr>
                                 <tr
@@ -596,12 +597,9 @@ onMounted(async () => {
                             >{{ row.vins_count }} VIN</span
                         >
                     </div>
-                    <p
-                        v-if="vehicleRows.length === 0"
-                        class="p-10 text-center text-muted-foreground"
+                    <EmptyState v-if="vehicleRows.length === 0"
+                        >No hay configuraciones registradas.</EmptyState
                     >
-                        No hay configuraciones registradas.
-                    </p>
                 </div>
             </div>
             <div v-else class="space-y-3">

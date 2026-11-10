@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { Search, Plus, Pencil, Trash2, Tag, Upload } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import Pagination from '@/components/Pagination.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useToast } from '@/composables/useToast';
@@ -169,7 +170,9 @@ onMounted(async () => {
                                         class="mx-auto mb-3 text-gray-300"
                                         :size="48"
                                     />
-                                    <p>No se encontraron marcas</p>
+                                    <EmptyState compact
+                                        >No se encontraron marcas</EmptyState
+                                    >
                                 </td>
                             </tr>
                             <tr

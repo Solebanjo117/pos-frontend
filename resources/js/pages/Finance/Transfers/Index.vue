@@ -5,6 +5,7 @@ import { onMounted, ref } from 'vue';
 import PageShell from '@/components/PageShell.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { financialTransfersService } from '@/services/financial-transfers';
@@ -79,7 +80,9 @@ onMounted(loadTransfers);
                     v-else-if="transfers.length === 0"
                     class="p-10 text-center"
                 >
-                    <p class="font-medium">Todavía no hay transferencias</p>
+                    <EmptyState compact
+                        >Todavía no hay transferencias</EmptyState
+                    >
                     <p class="mt-1 text-sm text-muted-foreground">
                         La primera operación aparecerá aquí con su folio y
                         trazabilidad.

@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { productsApi } from '@/services/api/products';
 import type {
@@ -926,7 +927,7 @@ defineExpose({
                             <td class="px-4 py-2">{{ movement.user?.name || '-' }}</td>
                         </tr>
                         <tr v-if="!(history?.movement_timeline ?? []).length">
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">No hay movimientos para el rango seleccionado.</td>
+                            <td colspan="7" ><EmptyState>No hay movimientos para el rango seleccionado.</EmptyState></td>
                         </tr>
                     </tbody>
                 </table>
@@ -1136,10 +1137,8 @@ defineExpose({
                         <tr v-if="!history?.lots.length">
                             <td
                                 colspan="12"
-                                class="px-4 py-6 text-center text-gray-500"
-                            >
-                                No hay lotes disponibles para esta variante.
-                            </td>
+                                
+                            ><EmptyState>No hay lotes disponibles para esta variante.</EmptyState></td>
                         </tr>
                     </tbody>
                 </table>
@@ -1412,10 +1411,8 @@ defineExpose({
                         <tr v-if="!history?.purchase_movements.length">
                             <td
                                 colspan="12"
-                                class="px-4 py-6 text-center text-gray-500"
-                            >
-                                No hay compras registradas para esta variante.
-                            </td>
+                                
+                            ><EmptyState>No hay compras registradas para esta variante.</EmptyState></td>
                         </tr>
                     </tbody>
                 </table>
@@ -1567,10 +1564,8 @@ defineExpose({
                         <tr v-if="!history?.sale_movements.length">
                             <td
                                 colspan="6"
-                                class="px-4 py-6 text-center text-gray-500"
-                            >
-                                No hay ventas registradas para esta variante.
-                            </td>
+                                
+                            ><EmptyState>No hay ventas registradas para esta variante.</EmptyState></td>
                         </tr>
                     </tbody>
                 </table>

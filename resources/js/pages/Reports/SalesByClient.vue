@@ -34,6 +34,7 @@ import { Bar } from 'vue-chartjs';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -929,12 +930,11 @@ onMounted(async () => {
                                 </tr>
                             </template>
                             <tr v-if="rows.length === 0">
-                                <td
-                                    colspan="8"
-                                    class="px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    No hay ventas por cliente para los filtros
-                                    seleccionados.
+                                <td colspan="8">
+                                    <EmptyState
+                                        >No hay ventas por cliente para los
+                                        filtros seleccionados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

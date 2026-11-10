@@ -10,6 +10,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import QuickVehicleDialog from '@/components/Vehicles/QuickVehicleDialog.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useToast } from '@/composables/useToast';
@@ -330,12 +331,12 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                     >
                         Vehículos asignados ({{ assignedCount }})
                     </p>
-                    <p
+                    <EmptyState
                         v-if="assignedCount === 0"
-                        class="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-sm text-gray-500 dark:border-border dark:text-gray-400"
+                        class="rounded-lg border border-dashed border-gray-200 dark:border-border"
+                        >Ningún vehículo asignado. Búscalos abajo y
+                        márcalos.</EmptyState
                     >
-                        Ningún vehículo asignado. Búscalos abajo y márcalos.
-                    </p>
                     <p
                         v-if="assignedCount > 1"
                         class="mb-2 text-xs text-gray-500 dark:text-gray-400"
@@ -590,12 +591,12 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                                     </td>
                                 </tr>
                                 <tr v-if="!loading && results.length === 0">
-                                    <td
-                                        colspan="4"
-                                        class="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
-                                    >
-                                        No hay vehículos que coincidan.
-                                        Regístralos en el catálogo de vehículos.
+                                    <td colspan="4">
+                                        <EmptyState
+                                            >No hay vehículos que coincidan.
+                                            Regístralos en el catálogo de
+                                            vehículos.</EmptyState
+                                        >
                                     </td>
                                 </tr>
                             </tbody>

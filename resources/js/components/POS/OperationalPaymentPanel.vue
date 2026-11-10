@@ -8,6 +8,7 @@ import {
     Gift,
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import apiClient from '@/services/api/client';
 import type { Customer } from '@/types/customer';
@@ -816,12 +817,12 @@ const handleCancel = () => {
                             </button>
                         </div>
 
-                        <div
+                        <EmptyState
                             v-else
-                            class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                            class="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
+                            >No hay metodos de pago activos para
+                            venta.</EmptyState
                         >
-                            No hay metodos de pago activos para venta.
-                        </div>
 
                         <div
                             v-if="activeMethodCode === 'cash' && showCashMethod"

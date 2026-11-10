@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { RefreshCw, Search } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import {
@@ -110,7 +111,7 @@ onMounted(() => load());
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div v-for="key in config.totalKeys" :key="key" class="rounded-md border bg-card p-3"><p class="text-xs font-semibold uppercase text-muted-foreground">{{ config.columns.find((column) => column.key === key)?.label ?? key }}</p><p class="mt-1 font-mono text-lg font-bold">{{ formatCurrency(summary[key] ?? 0) }}</p></div></div>
         <div class="overflow-hidden rounded-md border bg-card">
             <div class="flex items-center justify-between border-b px-4 py-2 text-xs text-muted-foreground"><span>{{ meta.total }} resultados</span><span>Pagina {{ meta.current_page }} de {{ meta.last_page }}</span></div>
-            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-muted/50 text-xs uppercase text-muted-foreground"><tr><th v-for="column in config.columns" :key="column.key" class="px-4 py-2 text-left" :class="{ 'text-right': column.type === 'money' || column.type === 'number' }">{{ column.label }}</th></tr></thead><tbody class="divide-y"><tr v-for="(row, index) in rows" :key="String(row.id ?? `${meta.current_page}-${index}`)"><td v-for="column in config.columns" :key="column.key" class="px-4 py-2" :class="{ 'text-right font-mono': column.type === 'money' || column.type === 'number' }">{{ display(row, column) }}</td></tr><tr v-if="!loading && !rows.length"><td :colspan="config.columns.length" class="px-4 py-10 text-center text-muted-foreground">No hay datos para los filtros seleccionados.</td></tr></tbody></table></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-muted/50 text-xs uppercase text-muted-foreground"><tr><th v-for="column in config.columns" :key="column.key" class="px-4 py-2 text-left" :class="{ 'text-right': column.type === 'money' || column.type === 'number' }">{{ column.label }}</th></tr></thead><tbody class="divide-y"><tr v-for="(row, index) in rows" :key="String(row.id ?? `${meta.current_page}-${index}`)"><td v-for="column in config.columns" :key="column.key" class="px-4 py-2" :class="{ 'text-right font-mono': column.type === 'money' || column.type === 'number' }">{{ display(row, column) }}</td></tr><tr v-if="!loading && !rows.length"><td :colspan="config.columns.length" ><EmptyState>No hay datos para los filtros seleccionados.</EmptyState></td></tr></tbody></table></div>
             <div class="flex items-center justify-between border-t px-4 py-3"><button type="button" class="rounded-md border px-3 py-1.5 text-sm disabled:opacity-40" :disabled="meta.current_page <= 1" @click="load(meta.current_page - 1)">Anterior</button><span class="text-xs text-muted-foreground">{{ meta.total }} resultados</span><button type="button" class="rounded-md border px-3 py-1.5 text-sm disabled:opacity-40" :disabled="meta.current_page >= meta.last_page" @click="load(meta.current_page + 1)">Siguiente</button></div>
         </div>
     </div>

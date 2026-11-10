@@ -14,6 +14,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -398,11 +399,11 @@ onMounted(load);
                                 </td>
                             </tr>
                             <tr v-if="!loading && accounts.length === 0">
-                                <td
-                                    colspan="9"
-                                    class="px-3 py-10 text-center text-sm text-muted-foreground"
-                                >
-                                    Aún no hay cuentas financieras registradas.
+                                <td colspan="9">
+                                    <EmptyState
+                                        >Aún no hay cuentas financieras
+                                        registradas.</EmptyState
+                                    >
                                 </td>
                             </tr>
                             <tr v-if="loading">

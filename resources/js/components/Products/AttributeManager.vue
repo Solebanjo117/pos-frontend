@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Trash2, Lock } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useProductAttributes,
@@ -267,12 +268,9 @@ const handleRemoveAttribute = async (attributeId: number) => {
                 label="Cargando especificaciones..."
             />
 
-            <div
-                v-else-if="displayedAttributes.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+            <EmptyState v-else-if="displayedAttributes.length === 0"
+                >No hay especificaciones definidas.</EmptyState
             >
-                No hay especificaciones definidas.
-            </div>
 
             <table v-else class="w-full text-left text-sm">
                 <thead class="bg-gray-50 dark:bg-card">

@@ -13,6 +13,7 @@ import {
     Settings2,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCategories } from '@/composables/useCategories';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -412,11 +413,10 @@ watch(pathSeparator, (value) => {
                                             :size="24"
                                         />
                                     </div>
-                                    <p
-                                        class="text-base font-medium text-gray-900 dark:text-gray-200"
+                                    <EmptyState compact
+                                        >No se encontraron
+                                        categorías</EmptyState
                                     >
-                                        No se encontraron categorías
-                                    </p>
                                     <p class="mt-1 text-sm">
                                         Intenta con otro término de búsqueda o
                                         crea una nueva.

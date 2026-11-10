@@ -7,6 +7,7 @@ import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import ProductFiltersComponent from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
@@ -1053,10 +1054,10 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                             >
                                 No hay productos
                             </h3>
-                            <p class="mt-1 text-sm text-gray-500">
-                                No hay productos que coincidan con los filtros
-                                actuales.
-                            </p>
+                            <EmptyState compact class="mt-1"
+                                >No hay productos que coincidan con los filtros
+                                actuales.</EmptyState
+                            >
                         </div>
 
                         <div v-else>

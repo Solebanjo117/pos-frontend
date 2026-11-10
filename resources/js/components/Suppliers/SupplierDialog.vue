@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import { Search } from 'lucide-vue-next';
 import { computed, ref, useId, watch } from 'vue';
 import AppModal from '@/components/ui/AppModal.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { brandsService } from '@/services/brands';
 import { suppliersService } from '@/services/suppliers';
@@ -279,12 +280,11 @@ watch(
                 <div
                     class="grid max-h-48 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2 md:grid-cols-3"
                 >
-                    <p
+                    <EmptyState
                         v-if="filteredBrands.length === 0"
-                        class="col-span-full text-sm text-muted-foreground"
+                        class="col-span-full"
+                        >Ninguna marca coincide con la búsqueda.</EmptyState
                     >
-                        Ninguna marca coincide con la búsqueda.
-                    </p>
                     <label
                         v-for="brand in filteredBrands"
                         :key="brand.id"

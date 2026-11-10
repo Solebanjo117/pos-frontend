@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import { ref, onMounted, computed } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -308,11 +309,10 @@ const formatCurrency = (value: number | null) => {
                                 </td>
                             </tr>
                             <tr v-else-if="inventory.length === 0">
-                                <td
-                                    colspan="9"
-                                    class="px-6 py-4 text-center text-gray-500 dark:text-gray-400"
-                                >
-                                    No se encontraron productos
+                                <td colspan="9">
+                                    <EmptyState
+                                        >No se encontraron productos</EmptyState
+                                    >
                                 </td>
                             </tr>
                             <tr

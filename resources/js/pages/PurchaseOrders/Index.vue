@@ -21,6 +21,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -894,12 +895,11 @@ onMounted(async () => {
                             </tr>
 
                             <tr v-if="purchaseOrders.length === 0">
-                                <td
-                                    colspan="8"
-                                    class="px-4 py-14 text-center text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    No se encontraron órdenes de compra con los
-                                    filtros seleccionados.
+                                <td colspan="8">
+                                    <EmptyState
+                                        >No se encontraron órdenes de compra con
+                                        los filtros seleccionados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

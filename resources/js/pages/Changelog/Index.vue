@@ -4,6 +4,7 @@ import { BookOpen, Clock3, Send, Tag } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import PageShell from '@/components/PageShell.vue';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
@@ -190,9 +191,7 @@ onMounted(loadChangelog);
                     v-if="releases.length === 0"
                     class="rounded-lg border bg-card p-8 text-center"
                 >
-                    <p class="text-sm text-muted-foreground">
-                        No hay cambios publicados todavia.
-                    </p>
+                    <EmptyState>No hay cambios publicados todavia.</EmptyState>
                 </section>
 
                 <section v-else class="space-y-4">

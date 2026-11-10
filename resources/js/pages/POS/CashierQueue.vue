@@ -15,6 +15,7 @@ import {
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useCashierQueue,
@@ -620,7 +621,7 @@ async function confirmRemove() {
             class="rounded-md border bg-card py-14 text-center"
         >
             <Inbox class="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p class="font-medium">No hay movimientos pendientes</p>
+            <EmptyState compact>No hay movimientos pendientes</EmptyState>
             <p class="mt-1 text-sm text-muted-foreground">
                 Los registros enviados a Caja apareceran aqui.
             </p>

@@ -14,6 +14,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
@@ -425,11 +426,11 @@ const submitUserAction = async () => {
                                 </td>
                             </tr>
                             <tr v-if="filteredUsers.length === 0">
-                                <td
-                                    colspan="5"
-                                    class="px-4 py-10 text-center text-muted-foreground"
-                                >
-                                    No hay usuarios con esos filtros.
+                                <td colspan="5">
+                                    <EmptyState
+                                        >No hay usuarios con esos
+                                        filtros.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

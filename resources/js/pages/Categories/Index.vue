@@ -275,20 +275,23 @@ watch(pathSeparator, (value) => {
                         Gestiona las categorías de productos y sus jerarquías
                     </p>
                 </div>
-                <Link
-                    href="/categories/create"
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                >
-                    <Plus :size="20" />
-                    Nueva Categoría
-                </Link>
-                <Link
-                    href="/categories/import"
-                    class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
-                >
-                    <Upload :size="20" />
-                    Importar
-                </Link>
+                <!-- Acciones a la derecha: Nueva Categoría e Importar -->
+                <div class="flex items-center gap-2">
+                    <Link
+                        href="/categories/create"
+                        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    >
+                        <Plus :size="20" />
+                        Nueva Categoría
+                    </Link>
+                    <Link
+                        href="/categories/import"
+                        class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+                    >
+                        <Upload :size="20" />
+                        Importar
+                    </Link>
+                </div>
             </div>
 
             <!-- Search -->

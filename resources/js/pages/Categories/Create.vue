@@ -1,30 +1,24 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, Plus, Save, X } from 'lucide-vue-next';
-import { ref, onMounted, computed } from 'vue';
+import { ArrowLeft, Save } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
 import CategoryImagesSection, {
     type PendingCategoryImage,
 } from '@/components/Categories/CategoryImagesSection.vue';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useCategories } from '@/composables/useCategories';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { categoriesService } from '@/services/categories';
 import type {
     CreateCategoryData,
-    Category,
     CategoryDefaultAttribute,
 } from '@/types/category';
 
-const { loading, error, createCategory, fetchCategoriesWithParent } =
-    useCategories();
+const { loading, error, createCategory } = useCategories();
 const { fetchSettings, defaultTaxRate, resolveTaxRate } = useStoreSettings();
 
-const parentCategories = ref<Category[]>([]);
 const pendingImages = ref<PendingCategoryImage[]>([]);
-const selectedParentCategoryId = ref<number | null>(null);
 
 type CategoryAttributeDraft = {
     name: string;
@@ -54,23 +48,6 @@ const form = ref<CategoryForm>({
     itbm_percent: defaultTaxRate(),
 });
 
-const parentCategoryOptions = computed<SelectOption[]>(() =>
-    parentCategories.value
-        .filter((category) => !form.value.parent_ids.includes(category.id))
-        .map((category) => ({
-            value: category.id,
-            label: formatCategoryLabel(category),
-        })),
-);
-
-const selectedParentCategories = computed(() =>
-    form.value.parent_ids
-        .map((parentId) =>
-            parentCategories.value.find((category) => category.id === parentId),
-        )
-        .filter((category): category is Category => Boolean(category)),
-);
-
 function addAttribute() {
     form.value.default_attributes.push({
         name: '',
@@ -82,44 +59,6 @@ function addAttribute() {
 
 function removeAttribute(index: number) {
     form.value.default_attributes.splice(index, 1);
-}
-
-function toCategoryId(value: number | string | null): number | null {
-    if (value === null || value === '') {
-        return null;
-    }
-
-    const categoryId = Number(value);
-
-    return Number.isFinite(categoryId) ? categoryId : null;
-}
-
-function formatCategoryLabel(category: Category): string {
-    return category.parent
-        ? `${category.parent.name} > ${category.name}`
-        : category.name;
-}
-
-function addParentCategory() {
-    if (
-        selectedParentCategoryId.value === null ||
-        form.value.parent_ids.includes(selectedParentCategoryId.value)
-    ) {
-        return;
-    }
-
-    form.value.parent_ids.push(selectedParentCategoryId.value);
-    selectedParentCategoryId.value = null;
-}
-
-function removeParentCategory(categoryId: number) {
-    form.value.parent_ids = form.value.parent_ids.filter(
-        (parentId) => parentId !== categoryId,
-    );
-
-    if (selectedParentCategoryId.value === categoryId) {
-        selectedParentCategoryId.value = null;
-    }
 }
 
 function parseSelectOptions(optionsText: string): string[] {
@@ -155,22 +94,14 @@ function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
     );
 }
 
+// El ITBM de la categoría es siempre el de la tienda (Ajustes > Tienda); no se edita aquí.
 function normalizeItbmPercent() {
-    if (
-        form.value.itbm_percent === null ||
-        form.value.itbm_percent === undefined
-    )
-        return;
-    const parsed = Number(form.value.itbm_percent);
-    form.value.itbm_percent = Number.isFinite(parsed)
-        ? Math.max(0, Math.min(100, Math.round(parsed)))
-        : defaultTaxRate();
+    form.value.itbm_percent = defaultTaxRate();
 }
 
 onMounted(async () => {
     await fetchSettings();
     form.value.itbm_percent = resolveTaxRate(form.value.itbm_percent ?? null);
-    parentCategories.value = await fetchCategoriesWithParent();
 });
 
 async function handleSubmit() {
@@ -271,70 +202,6 @@ function goBack() {
                     />
                 </div>
 
-                <!-- Parent Categories -->
-                <div>
-                    <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                        Categorías padre
-                    </label>
-                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                        <SearchableSelect
-                            :options="parentCategoryOptions"
-                            :model-value="selectedParentCategoryId"
-                            @update:model-value="
-                                (value) =>
-                                    (selectedParentCategoryId =
-                                        toCategoryId(value))
-                            "
-                            placeholder="Buscar categoría padre"
-                            search-placeholder="Buscar categoría padre"
-                            empty-results-text="Sin categorías disponibles"
-                            :loading="loading"
-                            :clearable="true"
-                        />
-                        <button
-                            type="button"
-                            @click="addParentCategory"
-                            :disabled="!selectedParentCategoryId"
-                            class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                        >
-                            <Plus class="h-4 w-4" />
-                            Agregar
-                        </button>
-                    </div>
-                    <div
-                        v-if="selectedParentCategories.length > 0"
-                        class="mt-2 flex flex-wrap gap-2"
-                    >
-                        <span
-                            v-for="category in selectedParentCategories"
-                            :key="category.id"
-                            class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
-                        >
-                            {{ formatCategoryLabel(category) }}
-                            <button
-                                type="button"
-                                @click="removeParentCategory(category.id)"
-                                class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
-                                :aria-label="`Quitar ${category.name}`"
-                            >
-                                <X class="h-3 w-3" />
-                            </button>
-                        </span>
-                    </div>
-                    <p
-                        v-else
-                        class="mt-2 text-xs text-gray-500 dark:text-gray-400"
-                    >
-                        Sin categorías padre seleccionadas
-                    </p>
-                    <p class="mt-1 text-xs text-gray-500">
-                        Agrega una o más categorías padre si esta es una
-                        subcategoría
-                    </p>
-                </div>
-
                 <!-- Description -->
                 <div>
                     <label
@@ -399,12 +266,14 @@ function goBack() {
                             </div>
                             <div class="flex items-end sm:col-span-2 sm:pb-2">
                                 <label
-                                    class="flex items-center gap-1 text-xs whitespace-nowrap text-gray-600 dark:text-gray-400"
+                                    class="flex cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap text-gray-600 dark:text-gray-400"
                                 >
-                                    <input
-                                        type="checkbox"
-                                        v-model="attr.required"
-                                        class="rounded"
+                                    <Checkbox
+                                        :model-value="attr.required"
+                                        @update:model-value="
+                                            (value) =>
+                                                (attr.required = value === true)
+                                        "
                                     />
                                     Obligatorio
                                 </label>
@@ -458,15 +327,18 @@ function goBack() {
                     <div
                         class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-muted/30"
                     >
-                        <!-- ITBM Checkbox + Porcentaje -->
-                        <div class="space-y-2">
+                        <!-- ITBM: solo si aplica; el porcentaje es siempre el de la tienda -->
+                        <div class="space-y-1">
                             <label
                                 class="flex cursor-pointer items-center gap-2"
                             >
-                                <input
-                                    type="checkbox"
-                                    v-model="form.applies_itbm"
-                                    class="rounded"
+                                <Checkbox
+                                    :model-value="form.applies_itbm"
+                                    data-testid="applies-itbm"
+                                    @update:model-value="
+                                        (value) =>
+                                            (form.applies_itbm = value === true)
+                                    "
                                 />
                                 <span
                                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -474,25 +346,16 @@ function goBack() {
                                     categoría</span
                                 >
                             </label>
-
-                            <div
+                            <p
                                 v-if="form.applies_itbm"
-                                class="flex items-center gap-3 pl-6"
+                                class="pl-6 text-xs text-gray-500 dark:text-gray-400"
+                                data-testid="itbm-store-rate"
                             >
-                                <label
-                                    class="text-sm text-gray-600 dark:text-gray-400"
-                                    >Porcentaje ITBM:</label
-                                >
-                                <input
-                                    v-model.number="form.itbm_percent"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="1"
-                                    class="w-20 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                />
-                                <span class="text-sm text-gray-500">%</span>
-                            </div>
+                                Se aplica el ITBM de la tienda ({{
+                                    defaultTaxRate()
+                                }}%). El porcentaje se cambia en Ajustes →
+                                Tienda.
+                            </p>
                         </div>
 
                         <!-- Pricing Formula -->

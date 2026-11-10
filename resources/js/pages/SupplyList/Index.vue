@@ -18,6 +18,7 @@ import { ref, onMounted, computed } from 'vue';
 import ProductSearchModal from '@/components/POS/ProductSearchModal.vue';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
@@ -675,12 +676,7 @@ onMounted(async () => {
         <div
             class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
         >
-            <div v-if="loading" class="p-12 text-center text-gray-500">
-                <div
-                    class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                ></div>
-                Cargando...
-            </div>
+            <LoadingState v-if="loading" label="Cargando..." />
             <div
                 v-else-if="filteredItems.length === 0"
                 class="p-12 text-center text-gray-400"

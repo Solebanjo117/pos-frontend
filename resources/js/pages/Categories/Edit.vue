@@ -4,6 +4,7 @@ import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import CategoryImagesSection from '@/components/Categories/CategoryImagesSection.vue';
 import { Checkbox } from '@/components/ui/checkbox';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -201,15 +202,11 @@ function goBack() {
             </div>
 
             <!-- Loading or Form -->
-            <div
+            <LoadingState
                 v-if="loading && !category"
-                class="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-border dark:bg-card"
-            >
-                <div
-                    class="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                ></div>
-                <p class="mt-4 text-gray-500">Cargando...</p>
-            </div>
+                class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                label="Cargando..."
+            />
 
             <form
                 v-else

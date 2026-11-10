@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { productsApi } from '@/services/api/products';
 import type {
     InventoryFifoLot,
@@ -894,12 +895,7 @@ defineExpose({
                 </button>
             </div>
 
-            <div
-                v-if="loading"
-                class="px-4 py-8 text-center text-sm text-gray-500"
-            >
-                Cargando historial de stock...
-            </div>
+            <LoadingState v-if="loading" label="Cargando historial de stock..." />
 
             <div v-else class="max-w-full overflow-x-auto">
                 <table

@@ -16,6 +16,7 @@ import { computed, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { transactionTraceService } from '@/services/transaction-traces';
@@ -193,12 +194,11 @@ function openReference(): void {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="space-y-5">
-            <div
+            <LoadingState
                 v-if="loading"
-                class="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-border dark:bg-card dark:text-gray-300"
-            >
-                Cargando movimiento...
-            </div>
+                class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                label="Cargando movimiento..."
+            />
 
             <div
                 v-else-if="error"
@@ -668,12 +668,10 @@ function openReference(): void {
                                 Movimientos relacionados
                             </h2>
                         </div>
-                        <div
+                        <LoadingState
                             v-if="loadingRelated"
-                            class="px-4 py-6 text-sm text-gray-500"
-                        >
-                            Cargando relacionados...
-                        </div>
+                            label="Cargando relacionados..."
+                        />
                         <div v-else class="overflow-x-auto">
                             <table class="min-w-full text-left text-sm">
                                 <thead

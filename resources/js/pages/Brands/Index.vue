@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { Search, Plus, Pencil, Trash2, Tag, Upload } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import Pagination from '@/components/Pagination.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -155,18 +156,8 @@ onMounted(async () => {
                             class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
                         >
                             <tr v-if="loading">
-                                <td
-                                    colspan="5"
-                                    class="px-6 py-12 text-center text-gray-500"
-                                >
-                                    <div
-                                        class="flex items-center justify-center gap-2"
-                                    >
-                                        <div
-                                            class="h-5 w-5 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                                        ></div>
-                                        Cargando...
-                                    </div>
+                                <td colspan="5">
+                                    <LoadingState label="Cargando..." />
                                 </td>
                             </tr>
                             <tr v-else-if="brands.length === 0">

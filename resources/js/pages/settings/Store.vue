@@ -23,6 +23,7 @@ import {
 } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -421,12 +422,11 @@ const handleResetData = async () => {
                     {{ error }}
                 </div>
 
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="rounded-lg border bg-card py-12 text-center text-sm text-muted-foreground"
-                >
-                    Cargando configuracion...
-                </div>
+                    class="rounded-lg border bg-card"
+                    label="Cargando configuracion..."
+                />
 
                 <form
                     v-else
@@ -788,12 +788,10 @@ const handleResetData = async () => {
                             </button>
                         </div>
 
-                        <div
+                        <LoadingState
                             v-if="paymentMethodsLoading"
-                            class="py-8 text-center text-sm text-muted-foreground"
-                        >
-                            Cargando metodos...
-                        </div>
+                            label="Cargando metodos..."
+                        />
 
                         <div v-else class="overflow-hidden rounded-md border">
                             <table class="w-full text-sm">

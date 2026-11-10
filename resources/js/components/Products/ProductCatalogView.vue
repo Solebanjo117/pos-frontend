@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import type { Product } from '@/types/product';
 import ProductCard from './ProductCard.vue';
 import ProductDetailModal from './ProductDetailModal.vue';
@@ -342,14 +343,7 @@ const requestNextPage = () => {
             <!-- Product Grid/List -->
             <main class="flex-1">
                 <!-- Loading -->
-                <div v-if="loading" class="py-16 text-center">
-                    <div
-                        class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                    ></div>
-                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                        Cargando catálogo...
-                    </p>
-                </div>
+                <LoadingState v-if="loading" label="Cargando catálogo..." />
 
                 <!-- Empty State -->
                 <div

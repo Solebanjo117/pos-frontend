@@ -10,9 +10,10 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { SalesReturnOperationalDetail } from '@/types/sales-return';
 
@@ -152,9 +153,11 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
             Volver a devoluciones
         </button>
 
-        <div v-if="loading" class="rounded-lg border bg-white p-8 text-center">
-            Cargando devolución...
-        </div>
+        <LoadingState
+            v-if="loading"
+            class="rounded-lg border bg-white"
+            label="Cargando devolución..."
+        />
 
         <div
             v-else-if="error"

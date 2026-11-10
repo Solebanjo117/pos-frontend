@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RefreshCw } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { categoriesService } from '@/services/categories';
 
 interface CategoryOption {
@@ -171,12 +172,11 @@ onBeforeUnmount(() => {
             Selecciona una categoría para ver imágenes heredadas.
         </div>
 
-        <div
+        <LoadingState
             v-else-if="loading"
-            class="rounded-md border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-border dark:text-gray-400"
-        >
-            Cargando imágenes heredadas...
-        </div>
+            class="rounded-md border border-dashed border-gray-300 dark:border-border"
+            label="Cargando imágenes heredadas..."
+        />
 
         <div
             v-else-if="inheritedImages.length === 0"

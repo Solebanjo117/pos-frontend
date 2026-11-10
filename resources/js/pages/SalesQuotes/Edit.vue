@@ -15,6 +15,7 @@ import {
     AlertTriangle,
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -351,12 +352,7 @@ onMounted(async () => {
 
     <div class="mx-auto w-full max-w-7xl">
         <!-- Loading -->
-        <div v-if="loading" class="py-20 text-center text-gray-500">
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
-            ></div>
-            Cargando cotización...
-        </div>
+        <LoadingState v-if="loading" label="Cargando cotización..." />
 
         <!-- Error -->
         <div

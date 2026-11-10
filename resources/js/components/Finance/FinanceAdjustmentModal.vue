@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -381,12 +382,7 @@ async function submit(): Promise<void> {
             >
                 {{ error }}
             </div>
-            <div
-                v-if="loading"
-                class="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"
-            >
-                <LoaderCircle class="size-4 animate-spin" /> Cargando opciones…
-            </div>
+            <LoadingState v-if="loading" label="Cargando opciones..." />
 
             <div v-else-if="confirmation" class="space-y-4">
                 <div class="rounded-xl border bg-muted/30 p-4">

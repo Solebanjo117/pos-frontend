@@ -7,6 +7,7 @@ import PageShell from '@/components/PageShell.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { financialAdjustmentsService } from '@/services/financial-adjustments';
 import type { BreadcrumbItem } from '@/types';
@@ -194,12 +195,10 @@ onMounted(async () => {
                         >Página {{ page }} de {{ lastPage }}</span
                     >
                 </div>
-                <div
+                <LoadingState
                     v-if="loading && rows.length === 0"
-                    class="p-12 text-center text-sm text-muted-foreground"
-                >
-                    Cargando ajustes…
-                </div>
+                    label="Cargando ajustes..."
+                />
                 <div v-else-if="rows.length === 0" class="p-12 text-center">
                     <p class="font-medium">No hay ajustes para estos filtros</p>
                     <p class="mt-1 text-sm text-muted-foreground">

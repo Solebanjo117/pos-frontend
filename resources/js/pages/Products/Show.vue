@@ -18,6 +18,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useToast } from '@/composables/useToast';
@@ -532,17 +533,11 @@ watch(effectiveImages, () => {
                     </div>
                 </div>
 
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-border dark:bg-card"
-                >
-                    <div
-                        class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-emerald-600 border-r-transparent"
-                    ></div>
-                    <p class="mt-3 text-sm text-gray-500">
-                        Cargando producto...
-                    </p>
-                </div>
+                    class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                    label="Cargando producto..."
+                />
 
                 <div
                     v-else-if="error"

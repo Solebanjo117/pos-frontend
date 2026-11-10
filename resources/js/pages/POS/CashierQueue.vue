@@ -15,6 +15,7 @@ import {
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useCashierQueue,
     type CashierQueueEntry,
@@ -604,12 +605,10 @@ async function confirmRemove() {
             </button>
         </header>
 
-        <div
+        <LoadingState
             v-if="loading && !entries.length"
-            class="py-14 text-center text-sm text-muted-foreground"
-        >
-            Cargando cola...
-        </div>
+            label="Cargando cola..."
+        />
         <div
             v-else-if="error"
             class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
@@ -1297,12 +1296,10 @@ async function confirmRemove() {
                 </button>
             </div>
             <div class="flex-1 overflow-y-auto px-5 py-4">
-                <div
+                <LoadingState
                     v-if="summaryLoading"
-                    class="py-10 text-center text-sm text-muted-foreground"
-                >
-                    Cargando pedido...
-                </div>
+                    label="Cargando pedido..."
+                />
                 <div v-else-if="summaryEntry" class="space-y-3">
                     <article
                         v-for="item in summaryEntry.items"

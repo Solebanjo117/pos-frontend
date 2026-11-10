@@ -9,6 +9,7 @@ import {
     DialogScrollContent,
     DialogTitle,
 } from '@/components/ui/dialog';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import apiClient from '@/services/api/client';
 import { CustomersApiService } from '@/services/customers';
 import type {
@@ -254,12 +255,7 @@ watch(
                 <DialogTitle>{{ title }}</DialogTitle>
             </DialogHeader>
 
-            <div
-                v-if="loading"
-                class="py-10 text-center text-sm text-muted-foreground"
-            >
-                Cargando...
-            </div>
+            <LoadingState v-if="loading" label="Cargando..." />
             <form v-else class="space-y-6" @submit.prevent="submit">
                 <div
                     v-if="error"

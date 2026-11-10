@@ -19,6 +19,7 @@ import {
 import { Banknote } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
@@ -332,12 +333,7 @@ onMounted(() => fetchQuotes());
         </div>
 
         <!-- Loading -->
-        <div v-if="loading" class="py-12 text-center text-gray-500">
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
-            ></div>
-            Cargando cotizaciones...
-        </div>
+        <LoadingState v-if="loading" label="Cargando cotizaciones..." />
 
         <!-- Empty State -->
         <div

@@ -15,6 +15,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWorkOrders } from '@/composables/useWorkOrders';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
@@ -295,12 +296,7 @@ onMounted(loadWorkOrders);
             <div
                 class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
             >
-                <div
-                    v-if="loading"
-                    class="flex items-center justify-center py-16 text-sm text-slate-500"
-                >
-                    Cargando ordenes...
-                </div>
+                <LoadingState v-if="loading" label="Cargando ordenes..." />
 
                 <div
                     v-else-if="workOrders.length === 0"

@@ -10,6 +10,7 @@ import {
     ArrowRight,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -138,9 +139,7 @@ const formatDate = (date: string | null) => {
     <Head :title="`Transferencia ${transfer?.reference || ''}`" />
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="mx-auto w-full max-w-4xl space-y-6">
-            <div v-if="loading" class="py-12 text-center text-gray-500">
-                Cargando...
-            </div>
+            <LoadingState v-if="loading" label="Cargando..." />
 
             <template v-else-if="transfer">
                 <!-- Header -->

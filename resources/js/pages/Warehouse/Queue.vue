@@ -4,6 +4,7 @@ import { PackageSearch, Package, CheckCircle, X } from 'lucide-vue-next';
 import { ref, onMounted, onUnmounted } from 'vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import SalesQueueCard from '@/components/Queues/SalesQueueCard.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useWarehouseQueue,
     type WarehouseOrder,
@@ -117,15 +118,10 @@ const handlePrepare = async (order: WarehouseOrder) => {
         </div>
 
         <!-- Loading -->
-        <div
+        <LoadingState
             v-if="loading && orders.length === 0"
-            class="py-16 text-center text-gray-500"
-        >
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
-            ></div>
-            Cargando órdenes pendientes...
-        </div>
+            label="Cargando órdenes pendientes..."
+        />
 
         <!-- Error -->
         <div

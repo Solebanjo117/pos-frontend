@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
 import { BookOpen, Columns3, FileText, Scale } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { ReportsApiService } from '@/services/reports';
 import type {
     AccountingAccountSummary,
@@ -181,12 +182,11 @@ onMounted(() => {
             {{ error }}
         </div>
 
-        <div
+        <LoadingState
             v-if="loading"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
-        >
-            Cargando contabilidad...
-        </div>
+            class="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+            label="Cargando contabilidad..."
+        />
 
         <div
             v-else-if="!hasLedger"

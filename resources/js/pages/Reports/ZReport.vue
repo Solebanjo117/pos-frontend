@@ -22,6 +22,7 @@ import FinanceAccountingPanel from '@/components/Finance/FinanceAccountingPanel.
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceMethodBars from '@/components/Finance/FinanceMethodBars.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -417,13 +418,11 @@ onMounted(async () => {
                 {{ error }}
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading && !report"
-                class="rounded-lg border border-slate-200 bg-white py-14 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
-            >
-                <RefreshCw :size="20" class="mx-auto mb-3 animate-spin" />
-                Cargando cierre de caja...
-            </div>
+                class="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                label="Cargando cierre de caja..."
+            />
 
             <template v-else-if="report">
                 <div class="grid gap-3 md:grid-cols-5">

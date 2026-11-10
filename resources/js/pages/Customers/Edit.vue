@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save, Building2, User } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -88,9 +89,10 @@ const goBack = () => {
         </div>
 
         <!-- Loading -->
-        <div v-if="loading && !currentCustomer" class="py-12 text-center">
-            Cargando cliente...
-        </div>
+        <LoadingState
+            v-if="loading && !currentCustomer"
+            label="Cargando cliente..."
+        />
 
         <!-- Error message -->
         <div

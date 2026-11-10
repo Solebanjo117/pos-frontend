@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import BrandTierPicker from '@/components/Brands/BrandTierPicker.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
@@ -98,15 +99,11 @@ function goBack() {
             </div>
 
             <!-- Loading or Form -->
-            <div
+            <LoadingState
                 v-if="loading && !brand"
-                class="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-border dark:bg-card"
-            >
-                <div
-                    class="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                ></div>
-                <p class="mt-4 text-gray-500">Cargando...</p>
-            </div>
+                class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                label="Cargando..."
+            />
 
             <form
                 v-else

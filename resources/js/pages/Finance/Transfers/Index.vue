@@ -5,6 +5,7 @@ import { onMounted, ref } from 'vue';
 import PageShell from '@/components/PageShell.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { financialTransfersService } from '@/services/financial-transfers';
 import type { BreadcrumbItem } from '@/types';
@@ -70,12 +71,10 @@ onMounted(loadTransfers);
                 {{ error }}
             </div>
             <div class="overflow-hidden rounded-xl border bg-card">
-                <div
+                <LoadingState
                     v-if="loading && transfers.length === 0"
-                    class="p-10 text-center text-sm text-muted-foreground"
-                >
-                    Cargando transferencias…
-                </div>
+                    label="Cargando transferencias..."
+                />
                 <div
                     v-else-if="transfers.length === 0"
                     class="p-10 text-center"

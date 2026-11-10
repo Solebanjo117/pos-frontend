@@ -10,6 +10,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { posService } from '@/services/api/pos';
@@ -443,11 +444,8 @@ onMounted(async () => {
                 </thead>
                 <tbody class="divide-y divide-border">
                     <tr v-if="loading">
-                        <td
-                            colspan="7"
-                            class="px-3 py-8 text-center text-muted-foreground"
-                        >
-                            Cargando transacciones…
+                        <td colspan="7">
+                            <LoadingState label="Cargando transacciones..." />
                         </td>
                     </tr>
                     <tr v-else-if="rows.length === 0">

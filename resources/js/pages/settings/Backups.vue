@@ -11,6 +11,7 @@ import {
     RefreshCw,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
@@ -191,12 +192,11 @@ onMounted(fetchBackups);
                     {{ error }}
                 </div>
 
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="rounded-lg border bg-card py-10 text-center text-sm text-muted-foreground"
-                >
-                    Cargando backups...
-                </div>
+                    class="rounded-lg border bg-card"
+                    label="Cargando backups..."
+                />
 
                 <div v-else class="overflow-hidden rounded-lg border bg-card">
                     <table class="w-full text-sm">

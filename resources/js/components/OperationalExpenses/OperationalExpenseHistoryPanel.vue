@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { operationalExpensesService } from '@/services/operational-expenses';
 import type {
     OperationalExpense,
@@ -118,11 +119,8 @@ onMounted(load);
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-border">
                     <tr v-if="loading">
-                        <td
-                            colspan="5"
-                            class="px-4 py-8 text-center text-gray-500"
-                        >
-                            Cargando historial...
+                        <td colspan="5">
+                            <LoadingState label="Cargando historial..." />
                         </td>
                     </tr>
                     <tr v-else-if="expenses.length === 0">

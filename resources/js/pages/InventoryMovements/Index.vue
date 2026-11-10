@@ -11,11 +11,12 @@ import {
     Warehouse,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import InventoryMovementDrawer from '@/components/Traceability/InventoryMovementDrawer.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
-import InventoryMovementDrawer from '@/components/Traceability/InventoryMovementDrawer.vue';
-import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import { usePosSettings } from '@/composables/usePosSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -457,12 +458,11 @@ function formatNumber(value: number): string {
                 </div>
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-border dark:bg-card dark:text-gray-300"
-            >
-                Cargando movimientos...
-            </div>
+                class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                label="Cargando movimientos..."
+            />
 
             <div
                 v-else-if="error"

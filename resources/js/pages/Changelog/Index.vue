@@ -4,6 +4,7 @@ import { BookOpen, Clock3, Send, Tag } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import PageShell from '@/components/PageShell.vue';
 import { Button } from '@/components/ui/button';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     changelogApi,
@@ -98,17 +99,11 @@ onMounted(loadChangelog);
                 </span>
             </template>
 
-            <section
+            <LoadingState
                 v-if="loading"
-                class="rounded-lg border bg-card p-8 text-center"
-            >
-                <div
-                    class="mx-auto mb-3 size-8 animate-spin rounded-full border-4 border-primary border-t-transparent"
-                ></div>
-                <p class="text-sm text-muted-foreground">
-                    Cargando changelog...
-                </p>
-            </section>
+                class="rounded-lg border bg-card"
+                label="Cargando changelog..."
+            />
 
             <section
                 v-else-if="error"

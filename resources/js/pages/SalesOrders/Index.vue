@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReorderableColumns } from '@/composables/useReorderableColumns';
 import { useSalesOrders } from '@/composables/useSalesOrders';
@@ -530,11 +531,8 @@ watch(currentWarehouseId, async () => {
                         class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
                     >
                         <tr v-if="loading">
-                            <td
-                                colspan="7"
-                                class="px-4 py-12 text-center text-gray-500 dark:text-gray-400"
-                            >
-                                Cargando órdenes...
+                            <td colspan="7">
+                                <LoadingState label="Cargando órdenes..." />
                             </td>
                         </tr>
                         <tr v-else-if="!loading && salesOrders.length === 0">

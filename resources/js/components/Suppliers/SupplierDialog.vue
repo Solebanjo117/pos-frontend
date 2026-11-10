@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import { Search } from 'lucide-vue-next';
 import { computed, ref, useId, watch } from 'vue';
 import AppModal from '@/components/ui/AppModal.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { brandsService } from '@/services/brands';
 import { suppliersService } from '@/services/suppliers';
 import type {
@@ -144,9 +145,7 @@ watch(
         size="lg"
         @update:open="emit('update:open', $event)"
     >
-        <div v-if="loading" class="py-10 text-center text-muted-foreground">
-            Cargando...
-        </div>
+        <LoadingState v-if="loading" label="Cargando..." />
         <form v-else :id="formId" class="space-y-6" @submit.prevent="submit">
             <div
                 v-if="error || validationMessages.length"

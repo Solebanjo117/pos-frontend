@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { ref, onMounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -87,14 +88,10 @@ const handleCancel = () => {
             </div>
 
             <!-- Loading State -->
-            <div v-if="loading && !currentWarehouse" class="py-12 text-center">
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                ></div>
-                <p class="mt-2 text-gray-800 dark:text-gray-200">
-                    Cargando almacén...
-                </p>
-            </div>
+            <LoadingState
+                v-if="loading && !currentWarehouse"
+                label="Cargando almacén..."
+            />
 
             <!-- Error Alert -->
             <div

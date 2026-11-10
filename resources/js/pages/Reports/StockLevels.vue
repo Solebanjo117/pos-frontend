@@ -19,6 +19,7 @@ import StockStatusChart from '@/components/charts/StockStatusChart.vue';
 import TopProductsChart from '@/components/charts/TopProductsChart.vue';
 import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue';
 import Pagination from '@/components/Pagination.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -1028,14 +1029,7 @@ const inventoryProductHref = (product: {
             </div>
 
             <!-- Loading State -->
-            <div
-                v-else-if="loading"
-                class="flex items-center justify-center py-12"
-            >
-                <div class="text-gray-700 dark:text-gray-300">
-                    Cargando reporte...
-                </div>
-            </div>
+            <LoadingState v-else-if="loading" label="Cargando reporte..." />
         </div>
     </AppLayout>
 </template>

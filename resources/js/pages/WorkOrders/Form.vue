@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Plus, Save, Trash2, Wrench } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { productsApi } from '@/services/api/products';
 import { CustomersApiService } from '@/services/customers';
@@ -284,12 +285,11 @@ onMounted(async () => {
                 {{ error }}
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="rounded-md border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-            >
-                Cargando formulario...
-            </div>
+                class="rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                label="Cargando formulario..."
+            />
 
             <div v-else class="grid gap-5 xl:grid-cols-[1fr_360px]">
                 <div class="space-y-5">

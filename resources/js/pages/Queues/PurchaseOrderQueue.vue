@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowRight, ClipboardCheck, Factory } from 'lucide-vue-next';
 import { onMounted, onUnmounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     usePurchaseOrderQueue,
     type PendingReceiptOrder,
@@ -61,15 +62,10 @@ const goToReceive = (id: number) => {
             </div>
         </div>
 
-        <div
+        <LoadingState
             v-if="loading && orders.length === 0"
-            class="py-16 text-center text-gray-500"
-        >
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"
-            ></div>
-            Cargando pedidos pendientes...
-        </div>
+            label="Cargando pedidos pendientes..."
+        />
 
         <div
             v-else-if="error"

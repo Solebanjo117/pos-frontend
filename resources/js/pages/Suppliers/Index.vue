@@ -12,6 +12,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import Pagination from '@/components/Pagination.vue';
 import SupplierDialog from '@/components/Suppliers/SupplierDialog.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { brandsService } from '@/services/brands';
 import { categoriesService } from '@/services/categories';
@@ -353,12 +354,7 @@ onMounted(async () => {
                 </button>
             </div>
             <div class="overflow-hidden rounded-lg border bg-card">
-                <div
-                    v-if="loading"
-                    class="p-12 text-center text-muted-foreground"
-                >
-                    Cargando...
-                </div>
+                <LoadingState v-if="loading" label="Cargando..." />
                 <table v-else class="w-full text-sm">
                     <thead
                         class="border-b bg-muted/40 text-left text-xs text-muted-foreground uppercase"

@@ -13,6 +13,7 @@ import {
     Settings2,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCategories } from '@/composables/useCategories';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Category } from '@/types/category';
@@ -392,18 +393,10 @@ watch(pathSeparator, (value) => {
                             class="divide-y divide-gray-100 bg-white dark:divide-border/50 dark:bg-card"
                         >
                             <tr v-if="loading">
-                                <td
-                                    colspan="4"
-                                    class="px-6 py-12 text-center text-gray-500"
-                                >
-                                    <div
-                                        class="flex items-center justify-center gap-2"
-                                    >
-                                        <div
-                                            class="h-5 w-5 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                                        ></div>
-                                        Cargando estructura...
-                                    </div>
+                                <td colspan="4">
+                                    <LoadingState
+                                        label="Cargando estructura..."
+                                    />
                                 </td>
                             </tr>
                             <tr v-else-if="filteredCategories.length === 0">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Trash2, Lock } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useProductAttributes,
     type ProductAttribute,
@@ -261,12 +262,10 @@ const handleRemoveAttribute = async (attributeId: number) => {
         <div
             class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
         >
-            <div
+            <LoadingState
                 v-if="loading && displayedAttributes.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500"
-            >
-                Cargando especificaciones...
-            </div>
+                label="Cargando especificaciones..."
+            />
 
             <div
                 v-else-if="displayedAttributes.length === 0"

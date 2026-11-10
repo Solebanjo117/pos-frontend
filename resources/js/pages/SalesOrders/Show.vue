@@ -26,6 +26,7 @@ import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useUsers } from '@/composables/useUsers';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -601,9 +602,10 @@ onMounted(async () => {
     <Head :title="`Factura ${order?.order_number || ''}`" />
 
     <AppLayout>
-        <div v-if="loading || operationalLoading" class="text-sm text-gray-500">
-            Cargando ficha operativa...
-        </div>
+        <LoadingState
+            v-if="loading || operationalLoading"
+            label="Cargando ficha operativa..."
+        />
 
         <div
             v-else-if="error || operationalError"

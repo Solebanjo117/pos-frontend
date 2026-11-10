@@ -5,9 +5,9 @@ import {
     ArrowLeft,
     ChevronLeft,
     ChevronRight,
-    LoaderCircle,
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     Sheet,
     SheetContent,
@@ -168,13 +168,11 @@ onBeforeUnmount(() => traceAbortController?.abort());
                 </SheetDescription>
             </SheetHeader>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="flex flex-1 items-center justify-center p-8 text-sm text-slate-500"
-            >
-                <LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-                Cargando trazabilidad...
-            </div>
+                class="flex-1"
+                label="Cargando trazabilidad..."
+            />
             <div
                 v-else-if="error"
                 class="m-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"

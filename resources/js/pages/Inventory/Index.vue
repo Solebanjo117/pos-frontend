@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import { ref, onMounted, computed } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -300,11 +301,10 @@ const formatCurrency = (value: number | null) => {
                             class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
                         >
                             <tr v-if="loading">
-                                <td
-                                    colspan="9"
-                                    class="px-6 py-4 text-center text-gray-500 dark:text-gray-400"
-                                >
-                                    Cargando inventario...
+                                <td colspan="9">
+                                    <LoadingState
+                                        label="Cargando inventario..."
+                                    />
                                 </td>
                             </tr>
                             <tr v-else-if="inventory.length === 0">

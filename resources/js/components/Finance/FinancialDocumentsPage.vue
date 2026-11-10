@@ -5,7 +5,6 @@ import {
     ChevronLeft,
     ChevronRight,
     FileText,
-    LoaderCircle,
     Pencil,
     Plus,
     RefreshCw,
@@ -15,6 +14,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import FinancialDocumentPaymentDialog from '@/components/Finance/FinancialDocumentPaymentDialog.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -382,15 +382,10 @@ onMounted(load);
                                 class="divide-y divide-gray-100 dark:divide-border"
                             >
                                 <tr v-if="loading">
-                                    <td
-                                        colspan="8"
-                                        class="px-4 py-12 text-center text-gray-500"
-                                    >
-                                        <LoaderCircle
-                                            :size="22"
-                                            class="mx-auto mb-2 animate-spin"
+                                    <td colspan="8">
+                                        <LoadingState
+                                            label="Cargando documentos..."
                                         />
-                                        Cargando documentos...
                                     </td>
                                 </tr>
                                 <tr v-else-if="documents.length === 0">
@@ -500,12 +495,10 @@ onMounted(load);
                     <div
                         class="divide-y divide-gray-100 md:hidden dark:divide-border"
                     >
-                        <div
+                        <LoadingState
                             v-if="loading"
-                            class="p-10 text-center text-sm text-gray-500"
-                        >
-                            Cargando documentos...
-                        </div>
+                            label="Cargando documentos..."
+                        />
                         <div
                             v-else-if="documents.length === 0"
                             class="p-10 text-center text-sm text-gray-500"

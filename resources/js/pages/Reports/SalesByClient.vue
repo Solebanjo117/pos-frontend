@@ -34,6 +34,7 @@ import { Bar } from 'vue-chartjs';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -551,13 +552,10 @@ onMounted(async () => {
                     </button>
                 </header>
 
-                <div
+                <LoadingState
                     v-if="loading && !report"
-                    class="py-16 text-center text-sm text-slate-500 dark:text-slate-400"
-                >
-                    <RefreshCw :size="20" class="mx-auto mb-3 animate-spin" />
-                    Cargando ventas por cliente...
-                </div>
+                    label="Cargando ventas por cliente..."
+                />
 
                 <div v-else class="overflow-x-auto">
                     <table

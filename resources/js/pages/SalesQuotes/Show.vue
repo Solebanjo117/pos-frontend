@@ -21,6 +21,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
@@ -235,12 +236,11 @@ onMounted(fetchDetail);
     <Head :title="`Cotizacion ${quote?.quote_number || ''}`" />
 
     <div class="mx-auto w-full max-w-7xl space-y-5">
-        <div
+        <LoadingState
             v-if="loading"
-            class="flex min-h-80 items-center justify-center text-sm font-medium text-slate-500 dark:text-slate-400"
-        >
-            Cargando cotizacion...
-        </div>
+            class="min-h-80"
+            label="Cargando cotizacion..."
+        />
 
         <div
             v-else-if="error"

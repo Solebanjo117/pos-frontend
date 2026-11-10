@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { financialAdjustmentsService } from '@/services/financial-adjustments';
 import type { BreadcrumbItem } from '@/types';
@@ -110,12 +111,7 @@ onMounted(load);
                     ><RotateCcw class="size-4" />Revertir ajuste</Button
                 ></template
             >
-            <div
-                v-if="loading"
-                class="p-12 text-center text-sm text-muted-foreground"
-            >
-                Cargando ajuste…
-            </div>
+            <LoadingState v-if="loading" label="Cargando ajuste..." />
             <div
                 v-else-if="error && !adjustment"
                 role="alert"

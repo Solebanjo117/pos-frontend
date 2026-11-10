@@ -23,6 +23,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -980,13 +981,10 @@ onBeforeUnmount(() => {
             <div
                 class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card"
             >
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="flex items-center justify-center py-16 text-sm text-slate-500 dark:text-slate-400"
-                >
-                    <RefreshCw :size="20" class="mr-2 animate-spin" />
-                    Cargando cierres de caja...
-                </div>
+                    label="Cargando cierres de caja..."
+                />
 
                 <div v-else class="overflow-x-auto">
                     <table class="w-full text-sm">

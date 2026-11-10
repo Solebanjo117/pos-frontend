@@ -7,6 +7,7 @@ import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import ProductFiltersComponent from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import type { SelectOption } from '@/components/ui/SearchableSelect.vue';
@@ -960,14 +961,10 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 </div>
 
                 <!-- Loading State (solo primera carga) -->
-                <div v-if="!hasLoadedOnce" class="py-12 text-center">
-                    <div
-                        class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                    ></div>
-                    <p class="mt-2 text-gray-800 dark:text-gray-200">
-                        Cargando productos...
-                    </p>
-                </div>
+                <LoadingState
+                    v-if="!hasLoadedOnce"
+                    label="Cargando productos..."
+                />
 
                 <!-- Error State -->
                 <div

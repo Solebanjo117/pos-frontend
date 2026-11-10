@@ -22,8 +22,9 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
-import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
+import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -971,12 +972,7 @@ const removeVariant = async (variantId?: number | null) => {
                             </button>
                         </div>
                     </div>
-                    <div
-                        v-if="purchaseHistoryLoading"
-                        class="p-8 text-sm text-gray-500"
-                    >
-                        Cargando historial...
-                    </div>
+                    <LoadingState v-if="purchaseHistoryLoading" label="Cargando historial..." />
                     <div v-else class="overflow-x-auto">
                         <table class="min-w-full text-sm">
                             <thead
@@ -1393,14 +1389,7 @@ const removeVariant = async (variantId?: number | null) => {
                         </div>
                     </div>
 
-                    <div v-if="loadingSupplierProducts" class="p-8 text-center">
-                        <div
-                            class="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600"
-                        ></div>
-                        <p class="mt-3 text-sm text-gray-500">
-                            Cargando productos suministrados...
-                        </p>
-                    </div>
+                    <LoadingState v-if="loadingSupplierProducts" label="Cargando productos suministrados..." />
 
                     <div
                         v-else-if="groupedSupplierProducts.length"

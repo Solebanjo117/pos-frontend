@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -987,12 +988,10 @@ const handleViewAlternative = async (altId: number) => {
                                 >
                                     Especificaciones Técnicas
                                 </h6>
-                                <div
+                                <LoadingState
                                     v-if="loadingAttrs"
-                                    class="animate-pulse py-2 text-sm text-gray-400"
-                                >
-                                    Cargando especificaciones...
-                                </div>
+                                    label="Cargando especificaciones..."
+                                />
                                 <div
                                     v-else-if="mergedSpecs.length === 0"
                                     class="py-2 text-sm text-gray-400 italic"
@@ -1345,12 +1344,10 @@ const handleViewAlternative = async (altId: number) => {
                         </div>
 
                         <div class="custom-scrollbar flex-1 overflow-y-auto">
-                            <div
+                            <LoadingState
                                 v-if="loadingVehicle"
-                                class="animate-pulse p-4 text-sm text-gray-400"
-                            >
-                                Cargando compatibilidad...
-                            </div>
+                                label="Cargando compatibilidad..."
+                            />
                             <div
                                 v-else-if="product.is_universal"
                                 class="bg-blue-50/50 p-6 text-center text-sm text-blue-600 italic dark:bg-blue-900/10 dark:text-blue-400"

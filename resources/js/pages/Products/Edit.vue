@@ -9,6 +9,7 @@ import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes';
 import { useProducts } from '@/composables/useProducts';
@@ -862,15 +863,10 @@ const validationErrorItems = computed(() =>
             </div>
 
             <!-- Loading -->
-            <div
+            <LoadingState
                 v-if="initialLoading || (loading && !currentProduct)"
-                class="py-12 text-center"
-            >
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                ></div>
-                <p class="mt-2 text-gray-600">Cargando producto...</p>
-            </div>
+                label="Cargando producto..."
+            />
 
             <div v-else class="space-y-4">
                 <!-- Success Message -->

@@ -11,6 +11,7 @@ import {
     Eye,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -129,9 +130,7 @@ const totalItems = (items: any[]) =>
             </div>
 
             <!-- Loading -->
-            <div v-if="loading" class="py-12 text-center text-gray-500">
-                Cargando...
-            </div>
+            <LoadingState v-if="loading" label="Cargando..." />
 
             <!-- Empty -->
             <div v-else-if="transfers.length === 0" class="py-12 text-center">

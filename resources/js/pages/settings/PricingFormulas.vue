@@ -12,6 +12,7 @@ import {
     AlertCircle,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePricingFormulas } from '@/composables/usePricingFormulas';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -199,12 +200,10 @@ const toggleActive = async (formula: PricingFormula) => {
             <div
                 class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
             >
-                <div
+                <LoadingState
                     v-if="loading && formulas.length === 0"
-                    class="p-8 text-center text-gray-500"
-                >
-                    Cargando fórmulas...
-                </div>
+                    label="Cargando fórmulas..."
+                />
 
                 <table
                     v-else

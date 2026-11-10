@@ -13,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useAuth } from '@/composables/useAuth';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { financialTransfersService } from '@/services/financial-transfers';
@@ -101,12 +102,7 @@ onMounted(loadTransfer);
                     Reversar
                 </Button>
             </template>
-            <div
-                v-if="loading"
-                class="p-10 text-center text-sm text-muted-foreground"
-            >
-                Cargando transferencia…
-            </div>
+            <LoadingState v-if="loading" label="Cargando transferencia..." />
             <div
                 v-else-if="error"
                 class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"

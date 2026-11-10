@@ -10,6 +10,7 @@ import {
     Warehouse,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -768,17 +769,11 @@ function pageItemLabel(): string {
                 </div>
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="rounded-lg border border-gray-200 bg-white py-12 text-center dark:border-border dark:bg-card"
-            >
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"
-                ></div>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                    Cargando inventario...
-                </p>
-            </div>
+                class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                label="Cargando inventario..."
+            />
 
             <div
                 v-else-if="error"

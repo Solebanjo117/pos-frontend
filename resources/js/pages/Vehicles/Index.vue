@@ -17,6 +17,7 @@ import Pagination from '@/components/Pagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import VehicleCatalogDialog from '@/components/Vehicles/VehicleCatalogDialog.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useToast } from '@/composables/useToast';
@@ -576,13 +577,11 @@ onBeforeUnmount(() => {
                         Reintentar
                     </Button>
                 </div>
-                <div
+                <LoadingState
                     v-else-if="loading"
-                    class="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground"
-                >
-                    <LoaderCircle class="h-5 w-5 animate-spin" />Cargando
-                    catálogo…
-                </div>
+                    class="min-h-64"
+                    label="Cargando catálogo..."
+                />
                 <div
                     v-else-if="rows.length === 0"
                     class="flex min-h-64 flex-col items-center justify-center p-6 text-center"

@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 import TraceableCell from '@/components/Traceability/TraceableCell.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import type { FinancialDrilldownReport } from '@/types/report';
 import type { TransactionTraceNode } from '@/types/transaction-trace';
 import { formatReportDateTime } from '@/utils/formatters';
@@ -198,12 +199,11 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
             </div>
 
             <div class="min-h-0 flex-1 overflow-auto p-4">
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="rounded-md border border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400"
-                >
-                    Cargando detalle...
-                </div>
+                    class="rounded-md border border-slate-200 dark:border-slate-800"
+                    label="Cargando detalle..."
+                />
 
                 <template v-else-if="report?.rows?.length">
                     <div class="space-y-2 md:hidden">

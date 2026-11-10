@@ -19,6 +19,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import {
     useVehicleCatalog,
@@ -421,11 +422,8 @@ onMounted(async () => {
                             </thead>
                             <tbody class="divide-y">
                                 <tr v-if="loading">
-                                    <td
-                                        :colspan="canManageCustomers ? 7 : 6"
-                                        class="px-4 py-10 text-center text-muted-foreground"
-                                    >
-                                        Cargando...
+                                    <td :colspan="canManageCustomers ? 7 : 6">
+                                        <LoadingState label="Cargando..." />
                                     </td>
                                 </tr>
                                 <tr v-else-if="customers.length === 0">
@@ -561,12 +559,10 @@ onMounted(async () => {
                         >Abrir administrador</Link
                     >
                 </div>
-                <div
+                <LoadingState
                     v-if="vehicleLoading"
-                    class="p-10 text-center text-muted-foreground"
-                >
-                    Cargando vehículos...
-                </div>
+                    label="Cargando vehículos..."
+                />
                 <div v-else class="divide-y">
                     <div
                         v-for="row in vehicleRows"

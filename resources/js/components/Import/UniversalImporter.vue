@@ -44,6 +44,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import {
     Tooltip,
@@ -5155,16 +5156,7 @@ const formatFileSize = (bytes: number) => {
                 </button>
             </div>
 
-            <div
-                v-if="
-                    importHistoryExpanded &&
-                    importRunsLoading &&
-                    importRuns.length === 0
-                "
-                class="px-6 py-6 text-sm text-gray-500 dark:text-gray-400"
-            >
-                Cargando historial...
-            </div>
+            <LoadingState v-if=" importHistoryExpanded && importRunsLoading && importRuns.length === 0 " label="Cargando historial..." />
             <div
                 v-else-if="importHistoryExpanded && importRuns.length === 0"
                 class="px-6 py-6 text-sm text-gray-500 dark:text-gray-400"

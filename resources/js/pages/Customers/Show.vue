@@ -21,7 +21,6 @@ import {
     Phone,
     Plus,
     Receipt,
-    RefreshCw,
     Search,
     Trash2,
     UserCircle2,
@@ -30,6 +29,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import CustomerProfileMetric from '@/components/Customers/CustomerProfileMetric.vue';
 import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { CustomersApiService } from '@/services/customers';
@@ -663,13 +663,11 @@ onMounted(async () => {
                     {{ error }}
                 </div>
 
-                <div
+                <LoadingState
                     v-if="loading && !customer"
-                    class="rounded-lg border border-slate-200 bg-white py-20 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
-                >
-                    <RefreshCw :size="22" class="mx-auto mb-3 animate-spin" />
-                    Cargando perfil del cliente...
-                </div>
+                    class="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                    label="Cargando perfil del cliente..."
+                />
 
                 <template v-else-if="customer">
                     <section
@@ -1231,16 +1229,10 @@ onMounted(async () => {
                                     {{ historyError }}
                                 </div>
 
-                                <div
+                                <LoadingState
                                     v-if="historyLoading"
-                                    class="py-14 text-center text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    <RefreshCw
-                                        :size="19"
-                                        class="mx-auto mb-3 animate-spin"
-                                    />
-                                    Cargando historial...
-                                </div>
+                                    label="Cargando historial..."
+                                />
 
                                 <template v-else>
                                     <div
@@ -1554,12 +1546,11 @@ onMounted(async () => {
                                             </Link>
                                         </div>
 
-                                        <div
+                                        <LoadingState
                                             v-if="workOrdersLoading"
-                                            class="rounded-lg border border-slate-200 p-8 text-center text-sm text-slate-500 dark:border-slate-800"
-                                        >
-                                            Cargando ordenes...
-                                        </div>
+                                            class="rounded-lg border border-slate-200 dark:border-slate-800"
+                                            label="Cargando ordenes..."
+                                        />
 
                                         <article
                                             v-for="workOrder in customerWorkOrders"

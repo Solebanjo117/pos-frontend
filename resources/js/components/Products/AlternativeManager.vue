@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import apiClient from '@/services/api/client';
 
 interface Alternative {
@@ -212,12 +213,10 @@ onMounted(() => {
         <div
             class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
         >
-            <div
+            <LoadingState
                 v-if="loading && displayedAlternatives.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500"
-            >
-                Cargando upsales...
-            </div>
+                label="Cargando upsales..."
+            />
 
             <div
                 v-else-if="displayedAlternatives.length === 0"

@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -295,14 +296,7 @@ const getExpiryColor = (dateString: string | null) => {
             </div>
 
             <!-- Loading State -->
-            <div v-if="loading" class="py-12 text-center">
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                ></div>
-                <p class="mt-2 text-gray-800 dark:text-gray-200">
-                    Cargando inventario...
-                </p>
-            </div>
+            <LoadingState v-if="loading" label="Cargando inventario..." />
 
             <!-- Error State -->
             <div

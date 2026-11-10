@@ -10,6 +10,7 @@ import {
     Filter,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 
@@ -185,12 +186,7 @@ onMounted(() => fetchLogs());
         </div>
 
         <!-- Loading -->
-        <div v-if="loading" class="py-12 text-center text-gray-500">
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
-            ></div>
-            Cargando registros...
-        </div>
+        <LoadingState v-if="loading" label="Cargando registros..." />
 
         <!-- Error -->
         <div

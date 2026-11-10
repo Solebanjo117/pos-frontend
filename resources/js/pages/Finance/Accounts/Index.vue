@@ -14,6 +14,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -405,11 +406,8 @@ onMounted(load);
                                 </td>
                             </tr>
                             <tr v-if="loading">
-                                <td
-                                    colspan="9"
-                                    class="px-3 py-10 text-center text-sm text-muted-foreground"
-                                >
-                                    Cargando cuentas…
+                                <td colspan="9">
+                                    <LoadingState label="Cargando cuentas..." />
                                 </td>
                             </tr>
                         </tbody>

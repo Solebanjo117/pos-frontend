@@ -11,6 +11,7 @@ import {
     Wrench,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     WorkOrdersApiService,
@@ -123,12 +124,11 @@ onMounted(loadOrder);
                 {{ error }}
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="rounded-md border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-            >
-                Cargando orden...
-            </div>
+                class="rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                label="Cargando orden..."
+            />
 
             <template v-else-if="order">
                 <section

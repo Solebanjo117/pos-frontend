@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { CheckCircle } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -164,14 +165,7 @@ const formatUtilization = (warehouse: any) => {
             </div>
 
             <!-- Loading State -->
-            <div v-if="loading" class="py-12 text-center">
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                ></div>
-                <p class="mt-2 text-gray-800 dark:text-gray-200">
-                    Cargando almacenes...
-                </p>
-            </div>
+            <LoadingState v-if="loading" label="Cargando almacenes..." />
 
             <!-- Error State -->
             <div

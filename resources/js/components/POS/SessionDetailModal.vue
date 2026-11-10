@@ -17,12 +17,9 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
-import {
-    formatCurrency,
-    formatDuration as fmtDuration,
-} from '@/utils/formatters';
+import LoadingState from '@/components/ui/LoadingState.vue';
+import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type {
     AccountPaymentRecord,
     CashMovementRecord,
@@ -33,6 +30,10 @@ import type {
     PurchasePaymentRecord,
     SessionSalesOrder,
 } from '@/services/posSessions';
+import {
+    formatCurrency,
+    formatDuration as fmtDuration,
+} from '@/utils/formatters';
 
 interface ReconciliationRow {
     code: string;
@@ -496,12 +497,11 @@ const handlePrint = () => {
                 </div>
             </header>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="flex min-h-80 items-center justify-center text-sm font-medium text-slate-500 dark:text-slate-400"
-            >
-                Cargando detalle del cierre...
-            </div>
+                class="min-h-80"
+                label="Cargando detalle del cierre..."
+            />
 
             <div
                 v-else-if="error"

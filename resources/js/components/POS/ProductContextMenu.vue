@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Info, X, ExternalLink } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 
 const props = defineProps<{
     show: boolean;
@@ -270,12 +271,10 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Empty state -->
-                    <div
+                    <LoadingState
                         v-if="!productDetails"
-                        class="py-4 text-center text-xs text-gray-400"
-                    >
-                        Cargando información...
-                    </div>
+                        label="Cargando información..."
+                    />
                 </div>
 
                 <!-- Footer action button -->

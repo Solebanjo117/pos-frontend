@@ -19,6 +19,7 @@ import MovementTypeChart from '@/components/charts/MovementTypeChart.vue';
 import Pagination from '@/components/Pagination.vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -1053,14 +1054,7 @@ const sourceLabel = (movement: {
             </div>
 
             <!-- Loading State -->
-            <div
-                v-else-if="loading"
-                class="flex items-center justify-center py-12"
-            >
-                <div class="text-gray-700 dark:text-gray-300">
-                    Cargando reporte...
-                </div>
-            </div>
+            <LoadingState v-else-if="loading" label="Cargando reporte..." />
         </div>
     </AppLayout>
 </template>

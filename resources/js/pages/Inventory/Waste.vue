@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -577,10 +578,10 @@ onMounted(async () => {
                     </button>
                 </div>
 
-                <div v-if="historyLoading" class="px-4 py-10 text-center">
-                    <PackageSearch class="mx-auto h-8 w-8 text-gray-400" />
-                    <p class="mt-2 text-sm text-gray-500">Cargando...</p>
-                </div>
+                <LoadingState
+                    v-if="historyLoading"
+                    label="Cargando historial..."
+                />
 
                 <div
                     v-else-if="history.length === 0"

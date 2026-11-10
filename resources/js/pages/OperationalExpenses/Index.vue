@@ -17,6 +17,7 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -1064,11 +1065,8 @@ onMounted(async () => {
                             class="divide-y divide-gray-100 dark:divide-border"
                         >
                             <tr v-if="loading">
-                                <td
-                                    colspan="9"
-                                    class="px-3 py-8 text-center text-gray-500"
-                                >
-                                    Cargando gastos...
+                                <td colspan="9">
+                                    <LoadingState label="Cargando gastos..." />
                                 </td>
                             </tr>
                             <tr v-else-if="expenses.length === 0">

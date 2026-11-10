@@ -20,10 +20,11 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
-import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useSuppliers } from '@/composables/useSuppliers';
@@ -671,13 +672,10 @@ onMounted(async () => {
             <section
                 class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card"
             >
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="flex items-center justify-center py-16 text-sm text-slate-500 dark:text-slate-400"
-                >
-                    <RefreshCw :size="20" class="mr-2 animate-spin" />
-                    Cargando órdenes de compra...
-                </div>
+                    label="Cargando órdenes de compra..."
+                />
 
                 <div v-else class="overflow-x-auto">
                     <table class="w-full text-sm">

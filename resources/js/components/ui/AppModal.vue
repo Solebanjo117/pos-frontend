@@ -8,7 +8,7 @@
  * form="<id del formulario>".
  */
 import { X } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
     Dialog,
     DialogClose,
@@ -47,6 +47,19 @@ const sizeClass = computed(
         })[props.size],
 );
 
+// Al abrir, reka-ui enfoca el primer elemento enfocable: la X del encabezado, que se veía
+// "en hover". Se enfoca el primer campo del contenido; si no hay, el propio cuadro.
+const bodyRef = ref<HTMLElement | null>(null);
+const FIRST_FIELD =
+    'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])';
+const onOpenAutoFocus = (event: Event) => {
+    event.preventDefault();
+    const field = bodyRef.value?.querySelector<HTMLElement>(FIRST_FIELD);
+    (field ?? (event.target as HTMLElement | null))?.focus?.({
+        preventScroll: true,
+    });
+};
+
 const onOpenChange = (value: boolean) => {
     emit('update:open', value);
     if (!value) emit('close');
@@ -58,6 +71,7 @@ const onOpenChange = (value: boolean) => {
         <!-- Sin overflow-hidden: las listas desplegables flotan por encima y pueden salir del cuadro. -->
         <DialogContent
             :show-close-button="false"
+            @open-auto-focus="onOpenAutoFocus"
             :class="[
                 'flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-0 p-0',
                 sizeClass,
@@ -78,14 +92,14 @@ const onOpenChange = (value: boolean) => {
                     </DialogDescription>
                 </div>
                 <DialogClose
-                    class="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:ring-2 focus:ring-ring focus:outline-hidden"
+                    class="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Cerrar"
                 >
                     <X class="h-4 w-4" />
                 </DialogClose>
             </header>
 
-            <div class="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <div ref="bodyRef" class="min-h-0 flex-1 overflow-y-auto px-6 py-4">
                 <slot />
             </div>
 

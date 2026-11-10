@@ -68,4 +68,29 @@ describe('AppModal', () => {
         expect(dialog().querySelector('footer')).toBeNull();
         wrapper.unmount();
     });
+
+    it('focuses the first field when it opens, not the close button', async () => {
+        const wrapper = mount(AppModal, {
+            attachTo: document.body,
+            props: { open: false, title: 'Editar proveedor' },
+            slots: {
+                default:
+                    '<form><input data-test="name" /><input data-test="email" /></form>',
+            },
+        });
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const close = dialog().querySelector('[aria-label="Cerrar"]');
+        expect(document.activeElement).toBe(
+            dialog().querySelector('[data-test="name"]'),
+        );
+        expect(document.activeElement).not.toBe(close);
+        // El anillo de la X solo aparece al navegar con teclado.
+        expect(close?.className).toContain('focus-visible:ring-2');
+        expect(close?.className).not.toContain(' focus:ring-2');
+        wrapper.unmount();
+    });
 });
+

@@ -44,7 +44,8 @@ function goBack() {
 <template>
     <Head title="Nueva Marca" />
     <AppLayout>
-        <div class="mx-auto max-w-2xl space-y-6">
+        <!-- w-full: dentro del layout flex, mx-auto solo encogería el formulario al ancho de su contenido. -->
+        <div class="mx-auto w-full max-w-3xl space-y-6">
             <!-- Header -->
             <div class="flex items-center gap-4">
                 <button

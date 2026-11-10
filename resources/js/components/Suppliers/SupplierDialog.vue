@@ -1,13 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
-import {
-    Dialog,
-    DialogFooter,
-    DialogHeader,
-    DialogScrollContent,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { computed, ref, useId, watch } from 'vue';
+import AppModal from '@/components/ui/AppModal.vue';
 import { brandsService } from '@/services/brands';
 import { suppliersService } from '@/services/suppliers';
 import type {
@@ -22,6 +16,8 @@ const emit = defineEmits<{
     saved: [supplier: Supplier];
 }>();
 const saving = ref(false);
+// Los botones del pie del modal envían el formulario por su id.
+const formId = `supplier-form-${useId()}`;
 const loading = ref(false);
 const error = ref<string | null>(null);
 const fieldErrors = ref<Record<string, string[]>>({});
@@ -122,234 +118,235 @@ watch(
 </script>
 
 <template>
-    <Dialog :open="open" @update:open="emit('update:open', $event)"
-        ><DialogScrollContent class="max-h-[92vh] max-w-3xl"
-            ><DialogHeader
-                ><DialogTitle>{{ title }}</DialogTitle></DialogHeader
+    <!-- AppModal: cabecera y pie fijos; solo el contenido se desplaza, dentro del modal. -->
+    <AppModal
+        :open="open"
+        :title="title"
+        size="lg"
+        @update:open="emit('update:open', $event)"
+    >
+        <div v-if="loading" class="py-10 text-center text-muted-foreground">
+            Cargando...
+        </div>
+        <form v-else :id="formId" class="space-y-6" @submit.prevent="submit">
+            <div
+                v-if="error || validationMessages.length"
+                class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
             >
-            <div v-if="loading" class="py-10 text-center text-muted-foreground">
-                Cargando...
-            </div>
-            <form v-else class="space-y-6" @submit.prevent="submit">
-                <div
-                    v-if="error || validationMessages.length"
-                    class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+                <p v-if="error">{{ error }}</p>
+                <ul
+                    v-if="validationMessages.length"
+                    class="mt-1 list-disc pl-5"
                 >
-                    <p v-if="error">{{ error }}</p>
-                    <ul
-                        v-if="validationMessages.length"
-                        class="mt-1 list-disc pl-5"
+                    <li
+                        v-for="item in validationMessages"
+                        :key="`${item.field}-${item.message}`"
                     >
-                        <li
-                            v-for="item in validationMessages"
-                            :key="`${item.field}-${item.message}`"
-                        >
-                            {{ item.message }}
-                        </li>
-                    </ul>
-                </div>
-                <section class="grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Proveedor *</label
-                        ><input
-                            v-model="form.name"
-                            required
-                            :aria-invalid="Boolean(fieldErrors.name)"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        />
-                        <p
-                            v-if="fieldErrors.name?.[0]"
-                            class="mt-1 text-xs text-destructive"
-                        >
-                            {{ fieldErrors.name[0] }}
-                        </p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Contacto</label
-                        ><input
-                            v-model="form.contact_name"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Email</label
-                        ><input
-                            v-model="form.email"
-                            type="email"
-                            :aria-invalid="Boolean(fieldErrors.email)"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        />
-                        <p
-                            v-if="fieldErrors.email?.[0]"
-                            class="mt-1 text-xs text-destructive"
-                        >
-                            {{ fieldErrors.email[0] }}
-                        </p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Teléfono</label
-                        ><input
-                            v-model="form.phone"
-                            :aria-invalid="Boolean(fieldErrors.phone)"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        />
-                        <p
-                            v-if="fieldErrors.phone?.[0]"
-                            class="mt-1 text-xs text-destructive"
-                        >
-                            {{ fieldErrors.phone[0] }}
-                        </p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium"
-                            >Dirección</label
-                        ><textarea
-                            v-model="form.address"
-                            rows="2"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Términos de pago</label
-                        ><input
-                            v-model="form.payment_terms"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium"
-                            >Entrega estimada (días)</label
-                        ><input
-                            v-model.number="form.lead_time_days"
-                            type="number"
-                            min="0"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        />
-                    </div>
-                </section>
-                <section class="space-y-3 border-t pt-5">
-                    <div>
-                        <h3 class="font-semibold">Marcas suministradas</h3>
-                        <p class="text-xs text-muted-foreground">
-                            Relación directa del catálogo. Las categorías se
-                            calculan desde productos y compras.
-                        </p>
-                    </div>
-                    <div
-                        class="grid max-h-48 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2 md:grid-cols-3"
-                    >
-                        <label
-                            v-for="brand in brands"
-                            :key="brand.id"
-                            class="flex items-center gap-2 text-sm"
-                            ><input
-                                type="checkbox"
-                                :checked="form.brand_ids?.includes(brand.id)"
-                                @change="toggleBrand(brand.id)"
-                            />
-                            {{ brand.name }}</label
-                        >
-                    </div>
-                    <p
-                        v-if="fieldErrors.brand_ids?.[0]"
-                        class="text-xs text-destructive"
-                    >
-                        {{ fieldErrors.brand_ids[0] }}
-                    </p>
-                </section>
-                <section v-if="relationships" class="space-y-3 border-t pt-5">
-                    <div class="flex items-center justify-between">
-                        <h3 class="font-semibold">Relaciones reales</h3>
-                        <Link
-                            :href="`/suppliers/${supplier?.id}`"
-                            class="text-sm text-primary hover:underline"
-                            >Ver perfil completo</Link
-                        >
-                    </div>
-                    <div class="grid gap-3 sm:grid-cols-3">
-                        <div class="rounded-md border p-3">
-                            <p class="text-xs text-muted-foreground">
-                                Productos configurados
-                            </p>
-                            <p class="text-xl font-bold">
-                                {{ relationships.configured_products_count }}
-                            </p>
-                        </div>
-                        <div class="rounded-md border p-3">
-                            <p class="text-xs text-muted-foreground">
-                                Órdenes relacionadas
-                            </p>
-                            <p class="text-xl font-bold">
-                                {{ relationships.purchase_orders_count }}
-                            </p>
-                        </div>
-                        <div class="rounded-md border p-3">
-                            <p class="text-xs text-muted-foreground">
-                                CxP abiertas
-                            </p>
-                            <p class="text-xl font-bold">
-                                {{
-                                    relationships.accounts_payable_orders_count
-                                }}
-                            </p>
-                        </div>
-                    </div>
-                    <div>
-                        <p
-                            class="mb-2 text-xs font-semibold text-muted-foreground uppercase"
-                        >
-                            Categorías derivadas
-                        </p>
-                        <div class="flex flex-wrap gap-2">
-                            <span
-                                v-for="category in relationships.categories"
-                                :key="category.id"
-                                class="rounded-full border px-2 py-1 text-xs"
-                                >{{ category.name }} ·
-                                {{
-                                    category.source === 'both'
-                                        ? 'configurada y comprada'
-                                        : category.source === 'configured'
-                                          ? 'configurada'
-                                          : 'comprada'
-                                }}</span
-                            ><span
-                                v-if="relationships.categories.length === 0"
-                                class="text-sm text-muted-foreground"
-                                >Sin categorías derivadas.</span
-                            >
-                        </div>
-                    </div>
-                </section>
+                        {{ item.message }}
+                    </li>
+                </ul>
+            </div>
+            <section class="grid gap-4 md:grid-cols-2">
                 <div>
-                    <label class="mb-1 block text-sm font-medium">Notas</label
-                    ><textarea
-                        v-model="form.notes"
-                        rows="3"
+                    <label class="mb-1 block text-sm font-medium"
+                        >Proveedor *</label
+                    ><input
+                        v-model="form.name"
+                        required
+                        :aria-invalid="Boolean(fieldErrors.name)"
+                        class="w-full rounded-md border bg-background px-3 py-2"
+                    />
+                    <p
+                        v-if="fieldErrors.name?.[0]"
+                        class="mt-1 text-xs text-destructive"
+                    >
+                        {{ fieldErrors.name[0] }}
+                    </p>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium"
+                        >Contacto</label
+                    ><input
+                        v-model="form.contact_name"
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>
-                <DialogFooter
-                    ><button
-                        type="button"
-                        class="rounded-md border px-4 py-2"
-                        @click="emit('update:open', false)"
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Email</label
+                    ><input
+                        v-model="form.email"
+                        type="email"
+                        :aria-invalid="Boolean(fieldErrors.email)"
+                        class="w-full rounded-md border bg-background px-3 py-2"
+                    />
+                    <p
+                        v-if="fieldErrors.email?.[0]"
+                        class="mt-1 text-xs text-destructive"
                     >
-                        Cancelar</button
-                    ><button
-                        type="submit"
-                        class="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-                        :disabled="saving || !form.name"
+                        {{ fieldErrors.email[0] }}
+                    </p>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium"
+                        >Teléfono</label
+                    ><input
+                        v-model="form.phone"
+                        :aria-invalid="Boolean(fieldErrors.phone)"
+                        class="w-full rounded-md border bg-background px-3 py-2"
+                    />
+                    <p
+                        v-if="fieldErrors.phone?.[0]"
+                        class="mt-1 text-xs text-destructive"
                     >
-                        {{ saving ? 'Guardando...' : 'Guardar proveedor' }}
-                    </button></DialogFooter
+                        {{ fieldErrors.phone[0] }}
+                    </p>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-medium"
+                        >Dirección</label
+                    ><textarea
+                        v-model="form.address"
+                        rows="2"
+                        class="w-full rounded-md border bg-background px-3 py-2"
+                    />
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium"
+                        >Términos de pago</label
+                    ><input
+                        v-model="form.payment_terms"
+                        class="w-full rounded-md border bg-background px-3 py-2"
+                    />
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium"
+                        >Entrega estimada (días)</label
+                    ><input
+                        v-model.number="form.lead_time_days"
+                        type="number"
+                        min="0"
+                        class="w-full rounded-md border bg-background px-3 py-2"
+                    />
+                </div>
+            </section>
+            <section class="space-y-3 border-t pt-5">
+                <div>
+                    <h3 class="font-semibold">Marcas suministradas</h3>
+                    <p class="text-xs text-muted-foreground">
+                        Relación directa del catálogo. Las categorías se
+                        calculan desde productos y compras.
+                    </p>
+                </div>
+                <div
+                    class="grid max-h-48 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2 md:grid-cols-3"
                 >
-            </form>
-        </DialogScrollContent></Dialog
-    >
+                    <label
+                        v-for="brand in brands"
+                        :key="brand.id"
+                        class="flex items-center gap-2 text-sm"
+                        ><input
+                            type="checkbox"
+                            :checked="form.brand_ids?.includes(brand.id)"
+                            @change="toggleBrand(brand.id)"
+                        />
+                        {{ brand.name }}</label
+                    >
+                </div>
+                <p
+                    v-if="fieldErrors.brand_ids?.[0]"
+                    class="text-xs text-destructive"
+                >
+                    {{ fieldErrors.brand_ids[0] }}
+                </p>
+            </section>
+            <section v-if="relationships" class="space-y-3 border-t pt-5">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-semibold">Relaciones reales</h3>
+                    <Link
+                        :href="`/suppliers/${supplier?.id}`"
+                        class="text-sm text-primary hover:underline"
+                        >Ver perfil completo</Link
+                    >
+                </div>
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-md border p-3">
+                        <p class="text-xs text-muted-foreground">
+                            Productos configurados
+                        </p>
+                        <p class="text-xl font-bold">
+                            {{ relationships.configured_products_count }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border p-3">
+                        <p class="text-xs text-muted-foreground">
+                            Órdenes relacionadas
+                        </p>
+                        <p class="text-xl font-bold">
+                            {{ relationships.purchase_orders_count }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border p-3">
+                        <p class="text-xs text-muted-foreground">
+                            CxP abiertas
+                        </p>
+                        <p class="text-xl font-bold">
+                            {{ relationships.accounts_payable_orders_count }}
+                        </p>
+                    </div>
+                </div>
+                <div>
+                    <p
+                        class="mb-2 text-xs font-semibold text-muted-foreground uppercase"
+                    >
+                        Categorías derivadas
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <span
+                            v-for="category in relationships.categories"
+                            :key="category.id"
+                            class="rounded-full border px-2 py-1 text-xs"
+                            >{{ category.name }} ·
+                            {{
+                                category.source === 'both'
+                                    ? 'configurada y comprada'
+                                    : category.source === 'configured'
+                                      ? 'configurada'
+                                      : 'comprada'
+                            }}</span
+                        ><span
+                            v-if="relationships.categories.length === 0"
+                            class="text-sm text-muted-foreground"
+                            >Sin categorías derivadas.</span
+                        >
+                    </div>
+                </div>
+            </section>
+            <div>
+                <label class="mb-1 block text-sm font-medium">Notas</label
+                ><textarea
+                    v-model="form.notes"
+                    rows="3"
+                    class="w-full rounded-md border bg-background px-3 py-2"
+                />
+            </div>
+        </form>
+
+        <template #footer>
+            <button
+                type="button"
+                class="rounded-md border px-4 py-2"
+                @click="emit('update:open', false)"
+            >
+                Cancelar
+            </button>
+            <button
+                type="submit"
+                :form="formId"
+                class="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+                :disabled="loading || saving || !form.name"
+            >
+                {{ saving ? 'Guardando...' : 'Guardar proveedor' }}
+            </button>
+        </template>
+    </AppModal>
 </template>

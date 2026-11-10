@@ -257,18 +257,7 @@ onMounted(async () => {
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <Link
-                        v-if="canManageCatalog"
-                        :href="importHref"
-                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
-                        ><Upload :size="17" /> Importar</Link
-                    >
-                    <button
-                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
-                        @click="suppliersService.exportCatalog()"
-                    >
-                        <Download :size="17" /> Exportar
-                    </button>
+                    <!-- Primero la acción de crear y luego Importar / Exportar -->
                     <Link
                         v-if="canManageCatalog && activeTab === 'categories'"
                         href="/categories/create"
@@ -289,6 +278,18 @@ onMounted(async () => {
                         @click="openSupplier()"
                     >
                         <Plus :size="17" /> Nuevo proveedor
+                    </button>
+                    <Link
+                        v-if="canManageCatalog"
+                        :href="importHref"
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
+                        ><Upload :size="17" /> Importar</Link
+                    >
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
+                        @click="suppliersService.exportCatalog()"
+                    >
+                        <Download :size="17" /> Exportar
                     </button>
                 </div>
             </header>

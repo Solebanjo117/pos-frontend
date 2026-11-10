@@ -21,11 +21,12 @@ vi.mock('@/services/suppliers', () => ({
 }));
 
 const stubs = {
-    Dialog: { template: '<div><slot /></div>' },
-    DialogScrollContent: { template: '<div><slot /></div>' },
-    DialogHeader: { template: '<header><slot /></header>' },
-    DialogTitle: { template: '<h2><slot /></h2>' },
-    DialogFooter: { template: '<footer><slot /></footer>' },
+    // AppModal real: cabecera, cuerpo con scroll y pie fijo. Aquí solo se renderizan sus partes.
+    AppModal: {
+        props: ['open', 'title'],
+        template:
+            '<div><h2>{{ title }}</h2><div data-test="modal-body"><slot /></div><footer data-test="modal-footer"><slot name="footer" /></footer></div>',
+    },
     Link: { template: '<a><slot /></a>' },
 };
 
@@ -69,5 +70,39 @@ describe('SupplierDialog', () => {
         expect(wrapper.text()).toContain('El correo no es válido.');
         expect(wrapper.text()).toContain('Una marca seleccionada no existe.');
         expect(wrapper.emitted('saved')).toBeUndefined();
+    });
+
+    it('puts Cancel and Save in the modal footer and submits the form from there', async () => {
+        vi.mocked(suppliersService.create).mockResolvedValue({
+            id: 3,
+            name: 'Proveedor nuevo',
+        } as any);
+
+        const wrapper = mount(SupplierDialog, {
+            props: { open: true, supplier: null },
+            global: { stubs },
+        });
+        await flushPromises();
+
+        const body = wrapper.get('[data-test="modal-body"]');
+        const footer = wrapper.get('[data-test="modal-footer"]');
+        const form = body.get('form');
+        const save = footer
+            .findAll('button')
+            .find((button) => button.text().includes('Guardar proveedor'))!;
+
+        expect(body.text()).not.toContain('Guardar proveedor');
+        expect(footer.text()).toContain('Cancelar');
+        expect(save.attributes('type')).toBe('submit');
+        expect(save.attributes('form')).toBe(form.attributes('id'));
+
+        await wrapper.find('input[required]').setValue('Proveedor nuevo');
+        await form.trigger('submit');
+        await flushPromises();
+
+        expect(suppliersService.create).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'Proveedor nuevo' }),
+        );
+        expect(wrapper.emitted('saved')).toHaveLength(1);
     });
 });

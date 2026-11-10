@@ -310,7 +310,7 @@ onBeforeUnmount(() => {
                     <button
                         @click="printTicket"
                         :disabled="!previewReady || previewLoading"
-                        class="flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         🖨️ Imprimir
                     </button>

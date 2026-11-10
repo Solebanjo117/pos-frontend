@@ -708,7 +708,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     <a
                         v-if="cartItemCount > 0"
                         href="/pos"
-                        class="relative inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700"
+                        class="relative inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                     >
                         <ShoppingCart class="mr-1 h-4 w-4" /> Carrito
                         <span
@@ -754,7 +754,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     <!-- New Product Button -->
                     <a
                         href="/inventory/products/create"
-                        class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                     >
                         <svg
                             class="h-4 w-4"
@@ -928,7 +928,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                         <div class="flex items-end gap-2">
                             <button
                                 @click="applyFilters"
-                                class="h-9 rounded-lg bg-blue-600 px-4 text-sm text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:focus:ring-offset-gray-800"
+                                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
                             >
                                 Filtrar
                             </button>
@@ -1561,7 +1561,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                 product,
                                                             )
                                                         "
-                                                        class="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
+                                                        class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                                                     >
                                                         <svg
                                                             class="h-3.5 w-3.5"

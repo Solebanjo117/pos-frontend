@@ -413,7 +413,7 @@ const sourceLabel = (movement: {
                         :disabled="
                             exporting || loading || !movementHistoryReport
                         "
-                        class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                         <FileSpreadsheet :size="18" />
                         Excel
@@ -530,7 +530,7 @@ const sourceLabel = (movement: {
                     >
                         <button
                             @click="applyFilters"
-                            class="h-[42px] flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 h-[42px] flex-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                             Aplicar
                         </button>

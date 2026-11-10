@@ -480,7 +480,7 @@ const handlePrint = () => {
                     <button
                         v-if="session"
                         type="button"
-                        class="inline-flex h-9 items-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 dark:bg-white"
                         @click="handlePrint"
                     >
                         <Printer :size="16" />
@@ -523,7 +523,7 @@ const handlePrint = () => {
                 </div>
                 <button
                     type="button"
-                    class="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 dark:bg-white"
                     @click="emit('retry')"
                 >
                     Reintentar

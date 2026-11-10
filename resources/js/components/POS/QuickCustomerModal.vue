@@ -287,7 +287,7 @@ const handleSubmit = async () => {
                             !form.name.trim() ||
                             !form.customer_type_id
                         "
-                        class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-bold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
                     >
                         <Save v-if="!loading" class="h-4 w-4" />
                         {{ loading ? 'Guardando...' : 'Guardar Cliente' }}

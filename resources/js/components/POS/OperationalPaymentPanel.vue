@@ -855,7 +855,7 @@ const handleCancel = () => {
                                 </div>
                                 <button
                                     type="button"
-                                    class="rounded-md bg-green-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-green-700"
+                                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                                     @click="handleMax('cash')"
                                 >
                                     Max
@@ -1038,7 +1038,7 @@ const handleCancel = () => {
                                 </div>
                                 <button
                                     type="button"
-                                    class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700"
+                                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                                     @click="handleMax('store_credit')"
                                 >
                                     Max
@@ -1101,7 +1101,7 @@ const handleCancel = () => {
                                     </div>
                                     <button
                                         type="button"
-                                        class="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                                        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                                         @click="
                                             handleMax(
                                                 selectedDynamicMethod.code,
@@ -1394,7 +1394,7 @@ const handleCancel = () => {
                         <button
                             type="button"
                             :disabled="!canFinish"
-                            class="w-full rounded-lg bg-green-600 py-3 font-bold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            class="w-full rounded-lg bg-primary py-3 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
                             @click="handleFinish"
                         >
                             {{ loading ? 'Guardando...' : primaryLabel }}

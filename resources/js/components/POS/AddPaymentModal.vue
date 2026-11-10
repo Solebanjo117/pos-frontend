@@ -307,7 +307,7 @@ const getMethodColor = (code: string) => methodColors[code] || 'gray';
                     <button
                         @click="handleSubmit"
                         :disabled="!canSubmit || loading"
-                        class="w-full rounded-xl bg-indigo-600 py-3 font-bold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
                     >
                         {{
                             loading

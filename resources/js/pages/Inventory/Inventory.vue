@@ -721,7 +721,7 @@ function pageItemLabel(): string {
                     <div class="flex items-end gap-2 lg:col-span-3">
                         <button
                             type="button"
-                            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             @click="applyFilters"
                         >
                             Filtrar

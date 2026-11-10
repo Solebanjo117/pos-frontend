@@ -527,7 +527,7 @@ watch(effectiveImages, () => {
                         <Link
                             v-if="canManageProducts"
                             :href="`/inventory/products/${productId}/edit`"
-                            class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
                         >
                             <Pencil :size="16" />
                             Editar

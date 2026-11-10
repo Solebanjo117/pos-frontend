@@ -1037,7 +1037,7 @@ watch(
                     type="submit"
                     form="purchase-order-form"
                     :disabled="loading || form.items.length === 0"
-                    class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                    class="inline-flex items-center gap-2 shadow-sm disabled:opacity-50 h-8 rounded-md px-3 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     <Save :size="16" />
                     {{ loading ? 'Guardando...' : 'Guardar cambios' }}
@@ -1253,7 +1253,7 @@ watch(
                                             loadingCandidates ||
                                             !canLoadCandidates
                                         "
-                                        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                        class="inline-flex items-center gap-2 transition disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                                     >
                                         <Search :size="16" />
                                         {{
@@ -1432,7 +1432,7 @@ watch(
                                         type="button"
                                         @click="addSelectedCandidates"
                                         :disabled="selectedCandidateCount === 0"
-                                        class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:opacity-50"
+                                        class="inline-flex items-center gap-2 transition disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                                     >
                                         <Plus :size="16" />
                                         Agregar seleccionados
@@ -1747,7 +1747,7 @@ watch(
                         <button
                             type="submit"
                             :disabled="loading || form.items.length === 0"
-                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2 text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                            class="inline-flex items-center gap-2 transition disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         >
                             <Save :size="18" />
                             {{
@@ -1807,7 +1807,7 @@ watch(
                 >
                     <button
                         type="button"
-                        class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                        class="h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         @click="closePurchaseNotice"
                     >
                         Entendido
@@ -1869,7 +1869,7 @@ watch(
                     </button>
                     <button
                         type="button"
-                        class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        class="disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         :disabled="linkingSupplierVariant"
                         @click="linkPromptedSupplierVariant"
                     >

@@ -205,7 +205,7 @@ onMounted(loadWorkOrders);
                 </div>
 
                 <button
-                    class="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                    class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 dark:bg-white"
                     @click="newOrder"
                 >
                     <Plus class="h-4 w-4" />
@@ -312,7 +312,7 @@ onMounted(loadWorkOrders);
                         >No hay ordenes con estos filtros.</EmptyState
                     >
                     <button
-                        class="mt-4 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-950"
+                        class="mt-4 h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 dark:bg-white"
                         @click="newOrder"
                     >
                         Crear orden

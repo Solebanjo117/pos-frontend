@@ -285,7 +285,7 @@ const getExpiryColor = (dateString: string | null) => {
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 flex-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                             Filtrar
                         </button>

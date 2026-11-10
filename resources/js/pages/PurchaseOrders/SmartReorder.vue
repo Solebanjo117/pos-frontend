@@ -632,7 +632,7 @@ onMounted(async () => {
                 <button
                     @click="handleGenerate"
                     :disabled="loading"
-                    class="inline-flex items-center gap-3 rounded-full bg-indigo-600 px-6 py-4 text-white shadow-lg transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="inline-flex items-center gap-3 rounded-full bg-primary px-6 py-4 text-primary-foreground shadow-lg transition hover:bg-primary/90 disabled:opacity-50"
                 >
                     <ShoppingCart :size="20" />
                     <span class="font-semibold"

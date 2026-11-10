@@ -92,7 +92,7 @@ onMounted(load);
             </div>
             <button
                 type="button"
-                class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 @click="load"
             >
                 Filtrar

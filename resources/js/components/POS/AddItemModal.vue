@@ -554,7 +554,7 @@ const handleSubmit = async () => {
                                 :disabled="
                                     pendingItems.length === 0 || submitting
                                 "
-                                class="rounded-xl bg-green-600 px-6 py-2.5 font-bold text-white transition-colors hover:bg-green-700 disabled:opacity-40"
+                                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
                             >
                                 {{
                                     submitting

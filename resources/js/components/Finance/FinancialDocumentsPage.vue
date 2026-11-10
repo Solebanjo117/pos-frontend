@@ -228,7 +228,7 @@ onMounted(load);
                     </div>
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="payableDocuments.length === 0"
                         @click="openPrimaryAction"
                     >
@@ -748,7 +748,7 @@ onMounted(load);
                                       .can_register_receipt
                         "
                         type="button"
-                        class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white"
+                        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         @click="openPayment(selectedDocument)"
                     >
                         {{ copy.action }}

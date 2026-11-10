@@ -4585,7 +4585,7 @@ const formatFileSize = (bytes: number) => {
                             : undefined
                     "
                     @click="requestImportConfirmation('file')"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-1.5 transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     <UploadCloud class="h-4 w-4" />
                     {{
@@ -7589,7 +7589,7 @@ const formatFileSize = (bytes: number) => {
                     type="button"
                     :disabled="!canImport"
                     @click="requestImportConfirmation('preview')"
-                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-2 transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     <UploadCloud class="h-4 w-4" />
                     {{ importRunning ? 'Importando...' : 'Importar' }}
@@ -7600,7 +7600,7 @@ const formatFileSize = (bytes: number) => {
                     :disabled="!canRunFullFile"
                     :title="fullFileImportBlockedReason ?? undefined"
                     @click="requestImportConfirmation('file')"
-                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-2 transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     <UploadCloud class="h-4 w-4" />
                     Importar archivo completo
@@ -7825,7 +7825,7 @@ const formatFileSize = (bytes: number) => {
                     <button
                         type="button"
                         :disabled="!profileNameIsValid || profileSaving"
-                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         @click="saveCurrentProfile"
                     >
                         {{ profileSaving ? 'Guardando...' : 'Guardar' }}
@@ -7925,7 +7925,7 @@ const formatFileSize = (bytes: number) => {
                     </button>
                     <button
                         type="button"
-                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                        class="h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         @click="confirmSafetyAction"
                     >
                         {{ safetyConfirmationSummary.primaryLabel }}
@@ -7980,7 +7980,7 @@ const formatFileSize = (bytes: number) => {
                     </button>
                     <button
                         type="button"
-                        class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                        class="h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         @click="confirmImport"
                     >
                         {{ importConfirmationSummary.primaryLabel }}

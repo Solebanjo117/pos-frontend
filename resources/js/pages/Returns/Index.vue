@@ -649,7 +649,7 @@ const handleCreateReturn = async (
                                         <button
                                             v-if="item.status === 'pending'"
                                             type="button"
-                                            class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                                            class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                             :disabled="processingId === item.id"
                                             @click="
                                                 processReturn(

@@ -176,7 +176,7 @@ onMounted(async () => {
                     />
                     <button
                         type="button"
-                        class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gray-900 px-4 text-sm font-medium text-white disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
+                        class="inline-flex items-center justify-center gap-2 disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         :disabled="loading"
                         @click="fetchReport"
                     >

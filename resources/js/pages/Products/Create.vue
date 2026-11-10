@@ -1067,7 +1067,7 @@ const readinessItems = computed(() => [
                         type="button"
                         @click="handleSubmit"
                         :disabled="loading"
-                        class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                         {{ loading ? 'Creando...' : 'Crear Producto' }}
                     </button>
@@ -1216,7 +1216,7 @@ const readinessItems = computed(() => [
                                     type="button"
                                     @click="addExtraCategory"
                                     :disabled="!selectedExtraCategoryId"
-                                    class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                                    class="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                                 >
                                     <Plus class="h-4 w-4" /> Agregar
                                 </button>
@@ -1339,7 +1339,7 @@ const readinessItems = computed(() => [
                                     type="button"
                                     @click="addRef"
                                     :disabled="!refInput.trim()"
-                                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                    class="h-9 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                                 >
                                     Agregar
                                 </button>
@@ -1473,7 +1473,7 @@ const readinessItems = computed(() => [
                             <button
                                 type="button"
                                 @click="addCustomAttribute"
-                                class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                                class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                             >
                                 <Plus class="h-3.5 w-3.5" /> Agregar atributo
                             </button>
@@ -1699,7 +1699,7 @@ const readinessItems = computed(() => [
                                     type="button"
                                     @click="addUpsale"
                                     :disabled="!selectedUpsaleProduct"
-                                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                    class="h-9 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                                 >
                                     Agregar upsale
                                 </button>
@@ -1843,7 +1843,7 @@ const readinessItems = computed(() => [
                                 type="button"
                                 @click="handleSubmit"
                                 :disabled="loading"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
+                                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             >
                                 {{ loading ? 'Creando...' : 'Crear producto' }}
                             </button>

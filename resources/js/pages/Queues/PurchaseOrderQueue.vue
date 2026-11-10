@@ -134,7 +134,7 @@ const goToReceive = (id: number) => {
 
                 <button
                     type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                    class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
                     @click="goToReceive(order.id)"
                 >
                     Ir a Recepcion

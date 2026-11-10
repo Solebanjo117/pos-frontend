@@ -319,7 +319,7 @@ onMounted(fetchDetail);
                         v-if="workflow.actions.can_open_in_pos"
                         type="button"
                         :disabled="openingInPOS"
-                        class="inline-flex h-9 items-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                         @click="handleOpenInPOS"
                     >
                         <ShoppingCart :size="16" />
@@ -671,7 +671,7 @@ onMounted(fetchDetail);
                             v-if="workflow.actions.can_send_to_cashier"
                             type="button"
                             :disabled="actionLoading === 'send-to-cashier'"
-                            class="inline-flex h-9 items-center gap-2 rounded-md bg-sky-600 px-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             @click="handleTransition('send-to-cashier')"
                         >
                             <ArrowRightLeft :size="16" />
@@ -681,7 +681,7 @@ onMounted(fetchDetail);
                             v-if="workflow.actions.can_mark_collected"
                             type="button"
                             :disabled="actionLoading === 'mark-collected'"
-                            class="inline-flex h-9 items-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             @click="handleTransition('mark-collected')"
                         >
                             <CheckCircle :size="16" />
@@ -691,7 +691,7 @@ onMounted(fetchDetail);
                             v-if="workflow.actions.can_convert"
                             type="button"
                             :disabled="actionLoading === 'convert'"
-                            class="inline-flex h-9 items-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             @click="handleConvert"
                         >
                             <FileCheck :size="16" />

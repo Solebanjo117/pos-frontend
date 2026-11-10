@@ -772,7 +772,7 @@ onMounted(async () => {
                     </div>
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
                         @click="openCreateForm"
                     >
                         <Plus :size="16" />
@@ -1323,7 +1323,7 @@ onMounted(async () => {
                                 creatingBeneficiary ||
                                 !beneficiaryForm.name.trim()
                             "
-                            class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             @click="createBeneficiaryFromForm"
                         >
                             {{
@@ -1622,7 +1622,7 @@ onMounted(async () => {
                             saving ||
                             Number(form.estimated_amount || form.amount) <= 0
                         "
-                        class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                         <DollarSign :size="16" />
                         {{ saving ? 'Guardando...' : 'Guardar' }}

@@ -122,7 +122,7 @@ const canManageCashRegister = computed(() =>
             <button
                 :disabled="!hasOpenSession || !canPay"
                 @click="emit('open-payment-modal')"
-                class="group relative flex h-14 w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-green-500 text-white shadow-sm transition-all hover:bg-green-600 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:bg-green-600 dark:hover:bg-green-500 dark:disabled:bg-muted"
+                class="group relative flex h-14 w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
                 :class="{
                     'cursor-not-allowed opacity-50': !hasOpenSession || !canPay,
                 }"

@@ -152,7 +152,7 @@ const getStockStatusColor = (item: any) => {
                     <div class="flex gap-2">
                         <a
                             :href="`/warehouses/${warehouseId}/edit`"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                             <Pencil class="mr-2 h-4 w-4" /> Editar
                         </a>
@@ -355,7 +355,7 @@ const getStockStatusColor = (item: any) => {
                         <div class="flex justify-end gap-2">
                             <button
                                 @click="applyInventoryFilters"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             >
                                 Filtrar
                             </button>

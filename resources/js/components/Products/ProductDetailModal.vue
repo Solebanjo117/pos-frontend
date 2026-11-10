@@ -1251,7 +1251,7 @@ const handleViewAlternative = async (altId: number) => {
                                                     (variant.total_stock ??
                                                         0) === 0
                                                 "
-                                                class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-transform hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                                class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-transform hover:bg-primary/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                                                 title="Agregar al carrito"
                                             >
                                                 <svg

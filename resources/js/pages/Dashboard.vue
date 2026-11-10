@@ -329,7 +329,7 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                 </label>
                 <button
                     type="button"
-                    class="h-9 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     @click="loadDashboard"
                 >
                     Aplicar

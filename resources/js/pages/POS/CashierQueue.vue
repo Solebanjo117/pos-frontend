@@ -717,7 +717,7 @@ async function confirmRemove() {
                                         </button>
                                         <button
                                             type="button"
-                                            class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                                             :disabled="processingId !== null"
                                             title="Cobrar"
                                             @click="startCharge(entry)"
@@ -819,7 +819,7 @@ async function confirmRemove() {
                             </button>
                             <button
                                 type="button"
-                                class="flex min-w-0 flex-col items-center gap-1 rounded-md bg-sky-600 px-2 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                class="flex h-8 min-w-0 flex-col items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                 :disabled="processingId !== null"
                                 title="Cobrar"
                                 @click="startCharge(entry)"
@@ -961,7 +961,7 @@ async function confirmRemove() {
                         </button>
                         <button
                             type="button"
-                            class="flex flex-1 items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                            class="flex h-9 flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             :disabled="processingId === entry.id"
                             @click="processEntry(entry)"
                         >
@@ -1157,7 +1157,7 @@ async function confirmRemove() {
                 </button>
                 <button
                     type="submit"
-                    class="rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     :disabled="processingId === settlementEntry.id"
                 >
                     {{
@@ -1375,7 +1375,7 @@ async function confirmRemove() {
             <div class="flex justify-end border-t px-5 py-4">
                 <button
                     type="button"
-                    class="rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     @click="notice = null"
                 >
                     Entendido

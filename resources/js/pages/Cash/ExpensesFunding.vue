@@ -309,7 +309,7 @@ onUnmounted(() => {
                                 :disabled="
                                     categorySaving || !categoryName.trim()
                                 "
-                                class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                                class="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                 @click="createCategory"
                             >
                                 <Plus class="size-4" /> Crear
@@ -388,7 +388,7 @@ onUnmounted(() => {
                     <button
                         type="submit"
                         :disabled="!canSubmit"
-                        class="inline-flex items-center gap-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <Send class="size-4" />
                         {{ submitting ? 'Enviando…' : 'Enviar a caja' }}

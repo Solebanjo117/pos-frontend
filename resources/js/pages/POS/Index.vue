@@ -3010,7 +3010,7 @@ onUnmounted(() => {
                             v-if="isPostSaleAmendment && orderDiff.total > 0"
                             @click="openPaymentModal()"
                             :disabled="editLoading"
-                            class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-blue-600 text-lg font-bold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
+                            class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
                         >
                             <svg
                                 v-if="editLoading"
@@ -3042,7 +3042,7 @@ onUnmounted(() => {
                             v-else-if="isEditableDraftOrder"
                             @click="saveEditableOrder"
                             :disabled="editLoading || cart.length === 0"
-                            class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-blue-600 text-lg font-bold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
+                            class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
                         >
                             <svg
                                 v-if="editLoading"
@@ -3226,7 +3226,7 @@ onUnmounted(() => {
                 </div>
                 <button
                     @click="showShortcutsHelp = false"
-                    class="mt-4 w-full rounded-xl bg-indigo-600 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="mt-4 h-9 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
                     Cerrar
                 </button>

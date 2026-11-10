@@ -501,7 +501,7 @@ const cancel = () => {
                             type="button"
                             @click="handleSubmit"
                             :disabled="loading"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                         >
                             {{
                                 loading ? 'Procesando...' : 'Confirmar Entrada'

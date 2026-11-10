@@ -255,7 +255,7 @@ onMounted(() => fetchQuotes());
             </div>
             <Link
                 href="/sales-quotes/create"
-                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white shadow-sm transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
             >
                 <Plus :size="20" />
                 Nueva Cotización
@@ -347,7 +347,7 @@ onMounted(() => fetchQuotes());
             <EmptyState compact>No hay cotizaciones para mostrar.</EmptyState>
             <Link
                 href="/sales-quotes/create"
-                class="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                class="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
             >
                 <Plus :size="16" />
                 Crear primera cotización

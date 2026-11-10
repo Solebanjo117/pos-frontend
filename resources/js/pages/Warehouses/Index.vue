@@ -106,7 +106,7 @@ const formatUtilization = (warehouse: any) => {
                 </div>
                 <a
                     href="/warehouses/create"
-                    class="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                     Nuevo Almacén
                 </a>
@@ -151,7 +151,7 @@ const formatUtilization = (warehouse: any) => {
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:focus:ring-offset-gray-800"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
                         >
                             Filtrar
                         </button>
@@ -397,7 +397,7 @@ const formatUtilization = (warehouse: any) => {
                 <div class="mt-6">
                     <a
                         href="/warehouses/create"
-                        class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     >
                         Nuevo Almacén
                     </a>

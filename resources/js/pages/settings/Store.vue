@@ -384,7 +384,7 @@ const handleResetData = async () => {
                     <button
                         type="button"
                         :disabled="saving || loading"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-50"
                         @click="handleSave"
                     >
                         <Save class="h-4 w-4" />
@@ -1238,7 +1238,7 @@ const handleResetData = async () => {
                         <button
                             type="submit"
                             :disabled="saving"
-                            class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-50"
                         >
                             <Save class="h-4 w-4" />
                             {{

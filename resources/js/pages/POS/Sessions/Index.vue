@@ -605,7 +605,7 @@ onBeforeUnmount(() => {
                     <button
                         type="button"
                         :disabled="!hasOpenSession || closeSessionLoading"
-                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white"
                         @click="showCloseSessionModal = true"
                     >
                         <Lock :size="16" />
@@ -746,7 +746,7 @@ onBeforeUnmount(() => {
                         <button
                             type="button"
                             :disabled="closeSessionLoading"
-                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white"
                             @click="showCloseSessionModal = true"
                         >
                             <Lock :size="16" />
@@ -952,7 +952,7 @@ onBeforeUnmount(() => {
                     <div class="flex flex-wrap gap-2">
                         <button
                             type="button"
-                            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
                             @click="applyFilters"
                         >
                             <Search :size="16" />

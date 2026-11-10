@@ -106,7 +106,7 @@ onMounted(() => load());
             <input v-if="reportKey !== 'valued-inventory'" v-model="filters.date_from" type="date" class="h-10 rounded-md border bg-background px-3 text-sm" />
             <input v-model="filters.date_to" type="date" class="h-10 rounded-md border bg-background px-3 text-sm" />
             <select v-model.number="filters.per_page" class="h-10 rounded-md border bg-background px-2 text-sm" @change="load(1)"><option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} filas</option></select>
-            <button type="submit" class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-sky-600 px-3 text-sm font-semibold text-white" :disabled="loading"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" /> Actualizar</button>
+            <button type="submit" class="inline-flex items-center justify-center gap-2 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90" :disabled="loading"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" /> Actualizar</button>
         </form>
         <ErrorMessage v-if="error">{{ error }}</ErrorMessage>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div v-for="key in config.totalKeys" :key="key" class="rounded-md border bg-card p-3"><p class="text-xs font-semibold uppercase text-muted-foreground">{{ config.columns.find((column) => column.key === key)?.label ?? key }}</p><p class="mt-1 font-mono text-lg font-bold">{{ formatCurrency(summary[key] ?? 0) }}</p></div></div>

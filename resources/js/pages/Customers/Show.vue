@@ -763,7 +763,7 @@ onMounted(async () => {
                                 </Link>
                                 <Link
                                     :href="`/sales-orders/create?customer_id=${customerIdNumber}`"
-                                    class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                    class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                                 >
                                     <Plus :size="15" />
                                     Nueva Venta
@@ -1207,7 +1207,7 @@ onMounted(async () => {
                                         </select>
                                         <button
                                             type="button"
-                                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700"
+                                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                                             @click="applyHistoryFilters"
                                         >
                                             Filtrar
@@ -1539,7 +1539,7 @@ onMounted(async () => {
                                             </div>
                                             <Link
                                                 :href="createWorkOrderUrl()"
-                                                class="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                                                class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 dark:bg-white"
                                             >
                                                 <Plus :size="15" />
                                                 Nueva orden
@@ -2050,7 +2050,7 @@ onMounted(async () => {
                                                 </div>
                                                 <button
                                                     type="submit"
-                                                    class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                                                    class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                                     :disabled="!canSaveVehicle"
                                                 >
                                                     <Plus :size="15" />

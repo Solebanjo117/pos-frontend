@@ -502,7 +502,7 @@ const totalCost = computed(() => roundMoney(quantity.value * unitCost.value));
                                     (product?.variants?.length > 0 &&
                                         !selectedVariantId)
                                 "
-                                class="flex min-w-[160px] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-primary dark:hover:bg-primary/90"
+                                class="flex h-9 min-w-[160px] items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <svg
                                     v-if="isSubmitting"

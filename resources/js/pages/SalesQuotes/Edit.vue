@@ -718,7 +718,7 @@ onMounted(async () => {
                     <button
                         @click="handleSave"
                         :disabled="saving || cart.length === 0"
-                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-lg font-bold text-white shadow-lg transition hover:bg-indigo-700 disabled:bg-gray-400 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-lg font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90 disabled:bg-gray-400"
                     >
                         <Save :size="20" />
                         {{ saving ? 'Guardando...' : 'Guardar Cambios' }}
@@ -771,7 +771,7 @@ onMounted(async () => {
                     <button
                         @click="handleSaveAndExit"
                         :disabled="saving"
-                        class="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition hover:bg-indigo-700"
+                        class="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
                     >
                         <Save :size="18" />
                         {{ saving ? 'Guardando...' : 'Guardar y salir' }}

@@ -345,7 +345,7 @@ onMounted(async () => {
                         type="button"
                         @click="handleExport"
                         :disabled="exporting || loading || !report"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-white"
                     >
                         <Printer :size="16" />
                         {{ exporting ? 'Exportando...' : 'PDF / Imprimir' }}

@@ -660,7 +660,7 @@ const removeVariant = async (variantId?: number | null) => {
                         <Link
                             v-if="supplier"
                             :href="`/suppliers/${supplier.id}/edit`"
-                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-white transition hover:bg-emerald-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="inline-flex items-center gap-2 transition h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         >
                             <Pencil :size="18" />
                             Editar
@@ -963,7 +963,7 @@ const removeVariant = async (variantId?: number | null) => {
                             </select>
                             <button
                                 type="button"
-                                class="inline-flex h-9 items-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                                class="inline-flex items-center gap-2 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                                 @click="searchPurchaseHistory"
                             >
                                 <Search :size="15" />
@@ -1221,7 +1221,7 @@ const removeVariant = async (variantId?: number | null) => {
                             <Link
                                 v-if="hasAccountsPayableOrders"
                                 :href="`/accounts-payable?supplier_id=${supplier.id}`"
-                                class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                                class="inline-flex items-center gap-2 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                             >
                                 <Banknote :size="15" />
                                 Ver en Cuentas por Pagar
@@ -1340,7 +1340,7 @@ const removeVariant = async (variantId?: number | null) => {
                         </div>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="inline-flex items-center gap-2 transition disabled:cursor-not-allowed disabled:opacity-60 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                             :disabled="linkingProducts"
                             @click="openProductPicker"
                         >
@@ -1842,7 +1842,7 @@ const removeVariant = async (variantId?: number | null) => {
                         </div>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm text-white transition hover:bg-emerald-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="inline-flex items-center gap-1 transition h-8 rounded-md px-3 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                             @click="openBrandSelector"
                         >
                             <Plus :size="16" />
@@ -1872,7 +1872,7 @@ const removeVariant = async (variantId?: number | null) => {
                             </select>
                             <button
                                 type="button"
-                                class="rounded-md bg-green-600 px-4 py-2 text-sm text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                class="transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                                 :disabled="!selectedBrandId || attachingBrand"
                                 @click="attachSelectedBrand"
                             >

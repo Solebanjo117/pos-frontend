@@ -481,7 +481,7 @@ onMounted(async () => {
                     <div class="flex items-end">
                         <button
                             type="button"
-                            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700"
+                            class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             @click="applyFilters"
                         >
                             <Filter :size="16" />

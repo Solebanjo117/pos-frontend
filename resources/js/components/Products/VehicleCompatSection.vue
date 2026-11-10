@@ -307,7 +307,7 @@ const rowSheet = (row: VehicleConfigurationRow) =>
                     <button
                         v-if="canManageCatalog && !modelValue.isUniversal"
                         type="button"
-                        class="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
+                        class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                         @click="showQuickAdd = true"
                     >
                         <Plus class="h-4 w-4" />

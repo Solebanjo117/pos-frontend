@@ -222,7 +222,7 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                         <button
                             v-if="detail.workflow.can_approve"
                             type="button"
-                            class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             :disabled="processing"
                             @click="processReturn('approve')"
                         >

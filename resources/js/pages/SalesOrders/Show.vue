@@ -705,7 +705,7 @@ onMounted(async () => {
                         <button
                             v-if="canEditBaseOrder"
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             @click="handleConfirm"
                         >
                             <CheckCircle :size="16" />
@@ -717,7 +717,7 @@ onMounted(async () => {
                                 currentSalesOrder?.status === 'processing'
                             "
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             @click="handleComplete"
                         >
                             <CheckCircle :size="16" />
@@ -1301,7 +1301,7 @@ onMounted(async () => {
                     <button
                         v-if="customer"
                         type="button"
-                        class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                        class="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         @click="router.visit(`/ar?customer_id=${customer.id}`)"
                     >
                         <DollarSign :size="15" />

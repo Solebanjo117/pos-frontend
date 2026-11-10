@@ -185,7 +185,7 @@ const formatDate = (date: string | null) => {
                             v-if="transfer.status === 'in_transit'"
                             @click="handleReceive"
                             :disabled="actionLoading"
-                            class="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50"
+                            class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
                         >
                             <PackageCheck :size="16" />
                             Recibir

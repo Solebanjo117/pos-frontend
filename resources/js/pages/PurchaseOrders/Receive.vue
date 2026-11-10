@@ -252,7 +252,7 @@ async function handleSubmit() {
                     type="submit"
                     form="receive-form"
                     :disabled="loading || receivingPackages <= 0"
-                    class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                    class="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
                 >
                     <Save :size="16" />
                     {{ loading ? 'Procesando...' : 'Registrar recepcion' }}
@@ -377,7 +377,7 @@ async function handleSubmit() {
                         <button
                             v-if="!allItemsReceived"
                             type="button"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
                             @click="handleMassReceive"
                         >
                             <PackageCheck :size="16" />

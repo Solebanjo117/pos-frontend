@@ -694,7 +694,7 @@ watch(currentWarehouseId, (value) => {
                         />
                         <button
                             type="button"
-                            class="inline-flex h-10 items-center gap-2 rounded-md bg-indigo-600 px-4 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="reportsLoading"
                             @click="applyDateRange"
                         >
@@ -733,7 +733,7 @@ watch(currentWarehouseId, (value) => {
                         </div>
                         <button
                             type="button"
-                            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                            class="inline-flex h-8 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                             :disabled="balanceLoading"
                             @click="applyBalanceDate"
                         >
@@ -1168,7 +1168,7 @@ watch(currentWarehouseId, (value) => {
                                 </h3>
                                 <div class="flex gap-2">
                                     <button
-                                        class="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500"
+                                        class="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition hover:bg-primary/90"
                                         @click="openCapitalMovement('in')"
                                     >
                                         Aporte

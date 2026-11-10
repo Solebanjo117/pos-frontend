@@ -406,7 +406,7 @@ onMounted(async () => {
         <div
             class="min-h-[calc(100vh-4.25rem)] bg-gray-50/60 dark:bg-background"
         >
-            <main class="mx-auto max-w-7xl min-w-0 p-4">
+            <main class="mx-auto w-full max-w-7xl min-w-0 p-4">
                 <div v-if="loading" class="flex justify-center py-12">
                     <div
                         class="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"

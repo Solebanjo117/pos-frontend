@@ -141,7 +141,7 @@ const toggleActive = async (formula: PricingFormula) => {
 <template>
     <Head title="Fórmulas de Precio - Configuración" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
+        <div class="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-6">
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">

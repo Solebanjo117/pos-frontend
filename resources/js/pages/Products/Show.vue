@@ -459,7 +459,7 @@ watch(effectiveImages, () => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="min-h-[calc(100vh-4rem)] bg-gray-50/60 dark:bg-background">
-            <div class="mx-auto max-w-7xl space-y-4 p-4">
+            <div class="mx-auto w-full max-w-7xl space-y-4 p-4">
                 <div
                     class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
                 >

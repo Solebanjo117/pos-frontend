@@ -24,7 +24,7 @@ onMounted(async () => {
 <template>
     <Head :title="beneficiary?.name || 'Beneficiario'" />
     <div class="min-h-[calc(100vh-4rem)] bg-gray-50/60 p-4 dark:bg-background">
-        <div class="mx-auto max-w-6xl space-y-4">
+        <div class="mx-auto w-full max-w-6xl space-y-4">
             <Link href="/operational-expenses" class="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white"><ArrowLeft :size="16" /> Gastos</Link>
             <p v-if="error" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
             <template v-if="beneficiary">

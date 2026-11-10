@@ -654,7 +654,7 @@ onMounted(async () => {
         <div
             class="min-h-[calc(100vh-4.25rem)] bg-slate-50 p-4 dark:bg-slate-950"
         >
-            <div class="mx-auto max-w-[1500px] space-y-4">
+            <div class="mx-auto w-full max-w-[1500px] space-y-4">
                 <div
                     v-if="error"
                     class="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100"

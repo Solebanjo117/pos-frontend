@@ -349,7 +349,7 @@ onMounted(async () => {
 <template>
     <Head :title="`Editar ${quoteNumber}`" />
 
-    <div class="mx-auto max-w-7xl">
+    <div class="mx-auto w-full max-w-7xl">
         <!-- Loading -->
         <div v-if="loading" class="py-20 text-center text-gray-500">
             <div

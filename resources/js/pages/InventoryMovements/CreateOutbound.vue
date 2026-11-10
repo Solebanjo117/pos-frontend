@@ -386,7 +386,7 @@ const cancel = () => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-4">
-            <div class="mx-auto max-w-7xl">
+            <div class="mx-auto w-full max-w-7xl">
                 <!-- Header -->
                 <div
                     class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center"

@@ -234,7 +234,7 @@ onMounted(fetchDetail);
 <template>
     <Head :title="`Cotizacion ${quote?.quote_number || ''}`" />
 
-    <div class="mx-auto max-w-7xl space-y-5 p-4">
+    <div class="mx-auto w-full max-w-7xl space-y-5 p-4">
         <div
             v-if="loading"
             class="flex min-h-80 items-center justify-center text-sm font-medium text-slate-500 dark:text-slate-400"

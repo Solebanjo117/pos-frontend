@@ -23,7 +23,7 @@ const selectedVehicle = ref<{
     <Head title="Buscador de Vehículos" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-7xl space-y-6 p-6">
+        <div class="mx-auto w-full max-w-7xl space-y-6 p-6">
             <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
                 Buscador y Selector de Vehículos
             </h1>

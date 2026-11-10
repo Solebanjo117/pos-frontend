@@ -588,7 +588,7 @@ const removeVariant = async (variantId?: number | null) => {
 <template>
     <Head :title="supplier?.name || 'Proveedor'" />
     <AppLayout>
-        <div class="mx-auto max-w-6xl space-y-6">
+        <div class="mx-auto w-full max-w-6xl space-y-6">
             <div
                 class="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm dark:border-emerald-900/30 dark:bg-card"
             >

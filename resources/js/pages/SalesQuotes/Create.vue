@@ -329,7 +329,7 @@ onMounted(async () => {
 <template>
     <Head title="Nueva Cotización" />
 
-    <div class="mx-auto max-w-7xl">
+    <div class="mx-auto w-full max-w-7xl">
         <!-- R41: Enhanced Header with Quote Number -->
         <div
             class="mb-6 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 px-6 py-4 dark:border-indigo-900/50 dark:from-indigo-950/30 dark:to-blue-950/30"

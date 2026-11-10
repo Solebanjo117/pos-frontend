@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { X, Search, Plus, Package, ChevronDown } from 'lucide-vue-next';
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { User } from '@/types';
@@ -269,12 +270,9 @@ const handleSubmit = async () => {
                         <!-- Body -->
                         <div class="flex-1 space-y-5 overflow-y-auto p-6">
                             <!-- Error -->
-                            <div
-                                v-if="errorMsg"
-                                class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20"
-                            >
+                            <ErrorMessage v-if="errorMsg">
                                 {{ errorMsg }}
-                            </div>
+                            </ErrorMessage>
 
                             <!-- Search -->
                             <div class="relative">

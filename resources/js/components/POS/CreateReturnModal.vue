@@ -2,7 +2,6 @@
 import {
     X,
     RotateCcw,
-    AlertCircle,
     Package,
     Search,
     Banknote,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import apiClient from '@/services/api/client';
 import type { User as UserType } from '@/types';
@@ -465,13 +465,9 @@ const refundMethodColor = (method: string, color: string) => {
                         <!-- ═══════════ BODY ═══════════ -->
                         <div class="flex-1 space-y-5 overflow-y-auto p-6">
                             <!-- Error -->
-                            <div
-                                v-if="error"
-                                class="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20"
-                            >
-                                <AlertCircle class="h-4 w-4 flex-shrink-0" />
+                            <ErrorMessage v-if="error">
                                 {{ error }}
-                            </div>
+                            </ErrorMessage>
 
                             <div
                                 class="grid gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-4 dark:border-border dark:bg-background/50"

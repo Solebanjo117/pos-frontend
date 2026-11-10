@@ -2,7 +2,6 @@
 import { Head, Link } from '@inertiajs/vue3';
 import {
     Clock,
-    AlertCircle,
     TrendingUp,
     Download,
     Calendar,
@@ -19,6 +18,7 @@ import MovementTypeChart from '@/components/charts/MovementTypeChart.vue';
 import Pagination from '@/components/Pagination.vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -422,13 +422,9 @@ const sourceLabel = (movement: {
             </div>
 
             <!-- Error Message -->
-            <div
-                v-if="error"
-                class="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
-                <AlertCircle :size="20" />
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <!-- Filters -->
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card">

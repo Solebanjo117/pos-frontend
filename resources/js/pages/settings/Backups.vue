@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -186,12 +187,9 @@ onMounted(fetchBackups);
                     </div>
                 </div>
 
-                <div
-                    v-if="error"
-                    class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <LoadingState
                     v-if="loading"

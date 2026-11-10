@@ -15,6 +15,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -198,12 +199,9 @@ onMounted(load);
                     Nueva cuenta
                 </Button>
             </template>
-            <div
-                v-if="error"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <form
                 class="flex flex-wrap items-end gap-3 rounded-lg border p-3"
                 @submit.prevent="

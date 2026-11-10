@@ -14,6 +14,7 @@ import {
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCategories } from '@/composables/useCategories';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -349,14 +350,11 @@ watch(pathSeparator, (value) => {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/10"
-            >
-                <p class="font-medium text-red-600 dark:text-red-400">
+            <ErrorMessage v-if="error">
+                <p class="font-medium">
                     {{ error }}
                 </p>
-            </div>
+            </ErrorMessage>
 
             <!-- Table -->
             <div

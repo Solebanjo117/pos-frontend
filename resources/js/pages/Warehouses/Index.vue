@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { CheckCircle } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useWarehouses } from '@/composables/useWarehouses';
@@ -168,12 +169,9 @@ const formatUtilization = (warehouse: any) => {
             <LoadingState v-if="loading" label="Cargando almacenes..." />
 
             <!-- Error State -->
-            <div
-                v-else-if="error"
-                class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error">
                 <p>{{ error }}</p>
-            </div>
+            </ErrorMessage>
 
             <!-- Warehouses Table -->
             <div

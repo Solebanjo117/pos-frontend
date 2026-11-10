@@ -13,6 +13,7 @@ import {
 import { computed, ref, onMounted } from 'vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { formatCurrency } from '@/utils/formatters';
@@ -285,12 +286,9 @@ async function handleSubmit() {
                     </nav>
                 </div>
 
-                <div
-                    v-if="error"
-                    class="mb-3 border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400"
-                >
+                <ErrorMessage v-if="error" class="mb-3">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <div
                     v-if="purchaseOrder && hasPreAppliedStock"

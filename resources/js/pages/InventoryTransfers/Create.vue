@@ -8,6 +8,7 @@ import {
     Building2,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -338,12 +339,9 @@ const submit = async () => {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="errorMsg"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-            >
+            <ErrorMessage v-if="errorMsg">
                 {{ errorMsg }}
-            </div>
+            </ErrorMessage>
 
             <!-- Submit -->
             <div class="flex justify-end gap-3">

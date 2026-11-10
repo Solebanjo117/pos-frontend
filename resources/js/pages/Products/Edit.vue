@@ -9,6 +9,7 @@ import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes';
@@ -878,12 +879,9 @@ const validationErrorItems = computed(() =>
                 </div>
 
                 <!-- Error Message -->
-                <div
-                    v-if="error"
-                    class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
                     <div class="space-y-4">

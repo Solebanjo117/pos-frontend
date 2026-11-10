@@ -12,6 +12,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import Pagination from '@/components/Pagination.vue';
 import SupplierDialog from '@/components/Suppliers/SupplierDialog.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { brandsService } from '@/services/brands';
@@ -330,12 +331,9 @@ onMounted(async () => {
                     />
                 </div>
             </div>
-            <div
-                v-if="error"
-                class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <div
                 v-if="canManageCatalog && selectedIds.length"
                 class="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm"

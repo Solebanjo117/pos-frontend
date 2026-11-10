@@ -4,6 +4,7 @@ import { Search } from 'lucide-vue-next';
 import { computed, ref, useId, watch } from 'vue';
 import AppModal from '@/components/ui/AppModal.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { brandsService } from '@/services/brands';
 import { suppliersService } from '@/services/suppliers';
@@ -148,10 +149,7 @@ watch(
     >
         <LoadingState v-if="loading" label="Cargando..." />
         <form v-else :id="formId" class="space-y-6" @submit.prevent="submit">
-            <div
-                v-if="error || validationMessages.length"
-                class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-if="error || validationMessages.length">
                 <p v-if="error">{{ error }}</p>
                 <ul
                     v-if="validationMessages.length"
@@ -164,7 +162,7 @@ watch(
                         {{ item.message }}
                     </li>
                 </ul>
-            </div>
+            </ErrorMessage>
             <section class="grid gap-4 md:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-sm font-medium"

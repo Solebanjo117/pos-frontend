@@ -6,6 +6,7 @@ import PageShell from '@/components/PageShell.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { financialTransfersService } from '@/services/financial-transfers';
@@ -65,12 +66,9 @@ onMounted(loadTransfers);
                 </Button>
             </template>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <div class="overflow-hidden rounded-xl border bg-card">
                 <LoadingState
                     v-if="loading && transfers.length === 0"

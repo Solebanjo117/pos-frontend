@@ -11,6 +11,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -776,12 +777,9 @@ function pageItemLabel(): string {
                 label="Cargando inventario..."
             />
 
-            <div
-                v-else-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-            >
+            <ErrorMessage v-else-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <div
                 v-else-if="viewMode === 'summary'"

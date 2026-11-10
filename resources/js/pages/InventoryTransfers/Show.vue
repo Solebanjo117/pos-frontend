@@ -10,6 +10,7 @@ import {
     ArrowRight,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -202,12 +203,9 @@ const formatDate = (date: string | null) => {
                 </div>
 
                 <!-- Error -->
-                <div
-                    v-if="errorMsg"
-                    class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-                >
+                <ErrorMessage v-if="errorMsg">
                     {{ errorMsg }}
-                </div>
+                </ErrorMessage>
 
                 <!-- Info Cards -->
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">

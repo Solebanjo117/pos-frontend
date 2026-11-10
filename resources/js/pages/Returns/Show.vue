@@ -12,6 +12,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
@@ -159,12 +160,9 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
             label="Cargando devolución..."
         />
 
-        <div
-            v-else-if="error"
-            class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
-        >
+        <ErrorMessage v-else-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <template v-else-if="detail && currentReturn">
             <header class="rounded-lg border bg-white p-4">

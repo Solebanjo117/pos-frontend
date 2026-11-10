@@ -15,6 +15,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -485,12 +486,9 @@ function statusClass(status: VariantStatus): string {
                 </div>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
                 <div

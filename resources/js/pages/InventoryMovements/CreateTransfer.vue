@@ -4,6 +4,7 @@ import { ArrowRightLeft, Trash2, Plus } from 'lucide-vue-next';
 import { ref, onMounted, computed, nextTick, watch } from 'vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -446,12 +447,9 @@ const cancel = () => {
                 >
                     {{ successMessage }}
                 </div>
-                <div
-                    v-if="error || globalError"
-                    class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-                >
+                <ErrorMessage v-if="error || globalError" class="mb-4">
                     {{ error || globalError }}
-                </div>
+                </ErrorMessage>
 
                 <!-- Main Grid -->
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">

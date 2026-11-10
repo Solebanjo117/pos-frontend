@@ -1,12 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import {
-    AlertTriangle,
-    ArrowLeft,
-    ChevronLeft,
-    ChevronRight,
-} from 'lucide-vue-next';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     Sheet,
@@ -173,23 +169,16 @@ onBeforeUnmount(() => traceAbortController?.abort());
                 class="flex-1"
                 label="Cargando trazabilidad..."
             />
-            <div
-                v-else-if="error"
-                class="m-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                role="alert"
-            >
-                <div>
-                    <AlertTriangle class="mr-1 inline h-4 w-4" />
-                    {{ error }}
-                </div>
+            <ErrorMessage v-else-if="error" class="m-4">
+                <div>{{ error }}</div>
                 <button
                     type="button"
-                    class="mt-3 rounded border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 dark:border-red-800 dark:hover:bg-red-950/60"
+                    class="mt-3 rounded border border-destructive/40 px-3 py-1.5 text-xs font-semibold hover:bg-destructive/10"
                     @click="retry"
                 >
                     Reintentar
                 </button>
-            </div>
+            </ErrorMessage>
             <div v-else-if="trace" class="space-y-4 p-4 pt-0">
                 <button
                     v-if="navigationStack.length"

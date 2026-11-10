@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3';
 import { RefreshCw, Search } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import {
@@ -107,7 +108,7 @@ onMounted(() => load());
             <select v-model.number="filters.per_page" class="h-10 rounded-md border bg-background px-2 text-sm" @change="load(1)"><option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} filas</option></select>
             <button type="submit" class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-sky-600 px-3 text-sm font-semibold text-white" :disabled="loading"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" /> Actualizar</button>
         </form>
-        <div v-if="error" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ error }}</div>
+        <ErrorMessage v-if="error">{{ error }}</ErrorMessage>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div v-for="key in config.totalKeys" :key="key" class="rounded-md border bg-card p-3"><p class="text-xs font-semibold uppercase text-muted-foreground">{{ config.columns.find((column) => column.key === key)?.label ?? key }}</p><p class="mt-1 font-mono text-lg font-bold">{{ formatCurrency(summary[key] ?? 0) }}</p></div></div>
         <div class="overflow-hidden rounded-md border bg-card">
             <div class="flex items-center justify-between border-b px-4 py-2 text-xs text-muted-foreground"><span>{{ meta.total }} resultados</span><span>Pagina {{ meta.current_page }} de {{ meta.last_page }}</span></div>

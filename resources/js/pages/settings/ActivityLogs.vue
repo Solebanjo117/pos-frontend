@@ -11,6 +11,7 @@ import {
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -190,12 +191,9 @@ onMounted(() => fetchLogs());
         <LoadingState v-if="loading" label="Cargando registros..." />
 
         <!-- Error -->
-        <div
-            v-else-if="error"
-            class="rounded-xl bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
-        >
+        <ErrorMessage v-else-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <!-- Log List -->
         <div v-else class="space-y-2">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 
 const props = defineProps<{
@@ -225,12 +226,9 @@ const handleSubmit = () => {
                     </div>
                 </div>
 
-                <p
-                    v-if="error"
-                    class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
-                >
+                <ErrorMessage v-if="error" class="mt-4">
                     {{ error }}
-                </p>
+                </ErrorMessage>
 
                 <div class="mt-5 flex justify-end gap-2">
                     <button

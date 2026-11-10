@@ -30,6 +30,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { Doughnut } from 'vue-chartjs';
 import SalesChart from '@/components/dashboard/SalesChart.vue';
 import PageShell from '@/components/PageShell.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboard } from '@/composables/useDashboard';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -376,12 +377,9 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                 />
             </section>
 
-            <section
-                v-else-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-            >
+            <ErrorMessage v-else-if="error">
                 {{ error }}
-            </section>
+            </ErrorMessage>
 
             <template v-else>
                 <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

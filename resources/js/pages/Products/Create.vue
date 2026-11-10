@@ -16,6 +16,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
@@ -1107,12 +1108,9 @@ const readinessItems = computed(() => [
                 </ul>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
                 <form

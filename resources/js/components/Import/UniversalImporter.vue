@@ -45,6 +45,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import {
@@ -5382,12 +5383,9 @@ const formatFileSize = (bytes: number) => {
         </ImportHistoryPanel>
 
         <!-- Error message -->
-        <div
-            v-if="error"
-            class="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
-        >
-            <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />{{ error }}
-        </div>
+        <ErrorMessage v-if="error">
+            {{ error }}
+        </ErrorMessage>
 
         <!-- Step 2: Preview Editable -->
         <ImportPreviewTable v-if="hasPreview" :shell-class="previewShellClass">

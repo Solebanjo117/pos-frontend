@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -350,12 +351,9 @@ onMounted(async () => {
         </div>
 
         <!-- Error / Warning -->
-        <div
-            v-if="error"
-            class="rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-        >
+        <ErrorMessage v-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <div
             v-if="!canEdit"

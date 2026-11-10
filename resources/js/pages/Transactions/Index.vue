@@ -11,6 +11,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -420,13 +421,9 @@ onMounted(async () => {
             </form>
         </div>
 
-        <p
-            v-if="error"
-            role="alert"
-            class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-        >
+        <ErrorMessage v-if="error" role="alert">
             {{ error }}
-        </p>
+        </ErrorMessage>
 
         <div class="overflow-x-auto rounded-lg border border-border bg-card">
             <table class="w-full min-w-[920px] text-sm">

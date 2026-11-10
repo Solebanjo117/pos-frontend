@@ -12,6 +12,7 @@ import {
     AlertCircle,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePricingFormulas } from '@/composables/usePricingFormulas';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -189,12 +190,9 @@ const toggleActive = async (formula: PricingFormula) => {
                 </div>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Formulas List -->
             <div
@@ -352,12 +350,9 @@ const toggleActive = async (formula: PricingFormula) => {
                     </div>
 
                     <div class="space-y-4 overflow-y-auto p-4">
-                        <div
-                            v-if="formError"
-                            class="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                        >
+                        <ErrorMessage v-if="formError">
                             {{ formError }}
-                        </div>
+                        </ErrorMessage>
 
                         <div
                             v-if="form.is_preset"

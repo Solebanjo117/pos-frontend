@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { AlertCircle, LoaderCircle, X } from 'lucide-vue-next';
+import { LoaderCircle, X } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -224,13 +225,9 @@ const submit = (): void => {
                     }}</strong>
                 </div>
 
-                <div
-                    v-if="localError || error"
-                    class="flex gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
-                >
-                    <AlertCircle :size="16" class="mt-0.5 shrink-0" />
+                <ErrorMessage v-if="localError || error">
                     {{ localError || error }}
-                </div>
+                </ErrorMessage>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <label class="space-y-1">

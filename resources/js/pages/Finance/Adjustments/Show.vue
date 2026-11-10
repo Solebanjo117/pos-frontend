@@ -13,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -112,21 +113,13 @@ onMounted(load);
                 ></template
             >
             <LoadingState v-if="loading" label="Cargando ajuste..." />
-            <div
-                v-else-if="error && !adjustment"
-                role="alert"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-else-if="error && !adjustment" role="alert">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <template v-else-if="adjustment">
-                <div
-                    v-if="error"
-                    role="alert"
-                    class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-                >
+                <ErrorMessage v-if="error" role="alert">
                     {{ error }}
-                </div>
+                </ErrorMessage>
                 <section class="rounded-xl border bg-card p-5">
                     <div
                         class="flex flex-wrap items-start justify-between gap-4 border-b pb-5"

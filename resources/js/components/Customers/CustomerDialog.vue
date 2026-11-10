@@ -9,6 +9,7 @@ import {
     DialogScrollContent,
     DialogTitle,
 } from '@/components/ui/dialog';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import apiClient from '@/services/api/client';
 import { CustomersApiService } from '@/services/customers';
@@ -257,12 +258,9 @@ watch(
 
             <LoadingState v-if="loading" label="Cargando..." />
             <form v-else class="space-y-6" @submit.prevent="submit">
-                <div
-                    v-if="error"
-                    class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <section class="grid gap-4 md:grid-cols-2">
                     <div>

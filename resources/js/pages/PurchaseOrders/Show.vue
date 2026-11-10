@@ -19,6 +19,7 @@ import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolb
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -415,12 +416,9 @@ onMounted(async () => {
                     ></div>
                 </div>
 
-                <div
-                    v-else-if="error"
-                    class="border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400"
-                >
+                <ErrorMessage v-else-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <template v-else-if="purchaseOrder">
                     <div

@@ -11,6 +11,7 @@ import {
     CheckCircle2,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -362,12 +363,9 @@ onMounted(async () => {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Success Panel -->
             <div

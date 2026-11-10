@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { ref, onMounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -96,12 +97,9 @@ const handleCancel = () => {
             />
 
             <!-- Error Alert -->
-            <div
-                v-else-if="error"
-                class="mb-6 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error" class="mb-6">
                 <p>{{ error }}</p>
-            </div>
+            </ErrorMessage>
 
             <!-- Form -->
             <form

@@ -10,6 +10,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -295,15 +296,12 @@ onMounted(async () => {
                     {{ successMsg }}
                 </div>
             </div>
-            <div
-                v-if="errorMsg"
-                class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
-            >
+            <ErrorMessage v-if="errorMsg">
                 <div class="flex items-center gap-2">
                     <AlertTriangle class="h-4 w-4" />
                     {{ errorMsg }}
                 </div>
-            </div>
+            </ErrorMessage>
 
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
                 <section

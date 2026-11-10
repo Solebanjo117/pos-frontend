@@ -8,6 +8,7 @@ import ProductFiltersComponent from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
@@ -968,12 +969,9 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 />
 
                 <!-- Error State -->
-                <div
-                    v-else-if="error"
-                    class="rounded-lg bg-red-50 p-4 text-red-800"
-                >
+                <ErrorMessage v-else-if="error">
                     <p>{{ error }}</p>
-                </div>
+                </ErrorMessage>
 
                 <!-- ========== SIDEBAR + TABLE LAYOUT ========== -->
                 <div v-else class="flex min-h-0 flex-col gap-4 lg:flex-row">

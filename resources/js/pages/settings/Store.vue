@@ -23,6 +23,7 @@ import {
 } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
@@ -415,12 +416,9 @@ const handleResetData = async () => {
                 >
                     {{ resetSuccess }}
                 </div>
-                <div
-                    v-if="error"
-                    class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <LoadingState
                     v-if="loading"
@@ -1268,12 +1266,9 @@ const handleResetData = async () => {
                                 Agregar metodo de pago
                             </h3>
                             <div class="mt-4 space-y-4">
-                                <div
-                                    v-if="newMethodError"
-                                    class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                                >
+                                <ErrorMessage v-if="newMethodError">
                                     {{ newMethodError }}
-                                </div>
+                                </ErrorMessage>
                                 <div class="space-y-1.5">
                                     <label class="text-sm font-medium"
                                         >Nombre</label
@@ -1454,12 +1449,9 @@ const handleResetData = async () => {
                                 </label>
                             </div>
 
-                            <p
-                                v-if="resetError"
-                                class="mx-5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                            >
+                            <ErrorMessage v-if="resetError" class="mx-5">
                                 {{ resetError }}
-                            </p>
+                            </ErrorMessage>
 
                             <div
                                 class="flex justify-end gap-2 border-t border-red-100 px-5 py-4 dark:border-red-900/60"

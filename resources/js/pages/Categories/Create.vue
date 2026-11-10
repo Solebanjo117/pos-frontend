@@ -6,6 +6,7 @@ import CategoryImagesSection, {
     type PendingCategoryImage,
 } from '@/components/Categories/CategoryImagesSection.vue';
 import { Checkbox } from '@/components/ui/checkbox';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -167,12 +168,9 @@ function goBack() {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Form -->
             <form

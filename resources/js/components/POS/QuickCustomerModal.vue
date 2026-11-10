@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { X, AlertCircle, Save } from 'lucide-vue-next';
+import { X, Save } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import apiClient from '@/services/api/client';
 import { CustomersApiService } from '@/services/customers';
 import type { CustomerType } from '@/types/customer';
@@ -146,13 +147,9 @@ const handleSubmit = async () => {
 
                 <div class="space-y-4 p-6">
                     <!-- Error -->
-                    <div
-                        v-if="error"
-                        class="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20"
-                    >
-                        <AlertCircle class="h-4 w-4 flex-shrink-0" />
+                    <ErrorMessage v-if="error">
                         {{ error }}
-                    </div>
+                    </ErrorMessage>
 
                     <div>
                         <label

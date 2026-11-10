@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3';
 import { Pencil } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -130,12 +131,9 @@ const getStockStatusColor = (item: any) => {
             <LoadingState v-if="loading" label="Cargando almacén..." />
 
             <!-- Error State -->
-            <div
-                v-else-if="error"
-                class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error">
                 <p>{{ error }}</p>
-            </div>
+            </ErrorMessage>
 
             <!-- Warehouse Details -->
             <div v-else-if="currentWarehouse" class="space-y-6">
@@ -378,12 +376,9 @@ const getStockStatusColor = (item: any) => {
                     </div>
 
                     <!-- Inventory Error -->
-                    <div
-                        v-else-if="inventoryError"
-                        class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-                    >
+                    <ErrorMessage v-else-if="inventoryError">
                         <p>{{ inventoryError }}</p>
-                    </div>
+                    </ErrorMessage>
 
                     <!-- Inventory Table -->
                     <div

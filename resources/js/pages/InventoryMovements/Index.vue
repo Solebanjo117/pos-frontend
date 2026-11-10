@@ -14,6 +14,7 @@ import { computed, onMounted, ref } from 'vue';
 import InventoryMovementDrawer from '@/components/Traceability/InventoryMovementDrawer.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -465,12 +466,9 @@ function formatNumber(value: number): string {
                 label="Cargando movimientos..."
             />
 
-            <div
-                v-else-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <div
                 v-else

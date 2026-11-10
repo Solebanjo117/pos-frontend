@@ -12,6 +12,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -217,13 +218,9 @@ async function submit(): Promise<void> {
             constrained
             content-class="max-w-5xl"
         >
-            <div
-                v-if="error"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-                role="alert"
-            >
+            <ErrorMessage v-if="error" role="alert">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <form class="space-y-6" @submit.prevent="openConfirmation">
                 <div class="grid gap-4 lg:grid-cols-[1fr_auto_1fr]">

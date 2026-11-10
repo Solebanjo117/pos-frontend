@@ -20,6 +20,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import {
@@ -396,12 +397,9 @@ onMounted(async () => {
                         Buscar
                     </button>
                 </div>
-                <div
-                    v-if="error"
-                    class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
                 <div class="overflow-hidden rounded-lg border bg-card">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">

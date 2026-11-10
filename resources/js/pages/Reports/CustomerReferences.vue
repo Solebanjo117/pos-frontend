@@ -10,6 +10,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -185,12 +186,9 @@ onMounted(async () => {
                 </div>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <section class="grid gap-3 md:grid-cols-4">
                 <div

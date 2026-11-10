@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { Banknote, Clock3, Pencil, Plus, Send } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import {
@@ -377,13 +378,9 @@ onUnmounted(() => {
                             placeholder="Información opcional para el cajero"
                         />
                     </label>
-                    <p
-                        v-if="error"
-                        role="alert"
-                        class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200"
-                    >
+                    <ErrorMessage v-if="error" role="alert">
                         {{ error }}
-                    </p>
+                    </ErrorMessage>
                 </div>
                 <div
                     class="flex justify-end border-t bg-muted/20 px-5 py-4 sm:px-6"

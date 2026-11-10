@@ -19,6 +19,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
@@ -540,12 +541,9 @@ watch(effectiveImages, () => {
                     label="Cargando producto..."
                 />
 
-                <div
-                    v-else-if="error"
-                    class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
-                >
+                <ErrorMessage v-else-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <template v-else-if="product">
                     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

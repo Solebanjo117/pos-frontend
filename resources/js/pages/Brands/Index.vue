@@ -4,6 +4,7 @@ import { Search, Plus, Pencil, Trash2, Tag, Upload } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import Pagination from '@/components/Pagination.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useToast } from '@/composables/useToast';
@@ -109,12 +110,9 @@ onMounted(async () => {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Table -->
             <div

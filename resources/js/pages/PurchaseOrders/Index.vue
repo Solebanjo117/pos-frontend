@@ -22,6 +22,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -662,13 +663,9 @@ onMounted(async () => {
                 </div>
             </section>
 
-            <div
-                v-if="error"
-                class="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200"
-            >
-                <AlertCircle :size="18" />
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <section
                 class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card"

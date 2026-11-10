@@ -19,6 +19,7 @@ import StockStatusChart from '@/components/charts/StockStatusChart.vue';
 import TopProductsChart from '@/components/charts/TopProductsChart.vue';
 import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue';
 import Pagination from '@/components/Pagination.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -334,13 +335,9 @@ const inventoryProductHref = (product: {
             </div>
 
             <!-- Error Message -->
-            <div
-                v-if="error"
-                class="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
-                <AlertCircle :size="20" />
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <!-- Summary Cards -->
             <div

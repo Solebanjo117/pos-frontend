@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch, useId } from 'vue';
 import AppModal from '@/components/ui/AppModal.vue';
 import { Button } from '@/components/ui/button';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SearchableSelect, {
@@ -533,13 +534,9 @@ const formId = useId();
                 />
             </section>
 
-            <p
-                v-if="errorMessage"
-                role="alert"
-                class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
-            >
+            <ErrorMessage v-if="errorMessage" role="alert">
                 {{ errorMessage }}
-            </p>
+            </ErrorMessage>
         </form>
 
         <template #footer>

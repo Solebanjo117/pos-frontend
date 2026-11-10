@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { UpdateSupplierData } from '@/types/supplier';
@@ -65,12 +66,9 @@ async function handleSubmit() {
                 </div>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <form
                 v-if="supplier"

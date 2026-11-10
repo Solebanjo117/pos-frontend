@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { ref, onMounted, computed } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -229,12 +230,9 @@ const formatCurrency = (value: number | null) => {
             </div>
 
             <!-- Error Message -->
-            <div
-                v-if="error"
-                class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
+            <ErrorMessage v-if="error" class="mb-4">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <!-- Inventory Table -->
             <div

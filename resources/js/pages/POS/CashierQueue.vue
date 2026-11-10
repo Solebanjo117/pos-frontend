@@ -16,6 +16,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useCashierQueue,
@@ -610,12 +611,9 @@ async function confirmRemove() {
             v-if="loading && !entries.length"
             label="Cargando cola..."
         />
-        <div
-            v-else-if="error"
-            class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-        >
+        <ErrorMessage v-else-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
         <div
             v-else-if="!entries.length"
             class="rounded-md border bg-card py-14 text-center"

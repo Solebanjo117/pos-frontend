@@ -4,6 +4,7 @@ import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import BrandTierPicker from '@/components/Brands/BrandTierPicker.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
@@ -68,12 +69,9 @@ function goBack() {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Form -->
             <form

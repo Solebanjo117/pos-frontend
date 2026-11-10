@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
-    AlertCircle,
     ChevronLeft,
     ChevronRight,
     FileText,
@@ -14,6 +13,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import FinancialDocumentPaymentDialog from '@/components/Finance/FinancialDocumentPaymentDialog.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -237,13 +237,9 @@ onMounted(load);
                     </button>
                 </header>
 
-                <div
-                    v-if="error"
-                    class="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
-                >
-                    <AlertCircle :size="16" />
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div

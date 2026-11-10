@@ -7,6 +7,7 @@ import PageShell from '@/components/PageShell.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -130,13 +131,9 @@ onMounted(async () => {
                 >
             </template>
 
-            <div
-                v-if="error"
-                role="alert"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-if="error" role="alert">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <form
                 class="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 xl:grid-cols-[1.5fr_repeat(4,1fr)_auto]"
                 @submit.prevent="applyFilters"

@@ -6,6 +6,7 @@ import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import AppModal from '@/components/ui/AppModal.vue';
 import { Button } from '@/components/ui/button';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
@@ -1780,12 +1781,9 @@ const formId = useId();
             @close="showBrandModal = false"
         >
             <div class="space-y-4">
-                <p
-                    v-if="brandError"
-                    class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
-                >
+                <ErrorMessage v-if="brandError">
                     {{ brandError }}
-                </p>
+                </ErrorMessage>
                 <div>
                     <label
                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"

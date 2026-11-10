@@ -26,6 +26,7 @@ import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useUsers } from '@/composables/useUsers';
@@ -607,12 +608,9 @@ onMounted(async () => {
             label="Cargando ficha operativa..."
         />
 
-        <div
-            v-else-if="error || operationalError"
-            class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
-        >
+        <ErrorMessage v-else-if="error || operationalError">
             {{ error || operationalError }}
-        </div>
+        </ErrorMessage>
 
         <div v-else-if="order && operationalDetail" class="space-y-4">
             <section

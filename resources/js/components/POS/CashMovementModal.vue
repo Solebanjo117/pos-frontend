@@ -9,6 +9,7 @@ import {
     Loader2,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { createIdempotencyKey } from '@/utils/idempotency';
 
 interface Props {
@@ -305,12 +306,9 @@ const handleClose = () => {
                 </div>
 
                 <!-- Error -->
-                <div
-                    v-if="error"
-                    class="rounded-xl bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <!-- Preview -->
                 <div

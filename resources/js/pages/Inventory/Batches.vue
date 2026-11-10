@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -302,12 +303,9 @@ const getExpiryColor = (dateString: string | null) => {
             <LoadingState v-if="loading" label="Cargando inventario..." />
 
             <!-- Error State -->
-            <div
-                v-else-if="error"
-                class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error">
                 <p>{{ error }}</p>
-            </div>
+            </ErrorMessage>
 
             <!-- Table -->
             <div

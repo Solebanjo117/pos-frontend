@@ -19,6 +19,7 @@ import ProductSearchModal from '@/components/POS/ProductSearchModal.vue';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -668,12 +669,9 @@ onMounted(async () => {
         </div>
 
         <!-- Error -->
-        <div
-            v-if="error"
-            class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-        >
-            <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
-        </div>
+        <ErrorMessage v-if="error">
+            <p class="text-sm">{{ error }}</p>
+        </ErrorMessage>
 
         <!-- Table -->
         <div

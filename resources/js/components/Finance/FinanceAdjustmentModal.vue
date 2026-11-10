@@ -10,6 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -375,13 +376,9 @@ async function submit(): Promise<void> {
                 </DialogDescription>
             </DialogHeader>
 
-            <div
-                v-if="error"
-                role="alert"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-if="error" role="alert">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <LoadingState v-if="loading" label="Cargando opciones..." />
 
             <div v-else-if="confirmation" class="space-y-4">

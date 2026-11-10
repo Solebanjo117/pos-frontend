@@ -22,6 +22,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -1045,12 +1046,9 @@ watch(
         </PurchaseOrderToolbar>
 
         <div class="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <form
                 id="purchase-order-form"
@@ -1273,12 +1271,9 @@ watch(
                                 </div>
                             </div>
 
-                            <div
-                                v-if="candidateError"
-                                class="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400"
-                            >
+                            <ErrorMessage v-if="candidateError" class="mt-3">
                                 {{ candidateError }}
-                            </div>
+                            </ErrorMessage>
 
                             <div
                                 v-if="candidateRows.length"
@@ -1851,12 +1846,9 @@ watch(
                         Puedes vincularla ahora para futuras compras, continuar
                         dejando advertencia en la orden, o cancelar.
                     </p>
-                    <p
-                        v-if="candidateError"
-                        class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300"
-                    >
+                    <ErrorMessage v-if="candidateError">
                         {{ candidateError }}
-                    </p>
+                    </ErrorMessage>
                 </div>
                 <div
                     class="flex flex-wrap justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-border"

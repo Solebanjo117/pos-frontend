@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import apiClient from '@/services/api/client';
 import type { Customer } from '@/types/customer';
@@ -738,12 +739,9 @@ const handleCancel = () => {
                     </div>
 
                     <div class="flex-1 space-y-4 overflow-y-auto p-4">
-                        <div
-                            v-if="error"
-                            class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
-                        >
+                        <ErrorMessage v-if="error">
                             {{ error }}
-                        </div>
+                        </ErrorMessage>
 
                         <div
                             v-if="selectableMethods.length > 0"

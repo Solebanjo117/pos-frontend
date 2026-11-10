@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save, Building2, User } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -97,12 +98,9 @@ const goBack = () => {
         />
 
         <!-- Error message -->
-        <div
-            v-if="error"
-            class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-700 dark:bg-red-900 dark:text-red-200"
-        >
+        <ErrorMessage v-if="error" class="mb-6">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <!-- Form -->
         <form

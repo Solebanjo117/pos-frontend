@@ -25,6 +25,7 @@ import { computed, onMounted, ref } from 'vue';
 import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -765,12 +766,9 @@ const removeVariant = async (variantId?: number | null) => {
                     </nav>
                 </div>
 
-                <div
-                    v-if="purchaseHistoryError"
-                    class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300"
-                >
+                <ErrorMessage v-if="purchaseHistoryError">
                     {{ purchaseHistoryError }}
-                </div>
+                </ErrorMessage>
 
                 <div
                     v-if="activeTab === 'summary'"
@@ -1355,12 +1353,9 @@ const removeVariant = async (variantId?: number | null) => {
                         </button>
                     </div>
 
-                    <div
-                        v-if="supplierProductActionError"
-                        class="border-b border-red-200 bg-red-50 px-6 py-3 text-sm font-medium text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"
-                    >
+                    <ErrorMessage v-if="supplierProductActionError">
                         {{ supplierProductActionError }}
-                    </div>
+                    </ErrorMessage>
 
                     <div
                         class="border-b border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-muted/20"

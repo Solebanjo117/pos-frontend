@@ -13,6 +13,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
@@ -521,12 +522,9 @@ const handleCreateReturn = async (
             </div>
         </section>
 
-        <div
-            v-if="error"
-            class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-        >
+        <ErrorMessage v-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <section class="overflow-hidden rounded-lg border bg-white">
             <LoadingState v-if="loading" label="Cargando devoluciones..." />

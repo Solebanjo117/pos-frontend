@@ -7,6 +7,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import apiClient from '@/services/api/client';
 
@@ -253,12 +254,9 @@ defineExpose({
             </DialogHeader>
 
             <div class="space-y-4 pt-2">
-                <p
-                    v-if="inlineError"
-                    class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
-                >
+                <ErrorMessage v-if="inlineError">
                     {{ inlineError }}
-                </p>
+                </ErrorMessage>
 
                 <!-- Make form -->
                 <template v-if="currentModal === 'vehicleMake'">

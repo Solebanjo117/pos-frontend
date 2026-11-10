@@ -11,6 +11,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -745,12 +746,9 @@ const handleSubmit = async () => {
                 <DialogTitle>Nueva Marca</DialogTitle>
             </DialogHeader>
             <div class="space-y-4 pt-2">
-                <p
-                    v-if="brandError"
-                    class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
-                >
+                <ErrorMessage v-if="brandError">
                     {{ brandError }}
-                </p>
+                </ErrorMessage>
                 <div>
                     <label
                         class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"

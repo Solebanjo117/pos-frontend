@@ -26,6 +26,7 @@ import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue';
 import VariantSelectModal from '@/components/POS/VariantSelectModal.vue';
 import VehicleContextHeader from '@/components/POS/VehicleContextHeader.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSession } from '@/composables/usePosSession';
@@ -2851,24 +2852,21 @@ onUnmounted(() => {
                 >
                     {{ quoteDraft.error.value }}
                 </div>
-                <div
+                <ErrorMessage
                     v-if="error && !props.returnMode && !props.editMode"
-                    class="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm whitespace-pre-line text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
+                    class="mb-3 whitespace-pre-line"
                 >
                     <div class="flex items-start gap-2">
                         <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
                         <span>{{ error }}</span>
                     </div>
-                </div>
+                </ErrorMessage>
                 <div class="mt-auto shrink-0 pt-4">
                     <!-- Return Mode: Show Confirm Return button -->
                     <div v-if="props.returnMode" class="space-y-3">
-                        <div
-                            v-if="returnError"
-                            class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-                        >
+                        <ErrorMessage v-if="returnError">
                             {{ returnError }}
-                        </div>
+                        </ErrorMessage>
                         <button
                             @click="confirmReturn"
                             :disabled="returnLoading || cart.length === 0"
@@ -2908,12 +2906,9 @@ onUnmounted(() => {
 
                     <!-- Edit Mode: Show Confirm Edit button or Payment Modal -->
                     <div v-else-if="props.editMode" class="space-y-3">
-                        <div
-                            v-if="editError"
-                            class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-                        >
+                        <ErrorMessage v-if="editError">
                             {{ editError }}
-                        </div>
+                        </ErrorMessage>
 
                         <div
                             v-if="

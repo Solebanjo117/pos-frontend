@@ -209,3 +209,25 @@ describe('module breadcrumbs', () => {
         ).toEqual([{ title: 'Finanzas', href: '/finance' }]);
     });
 });
+
+describe('hidden actions', () => {
+    it('hides "Registrar entrada" and "Transferencias" from Inventory > Operaciones but keeps their breadcrumbs', () => {
+        const inventory = getVisibleModuleById('inventory', 'admin', features);
+        const operations = inventory?.sections.find(
+            (section) => section.title === 'Operaciones',
+        );
+        const titles = operations?.actions.map((action) => action.title);
+
+        expect(titles).toContain('Movimientos');
+        expect(titles).toContain('Mermas');
+        expect(titles).not.toContain('Registrar entrada');
+        expect(titles).not.toContain('Transferencias');
+
+        // Las pantallas siguen existiendo (enlaces desde reportes) y conservan su ruta de migas.
+        expect(
+            resolveModuleBreadcrumbs('/inventory/transfers/7', []).map(
+                (item) => item.title,
+            ),
+        ).toEqual(['Inventario', 'Transferencias', 'Detalle']);
+    });
+});

@@ -65,6 +65,8 @@ export interface ModuleActionDefinition {
     icon: LucideIcon;
     roles?: AppRole[];
     feature?: ModuleFeature;
+    /** Oculta la acción de los menús; la pantalla sigue existiendo y conserva sus migas de pan. */
+    hidden?: boolean;
 }
 
 export interface ModuleSectionDefinition {
@@ -395,18 +397,21 @@ export const moduleDefinitions: ModuleDefinition[] = [
                             'Consultar entradas, salidas y trazabilidad.',
                         icon: History,
                     },
+                    // Ocultas por ahora (2026-11-10): se usa un solo almacén y la entrada manual no se usa.
                     {
                         title: 'Registrar entrada',
                         href: '/inventory/movements/inbound/create',
                         description: 'Ingresar existencias manualmente.',
                         icon: PackagePlus,
                         roles: roles.inventory,
+                        hidden: true,
                     },
                     {
                         title: 'Transferencias',
                         href: '/inventory/transfers',
                         description: 'Consultar movimientos entre bodegas.',
                         icon: Truck,
+                        hidden: true,
                     },
                     {
                         title: 'Mermas',
@@ -962,6 +967,7 @@ export const getVisibleModules = (
                     ...section,
                     actions: section.actions.filter(
                         (action) =>
+                            !action.hidden &&
                             roleAllowsAction(action, role) &&
                             featureAllowsAction(action, features),
                     ),

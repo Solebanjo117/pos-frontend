@@ -391,11 +391,11 @@ onMounted(async () => {
                         </div>
                         <div>
                             <h1
-                                class="text-xl font-bold text-gray-900 dark:text-white"
+                                class="text-2xl font-semibold tracking-tight text-foreground"
                             >
                                 Editar Cotización
                             </h1>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                            <p class="text-sm text-muted-foreground">
                                 Modifica la cotización y guarda los cambios
                             </p>
                         </div>

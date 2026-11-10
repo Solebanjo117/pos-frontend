@@ -463,7 +463,9 @@ onBeforeUnmount(() => {
                 class="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-center lg:justify-between"
             >
                 <div>
-                    <h1 class="text-2xl font-semibold tracking-tight">
+                    <h1
+                        class="text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Administración de Vehículos
                     </h1>
                     <p class="mt-1 text-sm text-muted-foreground">

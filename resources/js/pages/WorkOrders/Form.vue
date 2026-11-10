@@ -266,7 +266,11 @@ onMounted(async () => {
                         <ArrowLeft class="h-4 w-4" />
                         Volver
                     </Link>
-                    <h1 class="mt-2 text-2xl font-semibold">{{ pageTitle }}</h1>
+                    <h1
+                        class="mt-2 text-2xl font-semibold tracking-tight text-foreground"
+                    >
+                        {{ pageTitle }}
+                    </h1>
                 </div>
                 <button
                     class="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"

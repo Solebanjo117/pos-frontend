@@ -172,7 +172,9 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                     <div>
                         <div class="flex items-center gap-2">
                             <RotateCcw class="h-6 w-6 text-cyan-700" />
-                            <h1 class="text-2xl font-semibold text-gray-950">
+                            <h1
+                                class="text-2xl font-semibold tracking-tight text-foreground"
+                            >
                                 {{
                                     currentReturn.return_number ||
                                     `DEV-${currentReturn.id}`

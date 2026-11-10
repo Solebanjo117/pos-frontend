@@ -162,12 +162,12 @@ const submit = async () => {
             <!-- Header -->
             <div>
                 <h1
-                    class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                    class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <ArrowLeftRight :size="32" class="text-indigo-500" />
                     Nueva Transferencia
                 </h1>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Enviar mercancía de una sucursal a otra
                 </p>
             </div>

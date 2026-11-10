@@ -492,13 +492,13 @@ watch(effectiveImages, () => {
                             </span>
                         </div>
                         <h1
-                            class="text-2xl font-semibold break-words text-gray-950 lg:text-3xl dark:text-white"
+                            class="text-2xl font-semibold tracking-tight break-words text-foreground"
                         >
                             {{ product?.name || 'Detalle del producto' }}
                         </h1>
                         <p
                             v-if="product"
-                            class="mt-1 flex flex-wrap gap-2 text-sm text-gray-500 dark:text-gray-400"
+                            class="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground"
                         >
                             <span class="font-mono">{{
                                 product.sku_base

@@ -241,14 +241,14 @@ onMounted(() => fetchQuotes());
         <div class="flex items-center justify-between">
             <div>
                 <h1
-                    class="flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white"
+                    class="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <FileText
                         class="h-8 w-8 text-indigo-600 dark:text-primary"
                     />
                     Cotizaciones
                 </h1>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Presupuestos y estimaciones para clientes
                 </p>
             </div>

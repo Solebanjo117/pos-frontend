@@ -384,12 +384,12 @@ const sourceLabel = (movement: {
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                     >
                         <Clock :size="24" />
                         Histórico de movimientos
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         {{ activeWarehouseName }} ·
                         {{ reportTotal }} movimientos ·
                         {{ filters.date_from }} a

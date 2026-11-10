@@ -109,12 +109,12 @@ onMounted(() => fetchLogs());
         <!-- Header -->
         <div class="mb-6">
             <h1
-                class="flex items-center gap-3 text-2xl font-bold text-gray-900 dark:text-white"
+                class="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground"
             >
                 <Activity class="h-7 w-7 text-indigo-600 dark:text-primary" />
                 Bitácora de Actividad
             </h1>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-muted-foreground">
                 Registro de accesos y acciones del sistema
             </p>
         </div>

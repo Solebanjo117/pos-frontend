@@ -345,11 +345,11 @@ onMounted(async () => {
                     </div>
                     <div>
                         <h1
-                            class="text-xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             Nueva Cotización
                         </h1>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                        <p class="text-sm text-muted-foreground">
                             Crea un presupuesto sin afectar el inventario
                         </p>
                     </div>

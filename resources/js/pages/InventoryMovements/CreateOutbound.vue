@@ -393,14 +393,12 @@ const cancel = () => {
                 >
                     <div>
                         <h1
-                            class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                            class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                         >
                             <PackageMinus :size="32" />
                             Salida de Inventario (Masiva)
                         </h1>
-                        <p
-                            class="mt-1 text-sm text-gray-700 dark:text-gray-300"
-                        >
+                        <p class="mt-1 text-sm text-muted-foreground">
                             Registra salidas de múltiples productos
                             simultáneamente (Multialmacén)
                         </p>

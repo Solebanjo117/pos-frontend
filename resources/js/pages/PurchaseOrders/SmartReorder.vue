@@ -198,11 +198,11 @@ onMounted(async () => {
             <div class="flex items-center justify-between">
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Reabastecimiento Inteligente
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Genera órdenes de compra basadas en puntos de reorden
                     </p>
                 </div>

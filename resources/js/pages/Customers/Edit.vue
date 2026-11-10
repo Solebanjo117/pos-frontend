@@ -79,10 +79,12 @@ const goBack = () => {
                 <ArrowLeft :size="24" />
             </button>
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     Editar Cliente
                 </h1>
-                <p class="mt-1 text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     {{ currentCustomer?.name }}
                 </p>
             </div>

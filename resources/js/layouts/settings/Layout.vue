@@ -74,7 +74,7 @@ const sidebarNavItems = computed<NavItem[]>(() => [
                     Configuracion
                 </div>
                 <h1
-                    class="text-xl font-semibold tracking-normal text-foreground"
+                    class="text-2xl font-semibold tracking-tight text-foreground"
                 >
                     Administracion del sistema
                 </h1>

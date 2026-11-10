@@ -451,7 +451,7 @@ function statusClass(status: VariantStatus): string {
                         Inventario
                     </button>
                     <h1
-                        class="text-2xl font-semibold text-gray-950 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         {{ product?.name ?? 'Movimientos de inventario' }}
                     </h1>

@@ -695,7 +695,7 @@ onMounted(async () => {
                                         class="flex flex-wrap items-center gap-2"
                                     >
                                         <h1
-                                            class="truncate text-2xl font-bold text-slate-950 dark:text-slate-50"
+                                            class="truncate text-2xl font-semibold tracking-tight text-foreground"
                                         >
                                             {{ customer.name }}
                                         </h1>

@@ -98,7 +98,7 @@ onMounted(() => load());
 <template>
     <Head :title="config.title" />
     <div class="space-y-4">
-        <header><h1 class="text-2xl font-bold">{{ config.title }}</h1><p class="mt-1 text-sm text-muted-foreground">{{ config.description }}</p></header>
+        <header><h1 class="text-2xl font-semibold tracking-tight text-foreground">{{ config.title }}</h1><p class="mt-1 text-sm text-muted-foreground">{{ config.description }}</p></header>
         <form class="grid gap-3 rounded-md border bg-card p-3 md:grid-cols-[1fr_150px_150px_110px_auto]" @submit.prevent="load(1)">
             <label class="relative"><Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input v-model="filters.search" type="search" placeholder="Buscar" class="h-10 w-full rounded-md border bg-background pr-3 pl-9 text-sm" /></label>
             <input v-if="reportKey !== 'valued-inventory'" v-model="filters.date_from" type="date" class="h-10 rounded-md border bg-background px-3 text-sm" />

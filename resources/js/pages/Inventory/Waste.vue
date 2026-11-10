@@ -268,11 +268,11 @@ onMounted(async () => {
             >
                 <div>
                     <h1
-                        class="text-2xl font-semibold text-gray-950 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Registro de mermas
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Descuenta stock por dano, perdida, caducidad o ajuste
                         fisico.
                     </p>

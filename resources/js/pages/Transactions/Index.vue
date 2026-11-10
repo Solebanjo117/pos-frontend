@@ -267,7 +267,9 @@ onMounted(async () => {
     <div class="space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h1 class="text-2xl font-semibold text-foreground">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     Transacciones
                 </h1>
                 <p class="text-sm text-muted-foreground">

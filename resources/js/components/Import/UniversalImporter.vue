@@ -4387,12 +4387,12 @@ const formatFileSize = (bytes: number) => {
     <div ref="importerRootRef" :class="importerShellClass">
         <div class="mb-4">
             <h1
-                class="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white"
+                class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
             >
                 <FileSpreadsheet class="h-6 w-6 text-emerald-600" />
                 {{ config.title }}
             </h1>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-muted-foreground">
                 {{ config.description }}
             </p>
         </div>

@@ -224,7 +224,9 @@ onMounted(async () => {
     <main class="space-y-4">
         <header class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h1 class="text-xl font-semibold">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     {{
                         reportMode
                             ? 'Cobros por método'

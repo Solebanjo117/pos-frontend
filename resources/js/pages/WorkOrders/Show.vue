@@ -147,10 +147,12 @@ onMounted(loadOrder);
                                     `Sucursal #${order.warehouse_id}`
                                 }}
                             </div>
-                            <h1 class="mt-1 text-2xl font-semibold">
+                            <h1
+                                class="mt-1 text-2xl font-semibold tracking-tight text-foreground"
+                            >
                                 {{ order.folio }}
                             </h1>
-                            <p class="mt-1 text-sm text-slate-500">
+                            <p class="mt-1 text-sm text-muted-foreground">
                                 {{ order.notes || 'Sin notas internas.' }}
                             </p>
                         </div>

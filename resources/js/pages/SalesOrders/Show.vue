@@ -638,7 +638,7 @@ onMounted(async () => {
                                     Orden de venta / factura
                                 </p>
                                 <h1
-                                    class="font-mono text-2xl font-bold text-gray-900 dark:text-white"
+                                    class="font-mono text-2xl font-semibold tracking-tight text-foreground"
                                 >
                                     {{ order.order_number }}
                                 </h1>

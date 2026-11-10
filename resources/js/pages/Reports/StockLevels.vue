@@ -302,12 +302,12 @@ const inventoryProductHref = (product: {
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                     >
                         <BarChart3 :size="24" />
                         Niveles de stock
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         {{ activeWarehouseName }} · {{ reportTotal }} registros
                         · {{ atRiskCount }} en atención
                     </p>

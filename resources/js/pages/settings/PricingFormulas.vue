@@ -153,11 +153,11 @@ const toggleActive = async (formula: PricingFormula) => {
                     </div>
                     <div>
                         <h1
-                            class="text-2xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             Fórmulas de Precio
                         </h1>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                        <p class="text-sm text-muted-foreground">
                             Administra las fórmulas dinámicas para calcular
                             precios de venta
                         </p>

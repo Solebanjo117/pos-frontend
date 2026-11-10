@@ -577,7 +577,7 @@ async function confirmRemove() {
         <header class="flex items-center justify-between gap-4">
             <div>
                 <h1
-                    class="flex items-center gap-2 text-2xl font-bold text-foreground"
+                    class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <Inbox class="h-6 w-6 text-sky-600" />
                     Cola de Caja

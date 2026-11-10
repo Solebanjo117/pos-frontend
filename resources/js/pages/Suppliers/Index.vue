@@ -249,7 +249,9 @@ onMounted(async () => {
                 class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
                 <div>
-                    <h1 class="text-2xl font-bold">
+                    <h1
+                        class="text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Categorías, marcas y proveedores
                     </h1>
                     <p class="text-sm text-muted-foreground">

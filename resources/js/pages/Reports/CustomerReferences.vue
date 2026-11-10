@@ -131,7 +131,7 @@ onMounted(async () => {
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                     >
                         <Users :size="26" class="text-cyan-600" />
                         Clientes y referencias

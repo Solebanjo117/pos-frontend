@@ -33,7 +33,7 @@ onMounted(async () => {
                         <Building2 v-if="beneficiary.type === 'company'" :size="22" />
                         <UserRound v-else :size="22" />
                     </div>
-                    <div><h1 class="text-xl font-bold">{{ beneficiary.name }}</h1><p class="text-sm text-gray-500">{{ beneficiary.type === 'company' ? 'Empresa beneficiaria' : 'Beneficiario' }}</p></div>
+                    <div><h1 class="text-2xl font-semibold tracking-tight text-foreground">{{ beneficiary.name }}</h1><p class="text-sm text-muted-foreground">{{ beneficiary.type === 'company' ? 'Empresa beneficiaria' : 'Beneficiario' }}</p></div>
                 </header>
                 <OperationalExpenseHistoryPanel party-type="beneficiary" :party-id="beneficiary.id" />
             </template>

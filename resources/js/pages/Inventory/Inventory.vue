@@ -496,11 +496,11 @@ function pageItemLabel(): string {
             >
                 <div>
                     <h1
-                        class="text-2xl font-semibold text-gray-950 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Existencias
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Stock operativo, lotes y movimientos por variante.
                     </p>
                 </div>

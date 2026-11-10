@@ -42,7 +42,7 @@ const goToReceive = (id: number) => {
         <div class="flex items-center justify-between">
             <div>
                 <h1
-                    class="flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white"
+                    class="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <ClipboardCheck
                         class="h-8 w-8 text-blue-600 dark:text-blue-400"
@@ -55,7 +55,7 @@ const goToReceive = (id: number) => {
                         {{ count }}
                     </span>
                 </h1>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Ordenes de compra enviadas o parciales, pendientes de
                     recepcion
                 </p>

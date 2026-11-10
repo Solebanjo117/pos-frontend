@@ -270,7 +270,7 @@ onMounted(fetchDetail);
                         <div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <h1
-                                    class="text-2xl font-bold text-slate-950 dark:text-white"
+                                    class="text-2xl font-semibold tracking-tight text-foreground"
                                 >
                                     {{ quote.quote_number }}
                                 </h1>

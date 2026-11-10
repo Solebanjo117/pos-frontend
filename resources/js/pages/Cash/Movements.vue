@@ -72,7 +72,9 @@ onUnmounted(() => {
                     >
                         Caja · Operaciones
                     </p>
-                    <h1 class="mt-1 text-2xl font-semibold">
+                    <h1
+                        class="mt-1 text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Agregar / Retirar
                     </h1>
                     <p class="mt-1 text-sm text-muted-foreground">

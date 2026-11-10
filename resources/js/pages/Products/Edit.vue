@@ -786,7 +786,7 @@ const validationErrorItems = computed(() =>
                         </span>
                     </div>
                     <h1
-                        class="text-2xl font-bold break-words text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight break-words text-foreground"
                     >
                         {{ form.name || currentProduct?.name || 'Producto' }}
                     </h1>

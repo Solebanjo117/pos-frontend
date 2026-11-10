@@ -73,7 +73,7 @@ const handleDelivered = async (order: DeliveryOrder) => {
         <div class="flex items-center justify-between">
             <div>
                 <h1
-                    class="flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white"
+                    class="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <Truck
                         class="h-8 w-8 text-emerald-600 dark:text-emerald-400"
@@ -86,7 +86,7 @@ const handleDelivered = async (order: DeliveryOrder) => {
                         {{ count }}
                     </span>
                 </h1>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Ordenes preparadas pendientes de entrega final
                 </p>
             </div>

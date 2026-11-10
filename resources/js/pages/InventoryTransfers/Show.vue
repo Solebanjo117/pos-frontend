@@ -154,7 +154,7 @@ const formatDate = (date: string | null) => {
                                 >←</a
                             >
                             <h1
-                                class="font-mono text-3xl font-bold text-gray-900 dark:text-white"
+                                class="font-mono text-2xl font-semibold tracking-tight text-foreground"
                             >
                                 {{ transfer.reference }}
                             </h1>

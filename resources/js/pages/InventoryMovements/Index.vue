@@ -259,11 +259,11 @@ function formatNumber(value: number): string {
             >
                 <div class="min-w-0">
                     <h1
-                        class="text-xl font-semibold text-gray-950 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Movimientos de inventario
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Historial de entradas, salidas, transferencias y mermas.
                     </p>
                     <div class="mt-2 flex flex-wrap gap-2 text-xs">

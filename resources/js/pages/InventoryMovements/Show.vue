@@ -214,7 +214,7 @@ function openReference(): void {
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h1
-                                class="text-xl font-semibold text-gray-950 dark:text-white"
+                                class="text-2xl font-semibold tracking-tight text-foreground"
                             >
                                 Movimiento #{{ currentMovement.id }}
                             </h1>

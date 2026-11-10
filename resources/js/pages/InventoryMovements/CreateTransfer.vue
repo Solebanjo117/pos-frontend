@@ -407,14 +407,12 @@ const cancel = () => {
                 >
                     <div>
                         <h1
-                            class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                            class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                         >
                             <ArrowRightLeft :size="32" />
                             Transferencia entre Almacenes
                         </h1>
-                        <p
-                            class="mt-1 text-sm text-gray-700 dark:text-gray-300"
-                        >
+                        <p class="mt-1 text-sm text-muted-foreground">
                             Mueve inventario de un almacén a otro.
                         </p>
                     </div>

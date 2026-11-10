@@ -209,10 +209,12 @@ const getExpiryColor = (dateString: string | null) => {
         <div>
             <!-- Header -->
             <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     Inventario por Lotes
                 </h1>
-                <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Vista detallada de existencias agrupadas por número de lote.
                 </p>
                 <div class="mt-4 flex gap-2">

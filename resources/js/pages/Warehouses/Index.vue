@@ -95,11 +95,11 @@ const formatUtilization = (warehouse: any) => {
             <div class="mb-8 flex items-center justify-between">
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Almacenes
                     </h1>
-                    <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Gestiona los almacenes y ubicaciones del sistema
                     </p>
                 </div>

@@ -218,11 +218,11 @@ onMounted(load);
                 >
                     <div>
                         <h1
-                            class="text-2xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             {{ copy.title }}
                         </h1>
-                        <p class="text-sm text-gray-500">
+                        <p class="text-sm text-muted-foreground">
                             {{ copy.description }}
                         </p>
                     </div>

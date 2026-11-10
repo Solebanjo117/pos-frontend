@@ -260,7 +260,11 @@ onMounted(async () => {
                 class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
                 <div>
-                    <h1 class="text-2xl font-bold">Clientes</h1>
+                    <h1
+                        class="text-2xl font-semibold tracking-tight text-foreground"
+                    >
+                        Clientes
+                    </h1>
                     <p class="text-sm text-muted-foreground">
                         Clientes, crédito y vehículos asociados.
                     </p>

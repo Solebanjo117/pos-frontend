@@ -268,11 +268,11 @@ watch(pathSeparator, (value) => {
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Categorías
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Gestiona las categorías de productos y sus jerarquías
                     </p>
                 </div>

@@ -96,12 +96,12 @@ const totalItems = (items: any[]) =>
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                     >
                         <ArrowLeftRight :size="32" class="text-indigo-500" />
                         Transferencias de Inventario
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Enviar y recibir mercancía entre sucursales
                     </p>
                 </div>

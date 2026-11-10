@@ -192,10 +192,12 @@ onMounted(loadWorkOrders);
                         <Wrench class="h-4 w-4" />
                         Taller
                     </div>
-                    <h1 class="mt-1 text-2xl font-semibold tracking-normal">
+                    <h1
+                        class="mt-1 text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Ordenes de Trabajo
                     </h1>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                    <p class="text-sm text-muted-foreground">
                         Seguimiento operativo por cliente, vehiculo y mecanico
                         asignado.
                     </p>

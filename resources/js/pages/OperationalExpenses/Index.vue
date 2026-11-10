@@ -759,11 +759,11 @@ onMounted(async () => {
                 >
                     <div>
                         <h1
-                            class="text-2xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             Gastos operativos
                         </h1>
-                        <p class="text-sm text-gray-500">
+                        <p class="text-sm text-muted-foreground">
                             Luz, alquiler, contador, mantenimiento, software y
                             otros gastos de operación separados por impacto de
                             caja.

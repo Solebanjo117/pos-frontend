@@ -36,7 +36,7 @@ const props = withDefaults(
                     <div class="min-w-0 space-y-1">
                         <h1
                             v-if="title"
-                            class="text-2xl font-semibold text-foreground"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             {{ title }}
                         </h1>

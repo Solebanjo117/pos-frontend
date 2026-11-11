@@ -27,6 +27,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     smartReorderService,
@@ -437,6 +438,7 @@ onMounted(async () => {
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div
+                v-if="multiWarehouse"
                 class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
             >
                 <div

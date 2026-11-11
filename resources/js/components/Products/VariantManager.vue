@@ -11,6 +11,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
 import type { ProductCode } from '@/types/product';
 import {
@@ -1524,7 +1525,7 @@ const formId = useId();
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
-                        <div class="md:col-span-7">
+                        <div v-if="multiWarehouse" class="md:col-span-7">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >Almacén</label

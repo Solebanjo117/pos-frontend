@@ -29,6 +29,7 @@ import { useCategories } from '@/composables/useCategories';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import type { StockLevelsFilters } from '@/types/report';
@@ -561,7 +562,7 @@ const inventoryProductHref = (product: {
                 </div>
                 <div class="grid items-end gap-4 md:grid-cols-4 lg:grid-cols-5">
                     <!-- Warehouse -->
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Almacén</label
@@ -725,7 +726,10 @@ const inventoryProductHref = (product: {
                                         />
                                     </button>
                                 </th>
-                                <th class="px-6 py-3 text-left">
+                                <th
+                                    v-if="multiWarehouse"
+                                    class="px-6 py-3 text-left"
+                                >
                                     <button
                                         type="button"
                                         :class="sortHeaderClass('warehouse')"
@@ -970,6 +974,7 @@ const inventoryProductHref = (product: {
                                     {{ product.brand || '-' }}
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
                                 >
                                     {{ product.warehouse }}

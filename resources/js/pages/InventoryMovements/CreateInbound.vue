@@ -14,6 +14,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -107,7 +108,7 @@ const successMessage = ref('');
 const globalError = ref<string | null>(null);
 
 // Computed
-const showWarehouseSelect = computed(() => true);
+const showWarehouseSelect = computed(() => multiWarehouse);
 
 const warehouseOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Seleccionar...' },

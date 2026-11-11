@@ -32,6 +32,7 @@ import {
     Wrench,
 } from 'lucide-vue-next';
 import type { LucideIcon } from 'lucide-vue-next';
+import { MULTI_WAREHOUSE_ENABLED } from '@/config/features';
 import type { BreadcrumbItem } from '@/types';
 
 export type AppRole =
@@ -397,7 +398,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                             'Consultar entradas, salidas y trazabilidad.',
                         icon: History,
                     },
-                    // Ocultas por ahora (2026-11-10): se usa un solo almacén y la entrada manual no se usa.
+                    // "Registrar entrada" oculta por ahora (2026-11-10): la entrada manual no se usa.
                     {
                         title: 'Registrar entrada',
                         href: '/inventory/movements/inbound/create',
@@ -406,12 +407,13 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         roles: roles.inventory,
                         hidden: true,
                     },
+                    // Transferencias: solo con varios almacenes (config/features.ts).
                     {
                         title: 'Transferencias',
                         href: '/inventory/transfers',
                         description: 'Consultar movimientos entre bodegas.',
                         icon: Truck,
-                        hidden: true,
+                        hidden: !MULTI_WAREHOUSE_ENABLED,
                     },
                     {
                         title: 'Mermas',
@@ -430,7 +432,9 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 ],
             },
             {
-                title: 'Catálogos y bodegas',
+                title: MULTI_WAREHOUSE_ENABLED
+                    ? 'Catálogos y bodegas'
+                    : 'Catálogos',
                 actions: [
                     {
                         title: 'Categorías',
@@ -451,6 +455,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         href: '/warehouses',
                         description: 'Consultar y administrar ubicaciones.',
                         icon: Warehouse,
+                        hidden: !MULTI_WAREHOUSE_ENABLED,
                     },
                 ],
             },
@@ -700,6 +705,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         description: 'Movimientos entre bodegas.',
                         icon: Truck,
                         roles: roles.adminManager,
+                        hidden: !MULTI_WAREHOUSE_ENABLED,
                     },
                 ],
             },

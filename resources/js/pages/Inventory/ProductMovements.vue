@@ -17,6 +17,7 @@ import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPan
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { productsApi } from '@/services/api/products';
@@ -586,7 +587,7 @@ function statusClass(status: VariantStatus): string {
                 class="sticky top-0 z-10 rounded-lg border border-gray-200 bg-white/95 p-4 backdrop-blur dark:border-border dark:bg-card/95"
             >
                 <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
-                    <div class="lg:col-span-4">
+                    <div v-if="multiWarehouse" class="lg:col-span-4">
                         <label
                             class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
                         >
@@ -842,6 +843,7 @@ function statusClass(status: VariantStatus): string {
                             </div>
 
                             <p
+                                v-if="multiWarehouse"
                                 class="text-sm font-medium text-gray-500 dark:text-gray-400"
                             >
                                 Almacén:

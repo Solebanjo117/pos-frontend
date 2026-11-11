@@ -14,6 +14,7 @@ import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { CustomersApiService } from '@/services/customers';
 import { InventoryApiService } from '@/services/inventory';
@@ -164,7 +165,7 @@ onMounted(async () => {
                         v-model:to="filters.date_to"
                         class="md:col-span-2"
                     />
-                    <SearchableSelect
+                    <SearchableSelect v-if="multiWarehouse"
                         v-model="filters.warehouse_id"
                         :options="warehouseOptions"
                         placeholder="Sucursal"

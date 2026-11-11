@@ -30,6 +30,7 @@ import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useUsers } from '@/composables/useUsers';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { paymentMethodsService } from '@/services/paymentMethods';
@@ -886,7 +887,7 @@ onMounted(async () => {
                                 Sin sesión
                             </p>
                         </div>
-                        <div>
+                        <div v-if="multiWarehouse">
                             <p class="text-xs text-gray-500">Bodega</p>
                             <p
                                 class="font-semibold text-gray-900 dark:text-white"
@@ -1027,7 +1028,9 @@ onMounted(async () => {
                         >
                             <tr>
                                 <th class="px-3 py-2 text-left">Item</th>
-                                <th class="px-3 py-2 text-left">Bodega</th>
+                                <th class="px-3 py-2 text-left">
+                                    {{ multiWarehouse ? 'Bodega' : 'Vendedor' }}
+                                </th>
                                 <th class="px-3 py-2 text-right">Cant.</th>
                                 <th class="px-3 py-2 text-right">Precio</th>
                                 <th class="px-3 py-2 text-right">ITBM</th>
@@ -1096,7 +1099,9 @@ onMounted(async () => {
                                 <td
                                     class="px-3 py-3 text-gray-700 dark:text-gray-300"
                                 >
-                                    {{ item.warehouse_name || 'N/A' }}
+                                    <template v-if="multiWarehouse">{{
+                                        item.warehouse_name || 'N/A'
+                                    }}</template>
                                     <p
                                         v-if="item.seller_name"
                                         class="text-xs text-gray-500"
@@ -1396,7 +1401,12 @@ onMounted(async () => {
                         <tr>
                             <th class="px-3 py-2 text-left">Movimiento</th>
                             <th class="px-3 py-2 text-left">Item</th>
-                            <th class="px-3 py-2 text-left">Bodega</th>
+                            <th
+                                v-if="multiWarehouse"
+                                class="px-3 py-2 text-left"
+                            >
+                                Bodega
+                            </th>
                             <th class="px-3 py-2 text-right">Cantidad</th>
                             <th class="px-3 py-2 text-left">Lotes</th>
                         </tr>
@@ -1456,7 +1466,7 @@ onMounted(async () => {
                                     }}
                                 </p>
                             </td>
-                            <td class="px-3 py-3">
+                            <td v-if="multiWarehouse" class="px-3 py-3">
                                 {{ movement.warehouse_name || 'N/A' }}
                             </td>
                             <td class="px-3 py-3 text-right font-mono">

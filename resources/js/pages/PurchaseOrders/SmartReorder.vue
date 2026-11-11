@@ -16,6 +16,7 @@ import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useToast } from '@/composables/useToast';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import {
@@ -346,7 +347,7 @@ onMounted(async () => {
             <div
                 class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
             >
-                <div class="flex items-center gap-4">
+                <div v-if="multiWarehouse" class="flex items-center gap-4">
                     <label
                         class="text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Almacén:</label
@@ -489,6 +490,7 @@ onMounted(async () => {
                                     Mín
                                 </th>
                                 <th
+                                    v-if="multiWarehouse"
                                     class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase"
                                 >
                                     Almacén
@@ -562,6 +564,7 @@ onMounted(async () => {
                                     {{ item.reorder_point }}
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-4 py-3 text-center text-xs text-gray-500"
                                 >
                                     {{ item.warehouse_name }}

@@ -18,6 +18,7 @@ import { computed, onMounted, ref } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWorkOrders } from '@/composables/useWorkOrders';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     WorkOrdersApiService,
@@ -365,7 +366,10 @@ onMounted(loadWorkOrders);
                                     >
                                         {{ order.folio }}
                                     </Link>
-                                    <div class="mt-1 text-xs text-slate-500">
+                                    <div
+                                        v-if="multiWarehouse"
+                                        class="mt-1 text-xs text-slate-500"
+                                    >
                                         {{
                                             order.warehouse?.name ??
                                             `Sucursal #${order.warehouse_id}`

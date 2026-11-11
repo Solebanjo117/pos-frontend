@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Plus, Save, Trash2, Wrench } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { productsApi } from '@/services/api/products';
 import { CustomersApiService } from '@/services/customers';
@@ -349,7 +350,10 @@ onMounted(async () => {
                                     </option>
                                 </select>
                             </label>
-                            <label class="space-y-1 text-sm">
+                            <label
+                                v-if="multiWarehouse"
+                                class="space-y-1 text-sm"
+                            >
                                 <span class="font-medium">Sucursal</span>
                                 <select
                                     v-model="form.warehouse_id"
@@ -493,6 +497,7 @@ onMounted(async () => {
                                     placeholder="Precio"
                                 />
                                 <select
+                                    v-if="multiWarehouse"
                                     v-model="item.warehouse_id"
                                     class="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
                                 >

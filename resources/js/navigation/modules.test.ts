@@ -231,3 +231,18 @@ describe('hidden actions', () => {
         ).toEqual(['Inventario', 'Transferencias', 'Detalle']);
     });
 });
+
+describe('single warehouse', () => {
+    it('hides the warehouses catalog and transfers from every menu', () => {
+        const titles = getVisibleModules('admin', features).flatMap((module) =>
+            module.sections.flatMap((section) =>
+                section.actions.map((action) => action.title),
+            ),
+        );
+
+        expect(titles).not.toContain('Bodegas');
+        expect(titles).not.toContain('Transferencias');
+        // La cola de preparación de pedidos no depende de tener varios almacenes.
+        expect(titles).toContain('Cola de bodega');
+    });
+});

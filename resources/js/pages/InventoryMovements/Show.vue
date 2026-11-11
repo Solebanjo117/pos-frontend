@@ -20,6 +20,7 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { transactionTraceService } from '@/services/transaction-traces';
 import { type BreadcrumbItem } from '@/types';
@@ -292,6 +293,7 @@ function openReference(): void {
                     </div>
 
                     <div
+                        v-if="multiWarehouse"
                         class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                     >
                         <div
@@ -311,6 +313,7 @@ function openReference(): void {
                     </div>
 
                     <div
+                        v-if="multiWarehouse"
                         class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                     >
                         <div
@@ -682,7 +685,12 @@ function openReference(): void {
                                         <th class="px-4 py-3 text-right">
                                             Cantidad
                                         </th>
-                                        <th class="px-4 py-3">Almacen</th>
+                                        <th
+                                            v-if="multiWarehouse"
+                                            class="px-4 py-3"
+                                        >
+                                            Almacen
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -723,7 +731,10 @@ function openReference(): void {
                                                 formatNumber(movement.quantity)
                                             }}
                                         </td>
-                                        <td class="px-4 py-3">
+                                        <td
+                                            v-if="multiWarehouse"
+                                            class="px-4 py-3"
+                                        >
                                             {{
                                                 movement.warehouse?.name || '-'
                                             }}

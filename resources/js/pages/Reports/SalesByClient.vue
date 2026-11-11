@@ -41,6 +41,7 @@ import SearchableSelect, {
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { CustomersApiService } from '@/services/customers';
 import { ReportsApiService } from '@/services/reports';
@@ -415,7 +416,7 @@ onMounted(async () => {
                             @update:model-value="applyFilters"
                         />
                     </div>
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
                         >

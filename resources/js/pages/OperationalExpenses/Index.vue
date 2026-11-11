@@ -23,6 +23,7 @@ import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { operationalExpensesService } from '@/services/operational-expenses';
 import { ReportsApiService } from '@/services/reports';
@@ -1444,7 +1445,7 @@ onMounted(async () => {
                                     :options="statusOptions"
                                 />
                             </div>
-                            <div>
+                            <div v-if="multiWarehouse">
                                 <label class="mb-1 block text-sm font-medium"
                                     >Sucursal</label
                                 >

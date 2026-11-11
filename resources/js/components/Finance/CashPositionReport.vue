@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { onMounted, ref, watch } from 'vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
 import { validateFinancialReportDates } from '@/utils/financialReport';
 import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
@@ -214,7 +215,7 @@ onMounted(async () => {
                     <option value="period">Movimientos del período</option>
                 </select></label
             >
-            <label class="text-xs"
+            <label v-if="multiWarehouse" class="text-xs"
                 >Sucursal<select
                     v-model="filters.warehouse_id"
                     class="mt-1 block rounded border bg-background p-2"

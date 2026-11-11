@@ -2,6 +2,7 @@
 import { Link } from '@inertiajs/vue3';
 import { onMounted, ref, watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
 import { validateFinancialReportDates } from '@/utils/financialReport';
 import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
@@ -273,7 +274,7 @@ onMounted(async () => {
                 load();
             "
         >
-            <label class="text-xs"
+            <label v-if="multiWarehouse" class="text-xs"
                 >Sucursal<select
                     v-model="filters.warehouse_id"
                     class="mt-1 block rounded-md border bg-background p-2"

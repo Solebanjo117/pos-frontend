@@ -30,6 +30,7 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useSuppliers } from '@/composables/useSuppliers';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
@@ -1085,7 +1086,7 @@ watch(
                                     placeholder="Selecciona un proveedor"
                                 />
                             </div>
-                            <div>
+                            <div v-if="multiWarehouse">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >Almacén destino *</label

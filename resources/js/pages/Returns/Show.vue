@@ -14,6 +14,7 @@ import TransactionRelationsPanel from '@/components/Traceability/TransactionRela
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { SalesReturnOperationalDetail } from '@/types/sales-return';
@@ -275,7 +276,10 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                         {{ currentReturn.customer?.code || 'Sin código' }}
                     </p>
                 </div>
-                <div class="rounded-lg border bg-white p-3">
+                <div
+                    v-if="multiWarehouse"
+                    class="rounded-lg border bg-white p-3"
+                >
                     <p class="text-xs font-medium text-gray-500">Sucursal</p>
                     <p
                         class="mt-1 truncate text-lg font-semibold text-gray-950"
@@ -515,7 +519,12 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                         <tr>
                             <th class="px-3 py-2 text-left">Movimiento</th>
                             <th class="px-3 py-2 text-left">Producto</th>
-                            <th class="px-3 py-2 text-left">Sucursal</th>
+                            <th
+                                v-if="multiWarehouse"
+                                class="px-3 py-2 text-left"
+                            >
+                                Sucursal
+                            </th>
                             <th class="px-3 py-2 text-right">Cantidad</th>
                             <th class="px-3 py-2 text-left">Fecha</th>
                         </tr>
@@ -539,7 +548,7 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                             <td class="px-3 py-2">
                                 {{ movement.product_name || 'Producto' }}
                             </td>
-                            <td class="px-3 py-2">
+                            <td v-if="multiWarehouse" class="px-3 py-2">
                                 {{ movement.warehouse_name || 'N/A' }}
                             </td>
                             <td class="px-3 py-2 text-right tabular-nums">

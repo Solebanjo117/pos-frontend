@@ -16,6 +16,7 @@ import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 
@@ -355,7 +356,7 @@ onMounted(async () => {
                             </select>
                         </div>
 
-                        <div>
+                        <div v-if="multiWarehouse">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                             >
@@ -473,7 +474,10 @@ onMounted(async () => {
                                     {{ variantLabel(selectedVariant) }}
                                 </dd>
                             </div>
-                            <div class="flex items-start justify-between gap-3">
+                            <div
+                                v-if="multiWarehouse"
+                                class="flex items-start justify-between gap-3"
+                            >
                                 <dt class="text-gray-500">Almacen</dt>
                                 <dd
                                     class="text-right font-medium text-gray-950 dark:text-white"
@@ -600,7 +604,9 @@ onMounted(async () => {
                             <tr>
                                 <th class="px-4 py-3">Producto</th>
                                 <th class="px-4 py-3">Variante / SKU</th>
-                                <th class="px-4 py-3">Almacen</th>
+                                <th v-if="multiWarehouse" class="px-4 py-3">
+                                    Almacen
+                                </th>
                                 <th class="px-4 py-3 text-right">Cantidad</th>
                                 <th class="px-4 py-3">Motivo</th>
                                 <th class="px-4 py-3">Usuario</th>
@@ -632,7 +638,7 @@ onMounted(async () => {
                                         {{ entry.sku }}
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td v-if="multiWarehouse" class="px-4 py-3">
                                     <div class="flex items-center gap-2">
                                         <Warehouse
                                             class="h-4 w-4 text-gray-400"

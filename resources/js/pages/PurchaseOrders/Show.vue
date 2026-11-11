@@ -23,6 +23,7 @@ import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
@@ -562,11 +563,15 @@ onMounted(async () => {
                                             }}
                                         </div>
                                         <div
+                                            v-if="multiWarehouse"
                                             class="border-r border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
                                         >
                                             Almacen
                                         </div>
-                                        <div class="px-3 py-2">
+                                        <div
+                                            v-if="multiWarehouse"
+                                            class="px-3 py-2"
+                                        >
                                             {{
                                                 purchaseOrder.warehouse?.name ||
                                                 '-'
@@ -1189,11 +1194,12 @@ onMounted(async () => {
                                     }}
                                 </div>
                                 <div
+                                    v-if="multiWarehouse"
                                     class="border-r border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
                                 >
                                     Sucursal
                                 </div>
-                                <div class="px-3 py-2">
+                                <div v-if="multiWarehouse" class="px-3 py-2">
                                     {{ purchaseOrder.warehouse?.name || '-' }}
                                 </div>
                             </div>

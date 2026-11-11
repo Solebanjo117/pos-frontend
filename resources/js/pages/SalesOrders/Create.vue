@@ -7,10 +7,12 @@ import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useCustomers } from '@/composables/useCustomers';
+import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { CustomersApiService } from '@/services/customers';
 import type { CustomerVehicle } from '@/types/customer';
@@ -21,6 +23,12 @@ defineOptions({ layout: AppLayout });
 const { createSalesOrder, loading, error } = useSalesOrders();
 const { products, fetchProducts } = useProducts();
 const { warehouses, fetchWarehouses } = useWarehouses();
+const { currentWarehouseId, initWarehouse } = usePosSettings();
+// Con un solo almacén el campo está oculto: cada artículo usa el almacén actual.
+const defaultItemWarehouseId = (): number =>
+    multiWarehouse
+        ? 0
+        : (currentWarehouseId.value ?? warehouses.value[0]?.id ?? 0);
 const { customers, fetchCustomers } = useCustomers();
 const {
     fetchSettings: fetchStoreSettings,
@@ -218,7 +226,7 @@ const addItem = () => {
     // Reset
     newItem.value = {
         product_id: 0,
-        warehouse_id: 0,
+        warehouse_id: defaultItemWarehouseId(),
         quantity: 1,
         unit_price: 0,
         discount_percent: 0,
@@ -257,9 +265,11 @@ onMounted(async () => {
         fetchWarehouses(),
         fetchCustomers(),
         fetchStoreSettings(),
+        initWarehouse(),
     ]);
 
     newItem.value.tax_percent = defaultTaxRate();
+    newItem.value.warehouse_id = defaultItemWarehouseId();
 });
 </script>
 
@@ -443,7 +453,7 @@ onMounted(async () => {
                         </div>
                     </div>
 
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                             >Almacén</label
@@ -521,6 +531,7 @@ onMounted(async () => {
                                     Producto
                                 </th>
                                 <th
+                                    v-if="multiWarehouse"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
                                 >
                                     Almacén
@@ -574,6 +585,7 @@ onMounted(async () => {
                                     }}
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-6 py-4 text-sm text-gray-900 dark:text-white"
                                 >
                                     {{

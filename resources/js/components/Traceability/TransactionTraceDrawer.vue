@@ -11,6 +11,7 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import { transactionTraceService } from '@/services/transaction-traces';
 import type {
     InventoryMovementTraceDetails,
@@ -250,7 +251,7 @@ onBeforeUnmount(() => traceAbortController?.abort());
                             <dt class="text-xs text-slate-500">Variante</dt>
                             <dd>{{ inventoryDetails.variant?.sku || '-' }}</dd>
                         </div>
-                        <div>
+                        <div v-if="multiWarehouse">
                             <dt class="text-xs text-slate-500">
                                 Almacen origen
                             </dt>
@@ -258,7 +259,7 @@ onBeforeUnmount(() => traceAbortController?.abort());
                                 {{ inventoryDetails.warehouse?.name || '-' }}
                             </dd>
                         </div>
-                        <div>
+                        <div v-if="multiWarehouse">
                             <dt class="text-xs text-slate-500">
                                 Almacen destino
                             </dt>

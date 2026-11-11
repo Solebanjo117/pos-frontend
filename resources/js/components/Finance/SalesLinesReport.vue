@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
 import { validateFinancialReportDates } from '@/utils/financialReport';
 import type { FinancialReportFilters } from '@/utils/financialReport';
@@ -250,12 +251,16 @@ onMounted(() => {
             /></label>
             <details class="w-full">
                 <summary class="cursor-pointer text-sm text-primary">
-                    Filtros de sucursal, producto, marca, categoría, cliente y
-                    vendedor
+                    {{
+                        multiWarehouse
+                            ? 'Filtros de sucursal, producto, marca, categoría, cliente y vendedor'
+                            : 'Filtros de producto, marca, categoría, cliente y vendedor'
+                    }}
                 </summary>
                 <div class="mt-3 flex flex-wrap gap-3">
                     <label
                         v-for="(name, key) in selectors"
+                        v-show="multiWarehouse || key !== 'warehouse_id'"
                         :key="key"
                         class="text-xs"
                         >{{ name

@@ -28,6 +28,7 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { suppliersService } from '@/services/suppliers';
@@ -980,7 +981,7 @@ const removeVariant = async (variantId?: number | null) => {
                                 <tr>
                                     <th class="px-3 py-2 text-left">OC</th>
                                     <th class="px-3 py-2 text-left">Fecha</th>
-                                    <th class="px-3 py-2 text-left">
+                                    <th v-if="multiWarehouse" class="px-3 py-2 text-left">
                                         Sucursal
                                     </th>
                                     <th class="px-3 py-2 text-right">Items</th>
@@ -1028,7 +1029,7 @@ const removeVariant = async (variantId?: number | null) => {
                                     <td class="px-3 py-2 text-gray-600">
                                         {{ formatDate(order.order_date) }}
                                     </td>
-                                    <td class="px-3 py-2 text-gray-600">
+                                    <td v-if="multiWarehouse" class="px-3 py-2 text-gray-600">
                                         {{ order.warehouse?.name || '-' }}
                                     </td>
                                     <td class="px-3 py-2 text-right font-mono">

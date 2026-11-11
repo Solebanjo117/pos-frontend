@@ -21,6 +21,7 @@ import SearchableSelect, {
 } from '@/components/ui/SearchableSelect.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -69,7 +70,10 @@ const selectedMovementId = ref<number | null>(null);
 const movementDrawerOpen = ref(false);
 
 const showWarehouseColumns = computed(
-    () => !isSingleWarehouseMode() && !filters.value.warehouse_id,
+    () =>
+        multiWarehouse &&
+        !isSingleWarehouseMode() &&
+        !filters.value.warehouse_id,
 );
 const tableColspan = computed(() => (showWarehouseColumns.value ? 9 : 7));
 const warehouseFilterModel = computed<number | string | null>({
@@ -301,7 +305,7 @@ function formatNumber(value: number): string {
                         Salida
                     </a>
                     <a
-                        v-if="!isSingleWarehouseMode()"
+                        v-if="multiWarehouse && !isSingleWarehouseMode()"
                         href="/inventory/movements/transfer/create"
                         class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-border dark:text-gray-100 dark:hover:bg-muted"
                     >
@@ -414,7 +418,9 @@ function formatNumber(value: number): string {
                             <option value="in">Entrada</option>
                             <option value="out">Salida</option>
                             <option
-                                v-if="!isSingleWarehouseMode()"
+                                v-if="
+                                    multiWarehouse && !isSingleWarehouseMode()
+                                "
                                 value="transfer"
                             >
                                 Transferencia
@@ -422,7 +428,7 @@ function formatNumber(value: number): string {
                         </select>
                     </div>
 
-                    <div v-if="!isSingleWarehouseMode()">
+                    <div v-if="multiWarehouse && !isSingleWarehouseMode()">
                         <label
                             class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
                         >

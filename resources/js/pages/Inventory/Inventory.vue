@@ -18,6 +18,7 @@ import SearchableSelect, {
 } from '@/components/ui/SearchableSelect.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -178,7 +179,9 @@ const tabs: Array<{ key: ViewMode; label: string }> = [
     { key: 'movements', label: 'Movimientos' },
 ];
 
-const showWarehouseColumn = computed(() => !filters.value.warehouse_id);
+const showWarehouseColumn = computed(
+    () => multiWarehouse && !filters.value.warehouse_id,
+);
 
 const lotsColspan = computed(() => (showWarehouseColumn.value ? 13 : 12));
 const movementsColspan = computed(() => (showWarehouseColumn.value ? 8 : 6));
@@ -644,7 +647,7 @@ function pageItemLabel(): string {
                         </div>
                     </div>
 
-                    <div class="lg:col-span-2">
+                    <div v-if="multiWarehouse" class="lg:col-span-2">
                         <label
                             class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
                         >

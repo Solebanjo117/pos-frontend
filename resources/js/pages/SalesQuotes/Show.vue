@@ -23,6 +23,7 @@ import { computed, onMounted, ref } from 'vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
 import type {
@@ -514,7 +515,12 @@ onMounted(fetchDetail);
                                 class="border-b border-slate-200 bg-slate-50 text-xs text-slate-500 uppercase dark:border-border dark:bg-muted/50"
                             >
                                 <th class="px-4 py-3 text-left">Item</th>
-                                <th class="px-4 py-3 text-left">Bodega</th>
+                                <th
+                                    v-if="multiWarehouse"
+                                    class="px-4 py-3 text-left"
+                                >
+                                    Bodega
+                                </th>
                                 <th class="px-4 py-3 text-right">Cant.</th>
                                 <th class="px-4 py-3 text-right">Precio</th>
                                 <th class="px-4 py-3 text-right">ITBM</th>
@@ -559,7 +565,10 @@ onMounted(fetchDetail);
                                         {{ item.notes }}
                                     </p>
                                 </td>
-                                <td class="px-4 py-3 text-slate-600">
+                                <td
+                                    v-if="multiWarehouse"
+                                    class="px-4 py-3 text-slate-600"
+                                >
                                     {{ item.warehouse?.name || 'Sin bodega' }}
                                 </td>
                                 <td class="px-4 py-3 text-right font-semibold">

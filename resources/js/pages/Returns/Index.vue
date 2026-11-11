@@ -15,6 +15,7 @@ import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type {
@@ -682,7 +683,7 @@ const handleCreateReturn = async (
                                     <div
                                         class="grid gap-3 text-xs text-gray-600 md:grid-cols-4"
                                     >
-                                        <div>
+                                        <div v-if="multiWarehouse">
                                             <span class="font-semibold"
                                                 >Sucursal:</span
                                             >

@@ -17,6 +17,8 @@ import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import { financialAdjustmentsService } from '@/services/financial-adjustments';
 import type {
     AdjustmentOption,
@@ -231,6 +233,8 @@ const canContinue = computed(() => {
     return true;
 });
 
+const { currentWarehouseId } = usePosSettings();
+
 watch(
     () => props.open,
     async (open) => {
@@ -244,6 +248,13 @@ watch(
         loading.value = true;
         try {
             options.value = await financialAdjustmentsService.options();
+            // Con un solo almacén el campo está oculto: se usa el almacén actual (o el único disponible).
+            if (!multiWarehouse) {
+                const onlyWarehouse = options.value.warehouses[0];
+                form.value.warehouse_id =
+                    currentWarehouseId.value ??
+                    (onlyWarehouse ? Number(onlyWarehouse.value) : null);
+            }
             await nextTick();
             if (
                 form.value.type === 'accounts_receivable' &&
@@ -553,7 +564,7 @@ async function submit(): Promise<void> {
                     </div>
                 </template>
                 <template v-if="form.type === 'inventory'">
-                    <div>
+                    <div v-if="multiWarehouse">
                         <Label>Almacén</Label
                         ><SearchableSelect
                             v-model="form.warehouse_id"

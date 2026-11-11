@@ -24,6 +24,7 @@ import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useToast } from '@/composables/useToast';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { productsApi } from '@/services/api/products';
 import { type BreadcrumbItem } from '@/types';
@@ -563,6 +564,7 @@ watch(effectiveImages, () => {
                             </p>
                         </div>
                         <div
+                            v-if="multiWarehouse"
                             class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
                         >
                             <div
@@ -981,7 +983,11 @@ watch(effectiveImages, () => {
                                 <h2
                                     class="font-semibold text-gray-950 dark:text-white"
                                 >
-                                    Inventario por almacen
+                                    {{
+                                        multiWarehouse
+                                            ? 'Inventario por almacén'
+                                            : 'Inventario'
+                                    }}
                                 </h2>
                             </div>
                         </div>
@@ -991,7 +997,10 @@ watch(effectiveImages, () => {
                                     class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
                                 >
                                     <tr>
-                                        <th class="px-4 py-2 text-left">
+                                        <th
+                                            v-if="multiWarehouse"
+                                            class="px-4 py-2 text-left"
+                                        >
                                             Almacen
                                         </th>
                                         <th class="px-4 py-2 text-right">
@@ -1020,7 +1029,10 @@ watch(effectiveImages, () => {
                                         :key="item.id"
                                         class="border-t border-gray-100 dark:border-border"
                                     >
-                                        <td class="px-4 py-3 font-medium">
+                                        <td
+                                            v-if="multiWarehouse"
+                                            class="px-4 py-3 font-medium"
+                                        >
                                             {{ item.warehouse?.name || '-' }}
                                         </td>
                                         <td

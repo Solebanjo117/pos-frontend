@@ -33,6 +33,7 @@ import { usePosSession } from '@/composables/usePosSession';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     PosSessionsApiService,
@@ -664,7 +665,7 @@ onBeforeUnmount(() => {
                                     {{ activeSessionUserName }}
                                 </p>
                             </div>
-                            <div>
+                            <div v-if="multiWarehouse">
                                 <p
                                     class="text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
                                 >
@@ -887,7 +888,7 @@ onBeforeUnmount(() => {
                         label="Rango de fechas"
                     />
 
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-1.5 flex items-center gap-1 text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
                         >

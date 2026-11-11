@@ -31,6 +31,7 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { formatCurrency, formatDateInputValue } from '@/utils/formatters';
@@ -369,7 +370,7 @@ onMounted(async () => {
                             @change="loadReport"
                         />
                     </div>
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
                         >

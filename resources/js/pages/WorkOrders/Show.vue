@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     WorkOrdersApiService,
@@ -139,6 +140,7 @@ onMounted(loadOrder);
                     >
                         <div>
                             <div
+                                v-if="multiWarehouse"
                                 class="flex items-center gap-2 text-sm text-sky-700 dark:text-sky-300"
                             >
                                 <Wrench class="h-4 w-4" />

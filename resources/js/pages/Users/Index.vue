@@ -16,6 +16,7 @@ import {
 import { computed, ref } from 'vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import { useToast } from '@/composables/useToast';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 
@@ -289,7 +290,12 @@ const submitUserAction = async () => {
                             <tr>
                                 <th class="px-4 py-3 text-left">Usuario</th>
                                 <th class="px-4 py-3 text-left">Rol</th>
-                                <th class="px-4 py-3 text-left">Almacenes</th>
+                                <th
+                                    v-if="multiWarehouse"
+                                    class="px-4 py-3 text-left"
+                                >
+                                    Almacenes
+                                </th>
                                 <th class="px-4 py-3 text-left">Estado</th>
                                 <th class="px-4 py-3 text-right">Acciones</th>
                             </tr>
@@ -332,7 +338,7 @@ const submitUserAction = async () => {
                                         {{ roleLabel[user.role] ?? user.role }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td v-if="multiWarehouse" class="px-4 py-3">
                                     <div
                                         v-if="user.role === 'admin'"
                                         class="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"

@@ -11,6 +11,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import { productsApi } from '@/services/api/products';
 import type {
     InventoryFifoLot,
@@ -746,7 +747,7 @@ defineExpose({
             </div>
 
             <div v-if="!embedded" class="flex items-center gap-2">
-                <select
+                <select v-if="multiWarehouse"
                     v-model.number="selectedWarehouseId"
                     class="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                 >
@@ -1161,7 +1162,7 @@ defineExpose({
                             <th class="px-4 py-2 text-right">MISC total</th>
                             <th class="px-4 py-2 text-right">Costo final</th>
                             <th class="px-4 py-2 text-right">Precio venta</th>
-                            <th class="px-4 py-2">Almacén</th>
+                            <th v-if="multiWarehouse" class="px-4 py-2">Almacén</th>
                             <th
                                 class="sticky right-0 bg-gray-50 px-3 py-2 text-right shadow-[-10px_0_14px_-14px_rgba(15,23,42,0.7)] dark:bg-muted"
                             >
@@ -1350,7 +1351,7 @@ defineExpose({
                                     )
                                 }}</span>
                             </td>
-                            <td class="px-4 py-2">
+                            <td v-if="multiWarehouse" class="px-4 py-2">
                                 {{ movement.warehouse?.name || '-' }}
                             </td>
                             <td

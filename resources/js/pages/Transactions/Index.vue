@@ -14,6 +14,7 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { posService } from '@/services/api/pos';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
@@ -360,7 +361,11 @@ onMounted(async () => {
                     />
                 </label>
                 <select
-                    v-if="role === 'admin' && allowedWarehouses.length > 0"
+                    v-if="
+                        multiWarehouse &&
+                        role === 'admin' &&
+                        allowedWarehouses.length > 0
+                    "
                     v-model.number="selectedWarehouseId"
                     aria-label="Sucursal"
                     class="rounded-md border border-border bg-background px-2 py-2 text-sm"

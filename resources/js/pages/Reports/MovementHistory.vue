@@ -28,6 +28,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useReports } from '@/composables/useReports';
 import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
@@ -458,7 +459,7 @@ const sourceLabel = (movement: {
                         class="md:col-span-2"
                     />
 
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Almacén</label
@@ -862,11 +863,13 @@ const sourceLabel = (movement: {
                                     Producto
                                 </th>
                                 <th
+                                    v-if="multiWarehouse"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
                                 >
                                     Almacén
                                 </th>
                                 <th
+                                    v-if="multiWarehouse"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
                                 >
                                     Destino
@@ -956,11 +959,13 @@ const sourceLabel = (movement: {
                                     </p>
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
                                 >
                                     {{ movement.warehouse }}
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
                                 >
                                     {{ movement.destination_warehouse || '-' }}

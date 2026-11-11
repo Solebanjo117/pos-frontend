@@ -70,6 +70,9 @@ const { currentWarehouseId, initWarehouse } = usePosSettings();
 
 const selectedPeriod = ref('month');
 const selectedWarehouseId = ref<number | null>(null);
+// Por ahora se trabaja con un solo almacén (2026-11-11): se ocultan el selector y el nombre del
+// almacén. Los datos siguen calculándose para el almacén actual del usuario.
+const showWarehouseControls = false;
 const compare = ref(true);
 const dateFrom = ref('');
 const dateTo = ref('');
@@ -222,7 +225,10 @@ const clientProgress = (client: DashboardTopClient): string => {
 };
 
 onMounted(async () => {
-    await Promise.all([initWarehouse(), loadWarehouses()]);
+    await Promise.all([
+        initWarehouse(),
+        showWarehouseControls ? loadWarehouses() : Promise.resolve(),
+    ]);
     selectedWarehouseId.value = currentWarehouseId.value ?? null;
     await loadDashboard();
     initializing.value = false;
@@ -263,6 +269,8 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                     </button>
 
                     <label
+                        v-if="showWarehouseControls"
+                        data-testid="dashboard-warehouse-filter"
                         class="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-muted-foreground"
                     >
                         <WarehouseIcon class="size-4 text-indigo-500" />
@@ -346,8 +354,15 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                         <CircleDollarSign class="size-6" />
                     </div>
                     <div>
-                        <p class="text-sm font-semibold text-foreground">
-                            {{ activeWarehouseName }}
+                        <p
+                            class="text-sm font-semibold text-foreground"
+                            data-testid="dashboard-period-title"
+                        >
+                            {{
+                                showWarehouseControls
+                                    ? activeWarehouseName
+                                    : 'Resumen del periodo'
+                            }}
                         </p>
                         <p class="text-xs text-muted-foreground">
                             Periodo:

@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { RefreshCw, Search } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -105,7 +106,7 @@ onMounted(() => load());
             <label class="relative"><Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input v-model="filters.search" type="search" placeholder="Buscar" class="h-10 w-full rounded-md border bg-background pr-3 pl-9 text-sm" /></label>
             <input v-if="reportKey !== 'valued-inventory'" v-model="filters.date_from" type="date" class="h-10 rounded-md border bg-background px-3 text-sm" />
             <input v-model="filters.date_to" type="date" class="h-10 rounded-md border bg-background px-3 text-sm" />
-            <select v-model.number="filters.per_page" class="h-10 rounded-md border bg-background px-2 text-sm" @change="load(1)"><option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} filas</option></select>
+            <AppSelect v-model="filters.per_page" @update:model-value="load(1)" :options="[...[10, 25, 50, 100].map((size) => ({ value: size, label: `${size} filas` }))]" />
             <button type="submit" class="inline-flex items-center justify-center gap-2 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90" :disabled="loading"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" /> Actualizar</button>
         </form>
         <ErrorMessage v-if="error">{{ error }}</ErrorMessage>

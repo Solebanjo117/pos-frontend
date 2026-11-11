@@ -10,6 +10,7 @@ import {
     Warehouse,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -666,16 +667,17 @@ function pageItemLabel(): string {
                         >
                             Estado
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.stock_status"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option value="out_of_stock">Sin stock</option>
-                            <option value="low_stock">Stock bajo</option>
-                            <option value="normal">Normal</option>
-                            <option value="optimal">Optimo</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: undefined, label: 'Todos' },
+                                { value: 'out_of_stock', label: 'Sin stock' },
+                                { value: 'low_stock', label: 'Stock bajo' },
+                                { value: 'normal', label: 'Normal' },
+                                { value: 'optimal', label: 'Óptimo' },
+                            ]"
+                        />
                     </div>
 
                     <template v-if="viewMode === 'movements'">
@@ -709,15 +711,19 @@ function pageItemLabel(): string {
                             >
                                 Tipo
                             </label>
-                            <select
+                            <AppSelect
                                 v-model="filters.movement_type"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="undefined">Todos</option>
-                                <option value="in">Entradas</option>
-                                <option value="out">Salidas</option>
-                                <option value="transfer">Transferencias</option>
-                            </select>
+                                class="w-full"
+                                :options="[
+                                    { value: undefined, label: 'Todos' },
+                                    { value: 'in', label: 'Entradas' },
+                                    { value: 'out', label: 'Salidas' },
+                                    {
+                                        value: 'transfer',
+                                        label: 'Transferencias',
+                                    },
+                                ]"
+                            />
                         </div>
                     </template>
 

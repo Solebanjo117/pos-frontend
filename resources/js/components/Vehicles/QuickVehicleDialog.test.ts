@@ -1,8 +1,20 @@
 // @vitest-environment jsdom
 
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import QuickVehicleDialog from './QuickVehicleDialog.vue';
+
+// AppSelect funciona sobre el SearchableSelect simulado (un <select>): se elige por el texto visible.
+const chooseByLabel = async (
+    select: Omit<DOMWrapper<Element>, 'exists'>,
+    label: string,
+) => {
+    const option = select
+        .findAll('option')
+        .find((item) => item.text().trim() === label);
+    if (!option) throw new Error(`Opción "${label}" no encontrada`);
+    await select.setValue(option.element.getAttribute('value'));
+};
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 
@@ -176,7 +188,7 @@ describe('QuickVehicleDialog', () => {
         await wrapper.get('#quick-vehicle-year-to').setValue('1999');
         await wrapper.get('#quick-vehicle-engine-code').setValue('6G72');
         await wrapper.get('#quick-vehicle-engine-valves').setValue('24V');
-        await wrapper.get('#quick-vehicle-engine-cam').setValue('SOHC');
+        await chooseByLabel(wrapper.get('#quick-vehicle-engine-cam'), 'SOHC');
         await wrapper.get('form').trigger('submit');
         await flushPromises();
 

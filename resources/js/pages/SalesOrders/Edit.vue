@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -639,20 +640,18 @@ onMounted(async () => {
                                     }}
                                 </td>
                                 <td class="px-6 py-4">
-                                    <select
+                                    <AppSelect
                                         v-model="item.seller_id"
                                         :disabled="!canEdit"
-                                        class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white"
-                                    >
-                                        <option :value="undefined">—</option>
-                                        <option
-                                            v-for="user in users"
-                                            :key="user.id"
-                                            :value="user.id"
-                                        >
-                                            {{ user.name }}
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            { value: undefined, label: '—' },
+                                            ...(users ?? []).map((user) => ({
+                                                value: user.id,
+                                                label: String(user.name),
+                                            })),
+                                        ]"
+                                    />
                                 </td>
                                 <td
                                     class="px-6 py-4 text-right text-sm text-gray-900 dark:text-white"

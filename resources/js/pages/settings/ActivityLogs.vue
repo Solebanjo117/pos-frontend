@@ -10,6 +10,7 @@ import {
     Filter,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -130,32 +131,32 @@ onMounted(() => fetchLogs());
                     <label class="mb-1 block text-xs font-medium text-gray-500"
                         >Tipo</label
                     >
-                    <select
+                    <AppSelect
                         v-model="filterLogName"
-                        @change="fetchLogs(1)"
-                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                    >
-                        <option value="">Todos</option>
-                        <option value="auth">Autenticación</option>
-                        <option value="default">General</option>
-                    </select>
+                        @update:model-value="fetchLogs(1)"
+                        :options="[
+                            { value: '', label: 'Todos' },
+                            { value: 'auth', label: 'Autenticación' },
+                            { value: 'default', label: 'General' },
+                        ]"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-gray-500"
                         >Evento</label
                     >
-                    <select
+                    <AppSelect
                         v-model="filterEvent"
-                        @change="fetchLogs(1)"
-                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                    >
-                        <option value="">Todos</option>
-                        <option value="login">Login</option>
-                        <option value="logout">Logout</option>
-                        <option value="created">Creado</option>
-                        <option value="updated">Actualizado</option>
-                        <option value="deleted">Eliminado</option>
-                    </select>
+                        @update:model-value="fetchLogs(1)"
+                        :options="[
+                            { value: '', label: 'Todos' },
+                            { value: 'login', label: 'Login' },
+                            { value: 'logout', label: 'Logout' },
+                            { value: 'created', label: 'Creado' },
+                            { value: 'updated', label: 'Actualizado' },
+                            { value: 'deleted', label: 'Eliminado' },
+                        ]"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-gray-500"

@@ -15,6 +15,7 @@ import {
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -1094,19 +1095,16 @@ async function confirmRemove() {
                     class="space-y-1 text-sm"
                 >
                     <span>Metodo de pago</span>
-                    <select
+                    <AppSelect
                         v-model="settlement.payment_method"
-                        :required="returnNeedsMoney || !isReturnSettlement"
-                        class="w-full rounded-md border bg-background px-3 py-2"
-                    >
-                        <option
-                            v-for="method in paymentMethods"
-                            :key="method.code"
-                            :value="method.code"
-                        >
-                            {{ method.name }}
-                        </option>
-                    </select>
+                        class="w-full"
+                        :options="[
+                            ...(paymentMethods ?? []).map((method) => ({
+                                value: method.code,
+                                label: String(method.name),
+                            })),
+                        ]"
+                    />
                 </label>
                 <label
                     v-if="

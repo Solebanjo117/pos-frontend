@@ -22,6 +22,7 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
@@ -921,14 +922,15 @@ onBeforeUnmount(() => {
                             class="mb-1.5 block text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filterStatus"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="">Todos</option>
-                            <option value="closed">Cerradas</option>
-                            <option value="open">Abiertas</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: '', label: 'Todos' },
+                                { value: 'closed', label: 'Cerradas' },
+                                { value: 'open', label: 'Abiertas' },
+                            ]"
+                        />
                     </div>
 
                     <div>
@@ -936,18 +938,20 @@ onBeforeUnmount(() => {
                             class="mb-1.5 block text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
                             >Diferencia</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filterDifference"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="">Todas</option>
-                            <option value="balanced">Cuadradas</option>
-                            <option value="with_difference">
-                                Con diferencia
-                            </option>
-                            <option value="missing">Faltante</option>
-                            <option value="surplus">Sobrante</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: '', label: 'Todas' },
+                                { value: 'balanced', label: 'Cuadradas' },
+                                {
+                                    value: 'with_difference',
+                                    label: 'Con diferencia',
+                                },
+                                { value: 'missing', label: 'Faltante' },
+                                { value: 'surplus', label: 'Sobrante' },
+                            ]"
+                        />
                     </div>
 
                     <div class="flex flex-wrap gap-2">

@@ -2,6 +2,10 @@
 
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    appSelectButton,
+    chooseAppSelectOption,
+} from '@/lib/testing/appSelect';
 import TransactionsIndex from './Index.vue';
 
 const mocks = vi.hoisted(() => ({
@@ -152,9 +156,7 @@ describe('Transactions index', () => {
         const wrapper = mount(TransactionsIndex);
         await flushPromises();
 
-        expect(wrapper.find('select[aria-label="Sucursal"]').exists()).toBe(
-            false,
-        );
+        expect(appSelectButton(wrapper, 'Sucursal').exists()).toBe(false);
     });
 
     it('lets an admin filter an authorized warehouse without changing global context', async () => {
@@ -163,9 +165,9 @@ describe('Transactions index', () => {
         const wrapper = mount(TransactionsIndex);
         await flushPromises();
 
-        const selector = wrapper.find('select[aria-label="Sucursal"]');
+        const selector = appSelectButton(wrapper, 'Sucursal');
         expect(selector.exists()).toBe(true);
-        await selector.setValue('2');
+        await chooseAppSelectOption(selector, 'Sucursal Dos');
         await wrapper.find('form').trigger('submit');
         await flushPromises();
 

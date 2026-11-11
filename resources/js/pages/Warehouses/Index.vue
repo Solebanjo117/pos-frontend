@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { CheckCircle } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -138,14 +139,15 @@ const formatUtilization = (warehouse: any) => {
                         >
                             Estado
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.status"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option value="active">Activo</option>
-                            <option value="inactive">Inactivo</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: undefined, label: 'Todos' },
+                                { value: 'active', label: 'Activo' },
+                                { value: 'inactive', label: 'Inactivo' },
+                            ]"
+                        />
                     </div>
 
                     <div class="flex items-end gap-2">

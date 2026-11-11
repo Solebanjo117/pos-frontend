@@ -26,6 +26,7 @@ import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue';
 import VariantSelectModal from '@/components/POS/VariantSelectModal.vue';
 import VehicleContextHeader from '@/components/POS/VehicleContextHeader.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import { usePOS } from '@/composables/usePOS';
@@ -2792,27 +2793,21 @@ onUnmounted(() => {
                         >
                             Vehículo del cliente
                         </label>
-                        <select
+                        <AppSelect
                             id="customer-vehicle"
-                            v-model.number="customer_vehicle_id"
-                            class="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                        >
-                            <option :value="undefined">
-                                Sin vehículo relacionado
-                            </option>
-                            <option
-                                v-for="vehicle in customerVehicles"
-                                :key="vehicle.id"
-                                :value="vehicle.id"
-                            >
-                                {{ vehicle.display_name }}
-                                {{
-                                    vehicle.plate_number
-                                        ? `· ${vehicle.plate_number}`
-                                        : ''
-                                }}
-                            </option>
-                        </select>
+                            v-model="customer_vehicle_id"
+                            class="w-full"
+                            :options="[
+                                {
+                                    value: undefined,
+                                    label: 'Sin vehículo relacionado',
+                                },
+                                ...(customerVehicles ?? []).map((vehicle) => ({
+                                    value: vehicle.id,
+                                    label: `${vehicle.display_name} ${vehicle.plate_number ? `· ${vehicle.plate_number}` : ''}`,
+                                })),
+                            ]"
+                        />
                         <p class="text-xs text-muted-foreground">
                             La búsqueda de repuestos usará el motor y chasis de
                             este vehículo.

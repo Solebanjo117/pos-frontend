@@ -2,6 +2,7 @@
 import { Link } from '@inertiajs/vue3';
 import { Plus, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import {
     Dialog,
     DialogFooter,
@@ -277,20 +278,17 @@ watch(
                         <label class="mb-1 block text-sm font-medium"
                             >Tipo de cliente *</label
                         >
-                        <select
-                            v-model.number="form.customer_type_id"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                            required
-                        >
-                            <option :value="0" disabled>Selecciona...</option>
-                            <option
-                                v-for="type in activeTypes"
-                                :key="type.id"
-                                :value="type.id"
-                            >
-                                {{ type.name }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="form.customer_type_id"
+                            class="w-full"
+                            placeholder="Selecciona..."
+                            :options="[
+                                ...(activeTypes ?? []).map((type) => ({
+                                    value: type.id,
+                                    label: String(type.name),
+                                })),
+                            ]"
+                        />
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium"
@@ -374,70 +372,61 @@ watch(
                         class="space-y-3 rounded-lg border p-4"
                     >
                         <div class="grid gap-3 md:grid-cols-3">
-                            <select
-                                v-model.number="vehicle.make_id"
-                                class="rounded-md border bg-background px-3 py-2"
-                                @change="loadModels(vehicle)"
-                            >
-                                <option :value="null">Marca...</option>
-                                <option
-                                    v-for="make in makes"
-                                    :key="make.id"
-                                    :value="make.id"
-                                >
-                                    {{ make.name }}
-                                </option>
-                            </select>
-                            <select
-                                v-model.number="vehicle.vehicle_model_id"
-                                class="rounded-md border bg-background px-3 py-2"
+                            <AppSelect
+                                v-model="vehicle.make_id"
+                                @update:model-value="loadModels(vehicle)"
+                                :options="[
+                                    { value: null, label: 'Marca...' },
+                                    ...(makes ?? []).map((make) => ({
+                                        value: make.id,
+                                        label: String(make.name),
+                                    })),
+                                ]"
+                            />
+                            <AppSelect
+                                v-model="vehicle.vehicle_model_id"
                                 :disabled="!vehicle.make_id"
-                                @change="loadConfiguration(vehicle)"
-                            >
-                                <option :value="0">Modelo...</option>
-                                <option
-                                    v-for="model in vehicle.models"
-                                    :key="model.id"
-                                    :value="model.id"
-                                >
-                                    {{ model.name }} ({{ model.year_from }}-{{
-                                        model.year_to
-                                    }})
-                                </option>
-                            </select>
-                            <select
-                                v-model.number="vehicle.vehicle_engine_id"
-                                class="rounded-md border bg-background px-3 py-2"
+                                @update:model-value="loadConfiguration(vehicle)"
+                                :options="[
+                                    { value: 0, label: 'Modelo...' },
+                                    ...(vehicle.models ?? []).map((model) => ({
+                                        value: model.id,
+                                        label: `${model.name} (${model.year_from}-${model.year_to})`,
+                                    })),
+                                ]"
+                            />
+                            <AppSelect
+                                v-model="vehicle.vehicle_engine_id"
                                 :disabled="!vehicle.vehicle_model_id"
-                            >
-                                <option :value="0">Motor...</option>
-                                <option
-                                    v-for="engine in vehicle.engines"
-                                    :key="engine.id"
-                                    :value="engine.id"
-                                >
-                                    {{ engine.engine_code }}
-                                </option>
-                            </select>
-                            <select
-                                v-model.number="vehicle.vehicle_chassis_id"
-                                class="rounded-md border bg-background px-3 py-2"
+                                :options="[
+                                    { value: 0, label: 'Motor...' },
+                                    ...(vehicle.engines ?? []).map(
+                                        (engine) => ({
+                                            value: engine.id,
+                                            label: String(engine.engine_code),
+                                        }),
+                                    ),
+                                ]"
+                            />
+                            <AppSelect
+                                v-model="vehicle.vehicle_chassis_id"
                                 :disabled="
                                     !vehicle.vehicle_model_id ||
                                     vehicle.chassisOptions.length === 0
                                 "
-                            >
-                                <option :value="null">
-                                    Chasis opcional...
-                                </option>
-                                <option
-                                    v-for="chassis in vehicle.chassisOptions"
-                                    :key="chassis.id"
-                                    :value="chassis.id"
-                                >
-                                    {{ chassis.code }}
-                                </option>
-                            </select>
+                                :options="[
+                                    {
+                                        value: null,
+                                        label: 'Chasis opcional...',
+                                    },
+                                    ...(vehicle.chassisOptions ?? []).map(
+                                        (chassis) => ({
+                                            value: chassis.id,
+                                            label: String(chassis.code),
+                                        }),
+                                    ),
+                                ]"
+                            />
                             <input
                                 v-model.number="vehicle.year"
                                 type="number"
@@ -518,14 +507,15 @@ watch(
                     <div>
                         <label class="mb-1 block text-sm font-medium"
                             >Estado</label
-                        ><select
+                        ><AppSelect
                             v-model="form.status"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option value="active">Activo</option>
-                            <option value="inactive">Inactivo</option>
-                            <option value="blocked">Bloqueado</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'active', label: 'Activo' },
+                                { value: 'inactive', label: 'Inactivo' },
+                                { value: 'blocked', label: 'Bloqueado' },
+                            ]"
+                        />
                     </div>
                     <div class="md:col-span-3">
                         <label class="mb-1 block text-sm font-medium"

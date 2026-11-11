@@ -15,6 +15,7 @@ import {
 import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
@@ -1305,13 +1306,13 @@ onMounted(async () => {
                             placeholder="Nombre del beneficiario"
                             class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
                         />
-                        <select
+                        <AppSelect
                             v-model="beneficiaryForm.type"
-                            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
-                        >
-                            <option value="individual">Persona</option>
-                            <option value="company">Empresa</option>
-                        </select>
+                            :options="[
+                                { value: 'individual', label: 'Persona' },
+                                { value: 'company', label: 'Empresa' },
+                            ]"
+                        />
                         <input
                             v-model="beneficiaryForm.phone"
                             type="text"
@@ -1449,21 +1450,22 @@ onMounted(async () => {
                                 <label class="mb-1 block text-sm font-medium"
                                     >Sucursal</label
                                 >
-                                <select
-                                    v-model.number="form.warehouse_id"
-                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                                >
-                                    <option :value="null">
-                                        Sucursal actual
-                                    </option>
-                                    <option
-                                        v-for="warehouse in warehouses"
-                                        :key="warehouse.id"
-                                        :value="warehouse.id"
-                                    >
-                                        {{ warehouse.name }}
-                                    </option>
-                                </select>
+                                <AppSelect
+                                    v-model="form.warehouse_id"
+                                    class="w-full"
+                                    :options="[
+                                        {
+                                            value: null,
+                                            label: 'Sucursal actual',
+                                        },
+                                        ...(warehouses ?? []).map(
+                                            (warehouse) => ({
+                                                value: warehouse.id,
+                                                label: String(warehouse.name),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium">
@@ -1473,32 +1475,32 @@ onMounted(async () => {
                                             : 'Metodo previsto'
                                     }}
                                 </label>
-                                <select
+                                <AppSelect
                                     v-if="form.status === 'paid'"
                                     v-model="form.payment_method"
-                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                                >
-                                    <option
-                                        v-for="method in paymentMethods"
-                                        :key="method.value"
-                                        :value="method.value"
-                                    >
-                                        {{ method.label }}
-                                    </option>
-                                </select>
-                                <select
+                                    class="w-full"
+                                    :options="[
+                                        ...(paymentMethods ?? []).map(
+                                            (method) => ({
+                                                value: method.value,
+                                                label: String(method.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
+                                <AppSelect
                                     v-else
                                     v-model="form.planned_payment_method"
-                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                                >
-                                    <option
-                                        v-for="method in paymentMethods"
-                                        :key="method.value"
-                                        :value="method.value"
-                                    >
-                                        {{ method.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(paymentMethods ?? []).map(
+                                            (method) => ({
+                                                value: method.value,
+                                                label: String(method.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div v-if="form.status !== 'paid'">
                                 <label class="mb-1 block text-sm font-medium"

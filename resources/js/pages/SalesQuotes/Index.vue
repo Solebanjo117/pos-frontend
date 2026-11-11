@@ -19,6 +19,7 @@ import {
 import { Banknote } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
@@ -289,19 +290,16 @@ onMounted(() => fetchQuotes());
                     <label class="mb-1 block text-xs font-medium text-gray-500"
                         >Estado</label
                     >
-                    <select
+                    <AppSelect
                         v-model="statusFilter"
-                        @change="fetchQuotes(1)"
-                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                    >
-                        <option
-                            v-for="opt in statusOptions"
-                            :key="opt.value"
-                            :value="opt.value"
-                        >
-                            {{ opt.label }}
-                        </option>
-                    </select>
+                        @update:model-value="fetchQuotes(1)"
+                        :options="[
+                            ...(statusOptions ?? []).map((opt) => ({
+                                value: opt.value,
+                                label: String(opt.label),
+                            })),
+                        ]"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-gray-500"

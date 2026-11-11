@@ -14,6 +14,7 @@ import {
 import { ref, computed } from 'vue';
 import draggable from 'vuedraggable';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { formatCurrency } from '@/utils/formatters';
 
 const props = defineProps<{
@@ -625,40 +626,39 @@ const handlePurchaseSuccess = (result: {
                                                 class="block text-xs font-semibold tracking-wider text-gray-500 uppercase"
                                                 >Vendedor</label
                                             >
-                                            <select
-                                                :value="item.seller_id ?? ''"
+                                            <AppSelect
+                                                :model-value="
+                                                    item.seller_id ?? ''
+                                                "
                                                 :disabled="
                                                     props.canEditSeller ===
                                                     false
                                                 "
-                                                @change.stop="
+                                                class="w-full"
+                                                @update:model-value="
                                                     emit(
                                                         'update-item-seller',
                                                         item.id,
-                                                        (
-                                                            $event.target as HTMLSelectElement
-                                                        ).value
-                                                            ? Number(
-                                                                  (
-                                                                      $event.target as HTMLSelectElement
-                                                                  ).value,
-                                                              )
+                                                        $event
+                                                            ? Number($event)
                                                             : undefined,
                                                     )
                                                 "
-                                                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 dark:border-border dark:bg-card dark:text-white"
-                                            >
-                                                <option value="">
-                                                    Sin vendedor asignado
-                                                </option>
-                                                <option
-                                                    v-for="user in users"
-                                                    :key="user.id"
-                                                    :value="user.id"
-                                                >
-                                                    {{ user.name }}
-                                                </option>
-                                            </select>
+                                                :options="[
+                                                    {
+                                                        value: '',
+                                                        label: 'Sin vendedor asignado',
+                                                    },
+                                                    ...(users ?? []).map(
+                                                        (user) => ({
+                                                            value: user.id,
+                                                            label: String(
+                                                                user.name,
+                                                            ),
+                                                        }),
+                                                    ),
+                                                ]"
+                                            />
                                             <p class="text-xs text-gray-400">
                                                 Asigna quién vendió este
                                                 producto

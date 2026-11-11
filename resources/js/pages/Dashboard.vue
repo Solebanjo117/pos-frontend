@@ -30,6 +30,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { Doughnut } from 'vue-chartjs';
 import SalesChart from '@/components/dashboard/SalesChart.vue';
 import PageShell from '@/components/PageShell.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboard } from '@/composables/useDashboard';
@@ -274,19 +275,16 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                         class="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-muted-foreground"
                     >
                         <WarehouseIcon class="size-4 text-indigo-500" />
-                        <select
-                            v-model.number="selectedWarehouseId"
-                            class="bg-transparent text-sm font-medium text-foreground outline-none"
-                        >
-                            <option :value="null">Todas</option>
-                            <option
-                                v-for="warehouse in warehouses"
-                                :key="warehouse.id"
-                                :value="warehouse.id"
-                            >
-                                {{ warehouse.name }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="selectedWarehouseId"
+                            :options="[
+                                { value: null, label: 'Todas' },
+                                ...(warehouses ?? []).map((warehouse) => ({
+                                    value: warehouse.id,
+                                    label: String(warehouse.name),
+                                })),
+                            ]"
+                        />
                         <ChevronDown class="size-3" />
                     </label>
 

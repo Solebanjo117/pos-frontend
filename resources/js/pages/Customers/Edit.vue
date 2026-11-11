@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save, Building2, User } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCustomers } from '@/composables/useCustomers';
@@ -245,14 +246,15 @@ const goBack = () => {
                             class="mb-1 block text-sm font-medium text-gray-700"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="form.status"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option value="active">Activo</option>
-                            <option value="inactive">Inactivo</option>
-                            <option value="blocked">Bloqueado</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'active', label: 'Activo' },
+                                { value: 'inactive', label: 'Inactivo' },
+                                { value: 'blocked', label: 'Bloqueado' },
+                            ]"
+                        />
                     </div>
                 </div>
             </div>

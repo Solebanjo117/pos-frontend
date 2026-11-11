@@ -11,6 +11,7 @@ import {
     GripVertical,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -403,22 +404,20 @@ watch(currentWarehouseId, async () => {
                     >
                         Estado
                     </label>
-                    <select
+                    <AppSelect
                         v-model="filters.status"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        @change="
+                        class="w-full"
+                        @update:model-value="
                             currentPage = 1;
                             loadSalesOrders();
                         "
-                    >
-                        <option
-                            v-for="option in statusOptions"
-                            :key="option.value"
-                            :value="option.value"
-                        >
-                            {{ option.label }}
-                        </option>
-                    </select>
+                        :options="[
+                            ...(statusOptions ?? []).map((option) => ({
+                                value: option.value,
+                                label: String(option.label),
+                            })),
+                        ]"
+                    />
                 </div>
 
                 <div>
@@ -427,22 +426,20 @@ watch(currentWarehouseId, async () => {
                     >
                         Pago
                     </label>
-                    <select
+                    <AppSelect
                         v-model="filters.payment_status"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        @change="
+                        class="w-full"
+                        @update:model-value="
                             currentPage = 1;
                             loadSalesOrders();
                         "
-                    >
-                        <option
-                            v-for="option in paymentStatusOptions"
-                            :key="option.value"
-                            :value="option.value"
-                        >
-                            {{ option.label }}
-                        </option>
-                    </select>
+                        :options="[
+                            ...(paymentStatusOptions ?? []).map((option) => ({
+                                value: option.value,
+                                label: String(option.label),
+                            })),
+                        ]"
+                    />
                 </div>
 
                 <DateRangeInput

@@ -19,6 +19,7 @@ import StockStatusChart from '@/components/charts/StockStatusChart.vue';
 import TopProductsChart from '@/components/charts/TopProductsChart.vue';
 import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue';
 import Pagination from '@/components/Pagination.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
@@ -606,16 +607,17 @@ const inventoryProductHref = (product: {
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filters.status"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todos los estados</option>
-                            <option value="critical">Crítico</option>
-                            <option value="low">Bajo</option>
-                            <option value="normal">Normal</option>
-                            <option value="optimal">Óptimo</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: null, label: 'Todos los estados' },
+                                { value: 'critical', label: 'Crítico' },
+                                { value: 'low', label: 'Bajo' },
+                                { value: 'normal', label: 'Normal' },
+                                { value: 'optimal', label: 'Óptimo' },
+                            ]"
+                        />
                     </div>
 
                     <div class="flex items-end gap-2">

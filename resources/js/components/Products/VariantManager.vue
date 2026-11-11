@@ -5,6 +5,7 @@ import PricingFormula from '@/components/Products/PricingFormula.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import AppModal from '@/components/ui/AppModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
@@ -1457,15 +1458,17 @@ const formId = useId();
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >Estado</label
                             >
-                            <select
+                            <AppSelect
                                 v-model="form.status"
-                                class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                            >
-                                <option value="active">Activo</option>
-                                <option value="discontinued">
-                                    Discontinuado
-                                </option>
-                            </select>
+                                class="w-full min-w-0"
+                                :options="[
+                                    { value: 'active', label: 'Activo' },
+                                    {
+                                        value: 'discontinued',
+                                        label: 'Discontinuado',
+                                    },
+                                ]"
+                            />
                         </div>
 
                         <div v-if="editingVariant" class="md:col-span-3">
@@ -1530,20 +1533,16 @@ const formId = useId();
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >Almacén</label
                             >
-                            <select
-                                v-model.number="
-                                    form.initial_inventory[0].warehouse_id
-                                "
-                                class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                            >
-                                <option
-                                    v-for="warehouse in warehouses"
-                                    :key="warehouse.id"
-                                    :value="warehouse.id"
-                                >
-                                    {{ warehouse.name }}
-                                </option>
-                            </select>
+                            <AppSelect
+                                v-model="form.initial_inventory[0].warehouse_id"
+                                class="w-full min-w-0"
+                                :options="[
+                                    ...(warehouses ?? []).map((warehouse) => ({
+                                        value: warehouse.id,
+                                        label: String(warehouse.name),
+                                    })),
+                                ]"
+                            />
                         </div>
 
                         <div class="md:col-span-5">
@@ -1616,16 +1615,18 @@ const formId = useId();
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >ITBM costo</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="costItbmApplies"
                                     data-testid="cost-itbm-select"
-                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-card"
-                                >
-                                    <option value="yes">
-                                        Sí ({{ defaultTaxRate() }}%)
-                                    </option>
-                                    <option value="no">No</option>
-                                </select>
+                                    class="w-full min-w-0"
+                                    :options="[
+                                        {
+                                            value: 'yes',
+                                            label: `Sí (${defaultTaxRate()}%)`,
+                                        },
+                                        { value: 'no', label: 'No' },
+                                    ]"
+                                />
                             </div>
 
                             <div class="md:col-span-3">
@@ -1679,16 +1680,18 @@ const formId = useId();
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >ITBM venta</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="saleItbmApplies"
                                     data-testid="sale-itbm-select"
-                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-card"
-                                >
-                                    <option value="yes">
-                                        Sí ({{ defaultTaxRate() }}%)
-                                    </option>
-                                    <option value="no">No</option>
-                                </select>
+                                    class="w-full min-w-0"
+                                    :options="[
+                                        {
+                                            value: 'yes',
+                                            label: `Sí (${defaultTaxRate()}%)`,
+                                        },
+                                        { value: 'no', label: 'No' },
+                                    ]"
+                                />
                             </div>
 
                             <div class="md:col-span-9">

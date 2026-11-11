@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -338,22 +339,18 @@ onMounted(async () => {
                             >
                                 Variante
                             </label>
-                            <select
+                            <AppSelect
                                 v-model="selectedVariant"
-                                class="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                @change="fetchStock"
-                            >
-                                <option :value="null" disabled>
-                                    Selecciona variante
-                                </option>
-                                <option
-                                    v-for="variant in variants"
-                                    :key="variant.id"
-                                    :value="variant"
-                                >
-                                    {{ variantLabel(variant) }}
-                                </option>
-                            </select>
+                                class="w-full"
+                                @update:model-value="fetchStock()"
+                                placeholder="Selecciona variante"
+                                :options="[
+                                    ...(variants ?? []).map((variant) => ({
+                                        value: variant,
+                                        label: String(variantLabel(variant)),
+                                    })),
+                                ]"
+                            />
                         </div>
 
                         <div v-if="multiWarehouse">
@@ -402,21 +399,17 @@ onMounted(async () => {
                             >
                                 Motivo
                             </label>
-                            <select
+                            <AppSelect
                                 v-model="reason"
-                                class="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option value="" disabled>
-                                    Selecciona motivo
-                                </option>
-                                <option
-                                    v-for="reasonOption in reasons"
-                                    :key="reasonOption"
-                                    :value="reasonOption"
-                                >
-                                    {{ reasonOption }}
-                                </option>
-                            </select>
+                                class="w-full"
+                                placeholder="Selecciona motivo"
+                                :options="[
+                                    ...(reasons ?? []).map((reasonOption) => ({
+                                        value: reasonOption,
+                                        label: String(reasonOption),
+                                    })),
+                                ]"
+                            />
                         </div>
 
                         <div class="lg:col-span-2">

@@ -14,6 +14,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import { useToast } from '@/composables/useToast';
 import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
@@ -257,28 +258,27 @@ const submitUserAction = async () => {
                             <Filter
                                 class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                             />
-                            <select
+                            <AppSelect
                                 v-model="roleFilter"
-                                class="h-10 w-full rounded-md border bg-background pr-3 pl-9 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                            >
-                                <option value="all">Todos los roles</option>
-                                <option
-                                    v-for="role in roleOptions"
-                                    :key="role"
-                                    :value="role"
-                                >
-                                    {{ roleLabel[role] ?? role }}
-                                </option>
-                            </select>
+                                class="w-full"
+                                :options="[
+                                    { value: 'all', label: 'Todos los roles' },
+                                    ...(roleOptions ?? []).map((role) => ({
+                                        value: role,
+                                        label: String(roleLabel[role] ?? role),
+                                    })),
+                                ]"
+                            />
                         </div>
-                        <select
+                        <AppSelect
                             v-model="statusFilter"
-                            class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                        >
-                            <option value="all">Todos los estados</option>
-                            <option value="active">Activos</option>
-                            <option value="inactive">Inactivos</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'all', label: 'Todos los estados' },
+                                { value: 'active', label: 'Activos' },
+                                { value: 'inactive', label: 'Inactivos' },
+                            ]"
+                        />
                     </div>
                 </section>
 

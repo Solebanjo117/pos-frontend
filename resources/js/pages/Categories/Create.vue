@@ -5,6 +5,7 @@ import { ref, onMounted } from 'vue';
 import CategoryImagesSection, {
     type PendingCategoryImage,
 } from '@/components/Categories/CategoryImagesSection.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Checkbox } from '@/components/ui/checkbox';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useCategories } from '@/composables/useCategories';
@@ -254,13 +255,14 @@ function goBack() {
                                 >
                                     Tipo
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="attr.type"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="string">Texto</option>
-                                    <option value="select">Lista</option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        { value: 'string', label: 'Texto' },
+                                        { value: 'select', label: 'Lista' },
+                                    ]"
+                                />
                             </div>
                             <div class="flex items-end sm:col-span-2 sm:pb-2">
                                 <label

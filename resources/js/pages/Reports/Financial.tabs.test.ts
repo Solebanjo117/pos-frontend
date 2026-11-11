@@ -7,6 +7,10 @@ import CashPositionReport from '@/components/Finance/CashPositionReport.vue';
 import SalesLinesReport from '@/components/Finance/SalesLinesReport.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import type * as ReportsModule from '@/composables/useReports';
+import {
+    appSelectButton,
+    chooseAppSelectOption,
+} from '@/lib/testing/appSelect';
 import apiClient from '@/services/api/client';
 import Financial from './Financial.vue';
 vi.mock('@/services/api/client', () => ({ default: { get: vi.fn() } }));
@@ -246,7 +250,10 @@ describe('Reporte financiero: pestanas de rentabilidad y ventas', () => {
             '?tab=cash&date_from=2026-08-01&date_to=2026-08-15',
         );
         const cash = wrapper.getComponent(CashPositionReport);
-        await cash.get('select[aria-label="Consulta"]').setValue('period');
+        await chooseAppSelectOption(
+            appSelectButton(cash, 'Consulta'),
+            'Movimientos del período',
+        );
         const picker = cash.getComponent(DateRangeInput);
         picker.vm.$emit('update:from', '2026-08-05');
         picker.vm.$emit('update:to', '2026-08-12');
@@ -335,26 +342,19 @@ describe('Reporte financiero: pestanas de rentabilidad y ventas', () => {
         mocks.brandProfitabilityReport.value = brandRows;
         const wrapper = await mountAt('?tab=line_profitability');
 
-        expect(
-            (
-                wrapper.find('select[aria-label="Agrupar"]')
-                    .element as HTMLSelectElement
-            ).value,
-        ).toBe('brand');
+        expect(appSelectButton(wrapper, 'Agrupar').text()).toBe('Marca');
         expect(wrapper.find('tbody').text()).toContain('Bosch');
 
-        await wrapper.find('select[aria-label="Agrupar"]').setValue('category');
+        await chooseAppSelectOption(
+            appSelectButton(wrapper, 'Agrupar'),
+            'Categoría',
+        );
         await flushPromises();
 
         expect(apiClient.get).toHaveBeenCalledWith('/reports/sales-lines', {
             params: expect.objectContaining({ group_by: 'category' }),
         });
-        expect(
-            (
-                wrapper.find('select[aria-label="Agrupar"]')
-                    .element as HTMLSelectElement
-            ).value,
-        ).toBe('category');
+        expect(appSelectButton(wrapper, 'Agrupar').text()).toBe('Categoría');
         expect(wrapper.find('tbody').text()).toContain('Filtros');
         expect(wrapper.find('tbody').text()).not.toContain('Bosch');
 
@@ -372,11 +372,17 @@ describe('Reporte financiero: pestanas de rentabilidad y ventas', () => {
             params: expect.objectContaining({ warehouse_id: '2' }),
         });
 
-        await wrapper.find('select[aria-label="Agrupar"]').setValue('category');
+        await chooseAppSelectOption(
+            appSelectButton(wrapper, 'Agrupar'),
+            'Categoría',
+        );
         await flushPromises();
 
         vi.mocked(apiClient.get).mockClear();
-        await wrapper.find('select[aria-label="Agrupar"]').setValue('brand');
+        await chooseAppSelectOption(
+            appSelectButton(wrapper, 'Agrupar'),
+            'Marca',
+        );
         await flushPromises();
 
         expect(apiClient.get).not.toHaveBeenCalled();

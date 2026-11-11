@@ -33,6 +33,7 @@ import { computed, onMounted, ref } from 'vue';
 import { Bar } from 'vue-chartjs';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -467,17 +468,18 @@ onMounted(async () => {
                         >
                             Orden
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.sort_by"
-                            class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            @change="applyFilters"
-                        >
-                            <option value="total_revenue">Total</option>
-                            <option value="orders_count">Facturas</option>
-                            <option value="total_paid">Cobrado</option>
-                            <option value="pending_amount">Pendiente</option>
-                            <option value="customer_name">Cliente</option>
-                        </select>
+                            class="w-full"
+                            @update:model-value="applyFilters()"
+                            :options="[
+                                { value: 'total_revenue', label: 'Total' },
+                                { value: 'orders_count', label: 'Facturas' },
+                                { value: 'total_paid', label: 'Cobrado' },
+                                { value: 'pending_amount', label: 'Pendiente' },
+                                { value: 'customer_name', label: 'Cliente' },
+                            ]"
+                        />
                     </div>
                     <div class="flex items-end">
                         <button

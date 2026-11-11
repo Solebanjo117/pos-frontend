@@ -3,6 +3,7 @@ import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, watch } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -516,13 +517,17 @@ const handleSubmit = async () => {
                             class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="form.status"
-                            class="mt-1 h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                        >
-                            <option value="active">Activo</option>
-                            <option value="discontinued">Discontinuado</option>
-                        </select>
+                            class="mt-1 w-full min-w-0"
+                            :options="[
+                                { value: 'active', label: 'Activo' },
+                                {
+                                    value: 'discontinued',
+                                    label: 'Discontinuado',
+                                },
+                            ]"
+                        />
                     </div>
                 </div>
 
@@ -593,16 +598,18 @@ const handleSubmit = async () => {
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >ITBM costo</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="costItbmApplies"
                                     data-testid="cost-itbm-select"
-                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-card"
-                                >
-                                    <option value="yes">
-                                        Sí ({{ defaultTaxRate() }}%)
-                                    </option>
-                                    <option value="no">No</option>
-                                </select>
+                                    class="w-full min-w-0"
+                                    :options="[
+                                        {
+                                            value: 'yes',
+                                            label: `Sí (${defaultTaxRate()}%)`,
+                                        },
+                                        { value: 'no', label: 'No' },
+                                    ]"
+                                />
                             </div>
 
                             <div class="md:col-span-2">
@@ -655,16 +662,18 @@ const handleSubmit = async () => {
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >ITBM venta</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="saleItbmApplies"
                                     data-testid="sale-itbm-select"
-                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-card"
-                                >
-                                    <option value="yes">
-                                        Sí ({{ defaultTaxRate() }}%)
-                                    </option>
-                                    <option value="no">No</option>
-                                </select>
+                                    class="w-full min-w-0"
+                                    :options="[
+                                        {
+                                            value: 'yes',
+                                            label: `Sí (${defaultTaxRate()}%)`,
+                                        },
+                                        { value: 'no', label: 'No' },
+                                    ]"
+                                />
                             </div>
 
                             <div class="md:col-span-9">

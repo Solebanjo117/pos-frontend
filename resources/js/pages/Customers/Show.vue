@@ -29,6 +29,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import CustomerProfileMetric from '@/components/Customers/CustomerProfileMetric.vue';
 import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
@@ -1187,24 +1188,32 @@ onMounted(async () => {
                                                 "
                                             />
                                         </div>
-                                        <select
+                                        <AppSelect
                                             v-model="
                                                 historyFilters.payment_status
                                             "
-                                            class="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                            @change="applyHistoryFilters"
-                                        >
-                                            <option value="">
-                                                Pago: todos
-                                            </option>
-                                            <option value="paid">Pagada</option>
-                                            <option value="partial">
-                                                Parcial
-                                            </option>
-                                            <option value="pending">
-                                                Pendiente
-                                            </option>
-                                        </select>
+                                            @update:model-value="
+                                                applyHistoryFilters()
+                                            "
+                                            :options="[
+                                                {
+                                                    value: '',
+                                                    label: 'Pago: todos',
+                                                },
+                                                {
+                                                    value: 'paid',
+                                                    label: 'Pagada',
+                                                },
+                                                {
+                                                    value: 'partial',
+                                                    label: 'Parcial',
+                                                },
+                                                {
+                                                    value: 'pending',
+                                                    label: 'Pendiente',
+                                                },
+                                            ]"
+                                        />
                                         <button
                                             type="button"
                                             class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -1957,26 +1966,28 @@ onMounted(async () => {
                                                     >
                                                         Marca
                                                     </label>
-                                                    <select
-                                                        v-model.number="
-                                                            selectedMakeId
+                                                    <AppSelect
+                                                        v-model="selectedMakeId"
+                                                        class="w-full"
+                                                        @update:model-value="
+                                                            loadVehicleModels()
                                                         "
-                                                        class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                                        @change="
-                                                            loadVehicleModels
-                                                        "
-                                                    >
-                                                        <option :value="null">
-                                                            Seleccionar
-                                                        </option>
-                                                        <option
-                                                            v-for="make in vehicleMakes"
-                                                            :key="make.id"
-                                                            :value="make.id"
-                                                        >
-                                                            {{ make.name }}
-                                                        </option>
-                                                    </select>
+                                                        :options="[
+                                                            {
+                                                                value: null,
+                                                                label: 'Seleccionar',
+                                                            },
+                                                            ...(
+                                                                vehicleMakes ??
+                                                                []
+                                                            ).map((make) => ({
+                                                                value: make.id,
+                                                                label: String(
+                                                                    make.name,
+                                                                ),
+                                                            })),
+                                                        ]"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label
@@ -1984,26 +1995,30 @@ onMounted(async () => {
                                                     >
                                                         Modelo
                                                     </label>
-                                                    <select
-                                                        v-model.number="
+                                                    <AppSelect
+                                                        v-model="
                                                             vehicleForm.vehicle_model_id
                                                         "
-                                                        class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                                        @change="
-                                                            loadVehicleConfiguration
+                                                        class="w-full"
+                                                        @update:model-value="
+                                                            loadVehicleConfiguration()
                                                         "
-                                                    >
-                                                        <option :value="0">
-                                                            Seleccionar
-                                                        </option>
-                                                        <option
-                                                            v-for="model in vehicleModels"
-                                                            :key="model.id"
-                                                            :value="model.id"
-                                                        >
-                                                            {{ model.name }}
-                                                        </option>
-                                                    </select>
+                                                        :options="[
+                                                            {
+                                                                value: 0,
+                                                                label: 'Seleccionar',
+                                                            },
+                                                            ...(
+                                                                vehicleModels ??
+                                                                []
+                                                            ).map((model) => ({
+                                                                value: model.id,
+                                                                label: String(
+                                                                    model.name,
+                                                                ),
+                                                            })),
+                                                        ]"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label
@@ -2011,29 +2026,25 @@ onMounted(async () => {
                                                     >
                                                         Motor
                                                     </label>
-                                                    <select
-                                                        v-model.number="
+                                                    <AppSelect
+                                                        v-model="
                                                             vehicleForm.vehicle_engine_id
                                                         "
-                                                        class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                                    >
-                                                        <option :value="0">
-                                                            Seleccionar
-                                                        </option>
-                                                        <option
-                                                            v-for="engine in vehicleEngines"
-                                                            :key="engine.id"
-                                                            :value="engine.id"
-                                                        >
-                                                            {{
-                                                                engine.engine_code
-                                                            }}
-                                                            {{
-                                                                engine.displacement ||
-                                                                ''
-                                                            }}
-                                                        </option>
-                                                    </select>
+                                                        class="w-full"
+                                                        :options="[
+                                                            {
+                                                                value: 0,
+                                                                label: 'Seleccionar',
+                                                            },
+                                                            ...(
+                                                                vehicleEngines ??
+                                                                []
+                                                            ).map((engine) => ({
+                                                                value: engine.id,
+                                                                label: `${engine.engine_code} ${engine.displacement || ''}`,
+                                                            })),
+                                                        ]"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label

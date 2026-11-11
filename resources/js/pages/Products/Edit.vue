@@ -9,6 +9,7 @@ import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
@@ -1070,17 +1071,20 @@ const validationErrorItems = computed(() =>
                                             class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                             >Estado</label
                                         >
-                                        <select
+                                        <AppSelect
                                             v-model="form.status"
-                                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                        >
-                                            <option value="active">
-                                                Activo
-                                            </option>
-                                            <option value="discontinued">
-                                                Discontinuado
-                                            </option>
-                                        </select>
+                                            class="w-full"
+                                            :options="[
+                                                {
+                                                    value: 'active',
+                                                    label: 'Activo',
+                                                },
+                                                {
+                                                    value: 'discontinued',
+                                                    label: 'Discontinuado',
+                                                },
+                                            ]"
+                                        />
                                     </div>
                                 </div>
                             </div>

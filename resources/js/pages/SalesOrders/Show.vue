@@ -26,6 +26,7 @@ import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSalesOrders } from '@/composables/useSalesOrders';
@@ -1706,45 +1707,38 @@ onMounted(async () => {
                         class="block text-sm font-medium"
                     >
                         Resolución financiera
-                        <select
+                        <AppSelect
                             v-model="cancellationMethod"
-                            required
-                            class="mt-1 w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option value="" disabled>Seleccionar</option>
-                            <option
-                                v-for="method in cancellationOptions"
-                                :key="method.code"
-                                :value="method.code"
-                            >
-                                {{ method.name }}
-                            </option>
-                        </select>
+                            class="mt-1 w-full"
+                            placeholder="Seleccionar"
+                            :options="[
+                                ...(cancellationOptions ?? []).map(
+                                    (method) => ({
+                                        value: method.code,
+                                        label: String(method.name),
+                                    }),
+                                ),
+                            ]"
+                        />
                     </label>
                     <label
                         v-if="cancellationIsBank"
                         class="block text-sm font-medium"
                     >
                         Cuenta bancaria
-                        <select
-                            v-model.number="cancellationFinancialAccountId"
-                            required
-                            class="mt-1 w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option :value="null">Seleccionar</option>
-                            <option
-                                v-for="account in cancellationFinancialAccounts"
-                                :key="account.endpoint_id"
-                                :value="account.endpoint_id"
-                            >
-                                {{ account.name
-                                }}{{
-                                    account.masked_number
-                                        ? ` · ${account.masked_number}`
-                                        : ''
-                                }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="cancellationFinancialAccountId"
+                            class="mt-1 w-full"
+                            :options="[
+                                { value: null, label: 'Seleccionar' },
+                                ...(cancellationFinancialAccounts ?? []).map(
+                                    (account) => ({
+                                        value: account.endpoint_id,
+                                        label: `${account.name}${account.masked_number ? ` · ${account.masked_number}` : ''}`,
+                                    }),
+                                ),
+                            ]"
+                        />
                         <span
                             v-if="cancellationAccountsError"
                             class="mt-1 block text-xs text-red-600"

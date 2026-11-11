@@ -4,6 +4,7 @@ import { Eye, Plus, RefreshCw, Search } from 'lucide-vue-next';
 import { nextTick, onMounted, ref } from 'vue';
 import FinanceAdjustmentModal from '@/components/Finance/FinanceAdjustmentModal.vue';
 import PageShell from '@/components/PageShell.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/ui/EmptyState.vue';
@@ -143,34 +144,38 @@ onMounted(async () => {
                     placeholder="Folio, motivo o referencia"
                     aria-label="Buscar ajustes"
                 />
-                <select
+                <AppSelect
                     v-model="filters.type"
-                    class="h-10 rounded-md border bg-background px-3 text-sm"
                     aria-label="Tipo de ajuste"
-                >
-                    <option value="">Todos los tipos</option>
-                    <option value="cash">Efectivo</option>
-                    <option value="bank">Banco</option>
-                    <option value="inventory">Inventario</option>
-                    <option value="sales">Ventas</option>
-                    <option value="purchases">Compras</option>
-                    <option value="expenses">Gastos</option>
-                    <option value="investment">Inversión</option>
-                    <option value="accounts_receivable">
-                        Cuentas por cobrar
-                    </option>
-                    <option value="accounts_payable">Cuentas por pagar</option>
-                    <option value="manual_correction">Manual</option>
-                </select>
-                <select
+                    :options="[
+                        { value: '', label: 'Todos los tipos' },
+                        { value: 'cash', label: 'Efectivo' },
+                        { value: 'bank', label: 'Banco' },
+                        { value: 'inventory', label: 'Inventario' },
+                        { value: 'sales', label: 'Ventas' },
+                        { value: 'purchases', label: 'Compras' },
+                        { value: 'expenses', label: 'Gastos' },
+                        { value: 'investment', label: 'Inversión' },
+                        {
+                            value: 'accounts_receivable',
+                            label: 'Cuentas por cobrar',
+                        },
+                        {
+                            value: 'accounts_payable',
+                            label: 'Cuentas por pagar',
+                        },
+                        { value: 'manual_correction', label: 'Manual' },
+                    ]"
+                />
+                <AppSelect
                     v-model="filters.status"
-                    class="h-10 rounded-md border bg-background px-3 text-sm"
                     aria-label="Estado"
-                >
-                    <option value="">Todos los estados</option>
-                    <option value="completed">Completado</option>
-                    <option value="reversed">Reversado</option>
-                </select>
+                    :options="[
+                        { value: '', label: 'Todos los estados' },
+                        { value: 'completed', label: 'Completado' },
+                        { value: 'reversed', label: 'Reversado' },
+                    ]"
+                />
                 <Input
                     v-model="filters.date_from"
                     type="date"

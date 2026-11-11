@@ -10,6 +10,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -360,49 +361,43 @@ onMounted(async () => {
                         class="w-full rounded-md border border-border bg-background py-2 pr-3 pl-9 text-sm"
                     />
                 </label>
-                <select
+                <AppSelect
                     v-if="
                         multiWarehouse &&
                         role === 'admin' &&
                         allowedWarehouses.length > 0
                     "
-                    v-model.number="selectedWarehouseId"
+                    v-model="selectedWarehouseId"
                     aria-label="Sucursal"
-                    class="rounded-md border border-border bg-background px-2 py-2 text-sm"
-                >
-                    <option :value="null">Seleccionar sucursal</option>
-                    <option
-                        v-for="warehouse in allowedWarehouses"
-                        :key="warehouse.id"
-                        :value="warehouse.id"
-                    >
-                        {{ warehouse.name }}
-                    </option>
-                </select>
-                <select
+                    :options="[
+                        { value: null, label: 'Seleccionar sucursal' },
+                        ...(allowedWarehouses ?? []).map((warehouse) => ({
+                            value: warehouse.id,
+                            label: String(warehouse.name),
+                        })),
+                    ]"
+                />
+                <AppSelect
                     v-model="filters.status_group"
                     aria-label="Grupo de estados"
-                    class="rounded-md border border-border bg-background px-2 py-2 text-sm"
-                >
-                    <option value="">Todos los grupos</option>
-                    <option value="pending">Pendientes</option>
-                    <option value="completed">Finalizadas</option>
-                    <option value="cancelled">Canceladas</option>
-                </select>
-                <select
+                    :options="[
+                        { value: '', label: 'Todos los grupos' },
+                        { value: 'pending', label: 'Pendientes' },
+                        { value: 'completed', label: 'Finalizadas' },
+                        { value: 'cancelled', label: 'Canceladas' },
+                    ]"
+                />
+                <AppSelect
                     v-model="filters.status"
                     aria-label="Estado específico"
-                    class="rounded-md border border-border bg-background px-2 py-2 text-sm"
-                >
-                    <option value="">Cualquier estado</option>
-                    <option
-                        v-for="option in statuses"
-                        :key="option.value"
-                        :value="option.value"
-                    >
-                        {{ option.label }}
-                    </option>
-                </select>
+                    :options="[
+                        { value: '', label: 'Cualquier estado' },
+                        ...(statuses ?? []).map((option) => ({
+                            value: option.value,
+                            label: String(option.label),
+                        })),
+                    ]"
+                />
                 <input
                     v-model="filters.date_from"
                     type="date"

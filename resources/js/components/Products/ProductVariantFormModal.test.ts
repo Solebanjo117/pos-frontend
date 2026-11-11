@@ -3,6 +3,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import { chooseAppSelectOption } from '@/lib/testing/appSelect';
 import ProductVariantFormModal from './ProductVariantFormModal.vue';
 
 const updateVariant = vi.fn();
@@ -41,7 +42,6 @@ const stubs = {
     DialogHeader: passthrough,
     DialogTitle: passthrough,
     DialogDescription: passthrough,
-    SearchableSelect: { template: '<div />' },
     PricingFormula: {
         props: ['taxRate'],
         template: '<div data-testid="pricing-formula" :data-tax="taxRate" />',
@@ -92,16 +92,12 @@ describe('ProductVariantFormModal ITBM', () => {
         fetchVariants.mockResolvedValue([variantWithRates(10, 0)]);
         const wrapper = await mountModal();
 
-        const cost = wrapper.get<HTMLSelectElement>(
-            '[data-testid="cost-itbm-select"]',
-        );
-        const sale = wrapper.get<HTMLSelectElement>(
-            '[data-testid="sale-itbm-select"]',
-        );
+        const cost = wrapper.get('[data-testid="cost-itbm-select"]');
+        const sale = wrapper.get('[data-testid="sale-itbm-select"]');
 
-        expect(cost.element.value).toBe('yes');
+        // El selector muestra la opción elegida.
         expect(cost.text()).toContain('Sí (7%)');
-        expect(sale.element.value).toBe('no');
+        expect(sale.text()).toBe('No');
         expect(wrapper.find('input[type="number"][max="100"]').exists()).toBe(
             false,
         );
@@ -127,8 +123,14 @@ describe('ProductVariantFormModal ITBM', () => {
         fetchVariants.mockResolvedValue([variantWithRates(0, 7)]);
         const wrapper = await mountModal();
 
-        await wrapper.get('[data-testid="cost-itbm-select"]').setValue('yes');
-        await wrapper.get('[data-testid="sale-itbm-select"]').setValue('no');
+        await chooseAppSelectOption(
+            wrapper.get('[data-testid="cost-itbm-select"] button'),
+            'Sí (7%)',
+        );
+        await chooseAppSelectOption(
+            wrapper.get('[data-testid="sale-itbm-select"] button'),
+            'No',
+        );
         await wrapper.get('form').trigger('submit');
         await flushPromises();
 

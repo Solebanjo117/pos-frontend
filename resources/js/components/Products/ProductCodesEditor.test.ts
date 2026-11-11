@@ -132,10 +132,12 @@ describe('ProductCodesEditor', () => {
         expect(wrapper.get('a').attributes('href')).toBe(
             '/inventory/products/27/edit',
         );
-        expect(
-            (
-                editor.vm as unknown as { hasConflicts: () => boolean }
-            ).hasConflicts(),
-        ).toBe(true);
+        // Lo que ven las pantallas que usan el editor por ref: la API expuesta (defineExpose).
+        const exposed = (
+            editor.vm as unknown as {
+                $: { exposed: { hasConflicts: () => boolean } };
+            }
+        ).$.exposed;
+        expect(exposed.hasConflicts()).toBe(true);
     });
 });

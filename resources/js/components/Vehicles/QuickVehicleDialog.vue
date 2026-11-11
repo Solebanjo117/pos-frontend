@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch, useId } from 'vue';
 import AppModal from '@/components/ui/AppModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
@@ -304,8 +305,6 @@ const submit = async () => {
 
 const toggleClass =
     'text-xs font-medium text-teal-700 hover:underline dark:text-teal-300';
-const selectClass =
-    'h-9 w-full rounded-md border border-input bg-background px-3 text-sm dark:bg-input/30';
 
 // Id único por instancia: los botones del pie envían el formulario con form="...".
 const formId = useId();
@@ -488,17 +487,17 @@ const formId = useId();
                             v-model="form.valves"
                             placeholder="Válvulas (16V)"
                         />
-                        <select
+                        <AppSelect
                             id="quick-vehicle-engine-cam"
                             v-model="form.camType"
-                            :class="selectClass"
                             aria-label="Árbol de levas"
-                        >
-                            <option value="">Árbol —</option>
-                            <option value="SOHC">SOHC</option>
-                            <option value="DOHC">DOHC</option>
-                            <option value="OHV">OHV</option>
-                        </select>
+                            :options="[
+                                { value: '', label: 'Árbol —' },
+                                { value: 'SOHC', label: 'SOHC' },
+                                { value: 'DOHC', label: 'DOHC' },
+                                { value: 'OHV', label: 'OHV' },
+                            ]"
+                        />
                         <Input
                             id="quick-vehicle-engine-cylinders"
                             v-model="form.cylinders"
@@ -507,17 +506,17 @@ const formId = useId();
                             max="16"
                             placeholder="Cilindros"
                         />
-                        <select
+                        <AppSelect
                             id="quick-vehicle-engine-fuel"
                             v-model="form.fuelType"
-                            :class="selectClass"
                             aria-label="Combustible"
-                        >
-                            <option value="Gasoline">Gasolina</option>
-                            <option value="Diesel">Diésel</option>
-                            <option value="Hybrid">Híbrido</option>
-                            <option value="Electric">Eléctrico</option>
-                        </select>
+                            :options="[
+                                { value: 'Gasoline', label: 'Gasolina' },
+                                { value: 'Diesel', label: 'Diésel' },
+                                { value: 'Hybrid', label: 'Híbrido' },
+                                { value: 'Electric', label: 'Eléctrico' },
+                            ]"
+                        />
                     </div>
                 </div>
                 <SearchableSelect

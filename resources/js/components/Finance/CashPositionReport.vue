@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { onMounted, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
 import { validateFinancialReportDates } from '@/utils/financialReport';
@@ -205,31 +206,31 @@ onMounted(async () => {
             @submit.prevent="load(true)"
         >
             <label class="text-xs"
-                >Consulta<select
+                >Consulta<AppSelect
                     v-model="filters.mode"
                     aria-label="Consulta"
-                    class="mt-1 block rounded border bg-background p-2"
-                >
-                    <option value="current">Disponible actual</option>
-                    <option value="as_of">Saldo al cierre de una fecha</option>
-                    <option value="period">Movimientos del período</option>
-                </select></label
-            >
+                    class="mt-1 block"
+                    :options="[
+                        { value: 'current', label: 'Disponible actual' },
+                        {
+                            value: 'as_of',
+                            label: 'Saldo al cierre de una fecha',
+                        },
+                        { value: 'period', label: 'Movimientos del período' },
+                    ]"
+            /></label>
             <label v-if="multiWarehouse" class="text-xs"
-                >Sucursal<select
+                >Sucursal<AppSelect
                     v-model="filters.warehouse_id"
-                    class="mt-1 block rounded border bg-background p-2"
-                >
-                    <option value="">Sucursal activa</option>
-                    <option
-                        v-for="w in options.warehouses"
-                        :key="w.id"
-                        :value="w.id"
-                    >
-                        {{ w.name }}
-                    </option>
-                </select></label
-            >
+                    class="mt-1 block"
+                    :options="[
+                        { value: '', label: 'Sucursal activa' },
+                        ...(options.warehouses ?? []).map((w: any) => ({
+                            value: w.id,
+                            label: String(w.name),
+                        })),
+                    ]"
+            /></label>
             <ReportPeriod
                 v-model:from="filters.date_from"
                 v-model:to="filters.date_to"
@@ -253,61 +254,49 @@ onMounted(async () => {
                 </summary>
                 <div class="mt-3 flex flex-wrap gap-3">
                     <label class="text-xs"
-                        >Tipo<select
+                        >Tipo<AppSelect
                             v-model="filters.kind"
-                            class="mt-1 block rounded border bg-background p-2"
-                        >
-                            <option value="">Todos</option>
-                            <option
-                                v-for="(name, key) in kinds"
-                                :key="key"
-                                :value="key"
-                            >
-                                {{ name }}
-                            </option>
-                        </select></label
+                            class="mt-1 block"
+                            :options="[
+                                { value: '', label: 'Todos' },
+                                ...Object.entries(kinds).map(([key, name]) => ({
+                                    value: key,
+                                    label: String(name),
+                                })),
+                            ]" /></label
                     ><label class="text-xs"
-                        >Método<select
+                        >Método<AppSelect
                             v-model="filters.method"
-                            class="mt-1 block rounded border bg-background p-2"
-                        >
-                            <option value="">Todos</option>
-                            <option
-                                v-for="m in options.methods"
-                                :key="m.code"
-                                :value="m.code"
-                            >
-                                {{ m.name }}
-                            </option>
-                        </select></label
+                            class="mt-1 block"
+                            :options="[
+                                { value: '', label: 'Todos' },
+                                ...(options.methods ?? []).map((m: any) => ({
+                                    value: m.code,
+                                    label: String(m.name),
+                                })),
+                            ]" /></label
                     ><label class="text-xs"
-                        >Operador<select
+                        >Operador<AppSelect
                             v-model="filters.user_id"
-                            class="mt-1 block rounded border bg-background p-2"
-                        >
-                            <option value="">Todos</option>
-                            <option
-                                v-for="u in options.operators"
-                                :key="u.id"
-                                :value="u.id"
-                            >
-                                {{ u.name }}
-                            </option>
-                        </select></label
+                            class="mt-1 block"
+                            :options="[
+                                { value: '', label: 'Todos' },
+                                ...(options.operators ?? []).map((u: any) => ({
+                                    value: u.id,
+                                    label: String(u.name),
+                                })),
+                            ]" /></label
                     ><label class="text-xs"
-                        >Sesión<select
+                        >Sesión<AppSelect
                             v-model="filters.pos_session_id"
-                            class="mt-1 block rounded border bg-background p-2"
-                        >
-                            <option value="">Todas</option>
-                            <option
-                                v-for="s in options.sessions"
-                                :key="s.id"
-                                :value="s.id"
-                            >
-                                Caja #{{ s.id }}
-                            </option>
-                        </select></label
+                            class="mt-1 block"
+                            :options="[
+                                { value: '', label: 'Todas' },
+                                ...(options.sessions ?? []).map((s: any) => ({
+                                    value: s.id,
+                                    label: `Caja #${s.id}`,
+                                })),
+                            ]" /></label
                     ><label class="text-xs"
                         >Referencia / documento<input
                             v-model="filters.search"

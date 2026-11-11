@@ -12,6 +12,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { useToast } from '@/composables/useToast';
 import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -332,18 +333,16 @@ const submit = async () => {
                                 <label class="block text-sm font-medium"
                                     >Rol</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="form.role"
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option
-                                        v-for="role in VALID_ROLES"
-                                        :key="role.value"
-                                        :value="role.value"
-                                    >
-                                        {{ role.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(VALID_ROLES ?? []).map((role) => ({
+                                            value: role.value,
+                                            label: String(role.label),
+                                        })),
+                                    ]"
+                                />
                             </div>
 
                             <div

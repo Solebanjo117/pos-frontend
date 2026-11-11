@@ -8,6 +8,7 @@ import {
     Gift,
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
@@ -1165,35 +1166,31 @@ const handleCancel = () => {
                                             >(opcional)</span
                                         >
                                     </label>
-                                    <select
-                                        v-model.number="
+                                    <AppSelect
+                                        v-model="
                                             paymentAccountIds[
                                                 selectedDynamicMethod.code
                                             ]
                                         "
-                                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                    >
-                                        <option :value="null">
-                                            {{
-                                                selectedDynamicMethod.requires_financial_account ===
-                                                false
-                                                    ? 'Pendiente de asignar cuenta'
-                                                    : 'Selecciona una cuenta'
-                                            }}
-                                        </option>
-                                        <option
-                                            v-for="account in financialAccounts"
-                                            :key="account.endpoint_id"
-                                            :value="account.endpoint_id"
-                                        >
-                                            {{ account.name }}
-                                            {{
-                                                account.masked_number
-                                                    ? `· ${account.masked_number}`
-                                                    : ''
-                                            }}
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            {
+                                                value: null,
+                                                label: String(
+                                                    selectedDynamicMethod.requires_financial_account ===
+                                                        false
+                                                        ? 'Pendiente de asignar cuenta'
+                                                        : 'Selecciona una cuenta',
+                                                ),
+                                            },
+                                            ...(financialAccounts ?? []).map(
+                                                (account) => ({
+                                                    value: account.endpoint_id,
+                                                    label: `${account.name} ${account.masked_number ? `· ${account.masked_number}` : ''}`,
+                                                }),
+                                            ),
+                                        ]"
+                                    />
                                     <p
                                         v-if="financialAccountsError"
                                         class="mt-1 text-xs text-red-600 dark:text-red-400"

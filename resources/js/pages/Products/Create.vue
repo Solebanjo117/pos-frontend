@@ -8,6 +8,7 @@ import ProductImagesSection from '@/components/Products/ProductImagesSection.vue
 import type { PendingImage } from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -1277,15 +1278,17 @@ const readinessItems = computed(() => [
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >Estado</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="form.status"
-                                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="active">Activo</option>
-                                    <option value="discontinued">
-                                        Descontinuado
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        { value: 'active', label: 'Activo' },
+                                        {
+                                            value: 'discontinued',
+                                            label: 'Descontinuado',
+                                        },
+                                    ]"
+                                />
                             </div>
                         </div>
                     </div>
@@ -1681,18 +1684,21 @@ const readinessItems = computed(() => [
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                     >Tipo de relación</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="upsaleRelationshipType"
-                                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="compatible">
-                                        Compatible
-                                    </option>
-                                    <option value="substitute">
-                                        Sustituto
-                                    </option>
-                                    <option value="upgrade">Upgrade</option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        {
+                                            value: 'compatible',
+                                            label: 'Compatible',
+                                        },
+                                        {
+                                            value: 'substitute',
+                                            label: 'Sustituto',
+                                        },
+                                        { value: 'upgrade', label: 'Upgrade' },
+                                    ]"
+                                />
                             </div>
                             <div class="sm:col-span-3">
                                 <button

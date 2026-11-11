@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -269,16 +270,18 @@ const getExpiryColor = (dateString: string | null) => {
                         >
                             Estado de Caducidad
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.expiry_status"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option value="expiring_soon">
-                                Por Vencer (30 días)
-                            </option>
-                            <option value="expired">Vencidos</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: undefined, label: 'Todos' },
+                                {
+                                    value: 'expiring_soon',
+                                    label: 'Por Vencer (30 días)',
+                                },
+                                { value: 'expired', label: 'Vencidos' },
+                            ]"
+                        />
                     </div>
 
                     <!-- Actions -->

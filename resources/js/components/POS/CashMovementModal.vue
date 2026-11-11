@@ -9,6 +9,7 @@ import {
     Loader2,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { createIdempotencyKey } from '@/utils/idempotency';
 
@@ -218,18 +219,16 @@ const handleClose = () => {
                     >
                         Operacion
                     </label>
-                    <select
+                    <AppSelect
                         v-model="subtype"
-                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm dark:border-border dark:bg-muted"
-                    >
-                        <option
-                            v-for="operation in operations"
-                            :key="operation.value"
-                            :value="operation.value"
-                        >
-                            {{ operation.label }}
-                        </option>
-                    </select>
+                        class="w-full"
+                        :options="[
+                            ...(operations ?? []).map((operation) => ({
+                                value: operation.value,
+                                label: String(operation.label),
+                            })),
+                        ]"
+                    />
                 </div>
 
                 <!-- Amount -->
@@ -263,17 +262,17 @@ const handleClose = () => {
                     >
                         <FileText :size="12" class="mr-1 inline" /> Motivo
                     </label>
-                    <select
+                    <AppSelect
                         v-model="reason"
-                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:border-transparent focus:ring-2 focus:ring-indigo-500 dark:border-border dark:bg-muted dark:text-white"
-                    >
-                        <option value="" disabled>
-                            Selecciona un motivo...
-                        </option>
-                        <option v-for="r in reasons" :key="r" :value="r">
-                            {{ r }}
-                        </option>
-                    </select>
+                        class="w-full"
+                        placeholder="Selecciona un motivo..."
+                        :options="[
+                            ...(reasons ?? []).map((r) => ({
+                                value: r,
+                                label: String(r),
+                            })),
+                        ]"
+                    />
                 </div>
 
                 <!-- Notes -->

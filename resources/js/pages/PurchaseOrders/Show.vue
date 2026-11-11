@@ -18,6 +18,7 @@ import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSecti
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -294,9 +295,8 @@ async function handleDuplicate() {
     router.visit(`/purchase-orders/${duplicated.id}`);
 }
 
-async function handleStatusAction(event: Event) {
-    const action = (event.target as HTMLSelectElement).value;
-    (event.target as HTMLSelectElement).value = '';
+async function handleStatusAction(selected: unknown) {
+    const action = String(selected ?? '');
 
     if (action === 'send') {
         await handleSend();
@@ -369,41 +369,33 @@ onMounted(async () => {
                     <Copy :size="15" />
                     Duplicar
                 </button>
-                <select
+                <!-- Menú de acciones del estado: siempre muestra "Estado: …" y ejecuta la acción elegida. -->
+                <AppSelect
                     v-if="purchaseOrder"
-                    class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-border dark:bg-muted dark:text-white"
-                    @change="handleStatusAction"
-                >
-                    <option value="">
-                        Estado: {{ purchaseOrder.status_label }}
-                    </option>
-                    <option
-                        v-if="purchaseOrder.status === 'draft'"
-                        value="send"
-                    >
-                        Enviar
-                    </option>
-                    <option
-                        v-if="
-                            ['sent', 'partial', 'open'].includes(
-                                purchaseOrder.status,
-                            )
-                        "
-                        value="receive"
-                    >
-                        Recibir
-                    </option>
-                    <option
-                        v-if="
-                            !['received', 'cancelled'].includes(
-                                purchaseOrder.status,
-                            )
-                        "
-                        value="cancel"
-                    >
-                        Cancelar
-                    </option>
-                </select>
+                    class="w-44"
+                    model-value=""
+                    aria-label="Acciones de la orden de compra"
+                    :options="[
+                        {
+                            value: '',
+                            label: `Estado: ${purchaseOrder.status_label}`,
+                        },
+                        ...(purchaseOrder.status === 'draft'
+                            ? [{ value: 'send', label: 'Enviar' }]
+                            : []),
+                        ...(['sent', 'partial', 'open'].includes(
+                            purchaseOrder.status,
+                        )
+                            ? [{ value: 'receive', label: 'Recibir' }]
+                            : []),
+                        ...(!['received', 'cancelled'].includes(
+                            purchaseOrder.status,
+                        )
+                            ? [{ value: 'cancel', label: 'Cancelar' }]
+                            : []),
+                    ]"
+                    @update:model-value="handleStatusAction"
+                />
             </template>
         </PurchaseOrderToolbar>
 

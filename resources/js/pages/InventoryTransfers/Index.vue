@@ -11,6 +11,7 @@ import {
     Eye,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -117,17 +118,17 @@ const totalItems = (items: any[]) =>
 
             <!-- Filters -->
             <div class="flex gap-3">
-                <select
+                <AppSelect
                     v-model="statusFilter"
-                    @change="fetchTransfers"
-                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200"
-                >
-                    <option value="">Todos los estados</option>
-                    <option value="draft">Borrador</option>
-                    <option value="in_transit">En Tránsito</option>
-                    <option value="completed">Completada</option>
-                    <option value="cancelled">Cancelada</option>
-                </select>
+                    @update:model-value="fetchTransfers()"
+                    :options="[
+                        { value: '', label: 'Todos los estados' },
+                        { value: 'draft', label: 'Borrador' },
+                        { value: 'in_transit', label: 'En Tránsito' },
+                        { value: 'completed', label: 'Completada' },
+                        { value: 'cancelled', label: 'Cancelada' },
+                    ]"
+                />
             </div>
 
             <!-- Loading -->

@@ -4,6 +4,7 @@ import { PackageMinus, Trash2, Plus } from 'lucide-vue-next';
 import { ref, onMounted, computed, nextTick } from 'vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -471,21 +472,25 @@ const cancel = () => {
                                         class="mb-1 block text-sm font-medium text-gray-900 dark:text-white"
                                         >Tipo Referencia</label
                                     >
-                                    <select
+                                    <AppSelect
                                         v-model="headerForm.reference_type"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                    >
-                                        <option :value="undefined">
-                                            Ninguna
-                                        </option>
-                                        <option value="sale">Venta</option>
-                                        <option value="adjustment">
-                                            Ajuste (Pérdida/Daño)
-                                        </option>
-                                        <option value="transfer">
-                                            Transferencia
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            {
+                                                value: undefined,
+                                                label: 'Ninguna',
+                                            },
+                                            { value: 'sale', label: 'Venta' },
+                                            {
+                                                value: 'adjustment',
+                                                label: 'Ajuste (Pérdida/Daño)',
+                                            },
+                                            {
+                                                value: 'transfer',
+                                                label: 'Transferencia',
+                                            },
+                                        ]"
+                                    />
                                 </div>
 
                                 <div v-if="headerForm.reference_type">
@@ -631,42 +636,33 @@ const cancel = () => {
                                                     <div
                                                         class="flex items-center gap-1"
                                                     >
-                                                        <select
+                                                        <AppSelect
                                                             v-model="
                                                                 item.variant_id
                                                             "
-                                                            @change="
+                                                            class="w-full"
+                                                            @update:model-value="
                                                                 handleVariantChange(
                                                                     index,
                                                                 )
                                                             "
-                                                            class="w-full rounded-md border-gray-300 py-1.5 text-sm shadow-sm dark:border-border dark:bg-muted"
-                                                        >
-                                                            <option
-                                                                :value="null"
-                                                            >
-                                                                Genérico /
-                                                                Default
-                                                            </option>
-                                                            <option
-                                                                v-for="v in getProductDetails(
-                                                                    item.product_id,
-                                                                )?.variants ||
-                                                                []"
-                                                                :key="v.id"
-                                                                :value="v.id"
-                                                            >
-                                                                {{ v.sku }}
-                                                                {{
-                                                                    v.brand
-                                                                        ? '- ' +
-                                                                          v
-                                                                              .brand
-                                                                              .name
-                                                                        : ''
-                                                                }}
-                                                            </option>
-                                                        </select>
+                                                            :options="[
+                                                                {
+                                                                    value: null,
+                                                                    label: 'Genérico / Default',
+                                                                },
+                                                                ...(
+                                                                    getProductDetails(
+                                                                        item.product_id,
+                                                                    )
+                                                                        ?.variants ||
+                                                                    []
+                                                                ).map((v) => ({
+                                                                    value: v.id,
+                                                                    label: `${v.sku} ${v.brand ? '- ' + v.brand.name : ''}`,
+                                                                })),
+                                                            ]"
+                                                        />
                                                         <button
                                                             @click="
                                                                 refreshVariants(
@@ -718,31 +714,25 @@ const cancel = () => {
                                                         item.batches.length > 0
                                                     "
                                                 >
-                                                    <select
+                                                    <AppSelect
                                                         v-model="
                                                             item.product_batch_id
                                                         "
-                                                        class="w-full rounded-md border-gray-300 py-1.5 text-sm shadow-sm dark:border-border dark:bg-muted"
-                                                        :class="{
-                                                            'border-red-500':
-                                                                formErrors[
-                                                                    `item_${item.id}_batch`
-                                                                ],
-                                                        }"
-                                                    >
-                                                        <option :value="null">
-                                                            Seleccionar lote...
-                                                        </option>
-                                                        <option
-                                                            v-for="b in item.batches"
-                                                            :key="b.id"
-                                                            :value="b.id"
-                                                        >
-                                                            {{ b.batch_number }}
-                                                            - Stock:
-                                                            {{ b.quantity }}
-                                                        </option>
-                                                    </select>
+                                                        class="w-full"
+                                                        :options="[
+                                                            {
+                                                                value: null,
+                                                                label: 'Seleccionar lote...',
+                                                            },
+                                                            ...(
+                                                                item.batches ??
+                                                                []
+                                                            ).map((b) => ({
+                                                                value: b.id,
+                                                                label: `${b.batch_number} - Stock: ${b.quantity}`,
+                                                            })),
+                                                        ]"
+                                                    />
                                                 </div>
                                                 <div
                                                     v-else-if="item.product_id"

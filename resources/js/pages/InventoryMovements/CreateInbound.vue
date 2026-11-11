@@ -4,6 +4,7 @@ import { PackagePlus, Trash2, Plus, Copy } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -559,23 +560,28 @@ const cancel = () => {
                                         class="mb-1 block text-sm font-medium text-gray-900 dark:text-white"
                                         >Tipo Referencia</label
                                     >
-                                    <select
+                                    <AppSelect
                                         v-model="headerForm.reference_type"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                    >
-                                        <option :value="undefined">
-                                            Ninguna
-                                        </option>
-                                        <option value="purchase">
-                                            Compra (PO)
-                                        </option>
-                                        <option value="adjustment">
-                                            Ajuste
-                                        </option>
-                                        <option value="return">
-                                            Devolución
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            {
+                                                value: undefined,
+                                                label: 'Ninguna',
+                                            },
+                                            {
+                                                value: 'purchase',
+                                                label: 'Compra (PO)',
+                                            },
+                                            {
+                                                value: 'adjustment',
+                                                label: 'Ajuste',
+                                            },
+                                            {
+                                                value: 'return',
+                                                label: 'Devolución',
+                                            },
+                                        ]"
+                                    />
                                 </div>
 
                                 <div v-if="headerForm.reference_type">
@@ -805,44 +811,35 @@ const cancel = () => {
                                                     <div
                                                         class="flex items-center gap-1"
                                                     >
-                                                        <select
+                                                        <AppSelect
                                                             v-model="
                                                                 item.variant_id
                                                             "
-                                                            @change="
+                                                            class="w-full"
+                                                            @update:model-value="
                                                                 handleProductSelect(
                                                                     index,
                                                                     item.product_id,
                                                                     item.variant_id,
                                                                 )
                                                             "
-                                                            class="w-full rounded-md border-gray-300 py-1.5 text-sm shadow-sm dark:border-border dark:bg-muted"
-                                                        >
-                                                            <option
-                                                                :value="null"
-                                                            >
-                                                                Genérico /
-                                                                Default
-                                                            </option>
-                                                            <option
-                                                                v-for="v in getProductDetails(
-                                                                    item.product_id,
-                                                                )?.variants ||
-                                                                []"
-                                                                :key="v.id"
-                                                                :value="v.id"
-                                                            >
-                                                                {{ v.sku }}
-                                                                {{
-                                                                    v.brand
-                                                                        ? '- ' +
-                                                                          v
-                                                                              .brand
-                                                                              .name
-                                                                        : ''
-                                                                }}
-                                                            </option>
-                                                        </select>
+                                                            :options="[
+                                                                {
+                                                                    value: null,
+                                                                    label: 'Genérico / Default',
+                                                                },
+                                                                ...(
+                                                                    getProductDetails(
+                                                                        item.product_id,
+                                                                    )
+                                                                        ?.variants ||
+                                                                    []
+                                                                ).map((v) => ({
+                                                                    value: v.id,
+                                                                    label: `${v.sku} ${v.brand ? '- ' + v.brand.name : ''}`,
+                                                                })),
+                                                            ]"
+                                                        />
                                                         <button
                                                             @click="
                                                                 refreshVariants(

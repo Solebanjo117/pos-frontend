@@ -15,6 +15,7 @@ import {
     AlertTriangle,
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -633,18 +634,16 @@ onMounted(async () => {
                                 class="mb-1.5 block text-xs font-semibold tracking-wider text-gray-500 uppercase"
                                 >Estado</label
                             >
-                            <select
+                            <AppSelect
                                 v-model="status"
-                                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option
-                                    v-for="opt in statusOptions"
-                                    :key="opt.value"
-                                    :value="opt.value"
-                                >
-                                    {{ opt.label }}
-                                </option>
-                            </select>
+                                class="w-full"
+                                :options="[
+                                    ...(statusOptions ?? []).map((opt) => ({
+                                        value: opt.value,
+                                        label: String(opt.label),
+                                    })),
+                                ]"
+                            />
                         </div>
 
                         <div>

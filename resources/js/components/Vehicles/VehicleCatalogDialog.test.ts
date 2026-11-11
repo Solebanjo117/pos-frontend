@@ -1,9 +1,21 @@
 // @vitest-environment jsdom
 
-import { mount } from '@vue/test-utils';
+import { mount, type DOMWrapper } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import { nextTick } from 'vue';
 import VehicleCatalogDialog from './VehicleCatalogDialog.vue';
+
+// AppSelect funciona sobre el SearchableSelect simulado (un <select>): se elige por el texto visible.
+const chooseByLabel = async (
+    select: Omit<DOMWrapper<Element>, 'exists'>,
+    label: string,
+) => {
+    const option = select
+        .findAll('option')
+        .find((item) => item.text().trim() === label);
+    if (!option) throw new Error(`Opción "${label}" no encontrada`);
+    await select.setValue(option.element.getAttribute('value'));
+};
 
 const stubs = {
     AppModal: {
@@ -207,7 +219,7 @@ describe('VehicleCatalogDialog', () => {
         await wrapper.get('#vehicle-engine-nickname').setValue(' buzo ');
         await wrapper.get('#vehicle-engine-displacement').setValue('2.4L');
         await wrapper.get('#vehicle-engine-valves').setValue('8V');
-        await wrapper.get('#vehicle-engine-cam').setValue('SOHC');
+        await chooseByLabel(wrapper.get('#vehicle-engine-cam'), 'SOHC');
         await wrapper.get('#vehicle-engine-cylinders').setValue('4');
         await wrapper.get('form').trigger('submit');
 

@@ -17,6 +17,7 @@ import MovementTrendChart from '@/components/charts/MovementTrendChart.vue';
 import MovementTypeChart from '@/components/charts/MovementTypeChart.vue';
 import Pagination from '@/components/Pagination.vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -500,15 +501,16 @@ const sourceLabel = (movement: {
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Tipo</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filters.movement_type"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todos los tipos</option>
-                            <option value="in">Entradas</option>
-                            <option value="out">Salidas</option>
-                            <option value="transfer">Transferencias</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: null, label: 'Todos los tipos' },
+                                { value: 'in', label: 'Entradas' },
+                                { value: 'out', label: 'Salidas' },
+                                { value: 'transfer', label: 'Transferencias' },
+                            ]"
+                        />
                     </div>
 
                     <div>
@@ -516,14 +518,15 @@ const sourceLabel = (movement: {
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Agrupar por</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filters.group_by"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="day">Día</option>
-                            <option value="week">Semana</option>
-                            <option value="month">Mes</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'day', label: 'Día' },
+                                { value: 'week', label: 'Semana' },
+                                { value: 'month', label: 'Mes' },
+                            ]"
+                        />
                     </div>
 
                     <div

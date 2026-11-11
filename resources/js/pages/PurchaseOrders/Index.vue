@@ -20,6 +20,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
@@ -572,18 +573,16 @@ onMounted(async () => {
                         >
                             Estado
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.status"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option
-                                v-for="option in statusOptions"
-                                :key="option.value"
-                                :value="option.value || undefined"
-                            >
-                                {{ option.label }}
-                            </option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                ...(statusOptions ?? []).map((option) => ({
+                                    value: option.value || undefined,
+                                    label: String(option.label),
+                                })),
+                            ]"
+                        />
                     </div>
 
                     <div>
@@ -593,18 +592,18 @@ onMounted(async () => {
                             <CreditCard :size="13" />
                             Pago
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.payment_status"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option
-                                v-for="option in paymentStatusOptions"
-                                :key="option.value"
-                                :value="option.value || undefined"
-                            >
-                                {{ option.label }}
-                            </option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                ...(paymentStatusOptions ?? []).map(
+                                    (option) => ({
+                                        value: option.value || undefined,
+                                        label: String(option.label),
+                                    }),
+                                ),
+                            ]"
+                        />
                     </div>
 
                     <div>

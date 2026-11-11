@@ -15,6 +15,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWorkOrders } from '@/composables/useWorkOrders';
@@ -255,19 +256,16 @@ onMounted(loadWorkOrders);
                             @keyup.enter="applyFilters"
                         />
                     </label>
-                    <select
+                    <AppSelect
                         v-model="filters.status"
-                        class="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-950"
-                        @change="applyFilters"
-                    >
-                        <option
-                            v-for="status in statusOptions"
-                            :key="status.value"
-                            :value="status.value"
-                        >
-                            {{ status.label }}
-                        </option>
-                    </select>
+                        @update:model-value="applyFilters()"
+                        :options="[
+                            ...(statusOptions ?? []).map((status) => ({
+                                value: status.value,
+                                label: String(status.label),
+                            })),
+                        ]"
+                    />
                     <input
                         v-model="filters.date_from"
                         type="date"

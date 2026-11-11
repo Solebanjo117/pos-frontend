@@ -11,6 +11,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
@@ -465,33 +466,33 @@ const handleCreateReturn = async (
                         class="w-full rounded-md border px-8 py-2 text-sm"
                     />
                 </div>
-                <select
+                <AppSelect
                     v-model="filters.status"
-                    class="rounded-md border px-3 py-2 text-sm"
-                >
-                    <option value="">Todos los estados</option>
-                    <option value="pending">Pendiente</option>
-                    <option value="approved">Aprobada</option>
-                    <option value="rejected">Rechazada</option>
-                </select>
-                <select
+                    :options="[
+                        { value: '', label: 'Todos los estados' },
+                        { value: 'pending', label: 'Pendiente' },
+                        { value: 'approved', label: 'Aprobada' },
+                        { value: 'rejected', label: 'Rechazada' },
+                    ]"
+                />
+                <AppSelect
                     v-model="filters.refund_method"
-                    class="rounded-md border px-3 py-2 text-sm"
-                >
-                    <option value="">Todos los métodos</option>
-                    <option value="cash">Efectivo</option>
-                    <option value="card">Tarjeta</option>
-                    <option value="transfer">Transferencia</option>
-                    <option value="yappy">Yappy</option>
-                    <option value="ach">ACH</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="visa">Visa</option>
-                    <option value="mastercard">Mastercard</option>
-                    <option value="amex">AMEX</option>
-                    <option value="other">Otro</option>
-                    <option value="receivable">Reducir CxC</option>
-                    <option value="balance">Saldo a favor</option>
-                </select>
+                    :options="[
+                        { value: '', label: 'Todos los métodos' },
+                        { value: 'cash', label: 'Efectivo' },
+                        { value: 'card', label: 'Tarjeta' },
+                        { value: 'transfer', label: 'Transferencia' },
+                        { value: 'yappy', label: 'Yappy' },
+                        { value: 'ach', label: 'ACH' },
+                        { value: 'cheque', label: 'Cheque' },
+                        { value: 'visa', label: 'Visa' },
+                        { value: 'mastercard', label: 'Mastercard' },
+                        { value: 'amex', label: 'AMEX' },
+                        { value: 'other', label: 'Otro' },
+                        { value: 'receivable', label: 'Reducir CxC' },
+                        { value: 'balance', label: 'Saldo a favor' },
+                    ]"
+                />
                 <input
                     v-model="filters.customer_id"
                     type="number"

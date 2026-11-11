@@ -14,6 +14,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -593,19 +594,19 @@ function statusClass(status: VariantStatus): string {
                         >
                             Almacén
                         </label>
-                        <select
-                            v-model.number="selectedWarehouseId"
-                            class="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            @change="applyWarehouseFilter"
-                        >
-                            <option
-                                v-for="warehouse in productWarehouseOptions"
-                                :key="warehouse.id"
-                                :value="warehouse.id"
-                            >
-                                {{ warehouse.name }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="selectedWarehouseId"
+                            class="w-full"
+                            @update:model-value="applyWarehouseFilter()"
+                            :options="[
+                                ...(productWarehouseOptions ?? []).map(
+                                    (warehouse) => ({
+                                        value: warehouse.id,
+                                        label: String(warehouse.name),
+                                    }),
+                                ),
+                            ]"
+                        />
                     </div>
                     <div class="lg:col-span-3">
                         <label

@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3';
 import { Banknote, Clock3, Pencil, Plus, Send } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -255,30 +256,23 @@ onUnmounted(() => {
                                 Administrar categorías
                             </button></span
                         >
-                        <select
+                        <AppSelect
                             v-model="categoryId"
                             :disabled="
                                 loadingCategories ||
                                 availableCategories.length === 0
                             "
-                            required
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option :value="null" disabled>
-                                {{
-                                    loadingCategories
-                                        ? 'Cargando…'
-                                        : 'Selecciona una categoría'
-                                }}
-                            </option>
-                            <option
-                                v-for="category in availableCategories"
-                                :key="category.id"
-                                :value="category.id"
-                            >
-                                {{ category.name }}
-                            </option>
-                        </select>
+                            class="w-full"
+                            placeholder="{{ loadingCategories ? 'Cargando…' : 'Selecciona una categoría' }}"
+                            :options="[
+                                ...(availableCategories ?? []).map(
+                                    (category) => ({
+                                        value: category.id,
+                                        label: String(category.name),
+                                    }),
+                                ),
+                            ]"
+                        />
                         <span
                             v-if="
                                 operationType === 'funding' &&

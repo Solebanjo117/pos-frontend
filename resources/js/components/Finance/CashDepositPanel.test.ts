@@ -2,6 +2,10 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import {
+    appSelectButton,
+    chooseAppSelectOption,
+} from '@/lib/testing/appSelect';
 import apiClient from '@/services/api/client';
 import CashDepositPanel from './CashDepositPanel.vue';
 
@@ -91,7 +95,10 @@ async function ready() {
         .find((button) => button.text() === 'Seleccionar cobros')!
         .trigger('click');
     await flushPromises();
-    await wrapper.find('select').setValue('1');
+    await chooseAppSelectOption(
+        appSelectButton(wrapper, 'Banco de destino'),
+        'Banco USD · USD',
+    );
     return wrapper;
 }
 it('loads the applied range and separates remaining receipts from physical cash', async () => {

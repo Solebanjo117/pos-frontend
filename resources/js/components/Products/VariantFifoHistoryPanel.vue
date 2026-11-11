@@ -8,6 +8,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -747,18 +748,7 @@ defineExpose({
             </div>
 
             <div v-if="!embedded" class="flex items-center gap-2">
-                <select v-if="multiWarehouse"
-                    v-model.number="selectedWarehouseId"
-                    class="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                >
-                    <option
-                        v-for="warehouse in variantWarehouseOptions"
-                        :key="warehouse.id"
-                        :value="warehouse.id"
-                    >
-                        {{ warehouse.name }}
-                    </option>
-                </select>
+                <AppSelect v-if="multiWarehouse" v-model="selectedWarehouseId" :options="[...((variantWarehouseOptions) ?? []).map((warehouse) => ({ value: warehouse.id, label: String(warehouse.name) }))]" />
                 <Button
                     type="button"
                     variant="outline"

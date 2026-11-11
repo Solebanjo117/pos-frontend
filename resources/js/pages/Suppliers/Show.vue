@@ -24,6 +24,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -952,16 +953,7 @@ const removeVariant = async (variantId?: number | null) => {
                                 class="h-9 w-64 rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-border dark:bg-muted dark:text-white"
                                 @keyup.enter="searchPurchaseHistory"
                             />
-                            <select
-                                v-model="purchaseHistoryFilters.payment_status"
-                                class="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                @change="searchPurchaseHistory"
-                            >
-                                <option value="">Pago: todos</option>
-                                <option value="pending">Pendiente</option>
-                                <option value="partial">Parcial</option>
-                                <option value="paid">Pagado</option>
-                            </select>
+                            <AppSelect v-model="purchaseHistoryFilters.payment_status" @update:model-value="searchPurchaseHistory()" :options="[{ value: '', label: 'Pago: todos' }, { value: 'pending', label: 'Pendiente' }, { value: 'partial', label: 'Parcial' }, { value: 'paid', label: 'Pagado' }]" />
                             <button
                                 type="button"
                                 class="inline-flex items-center gap-2 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
@@ -1856,21 +1848,7 @@ const removeVariant = async (variantId?: number | null) => {
                         class="border-b border-gray-200 bg-gray-50 px-6 py-4 dark:border-border dark:bg-muted/30"
                     >
                         <div class="flex items-center gap-3">
-                            <select
-                                v-model="selectedBrandId"
-                                class="flex-1 rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="null" disabled>
-                                    Seleccionar marca...
-                                </option>
-                                <option
-                                    v-for="brand in brandsNotYetLinked"
-                                    :key="brand.id"
-                                    :value="brand.id"
-                                >
-                                    {{ brand.name }}
-                                </option>
-                            </select>
+                            <AppSelect v-model="selectedBrandId" class="flex-1" placeholder="Seleccionar marca..." :options="[...((brandsNotYetLinked) ?? []).map((brand) => ({ value: brand.id, label: String(brand.name) }))]" />
                             <button
                                 type="button"
                                 class="transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"

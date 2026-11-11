@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -380,13 +381,14 @@ onMounted(async () => {
                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="form.status"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="draft">Borrador</option>
-                            <option value="pending">Pendiente</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'draft', label: 'Borrador' },
+                                { value: 'pending', label: 'Pendiente' },
+                            ]"
+                        />
                     </div>
                 </div>
 

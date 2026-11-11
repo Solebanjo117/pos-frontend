@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import InventoryMovementDrawer from '@/components/Traceability/InventoryMovementDrawer.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
@@ -410,22 +411,23 @@ function formatNumber(value: number): string {
                         >
                             Tipo
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.movement_type"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option value="in">Entrada</option>
-                            <option value="out">Salida</option>
-                            <option
-                                v-if="
-                                    multiWarehouse && !isSingleWarehouseMode()
-                                "
-                                value="transfer"
-                            >
-                                Transferencia
-                            </option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: undefined, label: 'Todos' },
+                                { value: 'in', label: 'Entrada' },
+                                { value: 'out', label: 'Salida' },
+                                ...(multiWarehouse && !isSingleWarehouseMode()
+                                    ? [
+                                          {
+                                              value: 'transfer',
+                                              label: 'Transferencia',
+                                          },
+                                      ]
+                                    : []),
+                            ]"
+                        />
                     </div>
 
                     <div v-if="multiWarehouse && !isSingleWarehouseMode()">

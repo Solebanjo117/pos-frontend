@@ -12,6 +12,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import CustomerDialog from '@/components/Customers/CustomerDialog.vue';
 import Pagination from '@/components/Pagination.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import {
     Dialog,
     DialogContent,
@@ -375,20 +376,17 @@ onMounted(async () => {
                             @keyup.enter="applyFilters"
                         />
                     </div>
-                    <select
+                    <AppSelect
                         v-model="filters.customer_type_id"
-                        class="rounded-md border bg-background px-3 py-2"
-                        @change="applyFilters"
-                    >
-                        <option :value="undefined">Todos los tipos</option>
-                        <option
-                            v-for="type in customerTypes"
-                            :key="type.id"
-                            :value="type.id"
-                        >
-                            {{ type.name }}
-                        </option>
-                    </select>
+                        @update:model-value="applyFilters()"
+                        :options="[
+                            { value: undefined, label: 'Todos los tipos' },
+                            ...(customerTypes ?? []).map((type) => ({
+                                value: type.id,
+                                label: String(type.name),
+                            })),
+                        ]"
+                    />
                     <button
                         class="rounded-md border px-4 py-2"
                         :disabled="loading"
@@ -718,13 +716,14 @@ onMounted(async () => {
                     <div>
                         <label class="mb-1 block text-sm font-medium"
                             >Clasificación base</label
-                        ><select
+                        ><AppSelect
                             v-model="typeForm.base_kind"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option value="individual">Persona</option>
-                            <option value="business">Empresa</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'individual', label: 'Persona' },
+                                { value: 'business', label: 'Empresa' },
+                            ]"
+                        />
                     </div>
                     <label
                         v-if="editingType"

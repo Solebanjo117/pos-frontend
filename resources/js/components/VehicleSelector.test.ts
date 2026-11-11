@@ -93,14 +93,23 @@ describe('VehicleSelector', () => {
         });
         await flushPromises();
 
-        const selects = wrapper.findAll('select');
-        expect((selects[0].element as HTMLSelectElement).value).toBe('1');
-        expect((selects[1].element as HTMLSelectElement).value).toBe('2');
-        expect((selects[2].element as HTMLSelectElement).value).toBe('2020');
-        expect((selects[3].element as HTMLSelectElement).value).toBe('11');
-        expect(selects[3].findAll('option')).toHaveLength(3);
-        expect(selects[3].text()).toContain('1.8L');
+        // Marca, modelo, año y motor: cada selector muestra la opción restaurada.
+        const selects = wrapper.findAll('button[aria-haspopup="listbox"]');
+        expect(selects[0].text()).toBe('Toyota');
+        expect(selects[1].text()).toContain('Corolla');
+        expect(selects[2].text()).toBe('2020');
         expect(selects[3].text()).toContain('2.0L');
+
+        // El motor ofrece las dos variantes del mismo código (más la opción vacía).
+        await selects[3].trigger('click');
+        await flushPromises();
+        const engineOptions = Array.from(
+            document.body.querySelectorAll('li[role="option"]'),
+        ).map((item) => item.textContent ?? '');
+        expect(engineOptions).toHaveLength(3);
+        expect(engineOptions.join(' ')).toContain('1.8L');
+        expect(engineOptions.join(' ')).toContain('2.0L');
+        wrapper.unmount();
     });
 
     it('uses combined catalog search and selects the exact model and engine pair', async () => {

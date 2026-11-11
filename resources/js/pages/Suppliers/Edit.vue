@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -138,13 +139,14 @@ async function handleSubmit() {
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >Estado</label
                             >
-                            <select
+                            <AppSelect
                                 v-model="form.status"
-                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option value="active">Activo</option>
-                                <option value="inactive">Inactivo</option>
-                            </select>
+                                class="w-full"
+                                :options="[
+                                    { value: 'active', label: 'Activo' },
+                                    { value: 'inactive', label: 'Inactivo' },
+                                ]"
+                            />
                         </div>
                     </div>
                 </div>

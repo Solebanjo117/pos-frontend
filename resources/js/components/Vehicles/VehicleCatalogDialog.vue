@@ -2,6 +2,7 @@
 import { Plus, Trash2 } from 'lucide-vue-next';
 import { computed, reactive, watch, useId } from 'vue';
 import AppModal from '@/components/ui/AppModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -540,16 +541,17 @@ const formId = useId();
                     </div>
                     <div class="space-y-2">
                         <Label for="vehicle-engine-cam">Árbol de levas</Label>
-                        <select
+                        <AppSelect
                             id="vehicle-engine-cam"
                             v-model="form.cam_type"
-                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm dark:bg-input/30"
-                        >
-                            <option value="">—</option>
-                            <option value="SOHC">SOHC</option>
-                            <option value="DOHC">DOHC</option>
-                            <option value="OHV">OHV</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: '', label: '—' },
+                                { value: 'SOHC', label: 'SOHC' },
+                                { value: 'DOHC', label: 'DOHC' },
+                                { value: 'OHV', label: 'OHV' },
+                            ]"
+                        />
                     </div>
                     <div class="space-y-2">
                         <Label for="vehicle-engine-cylinders">Cilindros</Label>
@@ -566,16 +568,17 @@ const formId = useId();
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div class="space-y-2">
                         <Label for="vehicle-engine-fuel">Combustible</Label>
-                        <select
+                        <AppSelect
                             id="vehicle-engine-fuel"
                             v-model="form.fuel_type"
-                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm dark:bg-input/30"
-                        >
-                            <option value="Gasoline">Gasolina</option>
-                            <option value="Diesel">Diésel</option>
-                            <option value="Hybrid">Híbrido</option>
-                            <option value="Electric">Eléctrico</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'Gasoline', label: 'Gasolina' },
+                                { value: 'Diesel', label: 'Diésel' },
+                                { value: 'Hybrid', label: 'Híbrido' },
+                                { value: 'Electric', label: 'Eléctrico' },
+                            ]"
+                        />
                     </div>
                     <div class="space-y-2">
                         <Label for="vehicle-engine-aspiration"

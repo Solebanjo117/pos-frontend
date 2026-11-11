@@ -23,6 +23,7 @@ import {
 } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { useAuth } from '@/composables/useAuth';
@@ -625,120 +626,121 @@ const handleResetData = async () => {
                                 <label class="text-sm font-medium">
                                     Zona horaria
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="settings.regional_timezone"
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option
-                                        v-for="option in timezoneOptions"
-                                        :key="option.value"
-                                        :value="option.value"
-                                    >
-                                        {{ option.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(timezoneOptions ?? []).map(
+                                            (option) => ({
+                                                value: option.value,
+                                                label: String(option.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium">
                                     Formato de fecha
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="settings.regional_date_format"
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option
-                                        v-for="option in dateFormatOptions"
-                                        :key="option.value"
-                                        :value="option.value"
-                                    >
-                                        {{ option.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(dateFormatOptions ?? []).map(
+                                            (option) => ({
+                                                value: option.value,
+                                                label: String(option.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium">
                                     Formato de hora
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="settings.regional_time_format"
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option
-                                        v-for="option in timeFormatOptions"
-                                        :key="option.value"
-                                        :value="option.value"
-                                    >
-                                        {{ option.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(timeFormatOptions ?? []).map(
+                                            (option) => ({
+                                                value: option.value,
+                                                label: String(option.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium">
                                     Fecha y hora
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="settings.regional_datetime_format"
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option
-                                        v-for="option in datetimeFormatOptions"
-                                        :key="option.value"
-                                        :value="option.value"
-                                    >
-                                        {{ option.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(datetimeFormatOptions ?? []).map(
+                                            (option) => ({
+                                                value: option.value,
+                                                label: String(option.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium">
                                     Pais / region
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="settings.regional_country"
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option
-                                        v-for="option in countryOptions"
-                                        :key="option.value"
-                                        :value="option.value"
-                                    >
-                                        {{ option.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(countryOptions ?? []).map(
+                                            (option) => ({
+                                                value: option.value,
+                                                label: String(option.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium">
                                     Moneda principal
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="settings.store_currency"
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option value="USD">USD ($)</option>
-                                    <option value="PAB">PAB (B/.)</option>
-                                    <option value="EUR">EUR</option>
-                                    <option value="MXN">MXN ($)</option>
-                                    <option value="COP">COP ($)</option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        { value: 'USD', label: 'USD ($)' },
+                                        { value: 'PAB', label: 'PAB (B/.)' },
+                                        { value: 'EUR', label: 'EUR' },
+                                        { value: 'MXN', label: 'MXN ($)' },
+                                        { value: 'COP', label: 'COP ($)' },
+                                    ]"
+                                />
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium">
                                     Separador decimal
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="
                                         settings.regional_decimal_separator
                                     "
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option
-                                        v-for="option in decimalSeparatorOptions"
-                                        :key="option.value"
-                                        :value="option.value"
-                                    >
-                                        {{ option.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(decimalSeparatorOptions ?? []).map(
+                                            (option) => ({
+                                                value: option.value,
+                                                label: String(option.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <label
                                 class="flex items-start gap-3 rounded-md border p-3"
@@ -881,29 +883,29 @@ const handleResetData = async () => {
                                             {{ method.code }}
                                         </td>
                                         <td class="px-3 py-2">
-                                            <select
-                                                :value="
+                                            <AppSelect
+                                                :model-value="
                                                     method.liquidity_bucket ||
                                                     'bank'
                                                 "
-                                                class="h-8 rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary"
-                                                @change="
+                                                @update:model-value="
                                                     handleUpdateLiquidityBucket(
                                                         method,
-                                                        (
-                                                            $event.target as HTMLSelectElement
-                                                        ).value,
+                                                        $event,
                                                     )
                                                 "
-                                            >
-                                                <option
-                                                    v-for="option in liquidityBucketOptions"
-                                                    :key="option.value"
-                                                    :value="option.value"
-                                                >
-                                                    {{ option.label }}
-                                                </option>
-                                            </select>
+                                                :options="[
+                                                    ...(
+                                                        liquidityBucketOptions ??
+                                                        []
+                                                    ).map((option) => ({
+                                                        value: option.value,
+                                                        label: String(
+                                                            option.label,
+                                                        ),
+                                                    })),
+                                                ]"
+                                            />
                                             <div
                                                 v-if="
                                                     method.liquidity_bucket ===
@@ -932,43 +934,39 @@ const handleResetData = async () => {
                                                     />
                                                     Cuenta requerida
                                                 </label>
-                                                <select
-                                                    :value="
+                                                <AppSelect
+                                                    :model-value="
                                                         method.default_financial_account_id ??
                                                         ''
                                                     "
-                                                    class="h-8 rounded-md border bg-background px-2 text-xs"
                                                     aria-label="Cuenta predeterminada"
-                                                    @change="
+                                                    @update:model-value="
                                                         updateMethod(
                                                             method.id,
                                                             {
                                                                 default_financial_account_id:
                                                                     Number(
-                                                                        (
-                                                                            $event.target as HTMLSelectElement
-                                                                        ).value,
+                                                                        $event,
                                                                     ) || null,
                                                             },
                                                         )
                                                     "
-                                                >
-                                                    <option value="">
-                                                        Sin cuenta
-                                                        predeterminada
-                                                    </option>
-                                                    <option
-                                                        v-for="account in paymentAccounts"
-                                                        :key="
-                                                            account.endpoint_id
-                                                        "
-                                                        :value="
-                                                            account.endpoint_id
-                                                        "
-                                                    >
-                                                        {{ account.name }}
-                                                    </option>
-                                                </select>
+                                                    :options="[
+                                                        {
+                                                            value: '',
+                                                            label: 'Sin cuenta predeterminada',
+                                                        },
+                                                        ...(
+                                                            paymentAccounts ??
+                                                            []
+                                                        ).map((account) => ({
+                                                            value: account.endpoint_id,
+                                                            label: String(
+                                                                account.name,
+                                                            ),
+                                                        })),
+                                                    ]"
+                                                />
                                             </div>
                                         </td>
                                         <td class="px-3 py-2">
@@ -1070,18 +1068,17 @@ const handleResetData = async () => {
                                 <label class="text-sm font-medium">
                                     Expiracion de cotizaciones
                                 </label>
-                                <select
-                                    v-model.number="
-                                        settings.quote_expiration_days
-                                    "
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option :value="0">Deshabilitado</option>
-                                    <option :value="15">15 dias</option>
-                                    <option :value="30">30 dias</option>
-                                    <option :value="60">60 dias</option>
-                                    <option :value="90">90 dias</option>
-                                </select>
+                                <AppSelect
+                                    v-model="settings.quote_expiration_days"
+                                    class="w-full"
+                                    :options="[
+                                        { value: 0, label: 'Deshabilitado' },
+                                        { value: 15, label: '15 dias' },
+                                        { value: 30, label: '30 dias' },
+                                        { value: 60, label: '60 dias' },
+                                        { value: 90, label: '90 dias' },
+                                    ]"
+                                />
                             </div>
                             <label
                                 class="flex items-start gap-3 rounded-md border p-3"
@@ -1284,18 +1281,18 @@ const handleResetData = async () => {
                                     <label class="text-sm font-medium">
                                         Bucket financiero
                                     </label>
-                                    <select
+                                    <AppSelect
                                         v-model="newMethodLiquidityBucket"
-                                        class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                    >
-                                        <option
-                                            v-for="option in liquidityBucketOptions"
-                                            :key="option.value"
-                                            :value="option.value"
-                                        >
-                                            {{ option.label }}
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            ...(
+                                                liquidityBucketOptions ?? []
+                                            ).map((option) => ({
+                                                value: option.value,
+                                                label: String(option.label),
+                                            })),
+                                        ]"
+                                    />
                                 </div>
                                 <label class="flex items-center gap-2 text-sm">
                                     <input

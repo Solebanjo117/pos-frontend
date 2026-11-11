@@ -15,6 +15,7 @@ import ProductVariantFormModal from '@/components/Products/ProductVariantFormMod
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import {
     DropdownMenu,
     DropdownMenuTrigger,
@@ -1225,15 +1226,7 @@ watch(
                                         class="mb-1 block text-xs font-semibold text-gray-500 uppercase dark:text-gray-400"
                                         >Origen</label
                                     >
-                                    <select
-                                        v-model="candidateSource"
-                                        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                    >
-                                        <option value="low_stock">
-                                            Stock bajo
-                                        </option>
-                                        <option value="daily">OC diaria</option>
-                                    </select>
+                                    <AppSelect v-model="candidateSource" class="w-full" :options="[{ value: 'low_stock', label: 'Stock bajo' }, { value: 'daily', label: 'OC diaria' }]" />
                                 </div>
                                 <div v-if="candidateSource === 'daily'">
                                     <label

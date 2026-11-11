@@ -4,6 +4,7 @@ import { ArrowRightLeft, Trash2, Plus } from 'lucide-vue-next';
 import { ref, onMounted, computed, nextTick, watch } from 'vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
@@ -647,31 +648,25 @@ const cancel = () => {
                                                         item.batches.length > 0
                                                     "
                                                 >
-                                                    <select
+                                                    <AppSelect
                                                         v-model="
                                                             item.product_batch_id
                                                         "
-                                                        class="w-full rounded-md border-gray-300 py-1 text-sm shadow-sm dark:border-border dark:bg-muted"
-                                                        :class="{
-                                                            'border-red-500':
-                                                                formErrors[
-                                                                    `item_${item.id}_batch`
-                                                                ],
-                                                        }"
-                                                    >
-                                                        <option :value="null">
-                                                            Seleccionar lote...
-                                                        </option>
-                                                        <option
-                                                            v-for="b in item.batches"
-                                                            :key="b.id"
-                                                            :value="b.id"
-                                                        >
-                                                            {{ b.batch_number }}
-                                                            (Stock:
-                                                            {{ b.quantity }})
-                                                        </option>
-                                                    </select>
+                                                        class="w-full"
+                                                        :options="[
+                                                            {
+                                                                value: null,
+                                                                label: 'Seleccionar lote...',
+                                                            },
+                                                            ...(
+                                                                item.batches ??
+                                                                []
+                                                            ).map((b) => ({
+                                                                value: b.id,
+                                                                label: `${b.batch_number} (Stock: ${b.quantity})`,
+                                                            })),
+                                                        ]"
+                                                    />
                                                 </div>
                                                 <div
                                                     v-else-if="item.product_id"

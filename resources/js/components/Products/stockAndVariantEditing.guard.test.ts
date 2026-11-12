@@ -37,4 +37,12 @@ describe('Products: variant editing and stock adjustments', () => {
         expect(edit).not.toMatch(/loading\s*\?\s*'Guardando/);
         expect(edit).toMatch(/saving\s*\?\s*'Guardando/);
     });
+
+    it('uses the standard AppModal for the variant window (focus and close button behave like the rest)', () => {
+        const modal = source('components/Products/ProductVariantFormModal.vue');
+
+        expect(modal).not.toContain("from '@/components/ui/dialog'");
+        expect(modal).toContain('<AppModal');
+        expect(modal).toContain('<LoadingState');
+    });
 });

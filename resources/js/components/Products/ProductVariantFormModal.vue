@@ -4,16 +4,11 @@ import { ref, computed, watch } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
+import AppModal from '@/components/ui/AppModal.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-} from '@/components/ui/dialog';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
@@ -484,367 +479,354 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-    <Dialog :open="open" @update:open="handleOpenChange">
-        <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-            <DialogHeader>
-                <DialogTitle>Editar Variante</DialogTitle>
-                <DialogDescription>
-                    Marca, precios e inventario de esta variante.
-                </DialogDescription>
-            </DialogHeader>
+    <AppModal
+        :open="open"
+        title="Editar Variante"
+        description="Marca, precios e inventario de esta variante."
+        size="lg"
+        @update:open="handleOpenChange"
+    >
+        <LoadingState v-if="loadingVariant" label="Cargando variante..." />
 
-            <div v-if="loadingVariant" class="flex justify-center py-10">
-                <div
-                    class="h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"
+        <form
+            v-else
+            id="product-variant-form"
+            @submit.prevent.stop="handleSubmit"
+            class="space-y-4"
+        >
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <!-- Brand -->
+                <div>
+                    <label
+                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >Marca</label
+                    >
+                    <div class="flex gap-1">
+                        <SearchableSelect
+                            :options="brandOptions"
+                            :model-value="form.brand_id"
+                            @update:model-value="
+                                (v) => (form.brand_id = v as number)
+                            "
+                            placeholder="-- Selecciona marca --"
+                            :loading="loadingBrands"
+                        />
+                        <button
+                            type="button"
+                            @click="openBrandModal"
+                            class="flex-shrink-0 rounded-md border border-gray-300 bg-white p-2 text-gray-500 transition hover:border-blue-400 hover:text-blue-600 dark:border-border dark:bg-muted dark:hover:text-blue-400"
+                            title="Crear nueva marca"
+                        >
+                            <svg
+                                class="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 4v16m8-8H4"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div>
+                    <label
+                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >Estado</label
+                    >
+                    <AppSelect
+                        v-model="form.status"
+                        class="mt-1 w-full min-w-0"
+                        :options="[
+                            { value: 'active', label: 'Activo' },
+                            {
+                                value: 'discontinued',
+                                label: 'Discontinuado',
+                            },
+                        ]"
+                    />
+                </div>
+
+                <div v-if="editingVariant">
+                    <span
+                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >Stock actual</span
+                    >
+                    <div class="mt-1 flex h-9 items-center gap-3">
+                        <span
+                            data-test="variant-stock"
+                            class="text-base font-semibold tabular-nums"
+                            >{{ currentStock }}</span
+                        >
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-test="adjust-stock"
+                            @click="showStockAdjust = true"
+                            >Ajustar</Button
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-200 pt-4 dark:border-border">
+                <h4
+                    class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"
+                >
+                    Códigos comerciales
+                </h4>
+                <ProductCodesEditor
+                    ref="productCodesRef"
+                    v-model="form.codes"
+                    :exclude-variant-id="editingVariant?.id"
+                    :disabled="processing"
                 />
             </div>
 
-            <form
-                v-else
-                @submit.prevent.stop="handleSubmit"
-                class="space-y-4 py-4"
-            >
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <!-- Brand -->
-                    <div>
-                        <label
-                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >Marca</label
-                        >
-                        <div class="flex gap-1">
-                            <SearchableSelect
-                                :options="brandOptions"
-                                :model-value="form.brand_id"
+            <!-- Pricing Section -->
+            <div class="border-t border-gray-200 pt-4 dark:border-border">
+                <h4
+                    class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white"
+                >
+                    <CircleDollarSign class="h-4 w-4 text-gray-500" />
+                    Precios de esta Variante
+                </h4>
+
+                <div
+                    class="space-y-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 dark:border-border dark:bg-muted/50"
+                >
+                    <div
+                        class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
+                    >
+                        <div class="md:col-span-3">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Producto</label
+                            >
+                            <input
+                                :value="productName || 'Producto Base'"
+                                type="text"
+                                readonly
+                                class="mt-1 h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
+                            />
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Costo Base</label
+                            >
+                            <div class="relative mt-1">
+                                <span
+                                    class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
+                                    >$</span
+                                >
+                                <input
+                                    v-model.number="form.pricing.cost_base"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >ITBM costo</label
+                            >
+                            <AppSelect
+                                v-model="costItbmApplies"
+                                data-testid="cost-itbm-select"
+                                class="w-full min-w-0"
+                                :options="[
+                                    {
+                                        value: 'yes',
+                                        label: `Sí (${defaultTaxRate()}%)`,
+                                    },
+                                    { value: 'no', label: 'No' },
+                                ]"
+                            />
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Misceláneos</label
+                            >
+                            <div class="relative mt-1">
+                                <span
+                                    class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
+                                    >$</span
+                                >
+                                <input
+                                    v-model.number="
+                                        form.pricing.cost_miscellaneous
+                                    "
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Costo Total</label
+                            >
+                            <div class="relative mt-1">
+                                <span
+                                    class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
+                                    >$</span
+                                >
+                                <input
+                                    :value="getFormCostTotal().toFixed(2)"
+                                    type="text"
+                                    readonly
+                                    class="h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 pl-7 text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
+                    >
+                        <div class="md:col-span-3">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >ITBM venta</label
+                            >
+                            <AppSelect
+                                v-model="saleItbmApplies"
+                                data-testid="sale-itbm-select"
+                                class="w-full min-w-0"
+                                :options="[
+                                    {
+                                        value: 'yes',
+                                        label: `Sí (${defaultTaxRate()}%)`,
+                                    },
+                                    { value: 'no', label: 'No' },
+                                ]"
+                            />
+                        </div>
+
+                        <div class="md:col-span-9">
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >
+                                Precio de Venta
+                                <span
+                                    v-if="props.categoryFormula"
+                                    class="ml-1 text-xs font-semibold text-blue-500"
+                                >
+                                    · Fórmula:
+                                    <code
+                                        class="rounded bg-blue-50 px-1 font-mono dark:bg-blue-900/20"
+                                        >{{ props.categoryFormula }}</code
+                                    >
+                                </span>
+                            </label>
+                            <PricingFormula
+                                :cost="getFormCostTotal()"
+                                :tax-rate="itbmRateFor(saleItbmApplies)"
+                                :model-value="form.pricing_formula"
+                                :price="Number(form.pricing.base_price) || 0"
                                 @update:model-value="
-                                    (v) => (form.brand_id = v as number)
+                                    (v) => (form.pricing_formula = v)
                                 "
-                                placeholder="-- Selecciona marca --"
-                                :loading="loadingBrands"
+                                @update:price="onFormulaTotalChange"
                             />
                             <button
+                                v-if="
+                                    priceManuallyEdited &&
+                                    (props.categoryFormula ||
+                                        (props.categoryMargin != null &&
+                                            props.categoryMargin > 0))
+                                "
                                 type="button"
-                                @click="openBrandModal"
-                                class="flex-shrink-0 rounded-md border border-gray-300 bg-white p-2 text-gray-500 transition hover:border-blue-400 hover:text-blue-600 dark:border-border dark:bg-muted dark:hover:text-blue-400"
-                                title="Crear nueva marca"
+                                @click="recalculatePriceFromCategory"
+                                class="mt-1 flex items-center gap-1 text-xs text-gray-400 transition hover:text-indigo-600 dark:hover:text-indigo-400"
                             >
-                                <svg
-                                    class="h-4 w-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M12 4v16m8-8H4"
-                                    />
-                                </svg>
+                                &#8635; Recalcular por categoría
                             </button>
                         </div>
                     </div>
-
-                    <!-- Status -->
-                    <div>
-                        <label
-                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >Estado</label
-                        >
-                        <AppSelect
-                            v-model="form.status"
-                            class="mt-1 w-full min-w-0"
-                            :options="[
-                                { value: 'active', label: 'Activo' },
-                                {
-                                    value: 'discontinued',
-                                    label: 'Discontinuado',
-                                },
-                            ]"
-                        />
-                    </div>
-
-                    <div v-if="editingVariant">
-                        <span
-                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                            >Stock actual</span
-                        >
-                        <div class="mt-1 flex h-9 items-center gap-3">
-                            <span
-                                data-test="variant-stock"
-                                class="text-base font-semibold tabular-nums"
-                                >{{ currentStock }}</span
-                            >
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                data-test="adjust-stock"
-                                @click="showStockAdjust = true"
-                                >Ajustar</Button
-                            >
-                        </div>
-                    </div>
-                </div>
-
-                <div class="border-t border-gray-200 pt-4 dark:border-border">
-                    <h4
-                        class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"
-                    >
-                        Códigos comerciales
-                    </h4>
-                    <ProductCodesEditor
-                        ref="productCodesRef"
-                        v-model="form.codes"
-                        :exclude-variant-id="editingVariant?.id"
-                        :disabled="processing"
-                    />
-                </div>
-
-                <!-- Pricing Section -->
-                <div class="border-t border-gray-200 pt-4 dark:border-border">
-                    <h4
-                        class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white"
-                    >
-                        <CircleDollarSign class="h-4 w-4 text-gray-500" />
-                        Precios de esta Variante
-                    </h4>
-
-                    <div
-                        class="space-y-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 dark:border-border dark:bg-muted/50"
-                    >
-                        <div
-                            class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
-                        >
-                            <div class="md:col-span-3">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Producto</label
-                                >
-                                <input
-                                    :value="productName || 'Producto Base'"
-                                    type="text"
-                                    readonly
-                                    class="mt-1 h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Costo Base</label
-                                >
-                                <div class="relative mt-1">
-                                    <span
-                                        class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
-                                        >$</span
-                                    >
-                                    <input
-                                        v-model.number="form.pricing.cost_base"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                                    />
-                                </div>
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >ITBM costo</label
-                                >
-                                <AppSelect
-                                    v-model="costItbmApplies"
-                                    data-testid="cost-itbm-select"
-                                    class="w-full min-w-0"
-                                    :options="[
-                                        {
-                                            value: 'yes',
-                                            label: `Sí (${defaultTaxRate()}%)`,
-                                        },
-                                        { value: 'no', label: 'No' },
-                                    ]"
-                                />
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Misceláneos</label
-                                >
-                                <div class="relative mt-1">
-                                    <span
-                                        class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
-                                        >$</span
-                                    >
-                                    <input
-                                        v-model.number="
-                                            form.pricing.cost_miscellaneous
-                                        "
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
-                                    />
-                                </div>
-                            </div>
-
-                            <div class="md:col-span-3">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Costo Total</label
-                                >
-                                <div class="relative mt-1">
-                                    <span
-                                        class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-gray-400"
-                                        >$</span
-                                    >
-                                    <input
-                                        :value="getFormCostTotal().toFixed(2)"
-                                        type="text"
-                                        readonly
-                                        class="h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 pl-7 text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="grid grid-cols-1 items-start gap-4 md:grid-cols-12"
-                        >
-                            <div class="md:col-span-3">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >ITBM venta</label
-                                >
-                                <AppSelect
-                                    v-model="saleItbmApplies"
-                                    data-testid="sale-itbm-select"
-                                    class="w-full min-w-0"
-                                    :options="[
-                                        {
-                                            value: 'yes',
-                                            label: `Sí (${defaultTaxRate()}%)`,
-                                        },
-                                        { value: 'no', label: 'No' },
-                                    ]"
-                                />
-                            </div>
-
-                            <div class="md:col-span-9">
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >
-                                    Precio de Venta
-                                    <span
-                                        v-if="props.categoryFormula"
-                                        class="ml-1 text-xs font-semibold text-blue-500"
-                                    >
-                                        · Fórmula:
-                                        <code
-                                            class="rounded bg-blue-50 px-1 font-mono dark:bg-blue-900/20"
-                                            >{{ props.categoryFormula }}</code
-                                        >
-                                    </span>
-                                </label>
-                                <PricingFormula
-                                    :cost="getFormCostTotal()"
-                                    :tax-rate="itbmRateFor(saleItbmApplies)"
-                                    :model-value="form.pricing_formula"
-                                    :price="
-                                        Number(form.pricing.base_price) || 0
-                                    "
-                                    @update:model-value="
-                                        (v) => (form.pricing_formula = v)
-                                    "
-                                    @update:price="onFormulaTotalChange"
-                                />
-                                <button
-                                    v-if="
-                                        priceManuallyEdited &&
-                                        (props.categoryFormula ||
-                                            (props.categoryMargin != null &&
-                                                props.categoryMargin > 0))
-                                    "
-                                    type="button"
-                                    @click="recalculatePriceFromCategory"
-                                    class="mt-1 flex items-center gap-1 text-xs text-gray-400 transition hover:text-indigo-600 dark:hover:text-indigo-400"
-                                >
-                                    &#8635; Recalcular por categoría
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div v-if="error" class="mt-2 text-sm text-red-500">
-                    {{ error }}
-                </div>
-
-                <div class="mt-6 flex justify-end space-x-3">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        @click="requestClose()"
-                        >Cancelar</Button
-                    >
-                    <Button type="submit" :disabled="processing || loading">
-                        {{ processing ? 'Guardando...' : 'Guardar' }}
-                    </Button>
-                </div>
-            </form>
-        </DialogContent>
-    </Dialog>
-
-    <!-- Brand Creation Mini-Modal -->
-    <Dialog
-        :open="showBrandModal"
-        @update:open="
-            (v) => {
-                if (!v) showBrandModal = false;
-            }
-        "
-    >
-        <DialogContent class="sm:max-w-sm">
-            <DialogHeader>
-                <DialogTitle>Nueva Marca</DialogTitle>
-            </DialogHeader>
-            <div class="space-y-4 pt-2">
-                <ErrorMessage v-if="brandError">
-                    {{ brandError }}
-                </ErrorMessage>
-                <div>
-                    <label
-                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                        Nombre de la Marca <span class="text-red-500">*</span>
-                    </label>
-                    <input
-                        v-model="newBrandName"
-                        type="text"
-                        @keyup.enter="submitNewBrand"
-                        class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="Ej: Bosch, NGK, BERU..."
-                    />
-                </div>
-                <div class="flex justify-end gap-3">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        @click="showBrandModal = false"
-                        >Cancelar</Button
-                    >
-                    <Button
-                        type="button"
-                        @click="submitNewBrand"
-                        :disabled="creatingBrand"
-                    >
-                        {{ creatingBrand ? 'Creando...' : 'Crear Marca' }}
-                    </Button>
                 </div>
             </div>
-        </DialogContent>
-    </Dialog>
+
+            <ErrorMessage v-if="error">{{ error }}</ErrorMessage>
+        </form>
+
+        <template v-if="!loadingVariant" #footer>
+            <Button type="button" variant="outline" @click="requestClose()"
+                >Cancelar</Button
+            >
+            <Button
+                type="submit"
+                form="product-variant-form"
+                :disabled="processing || loading"
+            >
+                {{ processing ? 'Guardando...' : 'Guardar' }}
+            </Button>
+        </template>
+    </AppModal>
+
+    <!-- Brand Creation Mini-Modal -->
+    <AppModal
+        :open="showBrandModal"
+        title="Nueva Marca"
+        size="sm"
+        @update:open="(v) => (showBrandModal = v)"
+    >
+        <div class="space-y-4">
+            <ErrorMessage v-if="brandError">
+                {{ brandError }}
+            </ErrorMessage>
+            <div>
+                <label
+                    for="variant-new-brand-name"
+                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                    Nombre de la Marca <span class="text-red-500">*</span>
+                </label>
+                <input
+                    id="variant-new-brand-name"
+                    v-model="newBrandName"
+                    type="text"
+                    @keyup.enter="submitNewBrand"
+                    class="w-full rounded-md border border-gray-300 px-3 py-2 dark:border-border dark:bg-muted dark:text-white"
+                    placeholder="Ej: Bosch, NGK, BERU..."
+                />
+            </div>
+        </div>
+
+        <template #footer>
+            <Button
+                type="button"
+                variant="outline"
+                @click="showBrandModal = false"
+                >Cancelar</Button
+            >
+            <Button
+                type="button"
+                @click="submitNewBrand"
+                :disabled="creatingBrand"
+            >
+                {{ creatingBrand ? 'Creando...' : 'Crear Marca' }}
+            </Button>
+        </template>
+    </AppModal>
 
     <StockAdjustModal
         v-if="editingVariant"

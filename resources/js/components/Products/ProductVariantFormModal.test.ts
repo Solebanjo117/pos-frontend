@@ -40,13 +40,12 @@ vi.mock('@/services/api/client', () => ({
     },
 }));
 
-const passthrough = { template: '<div><slot /></div>' };
 const stubs = {
-    Dialog: passthrough,
-    DialogContent: passthrough,
-    DialogHeader: passthrough,
-    DialogTitle: passthrough,
-    DialogDescription: passthrough,
+    AppModal: {
+        props: ['open', 'title'],
+        template:
+            '<div v-if="open" :data-title="title"><slot /><footer><slot name="footer" /></footer></div>',
+    },
     PricingFormula: {
         props: ['taxRate'],
         template: '<div data-testid="pricing-formula" :data-tax="taxRate" />',
@@ -216,12 +215,14 @@ describe('ProductVariantFormModal ITBM', () => {
         });
         await flushPromises();
 
-        expect(wrapper.find('.animate-spin').exists()).toBe(true);
+        expect(wrapper.find('[data-slot="loading-state"]').exists()).toBe(true);
         expect(wrapper.find('form').exists()).toBe(false);
 
         resolveBrands({ data: { data: [] } });
         await flushPromises();
         expect(wrapper.find('form').exists()).toBe(true);
-        expect(wrapper.find('.animate-spin').exists()).toBe(false);
+        expect(wrapper.find('[data-slot="loading-state"]').exists()).toBe(
+            false,
+        );
     });
 });

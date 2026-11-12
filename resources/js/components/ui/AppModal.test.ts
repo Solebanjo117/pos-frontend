@@ -112,4 +112,21 @@ describe('AppModal', () => {
         expect(dialog().className).toContain('outline-none');
         wrapper.unmount();
     });
+
+    it('does not highlight the close button when it opens with nothing to type in (e.g. while loading)', async () => {
+        const wrapper = mount(AppModal, {
+            attachTo: document.body,
+            props: { open: false, title: 'Editar Variante' },
+            slots: { default: '<div role="status">Cargando...</div>' },
+        });
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(document.activeElement).not.toBe(
+            dialog().querySelector('[aria-label="Cerrar"]'),
+        );
+        expect(document.activeElement).toBe(dialog());
+        wrapper.unmount();
+    });
 });

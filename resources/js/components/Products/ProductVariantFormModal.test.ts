@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import { chooseAppSelectOption } from '@/lib/testing/appSelect';
+import apiClient from '@/services/api/client';
 import ProductVariantFormModal from './ProductVariantFormModal.vue';
 
 const updateVariant = vi.fn();
@@ -200,5 +201,27 @@ describe('ProductVariantFormModal ITBM', () => {
                         (input.element as HTMLInputElement).value === '10',
                 ),
         ).toBe(true);
+    });
+
+    it('shows the loading indicator, not an empty form, while brands are still loading', async () => {
+        fetchVariants.mockResolvedValue([variantWithRates(7, 7)]);
+        let resolveBrands: (value: unknown) => void = () => {};
+        vi.mocked(apiClient.get).mockReturnValueOnce(
+            new Promise((resolve) => (resolveBrands = resolve)) as any,
+        );
+
+        const wrapper = mount(ProductVariantFormModal, {
+            props: { open: true, productId: 10, variantId: 20 },
+            global: { stubs },
+        });
+        await flushPromises();
+
+        expect(wrapper.find('.animate-spin').exists()).toBe(true);
+        expect(wrapper.find('form').exists()).toBe(false);
+
+        resolveBrands({ data: { data: [] } });
+        await flushPromises();
+        expect(wrapper.find('form').exists()).toBe(true);
+        expect(wrapper.find('.animate-spin').exists()).toBe(false);
     });
 });

@@ -390,8 +390,17 @@ watch(
     () => props.open,
     async (isOpen) => {
         if (isOpen) {
-            if (brands.value.length === 0) await fetchBrands();
-            await fetchSettings();
+            // El indicador de carga cubre todo: marcas, configuración y la variante (en paralelo).
+            // Antes, la primera vez se veía el formulario vacío mientras llegaban las marcas.
+            loadingVariant.value = Boolean(props.variantId);
+            try {
+                await Promise.all([
+                    brands.value.length === 0 ? fetchBrands() : undefined,
+                    fetchSettings(),
+                ]);
+            } catch (e) {
+                console.error('Error loading brands or settings', e);
+            }
             await loadAndPopulate();
         }
     },

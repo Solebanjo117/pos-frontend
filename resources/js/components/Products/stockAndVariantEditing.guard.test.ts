@@ -30,4 +30,11 @@ describe('Products: variant editing and stock adjustments', () => {
             expect(file, path).toContain('<StockAdjustModal');
         }
     });
+
+    it('shows "Guardando..." on the product page only while saving, not while loading data', () => {
+        const edit = source('pages/Products/Edit.vue');
+
+        expect(edit).not.toMatch(/loading\s*\?\s*'Guardando/);
+        expect(edit).toMatch(/saving\s*\?\s*'Guardando/);
+    });
 });

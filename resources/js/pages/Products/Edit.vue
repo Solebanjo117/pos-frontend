@@ -594,6 +594,9 @@ const metadataPayload = (): UpdateProductRequest => {
 const vehicleCompatibilityPayload = () =>
     buildVehicleCompatibilityPayload(draftCompatibility.value);
 
+// Solo mientras se guarda: `loading` también se enciende al leer el producto o sus datos.
+const saving = ref(false);
+
 const handleSubmit = async () => {
     validationErrors.value = {};
     successMessage.value = '';
@@ -604,6 +607,8 @@ const handleSubmit = async () => {
         return;
     }
 
+    if (saving.value) return;
+    saving.value = true;
     try {
         await updateProduct(props.productId, metadataPayload());
         await fetchProduct(props.productId);
@@ -614,6 +619,8 @@ const handleSubmit = async () => {
         if (err.response?.data?.errors) {
             validationErrors.value = err.response.data.errors;
         }
+    } finally {
+        saving.value = false;
     }
 };
 
@@ -818,10 +825,10 @@ const validationErrorItems = computed(() =>
                     <button
                         type="button"
                         @click="handleSubmit"
-                        :disabled="loading"
+                        :disabled="saving || initialLoading"
                         class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
-                        {{ loading ? 'Guardando...' : 'Guardar Cambios' }}
+                        {{ saving ? 'Guardando...' : 'Guardar Cambios' }}
                     </button>
                 </div>
             </div>
@@ -1236,11 +1243,11 @@ const validationErrorItems = computed(() =>
                                 <button
                                     type="button"
                                     @click="handleSubmit"
-                                    :disabled="loading"
+                                    :disabled="saving || initialLoading"
                                     class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                 >
                                     {{
-                                        loading
+                                        saving
                                             ? 'Guardando...'
                                             : 'Guardar cambios'
                                     }}

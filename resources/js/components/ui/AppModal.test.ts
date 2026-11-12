@@ -92,5 +92,24 @@ describe('AppModal', () => {
         expect(close?.className).not.toContain(' focus:ring-2');
         wrapper.unmount();
     });
-});
 
+    it('skips read-only fields and never outlines the whole dialog', async () => {
+        const wrapper = mount(AppModal, {
+            attachTo: document.body,
+            props: { open: false, title: 'Editar variante' },
+            slots: {
+                default:
+                    '<form><input data-test="stock" readonly /><input data-test="sku" /></form>',
+            },
+        });
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(document.activeElement).toBe(
+            dialog().querySelector('[data-test="sku"]'),
+        );
+        expect(dialog().className).toContain('outline-none');
+        wrapper.unmount();
+    });
+});

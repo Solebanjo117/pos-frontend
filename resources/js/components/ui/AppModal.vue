@@ -50,8 +50,9 @@ const sizeClass = computed(
 // Al abrir, reka-ui enfoca el primer elemento enfocable: la X del encabezado, que se veía
 // "en hover". Se enfoca el primer campo del contenido; si no hay, el propio cuadro.
 const bodyRef = ref<HTMLElement | null>(null);
+// Solo campos que se pueden editar: un campo de solo lectura no sirve como punto de partida.
 const FIRST_FIELD =
-    'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])';
+    'input:not([type="hidden"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]):not([readonly])';
 const onOpenAutoFocus = (event: Event) => {
     event.preventDefault();
     const field = bodyRef.value?.querySelector<HTMLElement>(FIRST_FIELD);
@@ -73,7 +74,8 @@ const onOpenChange = (value: boolean) => {
             :show-close-button="false"
             @open-auto-focus="onOpenAutoFocus"
             :class="[
-                'flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-0 p-0',
+                // outline-none: si el foco cae en el propio cuadro (no hay campos), el navegador no le dibuja su borde.
+                'flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-0 p-0 outline-none',
                 sizeClass,
             ]"
         >

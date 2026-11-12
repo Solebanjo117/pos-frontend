@@ -180,4 +180,25 @@ describe('ProductVariantFormModal ITBM', () => {
         expect(adjust.attributes('data-wh')).toBe('3');
         expect(adjust.attributes('data-variant')).toBe('20');
     });
+
+    it('loads the brand when it is created already open (as from the products list)', async () => {
+        fetchVariants.mockResolvedValue([variantWithRates(7, 7)]);
+        const wrapper = mount(ProductVariantFormModal, {
+            props: { open: true, productId: 10, variantId: 20 },
+            global: { stubs },
+        });
+        await flushPromises();
+
+        expect(fetchVariants).toHaveBeenCalledWith(10);
+        // Con la marca cargada se ve su existencia y el costo base guardado.
+        expect(wrapper.find('[data-test="variant-stock"]').exists()).toBe(true);
+        expect(
+            wrapper
+                .findAll('input')
+                .some(
+                    (input) =>
+                        (input.element as HTMLInputElement).value === '10',
+                ),
+        ).toBe(true);
+    });
 });

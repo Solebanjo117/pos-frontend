@@ -395,6 +395,8 @@ watch(
             await loadAndPopulate();
         }
     },
+    // immediate: desde Productos la ventana se crea ya abierta; sin esto no cargaba la marca.
+    { immediate: true },
 );
 
 const handleSubmit = async () => {

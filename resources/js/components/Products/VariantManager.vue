@@ -22,6 +22,7 @@ import {
 } from '@/utils/brandTier';
 import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
 import type { ItbmChoice } from '@/utils/itbm';
+import { codesForEditing } from '@/utils/productCodes';
 
 type HeaderLotSyncState = {
     revision: number;
@@ -740,17 +741,7 @@ const openEditModal = (variant: any) => {
         brand_id: variant.brand_id,
         sku: variant.sku,
         upc: variant.upc || '',
-        codes:
-            variant.codes?.map((code: ProductCode) => ({ ...code })) ??
-            (variant.sku
-                ? [
-                      {
-                          code: variant.sku,
-                          type: 'sku' as const,
-                          is_primary: true,
-                      },
-                  ]
-                : []),
+        codes: codesForEditing(variant.codes, variant.sku, variant.upc),
         status: variant.status,
         pricing_formula: p?.pricing_formula || '',
         pricing: {

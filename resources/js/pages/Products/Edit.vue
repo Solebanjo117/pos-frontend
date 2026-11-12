@@ -23,6 +23,7 @@ import { productsApi } from '@/services/api/products';
 import { type BreadcrumbItem } from '@/types';
 import type { Category } from '@/types/category';
 import type { UpdateProductRequest } from '@/types/product';
+import { codesForEditing } from '@/utils/productCodes';
 import {
     normalizeAlternativesPayload,
     normalizeOemReferencesPayload,
@@ -472,17 +473,12 @@ const initializeProductDraft = async () => {
 
     form.value = {
         sku_base: currentProduct.value.sku_base || '',
-        codes:
-            currentProduct.value.codes?.map((code) => ({ ...code })) ??
-            (currentProduct.value.sku_base
-                ? [
-                      {
-                          code: currentProduct.value.sku_base,
-                          type: 'sku' as const,
-                          is_primary: true,
-                      },
-                  ]
-                : []),
+        // Sin códigos guardados se muestran (y conservan al guardar) el SKU base y el UPC.
+        codes: codesForEditing(
+            currentProduct.value.codes,
+            currentProduct.value.sku_base,
+            currentProduct.value.default_variant?.upc,
+        ),
         upc: currentProduct.value.default_variant?.upc || '',
         alternate_code: (currentProduct.value as any).alternate_code || '',
         category_id: categoryId ?? undefined,

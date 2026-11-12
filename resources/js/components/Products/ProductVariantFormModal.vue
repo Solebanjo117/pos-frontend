@@ -3,6 +3,7 @@ import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, watch } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
+import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
@@ -36,6 +38,7 @@ const props = defineProps<{
 const emit = defineEmits<{
     'update:open': [value: boolean];
     saved: [variant: any];
+    'stock-adjusted': [];
 }>();
 
 const { updateVariant, fetchVariants, loading, error } = useProducts();
@@ -307,6 +310,34 @@ const handleOpenChange = (isOpen: boolean) => {
     }
 };
 
+// Existencia de la marca en el almacén actual: se cambia solo con un ajuste (movimiento con motivo).
+const { currentWarehouseId } = usePosSettings();
+const showStockAdjust = ref(false);
+const currentStock = computed<number>(() => {
+    const inventory = editingVariant.value?.inventory ?? [];
+    const row = inventory.find(
+        (item: any) =>
+            (item.warehouse?.id ?? item.warehouse_id) ===
+            currentWarehouseId.value,
+    );
+    return Number(row?.quantity_available ?? 0);
+});
+const stockAdjustLabel = computed(() => {
+    const brand = brands.value.find((b) => b.id === form.value.brand_id);
+    return [props.productName, brand?.name].filter(Boolean).join(' · ');
+});
+const onStockAdjusted = async () => {
+    const variants = await fetchVariants(props.productId);
+    const fresh = variants.find((v: any) => v.id === props.variantId);
+    if (fresh && editingVariant.value) {
+        editingVariant.value = {
+            ...editingVariant.value,
+            inventory: fresh.inventory,
+        };
+    }
+    emit('stock-adjusted');
+};
+
 const loadAndPopulate = async () => {
     if (!props.variantId) return;
     loadingVariant.value = true;
@@ -519,6 +550,28 @@ const handleSubmit = async () => {
                                 },
                             ]"
                         />
+                    </div>
+
+                    <div v-if="editingVariant">
+                        <span
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >Stock actual</span
+                        >
+                        <div class="mt-1 flex h-9 items-center gap-3">
+                            <span
+                                data-test="variant-stock"
+                                class="text-base font-semibold tabular-nums"
+                                >{{ currentStock }}</span
+                            >
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                data-test="adjust-stock"
+                                @click="showStockAdjust = true"
+                                >Ajustar</Button
+                            >
+                        </div>
                     </div>
                 </div>
 
@@ -781,4 +834,15 @@ const handleSubmit = async () => {
             </div>
         </DialogContent>
     </Dialog>
+
+    <StockAdjustModal
+        v-if="editingVariant"
+        v-model:open="showStockAdjust"
+        :product-id="productId"
+        :variant-id="editingVariant.id"
+        :warehouse-id="currentWarehouseId"
+        :current-quantity="currentStock"
+        :label="stockAdjustLabel"
+        @saved="onStockAdjusted"
+    />
 </template>

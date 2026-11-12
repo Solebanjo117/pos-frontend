@@ -28,6 +28,10 @@ vi.mock('@/composables/useStoreSettings', () => ({
     }),
 }));
 
+vi.mock('@/composables/usePosSettings', () => ({
+    usePosSettings: () => ({ currentWarehouseId: ref(3) }),
+}));
+
 vi.mock('@/services/api/client', () => ({
     default: {
         get: vi.fn().mockResolvedValue({ data: { data: [] } }),
@@ -45,6 +49,11 @@ const stubs = {
     PricingFormula: {
         props: ['taxRate'],
         template: '<div data-testid="pricing-formula" :data-tax="taxRate" />',
+    },
+    StockAdjustModal: {
+        props: ['open', 'currentQuantity', 'warehouseId', 'variantId'],
+        template:
+            '<div data-testid="stock-adjust" :data-open="open" :data-qty="currentQuantity" :data-wh="warehouseId" :data-variant="variantId" />',
     },
     ProductCodesEditor: {
         template: '<div />',
@@ -144,5 +153,31 @@ describe('ProductVariantFormModal ITBM', () => {
             sale_tax_rate: 0,
             tax_rate: 0,
         });
+    });
+
+    it('shows the brand stock in the current warehouse and adjusts it only through the adjust window', async () => {
+        fetchVariants.mockResolvedValue([
+            {
+                ...variantWithRates(7, 7),
+                inventory: [
+                    { warehouse: { id: 2 }, quantity_available: 9 },
+                    { warehouse: { id: 3 }, quantity_available: 4 },
+                ],
+            },
+        ]);
+        const wrapper = await mountModal();
+
+        expect(wrapper.get('[data-test="variant-stock"]').text()).toBe('4');
+        expect(wrapper.find('input[type="number"][readonly]').exists()).toBe(
+            false,
+        );
+
+        const adjust = wrapper.get('[data-testid="stock-adjust"]');
+        expect(adjust.attributes('data-open')).toBe('false');
+        await wrapper.get('[data-test="adjust-stock"]').trigger('click');
+        expect(adjust.attributes('data-open')).toBe('true');
+        expect(adjust.attributes('data-qty')).toBe('4');
+        expect(adjust.attributes('data-wh')).toBe('3');
+        expect(adjust.attributes('data-variant')).toBe('20');
     });
 });

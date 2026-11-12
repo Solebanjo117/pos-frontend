@@ -3,6 +3,7 @@ import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, nextTick, onMounted, watch, useId } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
+import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import AppModal from '@/components/ui/AppModal.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
@@ -296,45 +297,31 @@ const currentWarehouseName = computed(() => {
     return wh?.name || `#${currentWarehouseId.value}`;
 });
 
-const updatingStockVariantId = ref<number | null>(null);
+// Ajuste de existencia: siempre con motivo (queda como movimiento de inventario), nunca escribiendo el número.
+const stockAdjustVariant = ref<any>(null);
+const showStockAdjust = ref(false);
 
-const updateVariantStock = async (variant: any, newStock: number) => {
-    if (isDraftMode.value || !props.productId || !currentWarehouseId.value)
-        return;
-    updatingStockVariantId.value = variant.id;
-    try {
-        await apiClient.put(
-            `/inventory/products/${props.productId}/warehouses/${currentWarehouseId.value}`,
-            {
-                variant_id: variant.id,
-                stock_available: newStock,
-            },
-        );
-        // Refresh variants to get updated data
-        await loadVariants();
-    } catch (e) {
-        console.error('Error updating variant stock:', e);
-        alert('Error al actualizar el stock. Intenta de nuevo.');
-    } finally {
-        updatingStockVariantId.value = null;
-    }
+const openStockAdjust = (variant: any) => {
+    stockAdjustVariant.value = variant;
+    showStockAdjust.value = true;
 };
 
-const onStockBlur = (variant: any, event: Event) => {
-    const input = event.target as HTMLInputElement;
-    const newStock = parseInt(input.value, 10);
-    if (isNaN(newStock) || newStock < 0) {
-        input.value = String(
-            getVariantStockForWarehouse(variant, currentWarehouseId.value),
-        );
-        return;
-    }
-    const currentStock = getVariantStockForWarehouse(
-        variant,
-        currentWarehouseId.value,
-    );
-    if (newStock !== currentStock) {
-        updateVariantStock(variant, newStock);
+const stockAdjustLabel = computed(() => {
+    const variant = stockAdjustVariant.value;
+    if (!variant) return '';
+    const brand = variant.brand?.name ?? 'Sin marca';
+    return `${props.productName || 'Producto'} · ${brand}${currentWarehouseName.value ? ` · ${currentWarehouseName.value}` : ''}`;
+});
+
+const onStockAdjusted = async () => {
+    const data = await loadVariants();
+    if (editingVariant.value && Array.isArray(data)) {
+        const fresh = data.find((v: any) => v.id === editingVariant.value.id);
+        if (fresh)
+            editingVariant.value = {
+                ...editingVariant.value,
+                inventory: fresh.inventory,
+            };
     }
 };
 
@@ -1306,28 +1293,25 @@ const formId = useId();
                                 {{ getVariantTotalStock(variant) }}
                             </template>
                             <template v-else>
-                                <div class="flex items-center gap-1">
-                                    <input
-                                        type="number"
-                                        :value="
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        data-test="variant-stock"
+                                        class="min-w-8 text-right font-medium tabular-nums"
+                                        >{{
                                             getVariantStockForWarehouse(
                                                 variant,
                                                 currentWarehouseId,
                                             )
-                                        "
-                                        min="0"
-                                        class="w-20 rounded-md border border-gray-300 px-2 py-1 text-right text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                                        :class="{
-                                            'cursor-wait opacity-50':
-                                                updatingStockVariantId ===
-                                                variant.id,
-                                        }"
-                                        :disabled="
-                                            updatingStockVariantId ===
-                                            variant.id
-                                        "
-                                        @blur="onStockBlur(variant, $event)"
-                                    />
+                                        }}</span
+                                    >
+                                    <button
+                                        type="button"
+                                        data-test="adjust-stock"
+                                        class="text-xs font-medium text-primary hover:underline"
+                                        @click="openStockAdjust(variant)"
+                                    >
+                                        Ajustar
+                                    </button>
                                     <span
                                         v-if="variant.inventory?.length > 1"
                                         class="text-[10px] text-gray-400"
@@ -1463,21 +1447,30 @@ const formId = useId();
                         </div>
 
                         <div v-if="editingVariant" class="md:col-span-3">
-                            <label
+                            <span
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >Stock actual</label
+                                >Stock actual</span
                             >
-                            <input
-                                :value="
-                                    getVariantStockForWarehouse(
-                                        editingVariant,
-                                        currentWarehouseId,
-                                    )
-                                "
-                                type="number"
-                                readonly
-                                class="h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 bg-transparent px-3 py-1 text-right text-base text-muted-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 dark:bg-muted/30"
-                            />
+                            <div class="flex h-9 items-center gap-3">
+                                <span
+                                    data-test="modal-variant-stock"
+                                    class="text-base font-semibold tabular-nums"
+                                    >{{
+                                        getVariantStockForWarehouse(
+                                            editingVariant,
+                                            currentWarehouseId,
+                                        )
+                                    }}</span
+                                >
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    data-test="modal-adjust-stock"
+                                    @click="openStockAdjust(editingVariant)"
+                                    >Ajustar</Button
+                                >
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -1811,5 +1804,21 @@ const formId = useId();
                 </Button>
             </template>
         </AppModal>
+
+        <StockAdjustModal
+            v-if="stockAdjustVariant && productId"
+            v-model:open="showStockAdjust"
+            :product-id="productId"
+            :variant-id="stockAdjustVariant.id"
+            :warehouse-id="currentWarehouseId"
+            :current-quantity="
+                getVariantStockForWarehouse(
+                    stockAdjustVariant,
+                    currentWarehouseId,
+                )
+            "
+            :label="stockAdjustLabel"
+            @saved="onStockAdjusted"
+        />
     </div>
 </template>

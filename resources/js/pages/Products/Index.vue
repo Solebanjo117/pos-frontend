@@ -7,6 +7,7 @@ import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import ProductFiltersComponent from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
+import ProductVariantFormModal from '@/components/Products/ProductVariantFormModal.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -407,6 +408,32 @@ const handleRestore = async (product: Product) => {
 };
 
 const expandedRows = ref<Set<number>>(new Set());
+// Editar una marca (variante) desde la lista, sin salir de Productos.
+const variantEditTarget = ref<{
+    productId: number;
+    variantId: number;
+    productName: string;
+    categoryId: number | null;
+} | null>(null);
+const showVariantEditModal = ref(false);
+const openVariantEdit = (product: any, variant: any) => {
+    variantEditTarget.value = {
+        productId: product.id,
+        variantId: variant.id,
+        productName: product.name,
+        categoryId: product.category_id ?? product.category?.id ?? null,
+    };
+    showVariantEditModal.value = true;
+};
+const variantEditCategory = computed<any>(() =>
+    variantEditTarget.value?.categoryId
+        ? ((categories.value as any[]).find(
+              (category) => category.id === variantEditTarget.value?.categoryId,
+          ) ?? null)
+        : null,
+);
+const refreshAfterVariantChange = () => fetchProducts(buildFetchFilters());
+
 const selectedProduct = ref<Product | null>(null);
 
 const openDetail = (product: Product) => {
@@ -1771,15 +1798,22 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                                 class="h-3.5 w-3.5"
                                                                             />
                                                                         </button>
-                                                                        <a
+                                                                        <button
                                                                             v-if="
                                                                                 canManageProducts
                                                                             "
-                                                                            :href="`/inventory/products/${product.id}/edit?variant=${variant.id}`"
+                                                                            type="button"
+                                                                            data-test="edit-variant"
                                                                             class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
+                                                                            @click="
+                                                                                openVariantEdit(
+                                                                                    product,
+                                                                                    variant,
+                                                                                )
+                                                                            "
                                                                         >
                                                                             Editar
-                                                                        </a>
+                                                                        </button>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
@@ -1873,6 +1907,23 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 :product="selectedProduct"
                 @close="closeDetail"
                 @view-alternative="(p: any) => (selectedProduct = p)"
+            />
+
+            <ProductVariantFormModal
+                v-if="variantEditTarget"
+                v-model:open="showVariantEditModal"
+                :product-id="variantEditTarget.productId"
+                :variant-id="variantEditTarget.variantId"
+                :product-name="variantEditTarget.productName"
+                :category-formula="variantEditCategory?.pricing_formula ?? null"
+                :category-margin="
+                    variantEditCategory?.default_margin_percent ?? null
+                "
+                :category-itbm-percent="
+                    variantEditCategory?.itbm_percent ?? null
+                "
+                @saved="refreshAfterVariantChange"
+                @stock-adjusted="refreshAfterVariantChange"
             />
         </div>
     </AppLayout>

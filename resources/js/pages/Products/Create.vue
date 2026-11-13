@@ -578,28 +578,6 @@ watch(
     },
 );
 
-// === OEM refs (draft) ===
-type PendingOemReference = { oem_code: string; manufacturer: string | null };
-const addedRefs = ref<PendingOemReference[]>([]);
-const refInput = ref('');
-const refManufacturerInput = ref<string | null>(null);
-
-const addRef = () => {
-    const code = refInput.value.trim();
-    const manufacturer = (refManufacturerInput.value || '').trim() || null;
-    if (!code) return;
-    const exists = addedRefs.value.some(
-        (ref) =>
-            ref.oem_code.toLowerCase() === code.toLowerCase() &&
-            (ref.manufacturer ?? '') === (manufacturer ?? ''),
-    );
-    if (exists) return;
-    addedRefs.value.push({ oem_code: code, manufacturer });
-    refInput.value = '';
-    refManufacturerInput.value = null;
-};
-const removeRef = (idx: number) => addedRefs.value.splice(idx, 1);
-
 // === Upsales (draft) ===
 type UpsaleRelationship = 'compatible' | 'substitute' | 'upgrade';
 type PendingUpsale = {
@@ -733,9 +711,6 @@ const selectedExtraCategories = computed(() => {
         )
         .filter(Boolean) as Category[];
 });
-const oemBrandOptions = computed(() =>
-    brands.value.map((b) => ({ value: b.name, label: b.name })),
-);
 
 onMounted(async () => {
     await fetchStoreSettings();
@@ -840,32 +815,6 @@ const handleSubmit = async () => {
         };
         const result = await createProduct(payload);
         const productId = (result as any)?.data?.id ?? (result as any)?.id;
-
-        if (productId && addedRefs.value.length > 0) {
-            const failedReferences: string[] = [];
-            for (const ref of addedRefs.value) {
-                try {
-                    await apiClient.post(
-                        `/products/${productId}/oem-references`,
-                        {
-                            oem_code: ref.oem_code,
-                            manufacturer: ref.manufacturer,
-                        },
-                    );
-                } catch (refError: any) {
-                    console.error(
-                        'Error creating OEM reference:',
-                        refError.response?.data || refError,
-                    );
-                    failedReferences.push(ref.oem_code);
-                }
-            }
-            if (failedReferences.length > 0) {
-                toast.error(
-                    `Producto creado, pero fallaron códigos alternos: ${failedReferences.join(', ')}`,
-                );
-            }
-        }
 
         if (productId && pendingVariants.value.length > 0) {
             const failedVariants: string[] = [];
@@ -1289,116 +1238,6 @@ const readinessItems = computed(() => [
                                     ]"
                                 />
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- SECTION 3: Codigos alternos -->
-                    <div
-                        class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-border dark:bg-card"
-                    >
-                        <h2
-                            class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                        >
-                            Códigos alternos
-                        </h2>
-                        <div class="grid items-end gap-3 sm:grid-cols-12">
-                            <div class="sm:col-span-5">
-                                <label
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                    >Código
-                                    <span class="text-red-500">*</span></label
-                                >
-                                <input
-                                    v-model="refInput"
-                                    type="text"
-                                    @keydown.enter.prevent="addRef"
-                                    class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
-                                    placeholder="Ej: 123-456-ABC"
-                                />
-                            </div>
-                            <div class="sm:col-span-4">
-                                <label
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                    >Marca</label
-                                >
-                                <SearchableSelect
-                                    :options="oemBrandOptions"
-                                    :model-value="refManufacturerInput"
-                                    @update:model-value="
-                                        (value) =>
-                                            (refManufacturerInput = value as
-                                                | string
-                                                | null)
-                                    "
-                                    :loading="loadingBrands"
-                                    placeholder="Sin marca"
-                                    search-placeholder="Buscar marca..."
-                                    :clearable="true"
-                                />
-                            </div>
-                            <div class="sm:col-span-3">
-                                <button
-                                    type="button"
-                                    @click="addRef"
-                                    :disabled="!refInput.trim()"
-                                    class="h-9 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
-                                >
-                                    Agregar
-                                </button>
-                            </div>
-                        </div>
-
-                        <div
-                            class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
-                        >
-                            <EmptyState v-if="addedRefs.length === 0"
-                                >No hay códigos alternos agregados.</EmptyState
-                            >
-                            <table v-else class="w-full text-left text-sm">
-                                <thead class="bg-gray-50 dark:bg-card">
-                                    <tr>
-                                        <th
-                                            class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                                        >
-                                            Código
-                                        </th>
-                                        <th
-                                            class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                                        >
-                                            Marca
-                                        </th>
-                                        <th class="w-12 px-4 py-2"></th>
-                                    </tr>
-                                </thead>
-                                <tbody
-                                    class="divide-y divide-gray-100 dark:divide-border/50"
-                                >
-                                    <tr
-                                        v-for="(ref, idx) in addedRefs"
-                                        :key="`${ref.oem_code}-${ref.manufacturer || ''}-${idx}`"
-                                    >
-                                        <td
-                                            class="px-4 py-2 font-mono text-gray-900 dark:text-white"
-                                        >
-                                            {{ ref.oem_code }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-gray-700 dark:text-gray-300"
-                                        >
-                                            {{ ref.manufacturer || '-' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-right">
-                                            <button
-                                                type="button"
-                                                @click="removeRef(idx)"
-                                                class="text-xs font-semibold text-red-500 hover:text-red-700"
-                                            >
-                                                Eliminar
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
                         </div>
                     </div>
 

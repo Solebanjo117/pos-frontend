@@ -4,7 +4,6 @@ import { Archive, Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next';
 import { ref, onMounted, watch, computed } from 'vue';
 import AlternativeManager from '@/components/Products/AlternativeManager.vue';
 import AttributeManager from '@/components/Products/AttributeManager.vue';
-import OemReferenceManager from '@/components/Products/OemReferenceManager.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
@@ -26,7 +25,6 @@ import type { UpdateProductRequest } from '@/types/product';
 import { codesForEditing } from '@/utils/productCodes';
 import {
     normalizeAlternativesPayload,
-    normalizeOemReferencesPayload,
     normalizeProductAttributesPayload,
 } from '@/utils/productPayload';
 import {
@@ -41,12 +39,6 @@ const props = defineProps<{
 }>();
 
 const { resolveTaxRate } = useStoreSettings();
-
-interface DraftOemReference {
-    id: number;
-    oem_code: string;
-    manufacturer: string | null;
-}
 
 interface DraftAlternative {
     id: number;
@@ -111,7 +103,6 @@ const attributeManagerRef = ref<InstanceType<typeof AttributeManager> | null>(
 const metadataInitialized = ref(false);
 const draftIdCounter = ref(-1000);
 const draftAttributes = ref<EditableProductAttribute[]>([]);
-const draftOemReferences = ref<DraftOemReference[]>([]);
 const draftAlternatives = ref<DraftAlternative[]>([]);
 const draftCompatibility = ref<DraftCompatData>(emptyCompatDraft());
 
@@ -220,16 +211,6 @@ const normalizeDraftAttributes = (
             unit: attribute.unit ?? null,
         };
     });
-};
-
-const normalizeDraftOemReferences = (
-    references: any[] = [],
-): DraftOemReference[] => {
-    return references.map((reference) => ({
-        id: Number(reference.id ?? nextDraftId()),
-        oem_code: String(reference.oem_code ?? ''),
-        manufacturer: reference.manufacturer ?? null,
-    }));
 };
 
 const normalizeDraftAlternatives = (
@@ -493,9 +474,6 @@ const initializeProductDraft = async () => {
     draftAttributes.value = normalizeDraftAttributes(
         currentProduct.value.attributes ?? [],
     );
-    draftOemReferences.value = normalizeDraftOemReferences(
-        currentProduct.value.oem_references ?? [],
-    );
     draftAlternatives.value = normalizeDraftAlternatives(
         currentProduct.value.alternatives ?? [],
     );
@@ -585,7 +563,6 @@ const metadataPayload = (): UpdateProductRequest => {
         ...categoryPayload(),
         is_universal: draftCompatibility.value.isUniversal,
         attributes: normalizeProductAttributesPayload(draftAttributes.value),
-        oem_references: normalizeOemReferencesPayload(draftOemReferences.value),
         alternatives: normalizeAlternativesPayload(draftAlternatives.value),
         vehicle_compatibility: vehicleCompatibilityPayload(),
     };
@@ -1091,13 +1068,6 @@ const validationErrorItems = computed(() =>
                                 </div>
                             </div>
                         </form>
-
-                        <!-- SECTION 3: Códigos Alternos -->
-                        <OemReferenceManager
-                            v-model="draftOemReferences"
-                            mode="draft"
-                            :product-id="props.productId"
-                        />
 
                         <!-- SECTION 4: Compatibilidad Vehicular -->
                         <VehicleCompatSection

@@ -121,11 +121,9 @@ describe('ProductVariantFormModal ITBM', () => {
         await flushPromises();
 
         expect(updateVariant).toHaveBeenCalledTimes(1);
-        // La variante no tiene códigos guardados (codes: []): se conserva su SKU al guardar.
-        expect(updateVariant.mock.calls[0][2]).toMatchObject({
-            sku: 'FIL-20',
-            codes: [{ code: 'FIL-20', type: 'sku', is_primary: true }],
-        });
+        // La ventana de la marca no envía códigos ni SKU: el backend conserva los de la marca.
+        expect(updateVariant.mock.calls[0][2]).not.toHaveProperty('codes');
+        expect(updateVariant.mock.calls[0][2]).not.toHaveProperty('sku');
         expect(updateVariant.mock.calls[0][2].pricing).toMatchObject({
             cost_tax_rate: 7,
             sale_tax_rate: 0,

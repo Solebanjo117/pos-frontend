@@ -40,15 +40,9 @@ describe('Products: no alternate_code column', () => {
 });
 
 describe('Products: code section names', () => {
-    it('calls the product codes "Números de parte" and the brand ones "Código de la marca"', () => {
+    it('calls the product codes "Números de parte"', () => {
         for (const file of ['Create.vue', 'Edit.vue']) {
             expect(source(file), file).toContain('Números de parte');
-        }
-        for (const file of [
-            '../../components/Products/VariantManager.vue',
-            '../../components/Products/ProductVariantFormModal.vue',
-        ]) {
-            expect(source(file), file).toContain('Código de la marca');
         }
         for (const file of [
             'Create.vue',
@@ -57,6 +51,27 @@ describe('Products: code section names', () => {
             '../../components/Products/ProductVariantFormModal.vue',
         ]) {
             expect(source(file), file).not.toContain('Códigos comerciales');
+        }
+    });
+});
+
+/*
+ * Decisión de Luis (2026-11-13): en la ventana de una marca solo se editan la marca, los precios
+ * y poco más. Los códigos son del producto; la marca usa su número de parte.
+ */
+describe('Products: brand windows do not edit codes', () => {
+    it('has no code editor and sends no codes or SKU when saving a brand', () => {
+        for (const file of [
+            '../../components/Products/VariantManager.vue',
+            '../../components/Products/ProductVariantFormModal.vue',
+        ]) {
+            const component = source(file);
+            expect(component, file).not.toContain('<ProductCodesEditor');
+            expect(component, file).not.toContain('Código de la marca');
+            expect(component, file).not.toContain('codes: form.value.codes');
+            expect(component, file).not.toMatch(
+                /sku:\s*form\.value\.codes\.find/,
+            );
         }
     });
 });

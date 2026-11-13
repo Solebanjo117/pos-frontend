@@ -2,7 +2,6 @@
 import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, nextTick, onMounted, watch, useId } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
-import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
 import AppModal from '@/components/ui/AppModal.vue';
@@ -15,7 +14,6 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
-import type { ProductCode } from '@/types/product';
 import {
     brandOptionLabel,
     brandTierLabel,
@@ -23,7 +21,6 @@ import {
 } from '@/utils/brandTier';
 import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
 import type { ItbmChoice } from '@/utils/itbm';
-import { codesForEditing } from '@/utils/productCodes';
 
 type HeaderLotSyncState = {
     revision: number;
@@ -121,7 +118,6 @@ const form = ref({
     brand_id: 1,
     sku: '',
     upc: '',
-    codes: [] as ProductCode[],
     status: 'active',
     pricing_formula: '' as string,
     pricing: {
@@ -145,9 +141,6 @@ const form = ref({
         },
     ],
 });
-const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
-    null,
-);
 
 const toSafeNumber = (value: any, fallback = 0): number => {
     const parsed = Number(value);
@@ -159,7 +152,6 @@ const buildModalStateSnapshot = (): string => {
         form: {
             brand_id: form.value.brand_id ?? null,
             status: form.value.status ?? 'active',
-            codes: form.value.codes,
             pricing_formula: form.value.pricing_formula ?? '',
             pricing: {
                 base_price: toSafeNumber(form.value.pricing.base_price),
@@ -671,7 +663,6 @@ const openCreateModal = () => {
         brand_id: brands.value[0]?.id ?? 1,
         sku: '',
         upc: '',
-        codes: [],
         status: 'active',
         pricing_formula: props.categoryFormula || '',
         pricing: {
@@ -728,7 +719,6 @@ const openEditModal = (variant: any) => {
         brand_id: variant.brand_id,
         sku: variant.sku,
         upc: variant.upc || '',
-        codes: codesForEditing(variant.codes, variant.sku, variant.upc),
         status: variant.status,
         pricing_formula: p?.pricing_formula || '',
         pricing: {
@@ -860,8 +850,6 @@ watch(
 );
 
 const handleSubmit = async () => {
-    await productCodesRef.value?.validateAll();
-    if (productCodesRef.value?.hasConflicts()) return;
     processing.value = true;
     try {
         const normalizedSaleTaxRate = itbmRateFor(
@@ -914,11 +902,7 @@ const handleSubmit = async () => {
         const payload = {
             brand_id: form.value.brand_id,
             status: form.value.status,
-            codes: form.value.codes,
-            sku: form.value.codes.find((code) => code.is_primary)?.code ?? null,
-            upc:
-                form.value.codes.find((code) => code.type === 'upc')?.code ??
-                null,
+            // Sin códigos: la marca usa el número de parte del producto (solo marca y precios).
             pricing_formula: form.value.pricing_formula || null,
             pricing: pricingPayload,
             initial_inventory: form.value.initial_inventory,
@@ -1473,26 +1457,6 @@ const formId = useId();
                             </div>
                         </div>
                     </div>
-                </section>
-
-                <section
-                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
-                >
-                    <h4
-                        class="mb-1 text-sm font-semibold text-gray-900 dark:text-white"
-                    >
-                        Código de la marca
-                    </h4>
-                    <p class="mb-3 text-xs text-muted-foreground">
-                        Si la marca usa el número de parte del producto, déjalo
-                        así. Agrega solo los números propios de esta marca.
-                    </p>
-                    <ProductCodesEditor
-                        ref="productCodesRef"
-                        v-model="form.codes"
-                        :exclude-variant-id="editingVariant?.id"
-                        :disabled="processing"
-                    />
                 </section>
 
                 <section

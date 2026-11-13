@@ -2,7 +2,6 @@
 import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, watch } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
-import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
 import AppModal from '@/components/ui/AppModal.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
@@ -14,11 +13,9 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
-import type { ProductCode } from '@/types/product';
 import { brandOptionLabel } from '@/utils/brandTier';
 import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
 import type { ItbmChoice } from '@/utils/itbm';
-import { codesForEditing } from '@/utils/productCodes';
 
 const props = defineProps<{
     open: boolean;
@@ -53,9 +50,6 @@ const applyRounding = (price: number): number => {
 const processing = ref(false);
 const loadingVariant = ref(false);
 const editingVariant = ref<any>(null);
-const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
-    null,
-);
 
 const brands = ref<{ id: number; name: string; tier?: string }[]>([]);
 const loadingBrands = ref(false);
@@ -176,7 +170,6 @@ const form = ref({
     brand_id: 1,
     sku: '',
     upc: '',
-    codes: [] as ProductCode[],
     status: 'active',
     pricing_formula: '' as string,
     pricing: {
@@ -272,7 +265,6 @@ const buildSnapshot = (): string =>
     JSON.stringify({
         brand_id: form.value.brand_id ?? null,
         sku: form.value.sku ?? '',
-        codes: form.value.codes,
         pricing: {
             base_price: toSafeNumber(form.value.pricing.base_price),
             cost_base: toSafeNumber((form.value.pricing as any).cost_base),
@@ -352,7 +344,6 @@ const loadAndPopulate = async () => {
             brand_id: variant.brand_id,
             sku: variant.sku,
             upc: variant.upc || '',
-            codes: codesForEditing(variant.codes, variant.sku, variant.upc),
             status: variant.status,
             pricing_formula: p?.pricing_formula || '',
             pricing: {
@@ -405,8 +396,6 @@ watch(
 
 const handleSubmit = async () => {
     if (!editingVariant.value) return;
-    await productCodesRef.value?.validateAll();
-    if (productCodesRef.value?.hasConflicts()) return;
     processing.value = true;
     try {
         const normalizedSaleTaxRate = normalizeItbmRate(
@@ -441,14 +430,13 @@ const handleSubmit = async () => {
             pricing_formula: form.value.pricing_formula || null,
         };
 
-        const payload = {
+        // Sin códigos ni SKU: la marca usa el número de parte del producto (solo marca y precios).
+        const payload: Record<string, unknown> = {
             ...form.value,
             pricing: pricingPayload,
-            sku: form.value.codes.find((code) => code.is_primary)?.code ?? null,
-            upc:
-                form.value.codes.find((code) => code.type === 'upc')?.code ??
-                null,
         };
+        delete payload.sku;
+        delete payload.upc;
 
         const savedVariant = await updateVariant(
             props.productId,
@@ -574,24 +562,6 @@ const handleSubmit = async () => {
                         >
                     </div>
                 </div>
-            </div>
-
-            <div class="border-t border-gray-200 pt-4 dark:border-border">
-                <h4
-                    class="mb-1 text-sm font-semibold text-gray-900 dark:text-white"
-                >
-                    Código de la marca
-                </h4>
-                <p class="mb-3 text-xs text-muted-foreground">
-                    Si la marca usa el número de parte del producto, déjalo así.
-                    Agrega solo los números propios de esta marca.
-                </p>
-                <ProductCodesEditor
-                    ref="productCodesRef"
-                    v-model="form.codes"
-                    :exclude-variant-id="editingVariant?.id"
-                    :disabled="processing"
-                />
             </div>
 
             <!-- Pricing Section -->

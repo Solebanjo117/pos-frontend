@@ -89,9 +89,9 @@ const normalizeQuery = (value?: string) => (value ?? '').trim().toLowerCase();
 const searchMatchesProduct = (product: Product, query: string) => {
     const matchesName = product.name.toLowerCase().includes(query);
     const matchesSku = product.sku_base?.toLowerCase().includes(query);
-    const matchesAlternateCode = product.alternate_code
-        ?.toLowerCase()
-        .includes(query);
+    const matchesOtherCode = product.codes?.some((code) =>
+        code.code?.toLowerCase().includes(query),
+    );
     const matchesVariantSku = product.variants?.some((v) =>
         v.sku?.toLowerCase().includes(query),
     );
@@ -113,7 +113,7 @@ const searchMatchesProduct = (product: Product, query: string) => {
     return (
         matchesName ||
         matchesSku ||
-        matchesAlternateCode ||
+        matchesOtherCode ||
         matchesVariantSku ||
         matchesBrand ||
         matchesCategory ||

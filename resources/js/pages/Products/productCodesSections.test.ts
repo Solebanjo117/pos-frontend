@@ -25,3 +25,16 @@ describe('Products: one place for codes on create and edit', () => {
         expect(source('Edit.vue')).not.toContain('oem_references');
     });
 });
+
+describe('Products: no alternate_code column', () => {
+    it('reads extra codes from product codes, not from products.alternate_code', () => {
+        for (const file of [
+            'Create.vue',
+            'Edit.vue',
+            '../../types/product.ts',
+            '../../components/Products/ProductCatalogView.vue',
+        ]) {
+            expect(source(file), file).not.toContain('alternate_code');
+        }
+    });
+});

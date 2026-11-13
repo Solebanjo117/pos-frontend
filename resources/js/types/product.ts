@@ -192,7 +192,6 @@ export interface Product {
     id: number;
     system_id?: string;
     sku_base: string | null; // Compatibility alias for the primary commercial code
-    alternate_code?: string | null; // Alternate identifier
     primary_code?: string | null;
     codes?: ProductCode[];
     name: string;
@@ -449,7 +448,6 @@ export interface CreateProductRequest {
     engine_id?: number; // R21: motor as reusable entity
     status?: 'active' | 'discontinued';
     batch_tracking?: boolean;
-    alternate_code?: string; // alternate identifier
     pricing_formula?: string; // Excel-like pricing formula
     // Default variant fields
     brand_id?: number;
@@ -489,7 +487,6 @@ export interface CreateProductRequest {
 export interface UpdateProductRequest {
     sku_base?: string | null;
     upc?: string | null;
-    alternate_code?: string; // alternate identifier
     codes?: ProductCode[];
     pricing_formula?: string; // Excel-like pricing formula
     product_line_id?: number;

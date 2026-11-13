@@ -73,7 +73,6 @@ const form = ref<CreateProductRequest>({
     category_id: undefined,
     engine_id: undefined,
     status: 'active',
-    alternate_code: '',
     pricing_formula: '',
     brand_id: undefined,
     sku: '',

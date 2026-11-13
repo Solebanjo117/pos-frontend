@@ -38,3 +38,25 @@ describe('Products: no alternate_code column', () => {
         }
     });
 });
+
+describe('Products: code section names', () => {
+    it('calls the product codes "Números de parte" and the brand ones "Código de la marca"', () => {
+        for (const file of ['Create.vue', 'Edit.vue']) {
+            expect(source(file), file).toContain('Números de parte');
+        }
+        for (const file of [
+            '../../components/Products/VariantManager.vue',
+            '../../components/Products/ProductVariantFormModal.vue',
+        ]) {
+            expect(source(file), file).toContain('Código de la marca');
+        }
+        for (const file of [
+            'Create.vue',
+            'Edit.vue',
+            '../../components/Products/VariantManager.vue',
+            '../../components/Products/ProductVariantFormModal.vue',
+        ]) {
+            expect(source(file), file).not.toContain('Códigos comerciales');
+        }
+    });
+});

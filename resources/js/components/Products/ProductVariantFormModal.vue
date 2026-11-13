@@ -578,10 +578,14 @@ const handleSubmit = async () => {
 
             <div class="border-t border-gray-200 pt-4 dark:border-border">
                 <h4
-                    class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"
+                    class="mb-1 text-sm font-semibold text-gray-900 dark:text-white"
                 >
-                    Códigos comerciales
+                    Código de la marca
                 </h4>
+                <p class="mb-3 text-xs text-muted-foreground">
+                    Si la marca usa el número de parte del producto, déjalo así.
+                    Agrega solo los números propios de esta marca.
+                </p>
                 <ProductCodesEditor
                     ref="productCodesRef"
                     v-model="form.codes"

@@ -1479,10 +1479,14 @@ const formId = useId();
                     class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                 >
                     <h4
-                        class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"
+                        class="mb-1 text-sm font-semibold text-gray-900 dark:text-white"
                     >
-                        Códigos comerciales
+                        Código de la marca
                     </h4>
+                    <p class="mb-3 text-xs text-muted-foreground">
+                        Si la marca usa el número de parte del producto, déjalo
+                        así. Agrega solo los números propios de esta marca.
+                    </p>
                     <ProductCodesEditor
                         ref="productCodesRef"
                         v-model="form.codes"

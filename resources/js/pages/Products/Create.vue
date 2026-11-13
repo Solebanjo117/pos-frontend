@@ -1209,12 +1209,18 @@ const readinessItems = computed(() => [
                                 <label
                                     class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >
-                                    Códigos comerciales
+                                    Números de parte
                                     <span
                                         class="text-xs font-normal text-gray-400"
                                         >(opcionales)</span
                                     >
                                 </label>
+                                <p class="mb-2 text-xs text-muted-foreground">
+                                    El principal es el número de parte del
+                                    producto y aplica a todas sus marcas. Agrega
+                                    otros números con los que se conoce la misma
+                                    pieza.
+                                </p>
                                 <ProductCodesEditor
                                     ref="productCodesRef"
                                     v-model="productCodesModel"

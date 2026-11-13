@@ -179,6 +179,19 @@ describe('ProductVariantFormModal ITBM', () => {
         expect(adjust.attributes('data-variant')).toBe('20');
     });
 
+    it('shows the brand code read-only and does not send it when saving', async () => {
+        fetchVariants.mockResolvedValue([variantWithRates(7, 7)]);
+        const wrapper = await mountModal();
+
+        const code = wrapper.get('[data-test="brand-code"]');
+        expect((code.element as HTMLInputElement).value).toBe('FIL-20');
+        expect(code.attributes('readonly')).toBeDefined();
+
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+        expect(updateVariant.mock.calls[0][2]).not.toHaveProperty('sku');
+    });
+
     it('loads the brand when it is created already open (as from the products list)', async () => {
         fetchVariants.mockResolvedValue([variantWithRates(7, 7)]);
         const wrapper = mount(ProductVariantFormModal, {

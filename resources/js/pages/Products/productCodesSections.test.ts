@@ -67,7 +67,12 @@ describe('Products: brand windows do not edit codes', () => {
         ]) {
             const component = source(file);
             expect(component, file).not.toContain('<ProductCodesEditor');
-            expect(component, file).not.toContain('Código de la marca');
+            // Se muestra solo para leer (2026-11-13), sin poder editarlo.
+            expect(component, file).toContain('Código de la marca');
+            expect(component, file).toMatch(
+                /data-test="brand-code"[\s\S]{0,300}readonly/,
+            );
+            expect(component, file).not.toMatch(/v-model="form\.sku"/);
             expect(component, file).not.toContain('codes: form.value.codes');
             expect(component, file).not.toMatch(
                 /sku:\s*form\.value\.codes\.find/,

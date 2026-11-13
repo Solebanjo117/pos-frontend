@@ -1140,7 +1140,6 @@ const readinessItems = computed(() => [
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >
                                     Descripción
-                                    <span class="text-red-500">*</span>
                                 </label>
                                 <input
                                     v-model="form.name"

@@ -920,13 +920,12 @@ const validationErrorItems = computed(() =>
                                             class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                                         >
                                             Descripción
-                                            <span class="text-red-500">*</span>
                                         </label>
                                         <div class="mt-1 flex gap-2">
                                             <input
                                                 v-model="form.name"
                                                 type="text"
-                                                required
+                                                placeholder="Vacía: se genera con categoría + compatibilidad vehicular"
                                                 class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                                             />
                                             <button

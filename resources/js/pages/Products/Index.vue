@@ -137,7 +137,7 @@ const addVariantToCart = (product: any, variant: any) => {
     const cartProduct = {
         id: product.id,
         name: `${product.name} - ${variant.brand?.name || ''}`,
-        sku_base: variant.sku || product.sku_base,
+        sku_base: product.sku_base || variant.sku,
         pricing: product.pricing,
         default_variant: {
             id: variant.id,

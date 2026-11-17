@@ -67,16 +67,27 @@ describe('Products: brand windows do not edit codes', () => {
         ]) {
             const component = source(file);
             expect(component, file).not.toContain('<ProductCodesEditor');
-            // Se muestra solo para leer (2026-11-13), sin poder editarlo.
-            expect(component, file).toContain('Código de la marca');
-            expect(component, file).toMatch(
-                /data-test="brand-code"[\s\S]{0,300}readonly/,
-            );
-            expect(component, file).not.toMatch(/v-model="form\.sku"/);
+            // Las marcas no tienen código propio (2026-11-17): ni se edita ni se muestra.
+            expect(component, file).not.toContain('Código de la marca');
+            expect(component, file).not.toContain('data-test="brand-code"');
             expect(component, file).not.toContain('codes: form.value.codes');
             expect(component, file).not.toMatch(
                 /sku:\s*form\.value\.codes\.find/,
             );
         }
+    });
+});
+
+describe('Products: the cart shows the product number, not a brand code', () => {
+    it('uses the product principal number first', () => {
+        const pos = source('../../composables/usePOS.ts');
+        const index = source('Index.vue');
+
+        expect(pos).toMatch(
+            /product_sku:\s*\(product as any\)\.sku_base \|\| variant\?\.sku/,
+        );
+        expect(index).toMatch(
+            /sku_base:\s*product\.sku_base \|\| variant\.sku/,
+        );
     });
 });

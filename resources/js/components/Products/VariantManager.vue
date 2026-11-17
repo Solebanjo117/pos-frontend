@@ -1431,28 +1431,6 @@ const formId = useId();
                             />
                         </div>
 
-                        <!-- Solo lectura (2026-11-13): se imprime en tickets y lo usa el importador. -->
-                        <div class="md:col-span-4">
-                            <label
-                                for="variant-brand-code"
-                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >Código de la marca
-                                <span class="text-xs font-normal text-gray-400"
-                                    >(solo lectura)</span
-                                ></label
-                            >
-                            <input
-                                id="variant-brand-code"
-                                data-test="brand-code"
-                                :value="form.sku || skuBase || '—'"
-                                type="text"
-                                readonly
-                                tabindex="-1"
-                                title="Se imprime en tickets y cotizaciones. No se edita aquí."
-                                class="h-9 w-full min-w-0 cursor-default rounded-md border border-input bg-muted/50 px-3 py-1 font-mono text-sm text-muted-foreground outline-none dark:bg-muted/30"
-                            />
-                        </div>
-
                         <div v-if="editingVariant" class="md:col-span-3">
                             <span
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"

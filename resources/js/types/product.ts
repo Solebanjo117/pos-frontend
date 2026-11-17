@@ -296,6 +296,9 @@ export interface InventoryFifoLot {
     source_type?: string | null;
     source_id?: number | null;
     source_movement_id?: number | null;
+    /** Proveedor del lote (null = sin proveedor; se puede cargar a mano si no viene de una compra). */
+    supplier?: { id: number; name: string } | null;
+    supplier_editable?: boolean;
     batch_number?: string | null;
     received_quantity: number;
     quantity_available: number;

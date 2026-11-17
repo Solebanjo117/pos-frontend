@@ -4,6 +4,7 @@ import { ref, computed, nextTick, onMounted, watch, useId } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import VariantSuppliersPanel from '@/components/Products/VariantSuppliersPanel.vue';
 import AppModal from '@/components/ui/AppModal.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
@@ -1479,6 +1480,16 @@ const formId = useId();
                             </div>
                         </div>
                     </div>
+                </section>
+
+                <section
+                    v-if="editingVariant && !isDraftMode && productId"
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <VariantSuppliersPanel
+                        :product-id="productId"
+                        :variant-id="editingVariant.id"
+                    />
                 </section>
 
                 <section

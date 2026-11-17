@@ -11,9 +11,12 @@ import { computed, onMounted, ref, watch } from 'vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
 import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import { productsApi } from '@/services/api/products';
+import { suppliersService } from '@/services/suppliers';
+import { variantSuppliersService } from '@/services/variantSuppliers';
 import type {
     InventoryFifoLot,
     ProductVariant,
@@ -711,7 +714,39 @@ watch(
     { deep: true },
 );
 
+// Proveedor de los lotes sin compra (existencia inicial, ajustes): se puede cargar a mano.
+const lotSupplierOptions = ref<{ value: number | null; label: string }[]>([]);
+const lotSupplierError = ref('');
+
+const loadLotSupplierOptions = async () => {
+    try {
+        const suppliers = (await suppliersService.getAllActive()) ?? [];
+        lotSupplierOptions.value = [
+            { value: null, label: 'Sin proveedor' },
+            ...suppliers.map((s: { id: number; name: string }) => ({
+                value: s.id,
+                label: s.name,
+            })),
+        ];
+    } catch {
+        lotSupplierOptions.value = [{ value: null, label: 'Sin proveedor' }];
+    }
+};
+
+const assignLotSupplier = async (lot: InventoryFifoLot, supplierId: unknown) => {
+    lotSupplierError.value = '';
+    const id = supplierId === null || supplierId === '' ? null : Number(supplierId);
+    try {
+        const result = await variantSuppliersService.assignLotSupplier(lot.id, id);
+        lot.supplier = result.supplier;
+    } catch (e: any) {
+        lotSupplierError.value =
+            e?.response?.data?.message || 'No se pudo cambiar el proveedor del lote.';
+    }
+};
+
 onMounted(() => {
+    loadLotSupplierOptions();
     if (!selectedWarehouseId.value) {
         selectedWarehouseId.value = resolveInitialWarehouse();
     } else {
@@ -887,6 +922,8 @@ defineExpose({
                 </button>
             </div>
 
+            <ErrorMessage v-if="lotSupplierError">{{ lotSupplierError }}</ErrorMessage>
+
             <LoadingState v-if="loading" label="Cargando historial de stock..." />
 
             <div v-else class="max-w-full overflow-x-auto">
@@ -933,6 +970,7 @@ defineExpose({
                         <tr>
                             <th class="px-4 py-2">Fecha</th>
                             <th class="px-4 py-2">Origen</th>
+                            <th class="px-4 py-2">Proveedor</th>
                             <th class="px-4 py-2">Lote</th>
                             <th class="px-4 py-2 text-right">Inicial</th>
                             <th class="px-4 py-2 text-right">Disponible</th>
@@ -997,6 +1035,16 @@ defineExpose({
                                         )
                                     }}
                                 </span>
+                            </td>
+                            <td class="px-4 py-2" data-test="lot-supplier">
+                                <AppSelect
+                                    v-if="lot.supplier_editable"
+                                    :model-value="lot.supplier?.id ?? null"
+                                    :options="lotSupplierOptions"
+                                    class="w-44"
+                                    @update:model-value="(v) => assignLotSupplier(lot, v)"
+                                />
+                                <span v-else>{{ lot.supplier?.name ?? 'Sin proveedor' }}</span>
                             </td>
                             <td class="px-4 py-2 font-mono">
                                 {{ lot.batch_number || `#${lot.id}` }}
@@ -1127,7 +1175,7 @@ defineExpose({
                         </tr>
                         <tr v-if="!history?.lots.length">
                             <td
-                                colspan="12"
+                                colspan="13"
                                 
                             ><EmptyState>No hay lotes disponibles para esta variante.</EmptyState></td>
                         </tr>

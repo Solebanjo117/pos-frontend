@@ -3,6 +3,7 @@ import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, watch } from 'vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
+import VariantSuppliersPanel from '@/components/Products/VariantSuppliersPanel.vue';
 import AppModal from '@/components/ui/AppModal.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
@@ -584,6 +585,16 @@ const handleSubmit = async () => {
                         >
                     </div>
                 </div>
+            </div>
+
+            <div
+                v-if="editingVariant"
+                class="border-t border-gray-200 pt-4 dark:border-border"
+            >
+                <VariantSuppliersPanel
+                    :product-id="productId"
+                    :variant-id="editingVariant.id"
+                />
             </div>
 
             <!-- Pricing Section -->

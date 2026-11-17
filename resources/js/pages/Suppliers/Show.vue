@@ -1473,7 +1473,7 @@ const removeVariant = async (variantId?: number | null) => {
                                                 Lead time
                                             </th>
                                             <th class="py-2 text-center">
-                                                Preferido
+                                                Por defecto
                                             </th>
                                             <th class="py-2 text-right">
                                                 Pendiente
@@ -1672,21 +1672,13 @@ const removeVariant = async (variantId?: number | null) => {
                                                 </span>
                                             </td>
                                             <td class="py-3 pr-4 text-center">
-                                                <input
-                                                    v-if="row.variant_id"
-                                                    v-model="
-                                                        editForms[
-                                                            row.variant_id
-                                                        ].is_preferred
-                                                    "
-                                                    type="checkbox"
-                                                    class="rounded border-gray-300"
-                                                />
+                                                <!-- Automático (2026-11-17): el proveedor más barato de la marca. -->
                                                 <span
-                                                    v-else-if="row.is_preferred"
-                                                    class="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700"
+                                                    v-if="row.is_preferred"
+                                                    title="El proveedor más barato de esta marca. Se calcula solo con el costo de la última compra."
+                                                    class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700"
                                                 >
-                                                    Preferido
+                                                    Más barato
                                                 </span>
                                                 <span
                                                     v-else

@@ -15,6 +15,9 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
+import { suppliersService } from '@/services/suppliers';
+import { draftSuppliersPayload } from '@/services/variantSuppliers';
+import type { DraftVariantSupplier } from '@/services/variantSuppliers';
 import {
     brandOptionLabel,
     brandTierLabel,
@@ -139,8 +142,18 @@ const form = ref({
             stock_available: 0,
             reorder_point: 5,
             reorder_quantity: 10,
+            // De qué proveedor vino la existencia inicial (opcional).
+            supplier_id: null as number | null,
         },
-    ],
+    ] as Array<{
+        warehouse_id: number;
+        stock_available: number;
+        reorder_point: number;
+        reorder_quantity: number;
+        supplier_id?: number | null;
+    }>,
+    // Proveedores de una marca nueva (se guardan junto con la marca).
+    suppliers: [] as DraftVariantSupplier[],
 });
 
 const toSafeNumber = (value: any, fallback = 0): number => {
@@ -167,12 +180,14 @@ const buildModalStateSnapshot = (): string => {
                 cost_tax_rate: toSafeNumber(form.value.pricing.cost_tax_rate),
                 tax_type: form.value.pricing.tax_type ?? 'custom',
             },
+            suppliers: form.value.suppliers ?? [],
             initial_inventory: (form.value.initial_inventory ?? []).map(
                 (row: any) => ({
                     warehouse_id: row.warehouse_id ?? null,
                     stock_available: toSafeNumber(row.stock_available),
                     reorder_point: toSafeNumber(row.reorder_point),
                     reorder_quantity: toSafeNumber(row.reorder_quantity),
+                    supplier_id: row.supplier_id ?? null,
                 }),
             ),
         },
@@ -249,6 +264,24 @@ const submitButtonLabel = computed(() => {
 
 // Warehouses options — fetched from API
 const warehouses = ref<{ id: number; name: string }[]>([]);
+// Proveedores para "Proveedor del stock inicial".
+const stockSupplierOptions = ref<{ value: number | null; label: string }[]>([
+    { value: null, label: 'Sin proveedor' },
+]);
+const loadStockSuppliers = async () => {
+    try {
+        const list = (await suppliersService.getAllActive()) ?? [];
+        stockSupplierOptions.value = [
+            { value: null, label: 'Sin proveedor' },
+            ...list.map((s: { id: number; name: string }) => ({
+                value: s.id,
+                label: s.name,
+            })),
+        ];
+    } catch {
+        // Sin la lista, el stock inicial queda sin proveedor.
+    }
+};
 const fetchWarehouses = async () => {
     try {
         const { data } = await apiClient.get('/warehouses/all');
@@ -686,9 +719,11 @@ const openCreateModal = () => {
                           stock_available: 0,
                           reorder_point: 5,
                           reorder_quantity: 10,
+                          supplier_id: null,
                       },
                   ]
                 : [],
+        suppliers: [],
     };
     priceManuallyEdited.value = false;
     showModal.value = true;
@@ -736,6 +771,8 @@ const openEditModal = (variant: any) => {
             pricing_formula: p?.pricing_formula || '',
         },
         initial_inventory: [],
+        // Solo una marca en borrador trae su lista; la de una marca guardada se maneja en su panel.
+        suppliers: isDraftMode.value ? [...(variant.suppliers ?? [])] : [],
     };
 
     // base_price ya se carga directo en form.pricing.base_price desde el backend
@@ -907,6 +944,11 @@ const handleSubmit = async () => {
             pricing_formula: form.value.pricing_formula || null,
             pricing: pricingPayload,
             initial_inventory: form.value.initial_inventory,
+            // Al crear la marca se envían sus proveedores (código y costo).
+            suppliers:
+                !editingVariant.value || isDraftMode.value
+                    ? draftSuppliersPayload(form.value.suppliers)
+                    : undefined,
         };
 
         if (isDraftMode.value) {
@@ -921,6 +963,7 @@ const handleSubmit = async () => {
                     );
                     draftVariants.value[idx] = {
                         ...payload,
+                        suppliers: form.value.suppliers,
                         _draftId: editingVariant.value._draftId,
                         brand,
                     };
@@ -931,6 +974,7 @@ const handleSubmit = async () => {
                 );
                 draftVariants.value.push({
                     ...payload,
+                    suppliers: form.value.suppliers,
                     _draftId: Date.now(),
                     brand,
                 });
@@ -1022,6 +1066,7 @@ onMounted(async () => {
         fetchBrands(),
         fetchWarehouses(),
         fetchSettings(),
+        loadStockSuppliers(),
     ]);
     if (!editingVariant.value) {
         const rate = defaultTaxRate();
@@ -1469,6 +1514,14 @@ const formId = useId();
                         :variant-id="editingVariant.id"
                     />
                 </section>
+                <!-- Marca nueva o en borrador: los proveedores se guardan junto con la marca. -->
+                <section
+                    v-else
+                    data-test="draft-variant-suppliers"
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
+                >
+                    <VariantSuppliersPanel draft v-model="form.suppliers" />
+                </section>
 
                 <section
                     v-if="!editingVariant && form.initial_inventory[0]"
@@ -1521,6 +1574,21 @@ const formId = useId();
                                 step="1"
                                 min="0"
                                 class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-right text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30"
+                            />
+                        </div>
+
+                        <div
+                            class="md:col-span-7"
+                            data-test="initial-stock-supplier"
+                        >
+                            <label
+                                class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >Proveedor del stock inicial (opcional)</label
+                            >
+                            <AppSelect
+                                v-model="form.initial_inventory[0].supplier_id"
+                                class="w-full min-w-0"
+                                :options="stockSupplierOptions"
                             />
                         </div>
                     </div>

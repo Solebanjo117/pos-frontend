@@ -7,19 +7,31 @@ import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { suppliersService } from '@/services/suppliers';
 import { variantSuppliersService } from '@/services/variantSuppliers';
-import type { VariantSupplierRow } from '@/services/variantSuppliers';
+import type {
+    DraftVariantSupplier,
+    VariantSupplierRow,
+} from '@/services/variantSuppliers';
 
 /**
  * Proveedores de una marca (como "Vendor IDs" del sistema anterior): el código con que cada
  * proveedor conoce la pieza y lo que se le pagó en la última compra. El más barato queda como
  * proveedor por defecto al pedir; el sistema lo calcula y el costo se actualiza al recibir compras.
+ *
+ * Con `draft` (marca que todavía no existe: al crear el producto o una marca nueva) la lista vive en
+ * el formulario (v-model) y se guarda junto con la marca.
  */
 const props = defineProps<{
-    productId: number;
-    variantId: number;
+    productId?: number | null;
+    variantId?: number | null;
+    draft?: boolean;
+    modelValue?: DraftVariantSupplier[];
 }>();
 
-const rows = ref<VariantSupplierRow[]>([]);
+const emit = defineEmits<{
+    'update:modelValue': [value: DraftVariantSupplier[]];
+}>();
+
+const liveRows = ref<VariantSupplierRow[]>([]);
 const allSuppliers = ref<{ id: number; name: string }[]>([]);
 const loading = ref(true);
 const saving = ref(false);
@@ -32,6 +44,31 @@ const newCost = ref<number | null>(null);
 const editingId = ref<number | null>(null);
 const editCode = ref('');
 const editCost = ref<number | null>(null);
+
+// En borrador, el más barato (con costo) es el proveedor por defecto, igual que en el backend.
+const draftRows = computed<VariantSupplierRow[]>(() => {
+    const list = props.modelValue ?? [];
+    const withCost = list.filter((row) => Number(row.supplier_cost) > 0);
+    const candidates = withCost.length ? withCost : list;
+    const cheapest = [...candidates].sort(
+        (a, b) => Number(a.supplier_cost) - Number(b.supplier_cost),
+    )[0];
+
+    return [...list]
+        .sort((a, b) => Number(a.supplier_cost) - Number(b.supplier_cost))
+        .map((row) => ({
+            supplier_id: row.supplier_id,
+            supplier_name: row.supplier_name ?? null,
+            supplier_code: row.supplier_code ?? null,
+            supplier_cost: Number(row.supplier_cost) || 0,
+            last_purchased_at: null,
+            lead_time_days: 0,
+            minimum_order_quantity: 1,
+            is_default: cheapest?.supplier_id === row.supplier_id,
+        }));
+});
+
+const rows = computed(() => (props.draft ? draftRows.value : liveRows.value));
 
 const supplierOptions = computed(() =>
     (allSuppliers.value ?? [])
@@ -55,15 +92,23 @@ const shortDate = (value: string | null) =>
 const apiError = (e: any, fallback: string) =>
     e?.response?.data?.message || fallback;
 
+const emitDraft = (list: DraftVariantSupplier[]) =>
+    emit('update:modelValue', list);
+
 const load = async () => {
     loading.value = true;
     error.value = '';
     try {
         const [list, suppliers] = await Promise.all([
-            variantSuppliersService.list(props.productId, props.variantId),
+            props.draft || !props.productId || !props.variantId
+                ? Promise.resolve([])
+                : variantSuppliersService.list(
+                      props.productId,
+                      props.variantId,
+                  ),
             suppliersService.getAllActive(),
         ]);
-        rows.value = list;
+        liveRows.value = list;
         allSuppliers.value = suppliers ?? [];
     } catch (e) {
         error.value = apiError(e, 'No se pudieron cargar los proveedores.');
@@ -72,27 +117,61 @@ const load = async () => {
     }
 };
 
-const add = async () => {
-    if (!newSupplierId.value || newCost.value === null || saving.value) return;
+const save = async (
+    supplierId: number,
+    code: string,
+    cost: number,
+    fallback: string,
+): Promise<boolean> => {
+    if (props.draft) {
+        const list = [...(props.modelValue ?? [])];
+        const entry: DraftVariantSupplier = {
+            supplier_id: supplierId,
+            supplier_name:
+                allSuppliers.value.find((s) => s.id === supplierId)?.name ??
+                list.find((row) => row.supplier_id === supplierId)
+                    ?.supplier_name ??
+                null,
+            supplier_code: code.trim() || null,
+            supplier_cost: cost,
+        };
+        const index = list.findIndex((row) => row.supplier_id === supplierId);
+        if (index >= 0) list[index] = entry;
+        else list.push(entry);
+        emitDraft(list);
+        return true;
+    }
+
     saving.value = true;
     error.value = '';
     try {
-        rows.value = await variantSuppliersService.save(
-            props.productId,
-            props.variantId,
-            newSupplierId.value,
-            {
-                supplier_code: newCode.value.trim() || null,
-                supplier_cost: Number(newCost.value),
-            },
+        liveRows.value = await variantSuppliersService.save(
+            props.productId!,
+            props.variantId!,
+            supplierId,
+            { supplier_code: code.trim() || null, supplier_cost: cost },
         );
+        return true;
+    } catch (e) {
+        error.value = apiError(e, fallback);
+        return false;
+    } finally {
+        saving.value = false;
+    }
+};
+
+const add = async () => {
+    if (!newSupplierId.value || newCost.value === null || saving.value) return;
+    const ok = await save(
+        newSupplierId.value,
+        newCode.value,
+        Number(newCost.value),
+        'No se pudo agregar el proveedor.',
+    );
+    if (ok) {
         newSupplierId.value = null;
         newCode.value = '';
         newCost.value = null;
-    } catch (e) {
-        error.value = apiError(e, 'No se pudo agregar el proveedor.');
-    } finally {
-        saving.value = false;
     }
 };
 
@@ -104,34 +183,31 @@ const startEdit = (row: VariantSupplierRow) => {
 
 const saveEdit = async (row: VariantSupplierRow) => {
     if (editCost.value === null || saving.value) return;
-    saving.value = true;
-    error.value = '';
-    try {
-        rows.value = await variantSuppliersService.save(
-            props.productId,
-            props.variantId,
-            row.supplier_id,
-            {
-                supplier_code: editCode.value.trim() || null,
-                supplier_cost: Number(editCost.value),
-            },
-        );
-        editingId.value = null;
-    } catch (e) {
-        error.value = apiError(e, 'No se pudo guardar el proveedor.');
-    } finally {
-        saving.value = false;
-    }
+    const ok = await save(
+        row.supplier_id,
+        editCode.value,
+        Number(editCost.value),
+        'No se pudo guardar el proveedor.',
+    );
+    if (ok) editingId.value = null;
 };
 
 const remove = async (row: VariantSupplierRow) => {
     if (saving.value) return;
+    if (props.draft) {
+        emitDraft(
+            (props.modelValue ?? []).filter(
+                (item) => item.supplier_id !== row.supplier_id,
+            ),
+        );
+        return;
+    }
     saving.value = true;
     error.value = '';
     try {
-        rows.value = await variantSuppliersService.remove(
-            props.productId,
-            props.variantId,
+        liveRows.value = await variantSuppliersService.remove(
+            props.productId!,
+            props.variantId!,
             row.supplier_id,
         );
     } catch (e) {

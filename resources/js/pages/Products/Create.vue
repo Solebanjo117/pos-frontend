@@ -26,6 +26,7 @@ import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
+import { draftSuppliersPayload } from '@/services/variantSuppliers';
 import { type BreadcrumbItem } from '@/types';
 import type { Brand } from '@/types/brand';
 import type { Category } from '@/types/category';
@@ -826,6 +827,10 @@ const handleSubmit = async () => {
                         status: variant.status || 'active',
                         pricing: variant.pricing,
                         initial_inventory: variant.initial_inventory || [],
+                        // Proveedores de la marca y del stock inicial (2026-11-18).
+                        suppliers: draftSuppliersPayload(
+                            variant.suppliers ?? [],
+                        ),
                     });
                 } catch (variantError: any) {
                     console.error(

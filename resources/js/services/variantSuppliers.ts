@@ -13,6 +13,22 @@ export interface VariantSupplierRow {
     is_default: boolean;
 }
 
+/** Proveedor de una marca que todavía no existe (se guarda junto con la marca). */
+export interface DraftVariantSupplier {
+    supplier_id: number;
+    supplier_name?: string | null;
+    supplier_code?: string | null;
+    supplier_cost: number;
+}
+
+/** Lo que se envía al crear la marca (sin el nombre, que es solo para mostrar). */
+export const draftSuppliersPayload = (list: DraftVariantSupplier[] = []) =>
+    list.map((row) => ({
+        supplier_id: row.supplier_id,
+        supplier_code: row.supplier_code?.trim() || null,
+        supplier_cost: Number(row.supplier_cost) || 0,
+    }));
+
 export interface VariantSupplierPayload {
     supplier_code?: string | null;
     supplier_cost: number;

@@ -141,3 +141,25 @@ describe('Products: create and import only from the products page, by role', () 
         );
     });
 });
+
+/*
+ * 2026-11-18: al crear una marca (en Crear producto o una marca nueva) también se indican sus
+ * proveedores y de qué proveedor vino el stock inicial; se guardan junto con la marca.
+ */
+describe('Products: suppliers when creating a brand', () => {
+    it('shows the suppliers section and the initial stock supplier for new brands, and sends them', () => {
+        const manager = source('../../components/Products/VariantManager.vue');
+
+        expect(manager).toContain('data-test="draft-variant-suppliers"');
+        expect(manager).toContain(
+            '<VariantSuppliersPanel draft v-model="form.suppliers" />',
+        );
+        expect(manager).toContain('data-test="initial-stock-supplier"');
+        expect(manager).toContain(
+            'draftSuppliersPayload(form.value.suppliers)',
+        );
+        expect(source('Create.vue')).toMatch(
+            /suppliers:\s*draftSuppliersPayload\(\s*variant\.suppliers \?\? \[\],?\s*\)/,
+        );
+    });
+});

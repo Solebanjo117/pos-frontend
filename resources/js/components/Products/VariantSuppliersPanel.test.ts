@@ -167,4 +167,49 @@ describe('VariantSuppliersPanel', () => {
             wrapper.findAll('[data-test="variant-supplier-row"]'),
         ).toHaveLength(1);
     });
+
+    it('in draft mode keeps the list in the form, marks the cheapest and calls no API', async () => {
+        const wrapper = mount(VariantSuppliersPanel, {
+            props: {
+                draft: true,
+                modelValue: [
+                    {
+                        supplier_id: 2,
+                        supplier_name: 'JAPAN INTERNATIONAL PARTS',
+                        supplier_code: 'D8521-3RA1A',
+                        supplier_cost: 10.88,
+                    },
+                ],
+            },
+            global: { stubs: { SearchableSelect: SearchableSelectStub } },
+        });
+        await flushPromises();
+
+        expect(get).toHaveBeenCalledTimes(1);
+        expect(get).toHaveBeenCalledWith('/suppliers/all');
+
+        await wrapper.get('[data-test="pick-supplier"]').trigger('click');
+        await wrapper.get('#new-supplier-code').setValue('726HAIQ7271');
+        await wrapper.get('#new-supplier-cost').setValue('9.54');
+        await wrapper.get('[data-test="add-supplier"]').trigger('click');
+        await flushPromises();
+
+        expect(put).not.toHaveBeenCalled();
+        const emitted = wrapper
+            .emitted('update:modelValue')!
+            .at(-1)![0] as any[];
+        expect(emitted.map((row) => row.supplier_id)).toEqual([2, 1]);
+        expect(emitted[1]).toMatchObject({
+            supplier_name: 'NIKOMOTO 555 SUN',
+            supplier_code: '726HAIQ7271',
+            supplier_cost: 9.54,
+        });
+
+        await wrapper.setProps({ modelValue: emitted });
+        const rows = wrapper.findAll('[data-test="variant-supplier-row"]');
+        expect(rows[0].text()).toContain('NIKOMOTO 555 SUN');
+        expect(rows[0].find('[data-test="default-supplier"]').exists()).toBe(
+            true,
+        );
+    });
 });

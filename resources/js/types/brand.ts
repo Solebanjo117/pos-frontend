@@ -1,6 +1,14 @@
 import type { BrandTier } from '@/utils/brandTier';
 import type { Supplier } from './supplier';
 
+export interface BrandSupplierLink {
+    id: number;
+    name: string;
+    manual: boolean;
+    pieces: number;
+    origin: 'pieces' | 'manual';
+}
+
 export interface Brand {
     id: number;
     name: string;
@@ -12,6 +20,8 @@ export interface Brand {
     product_variants_count?: number;
     suppliers_count?: number;
     suppliers?: Pick<Supplier, 'id' | 'name' | 'contact_name' | 'phone'>[];
+    /** Proveedores por sus piezas (calculado) y marcados a mano, en una sola lista. */
+    supplier_links?: BrandSupplierLink[];
     created_at?: string;
     updated_at?: string;
 }

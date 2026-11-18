@@ -250,8 +250,9 @@ watch(
                 <div>
                     <h3 class="font-semibold">Marcas suministradas</h3>
                     <p class="text-xs text-muted-foreground">
-                        Relación directa del catálogo. Las categorías se
-                        calculan desde productos y compras.
+                        Marca a mano las marcas que trae este proveedor aunque
+                        todavía no tengan piezas registradas. Las marcas de sus
+                        piezas aparecen solas en su ficha.
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">

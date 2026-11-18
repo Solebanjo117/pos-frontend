@@ -20,7 +20,28 @@ vi.mock('@/layouts/AppLayout.vue', () => ({
 vi.mock('@/composables/useBrands', () => ({
     useBrands: () => ({
         brands: ref([]),
-        brand: ref({ id: 1, name: 'BOSCH', tier: 'premium', suppliers: [] }),
+        brand: ref({
+            id: 1,
+            name: 'BOSCH',
+            tier: 'premium',
+            suppliers: [],
+            supplier_links: [
+                {
+                    id: 7,
+                    name: 'NIKOMOTO 555 SUN',
+                    manual: false,
+                    pieces: 12,
+                    origin: 'pieces',
+                },
+                {
+                    id: 8,
+                    name: 'JAPAN INTERNATIONAL PARTS',
+                    manual: true,
+                    pieces: 0,
+                    origin: 'manual',
+                },
+            ],
+        }),
         pagination: ref(null),
         loading: ref(false),
         error: ref(null),
@@ -70,5 +91,17 @@ describe('Marcas', () => {
             importLink.element.parentElement,
         );
         expect(create.element.nextElementSibling).toBe(importLink.element);
+    });
+});
+
+describe('Marcas: proveedores', () => {
+    it('Editar marca muestra los proveedores por sus piezas, aparte de los marcados a mano', async () => {
+        const wrapper = mount(Edit as any, { props: { id: '1' } });
+        await flushPromises();
+
+        const pieces = wrapper.get('[data-test="brand-piece-suppliers"]');
+        expect(pieces.text()).toContain('NIKOMOTO 555 SUN · 12 piezas');
+        expect(pieces.text()).not.toContain('JAPAN');
+        expect(wrapper.text()).toContain('marcado(s) a mano');
     });
 });

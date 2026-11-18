@@ -1869,6 +1869,11 @@ const removeVariant = async (variantId?: number | null) => {
                     </div>
 
                     <div class="p-6">
+                        <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                            Las marcas de las piezas que tienen este proveedor
+                            aparecen solas. Agrega a mano las que trae pero
+                            todavía no tienen piezas registradas.
+                        </p>
                         <div
                             v-if="loadingBrands"
                             class="flex justify-center py-4"
@@ -1892,10 +1897,21 @@ const removeVariant = async (variantId?: number | null) => {
                                 >
                                     {{ brand.name }}
                                 </Link>
+                                <span
+                                    data-test="supplier-brand-origin"
+                                    class="text-xs font-normal text-blue-500 dark:text-blue-300/80"
+                                    >{{
+                                        (brand.pieces ?? 0) > 0
+                                            ? `· ${brand.pieces} ${brand.pieces === 1 ? 'pieza' : 'piezas'}`
+                                            : '· marcada a mano'
+                                    }}</span
+                                >
+                                <!-- Solo se quitan las marcadas a mano; las de piezas dependen de sus piezas. -->
                                 <button
+                                    v-if="(brand.pieces ?? 0) === 0"
                                     type="button"
                                     class="ml-0.5 text-blue-400 transition hover:text-red-500"
-                                    title="Desasociar marca"
+                                    title="Quitar marca"
                                     @click="removeBrand(brand.id)"
                                 >
                                     <X :size="14" />

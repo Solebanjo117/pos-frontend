@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import BrandTierPicker from '@/components/Brands/BrandTierPicker.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
@@ -21,6 +21,9 @@ interface Props {
 const props = defineProps<Props>();
 
 const { brand, loading, error, fetchBrandById, updateBrand } = useBrands();
+const piecesSuppliers = computed(() =>
+    (brand.value?.supplier_links ?? []).filter((link) => link.pieces > 0),
+);
 const { fetchActiveSuppliers } = useSuppliers();
 const toast = useToast();
 const availableSuppliers = ref<Supplier[]>([]);
@@ -158,10 +161,31 @@ function goBack() {
 
                 <div>
                     <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
                         Proveedores
                     </label>
+                    <!-- Calculado (2026-11-18): proveedores que tienen piezas de esta marca. -->
+                    <div
+                        v-if="piecesSuppliers.length"
+                        data-test="brand-piece-suppliers"
+                        class="mb-3 flex flex-wrap gap-2"
+                    >
+                        <span
+                            v-for="link in piecesSuppliers"
+                            :key="link.id"
+                            class="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700 dark:border-border dark:bg-muted/40 dark:text-gray-200"
+                        >
+                            {{ link.name }} ·
+                            {{ link.pieces }}
+                            {{ link.pieces === 1 ? 'pieza' : 'piezas' }}
+                        </span>
+                    </div>
+                    <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                        Los proveedores de sus piezas aparecen solos. Marca a
+                        mano los que traen esta marca pero todavía no tienen
+                        piezas registradas.
+                    </p>
                     <div
                         class="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-border dark:bg-muted"
                     >
@@ -184,7 +208,7 @@ function goBack() {
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {{ form.supplier_ids?.length || 0 }} proveedor(es)
-                        seleccionado(s)
+                        marcado(s) a mano
                     </p>
                 </div>
 

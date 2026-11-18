@@ -175,7 +175,7 @@ onMounted(load);
                     >
                         <tr>
                             <th class="px-3 py-2">Proveedor</th>
-                            <th class="px-3 py-2">Su código</th>
+                            <th class="px-3 py-2">Código del proveedor</th>
                             <th class="px-3 py-2 text-right">
                                 Costo última compra
                             </th>
@@ -248,7 +248,14 @@ onMounted(load);
                             </template>
                             <template v-else>
                                 <td class="px-3 py-2 font-mono text-xs">
-                                    {{ row.supplier_code || '—' }}
+                                    <span v-if="row.supplier_code">{{
+                                        row.supplier_code
+                                    }}</span>
+                                    <span
+                                        v-else
+                                        class="font-sans text-muted-foreground"
+                                        >Usa el número de parte</span
+                                    >
                                 </td>
                                 <td class="px-3 py-2 text-right tabular-nums">
                                     {{ money(row.supplier_cost) }}
@@ -304,13 +311,14 @@ onMounted(load);
                     <label
                         for="new-supplier-code"
                         class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300"
-                        >Su código</label
+                        >Código del proveedor para esta pieza (opcional)</label
                     >
                     <input
                         id="new-supplier-code"
                         v-model="newCode"
                         type="text"
                         placeholder="Ej: 726HAIQ7271"
+                        aria-describedby="new-supplier-code-help"
                         class="h-9 w-full rounded-md border border-input bg-transparent px-2 font-mono text-sm"
                         @keydown.enter.prevent="add"
                     />
@@ -343,6 +351,14 @@ onMounted(load);
                     </button>
                 </div>
             </div>
+            <p
+                id="new-supplier-code-help"
+                class="text-xs text-muted-foreground"
+            >
+                Cada proveedor puede llamar distinto a la misma pieza. Si se
+                deja vacío, el pedido a ese proveedor usa nuestro número de
+                parte.
+            </p>
         </template>
     </section>
 </template>

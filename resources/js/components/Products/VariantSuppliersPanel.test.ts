@@ -126,6 +126,27 @@ describe('VariantSuppliersPanel', () => {
         ).toHaveLength(3);
     });
 
+    it('explains that the supplier code is optional and shows the fallback when it is empty', async () => {
+        get.mockImplementation((url: string) =>
+            Promise.resolve({
+                data: {
+                    data: url.startsWith('/suppliers')
+                        ? []
+                        : [{ ...japan, supplier_code: null }],
+                },
+            }),
+        );
+        const wrapper = await mountPanel();
+
+        expect(wrapper.text()).toContain(
+            'Código del proveedor para esta pieza (opcional)',
+        );
+        expect(wrapper.text()).toContain('usa nuestro número de parte');
+        expect(
+            wrapper.get('[data-test="variant-supplier-row"]').text(),
+        ).toContain('Usa el número de parte');
+    });
+
     it('removes a supplier from the brand', async () => {
         del.mockResolvedValue({ data: { data: [nikomoto] } });
         const wrapper = await mountPanel();

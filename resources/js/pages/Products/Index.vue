@@ -25,11 +25,18 @@ import { productsApi } from '@/services/api/products';
 import { ReportsApiService } from '@/services/reports';
 import { type BreadcrumbItem } from '@/types';
 import type { Product, ProductFilters } from '@/types/product';
-import { canManagePurchasingRecords } from '@/utils/catalogPermissions';
+import {
+    canManageCatalog,
+    canManagePurchasingRecords,
+} from '@/utils/catalogPermissions';
 
 const page = usePage();
+// Crear: admin, gerente o comprador. Importar: admin o gerente (igual que el backend).
 const canManageProducts = computed(() =>
     canManagePurchasingRecords((page.props.auth?.user as any)?.role),
+);
+const canImportProducts = computed(() =>
+    canManageCatalog((page.props.auth?.user as any)?.role),
 );
 const { currentWarehouseId, initWarehouse } = usePosSettings();
 
@@ -741,6 +748,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     </a>
 
                     <a
+                        v-if="canImportProducts"
                         href="/inventory/products/import"
                         class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
                     >
@@ -776,6 +784,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
 
                     <!-- New Product Button -->
                     <a
+                        v-if="canManageProducts"
                         href="/inventory/products/create"
                         class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                     >

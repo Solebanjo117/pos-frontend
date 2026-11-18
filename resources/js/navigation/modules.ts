@@ -372,20 +372,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                             'Buscar y administrar el catálogo de artículos.',
                         icon: Package,
                     },
-                    {
-                        title: 'Nuevo producto',
-                        href: '/inventory/products/create',
-                        description: 'Registrar un artículo en el catálogo.',
-                        icon: Plus,
-                        roles: roles.purchasing,
-                    },
-                    {
-                        title: 'Importar productos',
-                        href: '/inventory/products/import',
-                        description: 'Cargar artículos desde un archivo.',
-                        icon: PackagePlus,
-                        roles: roles.adminManager,
-                    },
+                    // Crear e importar productos (2026-11-18): solo con los botones dentro de Productos.
                 ],
             },
             {

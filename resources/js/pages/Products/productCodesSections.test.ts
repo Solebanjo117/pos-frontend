@@ -113,3 +113,31 @@ describe('Products: no OEM references', () => {
         }
     });
 });
+
+/*
+ * 2026-11-18: el menú de Inventario no repite los botones de Productos. Crear e importar se hacen
+ * desde Productos, y esos botones solo se muestran a quien puede usarlos (igual que el backend).
+ */
+describe('Products: create and import only from the products page, by role', () => {
+    it('has no "new product" or "import products" shortcut in the inventory menu', () => {
+        const menu = source('../../navigation/modules.ts');
+
+        expect(menu).not.toContain("href: '/inventory/products/create'");
+        expect(menu).not.toContain("href: '/inventory/products/import'");
+        expect(menu).toContain("href: '/inventory/products'");
+    });
+
+    it('shows the create button to purchasing roles and the import button to admin or manager', () => {
+        const index = source('Index.vue');
+
+        expect(index).toMatch(
+            /v-if="canManageProducts"\s*href="\/inventory\/products\/create"/,
+        );
+        expect(index).toMatch(
+            /v-if="canImportProducts"\s*href="\/inventory\/products\/import"/,
+        );
+        expect(index).toMatch(
+            /canImportProducts = computed\(\(\) =>\s*canManageCatalog\(/,
+        );
+    });
+});

@@ -465,7 +465,6 @@ const initializeProductDraft = async () => {
         description: currentProduct.value.description || '',
         status: currentProduct.value.status,
         is_universal: currentProduct.value.is_universal ?? false,
-        batch_tracking: currentProduct.value.batch_tracking,
         extra_category_ids: extraCategoryIds.value,
     };
 

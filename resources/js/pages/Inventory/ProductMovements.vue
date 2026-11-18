@@ -238,7 +238,6 @@ async function fetchProduct(): Promise<void> {
                 'inventory',
                 'suppliers',
                 'compatibility',
-                'oem',
             ].join(','),
             warehouse_id: selectedWarehouseId.value || undefined,
         });

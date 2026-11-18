@@ -416,14 +416,6 @@ const validateForm = () => {
             formErrors.value[`item_${item.id}_quantity`] = 'Cantidad inválida';
             isValid = false;
         }
-
-        const product = getProductDetails(item.product_id);
-        if (product && product.batch_tracking) {
-            if (!item.batch_number) {
-                formErrors.value[`item_${item.id}_batch`] = 'Lote requerido';
-                isValid = false;
-            }
-        }
     });
 
     return isValid;

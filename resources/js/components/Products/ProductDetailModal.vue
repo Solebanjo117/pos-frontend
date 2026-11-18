@@ -49,11 +49,6 @@ interface ProductAttribute {
     value: string;
     unit?: string | null;
 }
-interface OemReference {
-    id?: number;
-    oem_code: string;
-    manufacturer: string;
-}
 interface AlternativeRecord {
     id: number;
     sku: string;
@@ -535,8 +530,7 @@ const headerTitle = computed(() =>
     }),
 );
 
-// ── OEM + Alternatives ────────────────────────────────────────────────────────
-const oemData = ref<OemReference[]>([]);
+// ── Alternatives ────────────────────────────────────────────────────────
 const alternativesData = ref<AlternativeRecord[]>([]);
 const loadingRefs = ref(false);
 const showAlternatives = ref(false);
@@ -546,7 +540,6 @@ const resetModalStateForProduct = () => {
     currentImageIdx.value = 0;
     attributesData.value = [];
     vehicleRows.value = [];
-    oemData.value = [];
     alternativesData.value = [];
     showAlternatives.value = false;
     activeVariantId.value =
@@ -579,12 +572,10 @@ const loadProductDetails = async () => {
         })(),
         (async () => {
             try {
-                const [oemRes, altRes] = await Promise.all([
-                    apiClient.get(`/products/${productId}/oem-references`),
-                    apiClient.get(`/products/${productId}/alternatives`),
-                ]);
+                const altRes = await apiClient.get(
+                    `/products/${productId}/alternatives`,
+                );
                 if (productId !== props.product.id) return;
-                oemData.value = oemRes.data.data ?? [];
                 alternativesData.value = altRes.data.data ?? [];
             } catch (e) {
                 console.error(e);
@@ -1497,72 +1488,6 @@ const handleViewAlternative = async (altId: number) => {
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- OEM Referencias (Full Width) -->
-                    <div
-                        v-if="!loadingRefs && oemData.length > 0"
-                        class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="flex items-center gap-2 rounded-t-lg border-b border-gray-100 bg-gray-50 p-4 font-bold text-gray-900 dark:border-border dark:bg-background dark:text-white"
-                        >
-                            <svg
-                                class="h-5 w-5 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z"
-                                />
-                            </svg>
-                            Referencias OEM
-                            <span
-                                class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-normal text-gray-500 dark:bg-muted"
-                            >
-                                {{ oemData.length }}
-                            </span>
-                        </div>
-                        <div class="overflow-x-auto rounded-b-lg">
-                            <table
-                                class="min-w-full divide-y divide-gray-200 text-sm dark:divide-border"
-                            >
-                                <tbody
-                                    class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
-                                >
-                                    <tr
-                                        v-for="oem in oemData"
-                                        :key="oem.oem_code"
-                                        class="hover:bg-gray-50 dark:hover:bg-muted/50"
-                                    >
-                                        <td
-                                            class="px-4 py-3 font-mono font-semibold text-amber-700 dark:text-amber-400"
-                                        >
-                                            <a
-                                                :href="
-                                                    deepLink(
-                                                        'oem_code',
-                                                        oem.oem_code,
-                                                    )
-                                                "
-                                                target="_blank"
-                                                class="hover:underline"
-                                                >{{ oem.oem_code }}</a
-                                            >
-                                        </td>
-                                        <td
-                                            class="px-4 py-3 text-gray-600 dark:text-gray-400"
-                                        >
-                                            {{ oem.manufacturer || '—' }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
                         </div>
                     </div>
 

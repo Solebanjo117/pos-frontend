@@ -245,36 +245,6 @@ export const productsApi = {
     },
 
     /**
-     * Add OEM reference
-     */
-    async addOemReference(
-        id: number,
-        data: {
-            oem_code: string;
-            manufacturer?: string;
-        },
-    ): Promise<ApiResponse<any>> {
-        const response = await apiClient.post<ApiResponse<any>>(
-            `/products/${id}/oem-references`,
-            data,
-        );
-        return response.data;
-    },
-
-    /**
-     * Remove OEM reference
-     */
-    async removeOemReference(
-        productId: number,
-        referenceId: number,
-    ): Promise<ApiResponse<void>> {
-        const response = await apiClient.delete<ApiResponse<void>>(
-            `/products/${productId}/oem-references/${referenceId}`,
-        );
-        return response.data;
-    },
-
-    /**
      * Add alternative product
      */
     async addAlternative(
@@ -300,25 +270,6 @@ export const productsApi = {
     ): Promise<ApiResponse<void>> {
         const response = await apiClient.delete<ApiResponse<void>>(
             `/products/${productId}/alternatives/${alternativeId}`,
-        );
-        return response.data;
-    },
-
-    /**
-     * Get batches for a product
-     */
-    async getBatches(
-        productId: number,
-        warehouseId?: number,
-    ): Promise<ApiResponse<any[]>> {
-        const params: any = {};
-        if (warehouseId) {
-            params.warehouse_id = warehouseId;
-        }
-
-        const response = await apiClient.get<ApiResponse<any[]>>(
-            `/products/${productId}/batches`,
-            { params },
         );
         return response.data;
     },

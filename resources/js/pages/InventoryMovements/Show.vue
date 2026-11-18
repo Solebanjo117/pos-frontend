@@ -461,10 +461,7 @@ function openReference(): void {
                                         }}
                                     </td>
                                     <td class="px-4 py-3 font-mono text-xs">
-                                        {{
-                                            currentMovement.product_batch
-                                                ?.batch_number || '-'
-                                        }}
+                                        {{ fifoLots[0]?.batch_number || '-' }}
                                     </td>
                                     <td
                                         class="max-w-md px-4 py-3 text-gray-600 dark:text-gray-300"

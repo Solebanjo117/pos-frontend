@@ -91,3 +91,25 @@ describe('Products: the cart shows the product number, not a brand code', () => 
         );
     });
 });
+
+/*
+ * 2026-11-18: las "referencias OEM" eran otra lista de números de la pieza. Se pasaron a los números
+ * de parte del producto y la tabla se eliminó.
+ */
+describe('Products: no OEM references', () => {
+    it('shows the part numbers on the product page and never calls the old OEM endpoints', () => {
+        expect(source('Show.vue')).toContain('Números de parte');
+        for (const file of [
+            'Show.vue',
+            'Index.vue',
+            '../../components/Products/ProductDetailModal.vue',
+            '../../services/api/products.ts',
+            '../../types/product.ts',
+        ]) {
+            const text = source(file);
+            expect(text, file).not.toContain('oem-references');
+            expect(text, file).not.toContain('oem_references');
+            expect(text, file).not.toContain('oem_code');
+        }
+    });
+});

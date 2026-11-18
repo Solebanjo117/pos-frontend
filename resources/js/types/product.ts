@@ -146,12 +146,6 @@ export interface ProductImage {
     category_media_id?: number | null;
 }
 
-export interface OemReference {
-    id?: number;
-    oem_code: string;
-    manufacturer: string | null;
-}
-
 export interface VehicleCompatibility {
     id?: number;
     scope_type?: string | null;
@@ -198,7 +192,6 @@ export interface Product {
     description?: string;
     image_url?: string | null;
     status: 'active' | 'discontinued';
-    batch_tracking: boolean;
     is_universal?: boolean;
     category_id?: number;
     product_line?: ProductLine;
@@ -407,7 +400,6 @@ export interface ProductDetail extends Product {
     suppliers?: ProductSupplier[];
     media?: ProductMedia[];
     images?: ProductImage[];
-    oem_references?: OemReference[];
     alternatives?: AlternativeProduct[];
     compatibility?: VehicleCompatibility[];
     vins?: ProductVin[];
@@ -450,7 +442,6 @@ export interface CreateProductRequest {
     extra_category_ids?: number[];
     engine_id?: number; // R21: motor as reusable entity
     status?: 'active' | 'discontinued';
-    batch_tracking?: boolean;
     pricing_formula?: string; // Excel-like pricing formula
     // Default variant fields
     brand_id?: number;
@@ -499,7 +490,6 @@ export interface UpdateProductRequest {
     name?: string;
     description?: string;
     status?: 'active' | 'discontinued';
-    batch_tracking?: boolean;
     is_universal?: boolean;
     pricing?: {
         base_price?: number;
@@ -521,10 +511,6 @@ export interface UpdateProductRequest {
         source_category_id?: number | null;
         type?: ProductAttributeType;
         options?: string[] | null;
-    }>;
-    oem_references?: Array<{
-        oem_code: string;
-        manufacturer?: string | null;
     }>;
     alternatives?: Array<{
         id?: number;
@@ -549,7 +535,6 @@ export interface ProductFilters {
     per_page?: number;
     page?: number;
     // Deep linking filters
-    oem_code?: string;
     attribute_value?: string;
     vin?: string;
     // Sidebar advanced filters

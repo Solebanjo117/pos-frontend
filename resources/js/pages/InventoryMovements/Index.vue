@@ -558,16 +558,6 @@ function formatNumber(value: number): string {
                                             '-'
                                         }}
                                     </div>
-                                    <div
-                                        v-if="movement.product_batch"
-                                        class="mt-1 font-mono text-xs text-gray-500"
-                                    >
-                                        Lote
-                                        {{
-                                            movement.product_batch
-                                                .batch_number || '-'
-                                        }}
-                                    </div>
                                 </td>
                                 <td
                                     v-if="showWarehouseColumns"

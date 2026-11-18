@@ -279,7 +279,12 @@ const reorderAlerts = computed(
     () => product.value?.inventory?.filter((item) => item.needs_reorder) ?? [],
 );
 
-const oemReferences = computed(() => product.value?.oem_references ?? []);
+// Todos los números de la pieza (el principal primero): reemplazan a las "referencias OEM".
+const partNumbers = computed(() =>
+    [...(product.value?.codes ?? [])].sort(
+        (a, b) => Number(b.is_primary) - Number(a.is_primary),
+    ),
+);
 const alternatives = computed<AlternativeProduct[]>(
     () => product.value?.alternatives ?? [],
 );
@@ -1508,29 +1513,31 @@ watch(effectiveImages, () => {
                                 <h2
                                     class="font-semibold text-gray-950 dark:text-white"
                                 >
-                                    Referencias OEM
+                                    Números de parte
                                 </h2>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <Link
-                                    v-for="reference in oemReferences"
-                                    :key="`${reference.manufacturer}-${reference.oem_code}`"
-                                    :href="`/inventory/products?oem_code=${encodeURIComponent(reference.oem_code)}`"
+                                    v-for="partNumber in partNumbers"
+                                    :key="partNumber.code"
+                                    :href="`/inventory/products?search=${encodeURIComponent(partNumber.code)}`"
                                     class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm hover:border-emerald-200 hover:bg-emerald-50 dark:border-border dark:bg-muted/30"
                                 >
                                     <span
                                         class="block font-mono font-semibold"
-                                        >{{ reference.oem_code }}</span
+                                        >{{ partNumber.code }}</span
                                     >
                                     <span class="text-xs text-gray-500">{{
-                                        reference.manufacturer || '-'
+                                        partNumber.is_primary
+                                            ? 'Principal'
+                                            : 'Adicional'
                                     }}</span>
                                 </Link>
                                 <p
-                                    v-if="!oemReferences.length"
+                                    v-if="!partNumbers.length"
                                     class="text-sm text-gray-500"
                                 >
-                                    Sin referencias OEM.
+                                    Sin números de parte.
                                 </p>
                             </div>
                         </div>

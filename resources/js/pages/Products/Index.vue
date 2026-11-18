@@ -164,7 +164,6 @@ const filters = ref<ProductFilters>({
     search: '',
     status: undefined,
     brand_id: undefined,
-    oem_code: undefined,
     warehouse_id: currentWarehouseId.value || undefined,
     has_stock: false,
 });
@@ -469,8 +468,6 @@ onMounted(async () => {
     if (params.has('product_line_id'))
         filters.value.product_line_id =
             Number(params.get('product_line_id')) || undefined;
-    if (params.has('oem_code'))
-        filters.value.oem_code = params.get('oem_code') ?? undefined;
     filters.value.warehouse_id = currentWarehouseId.value || undefined;
     try {
         await Promise.all([
@@ -536,7 +533,6 @@ const clearFilters = () => {
         status: undefined,
         brand_id: undefined,
         category_id: undefined,
-        oem_code: undefined,
         warehouse_id: currentWarehouseId.value || undefined,
         has_stock: false,
         min_price: undefined,

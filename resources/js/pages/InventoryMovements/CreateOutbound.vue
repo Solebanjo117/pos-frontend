@@ -23,10 +23,7 @@ interface OutboundItem {
     id: string;
     product_id: number | null;
     variant_id: number | null; // Added
-    product_batch_id: number | null;
     quantity: number;
-    // Helpers
-    batches: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -40,7 +37,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const { recordBulkOutbound, loading, error } = useInventoryMovements();
-const { products, fetchProducts, fetchBatches } = useProducts();
+const { products, fetchProducts } = useProducts();
 const { warehouses, fetchWarehouses } = useWarehouses();
 const {
     isSingleWarehouseMode,
@@ -120,9 +117,7 @@ const addItem = () => {
         id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         product_id: null,
         variant_id: null, // Added
-        product_batch_id: null,
         quantity: 1,
-        batches: [],
     });
 };
 
@@ -140,41 +135,10 @@ const handleProductSelect = async (
     const item = items.value[index];
     item.product_id = productId;
     item.variant_id = variantId || null;
-    item.product_batch_id = null;
-    item.batches = [];
-
-    if (productId && headerForm.value.warehouse_id) {
-        try {
-            const allBatches = await fetchBatches(
-                productId,
-                headerForm.value.warehouse_id,
-            );
-            item.batches = allBatches;
-        } catch (e) {
-            console.error('Error fetching batches', e);
-        }
-    }
 
     // Auto-add row if last item
     if (index === items.value.length - 1 && productId !== null) {
         nextTick(() => addItem());
-    }
-};
-
-const handleVariantChange = async (index: number) => {
-    const item = items.value[index];
-    // Re-fetch batches filtered for this variant if needed
-    if (item.product_id && headerForm.value.warehouse_id) {
-        try {
-            const allBatches = await fetchBatches(
-                item.product_id,
-                headerForm.value.warehouse_id,
-            );
-            item.batches = allBatches;
-            item.product_batch_id = null;
-        } catch (e) {
-            console.error('Error fetching batches', e);
-        }
     }
 };
 
@@ -281,13 +245,7 @@ const getProductDetails = (productId: number | null) => {
 const getStockAvailable = (item: OutboundItem) => {
     if (!item.product_id || !headerForm.value.warehouse_id) return null;
 
-    // If batch selected, limit by batch quantity
-    if (item.product_batch_id) {
-        const batch = item.batches.find((b) => b.id === item.product_batch_id);
-        return batch ? batch.quantity : 0;
-    }
-
-    // Otherwise, limit by global warehouse inventory for this variant
+    // Limit by warehouse inventory for this variant (FIFO decides the lots)
     const product = getProductDetails(item.product_id);
     if (!product || !product.inventory) return 0;
 
@@ -300,7 +258,7 @@ const getStockAvailable = (item: OutboundItem) => {
                 (item.variant_id === null && i.variant_id === null)),
     );
 
-    return inv ? inv.quantity_available : 0;
+    return inv?.quantity_available ?? 0;
 };
 
 const validateForm = () => {
@@ -333,15 +291,6 @@ const validateForm = () => {
                 `Excede stock (${stock})`;
             isValid = false;
         }
-
-        // Batch Req
-        const product = getProductDetails(item.product_id);
-        if (product && product.batch_tracking) {
-            if (item.batches.length > 0 && !item.product_batch_id) {
-                formErrors.value[`item_${item.id}_batch`] = 'Lote requerido';
-                isValid = false;
-            }
-        }
     });
 
     return isValid;
@@ -364,7 +313,6 @@ const handleSubmit = async () => {
                 reference_type: headerForm.value.reference_type,
                 reference_id: headerForm.value.reference_id || undefined,
                 notes: headerForm.value.notes || undefined,
-                product_batch_id: item.product_batch_id || undefined,
             })),
         };
 
@@ -569,12 +517,6 @@ const cancel = () => {
                                             </th>
                                             <th
                                                 scope="col"
-                                                class="px-3 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-300"
-                                            >
-                                                Lote (Stock)
-                                            </th>
-                                            <th
-                                                scope="col"
                                                 class="w-24 px-3 py-3 text-center text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-300"
                                             >
                                                 Cant.
@@ -641,11 +583,6 @@ const cancel = () => {
                                                                 item.variant_id
                                                             "
                                                             class="w-full"
-                                                            @update:model-value="
-                                                                handleVariantChange(
-                                                                    index,
-                                                                )
-                                                            "
                                                             :options="[
                                                                 {
                                                                     value: null,
@@ -707,53 +644,6 @@ const cancel = () => {
                                                     Solo disponible al elegir
                                                     base
                                                 </div>
-                                            </td>
-                                            <td class="px-3 py-4 align-top">
-                                                <div
-                                                    v-if="
-                                                        item.batches.length > 0
-                                                    "
-                                                >
-                                                    <AppSelect
-                                                        v-model="
-                                                            item.product_batch_id
-                                                        "
-                                                        class="w-full"
-                                                        :options="[
-                                                            {
-                                                                value: null,
-                                                                label: 'Seleccionar lote...',
-                                                            },
-                                                            ...(
-                                                                item.batches ??
-                                                                []
-                                                            ).map((b) => ({
-                                                                value: b.id,
-                                                                label: `${b.batch_number} - Stock: ${b.quantity}`,
-                                                            })),
-                                                        ]"
-                                                    />
-                                                </div>
-                                                <div
-                                                    v-else-if="item.product_id"
-                                                    class="mt-2 text-xs text-gray-500 italic"
-                                                >
-                                                    Sin lotes registrados
-                                                </div>
-                                                <p
-                                                    v-if="
-                                                        formErrors[
-                                                            `item_${item.id}_batch`
-                                                        ]
-                                                    "
-                                                    class="mt-1 text-xs text-red-600"
-                                                >
-                                                    {{
-                                                        formErrors[
-                                                            `item_${item.id}_batch`
-                                                        ]
-                                                    }}
-                                                </p>
                                             </td>
                                             <td class="px-3 py-4 align-top">
                                                 <input

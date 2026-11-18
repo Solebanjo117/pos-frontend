@@ -187,18 +187,6 @@ export const normalizeInitialInventoryPayload = (inventory: unknown) => {
     }>;
 };
 
-export const normalizeOemReferencesPayload = <
-    T extends { oem_code?: unknown; manufacturer?: unknown },
->(
-    references: T[],
-) =>
-    references
-        .map((reference) => ({
-            oem_code: String(reference.oem_code ?? '').trim(),
-            manufacturer: String(reference.manufacturer ?? '').trim() || null,
-        }))
-        .filter((reference) => reference.oem_code !== '');
-
 export const normalizeAlternativesPayload = <
     T extends {
         id?: unknown;

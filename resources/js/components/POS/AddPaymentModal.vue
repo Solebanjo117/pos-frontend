@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Banknote, X, AlertCircle, CreditCard } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import { formatCurrency, roundMoney } from '@/utils/formatters';
 
@@ -150,13 +151,9 @@ const getMethodColor = (code: string) => methodColors[code] || 'gray';
 
                 <div class="space-y-4 p-6">
                     <!-- Error -->
-                    <div
-                        v-if="error"
-                        class="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20"
-                    >
-                        <AlertCircle class="h-4 w-4 flex-shrink-0" />
+                    <ErrorMessage v-if="error">
                         {{ error }}
-                    </div>
+                    </ErrorMessage>
 
                     <!-- Balance summary -->
                     <div
@@ -310,7 +307,7 @@ const getMethodColor = (code: string) => methodColors[code] || 'gray';
                     <button
                         @click="handleSubmit"
                         :disabled="!canSubmit || loading"
-                        class="w-full rounded-xl bg-indigo-600 py-3 font-bold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
                     >
                         {{
                             loading

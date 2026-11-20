@@ -11,6 +11,9 @@ import {
     RefreshCw,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
@@ -184,19 +187,15 @@ onMounted(fetchBackups);
                     </div>
                 </div>
 
-                <div
-                    v-if="error"
-                    class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="rounded-lg border bg-card py-10 text-center text-sm text-muted-foreground"
-                >
-                    Cargando backups...
-                </div>
+                    class="rounded-lg border bg-card"
+                    label="Cargando backups..."
+                />
 
                 <div v-else class="overflow-hidden rounded-lg border bg-card">
                     <table class="w-full text-sm">
@@ -245,12 +244,11 @@ onMounted(fetchBackups);
                                 </td>
                             </tr>
                             <tr v-if="backups.length === 0">
-                                <td
-                                    colspan="4"
-                                    class="px-4 py-10 text-center text-muted-foreground"
-                                >
-                                    No hay backups disponibles. Crea el primero
-                                    con "Backup ahora".
+                                <td colspan="4">
+                                    <EmptyState
+                                        >No hay backups disponibles. Crea el
+                                        primero con "Backup ahora".</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

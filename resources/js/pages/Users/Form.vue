@@ -12,7 +12,9 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { useToast } from '@/composables/useToast';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 
@@ -65,6 +67,13 @@ const form = ref({
         props.userData?.role === 'admin',
     warehouse_ids: props.userData?.warehouse_ids ?? ([] as number[]),
 });
+
+// Con un solo almacén la sección está oculta: un usuario sin almacenes recibe todos (hoy, el único),
+// para que siempre pueda operar.
+if (!multiWarehouse && form.value.warehouse_ids.length === 0) {
+    form.value.warehouse_ids =
+        props.warehouses?.map((warehouse) => warehouse.id) ?? [];
+}
 
 const errors = ref<Record<string, string>>({});
 const loading = ref(false);
@@ -315,7 +324,7 @@ const submit = async () => {
                         <div class="mb-4 flex items-center gap-2">
                             <ShieldCheck class="h-4 w-4 text-primary" />
                             <h3 class="text-sm font-semibold text-foreground">
-                                Rol y almacenes
+                                {{ multiWarehouse ? 'Rol y almacenes' : 'Rol' }}
                             </h3>
                         </div>
 
@@ -324,22 +333,20 @@ const submit = async () => {
                                 <label class="block text-sm font-medium"
                                     >Rol</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="form.role"
-                                    class="h-10 w-full rounded-md border bg-background px-3 text-sm transition outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option
-                                        v-for="role in VALID_ROLES"
-                                        :key="role.value"
-                                        :value="role.value"
-                                    >
-                                        {{ role.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(VALID_ROLES ?? []).map((role) => ({
+                                            value: role.value,
+                                            label: String(role.label),
+                                        })),
+                                    ]"
+                                />
                             </div>
 
                             <div
-                                v-if="isAdminRole"
+                                v-if="multiWarehouse && isAdminRole"
                                 class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200"
                             >
                                 Los administradores tienen acceso automatico a
@@ -347,7 +354,11 @@ const submit = async () => {
                             </div>
 
                             <div
-                                v-else-if="warehouses && warehouses.length > 0"
+                                v-else-if="
+                                    multiWarehouse &&
+                                    warehouses &&
+                                    warehouses.length > 0
+                                "
                                 class="space-y-2"
                             >
                                 <div

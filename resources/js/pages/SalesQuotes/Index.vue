@@ -19,6 +19,9 @@ import {
 import { Banknote } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
@@ -240,20 +243,20 @@ onMounted(() => fetchQuotes());
         <div class="flex items-center justify-between">
             <div>
                 <h1
-                    class="flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white"
+                    class="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <FileText
                         class="h-8 w-8 text-indigo-600 dark:text-primary"
                     />
                     Cotizaciones
                 </h1>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Presupuestos y estimaciones para clientes
                 </p>
             </div>
             <Link
                 href="/sales-quotes/create"
-                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white shadow-sm transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
             >
                 <Plus :size="20" />
                 Nueva Cotización
@@ -287,19 +290,16 @@ onMounted(() => fetchQuotes());
                     <label class="mb-1 block text-xs font-medium text-gray-500"
                         >Estado</label
                     >
-                    <select
+                    <AppSelect
                         v-model="statusFilter"
-                        @change="fetchQuotes(1)"
-                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                    >
-                        <option
-                            v-for="opt in statusOptions"
-                            :key="opt.value"
-                            :value="opt.value"
-                        >
-                            {{ opt.label }}
-                        </option>
-                    </select>
+                        @update:model-value="fetchQuotes(1)"
+                        :options="[
+                            ...(statusOptions ?? []).map((opt) => ({
+                                value: opt.value,
+                                label: String(opt.label),
+                            })),
+                        ]"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-gray-500"
@@ -332,12 +332,7 @@ onMounted(() => fetchQuotes());
         </div>
 
         <!-- Loading -->
-        <div v-if="loading" class="py-12 text-center text-gray-500">
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
-            ></div>
-            Cargando cotizaciones...
-        </div>
+        <LoadingState v-if="loading" label="Cargando cotizaciones..." />
 
         <!-- Empty State -->
         <div
@@ -347,12 +342,10 @@ onMounted(() => fetchQuotes());
             <FileText
                 class="mx-auto mb-4 h-16 w-16 text-gray-300 dark:text-gray-600"
             />
-            <p class="text-gray-500 dark:text-gray-400">
-                No hay cotizaciones para mostrar.
-            </p>
+            <EmptyState compact>No hay cotizaciones para mostrar.</EmptyState>
             <Link
                 href="/sales-quotes/create"
-                class="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                class="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
             >
                 <Plus :size="16" />
                 Crear primera cotización

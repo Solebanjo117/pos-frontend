@@ -52,6 +52,10 @@ export interface VehicleEngineRow extends VehicleCatalogCapability {
     displacement?: string | null;
     fuel_type?: string | null;
     aspiration?: string | null;
+    nickname?: string | null;
+    valves?: string | null;
+    cam_type?: string | null;
+    cylinders?: number | null;
     vehicles_count: number;
     make?: { id: number; name: string };
     models?: Array<{ id: number; name: string }>;
@@ -80,6 +84,10 @@ export interface VehicleConfigurationRow extends VehicleCatalogCapability {
         displacement?: string | null;
         fuel_type?: string | null;
         aspiration?: string | null;
+        nickname?: string | null;
+        valves?: string | null;
+        cam_type?: string | null;
+        cylinders?: number | null;
     };
     vins: VehicleVinRow[];
     vins_count: number;
@@ -105,6 +113,42 @@ const endpointByTab: Record<VehicleCatalogTab, string> = {
     models: '/vehicle-models',
     vehicles: '/vehicle-configurations',
 };
+
+type EngineSheet = Pick<
+    VehicleEngineRow,
+    | 'displacement'
+    | 'valves'
+    | 'cam_type'
+    | 'cylinders'
+    | 'fuel_type'
+    | 'aspiration'
+>;
+
+const fuelLabels: Record<string, string> = {
+    Gasoline: 'Gasolina',
+    Diesel: 'Diésel',
+    Hybrid: 'Híbrido',
+    Electric: 'Eléctrico',
+};
+
+/** Ficha corta del motor, como en el catálogo del taller: "1.8L 16V DOHC". */
+export const engineSheet = (engine: EngineSheet): string =>
+    [engine.displacement, engine.valves, engine.cam_type]
+        .filter(Boolean)
+        .join(' ');
+
+/** Ficha completa: "1.8L 16V DOHC · 4 cil. · Gasolina · Turbo". */
+export const engineSpecsLabel = (engine: EngineSheet): string =>
+    [
+        engineSheet(engine),
+        engine.cylinders ? `${engine.cylinders} cil.` : null,
+        engine.fuel_type
+            ? (fuelLabels[engine.fuel_type] ?? engine.fuel_type)
+            : null,
+        engine.aspiration,
+    ]
+        .filter(Boolean)
+        .join(' · ') || 'Sin especificaciones';
 
 export function useVehicleCatalog() {
     const fetchSummary = async (): Promise<VehicleCatalogSummary> => {

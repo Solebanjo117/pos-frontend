@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Send, Save } from 'lucide-vue-next';
 import { computed, reactive, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/composables/useAuth';
 import { changelogApi } from '@/services/api/changelog';
@@ -75,18 +76,18 @@ const submit = async (publish: boolean) => {
                 placeholder="Titulo de la nota"
                 class="h-9 rounded-md border border-input bg-background px-3 text-sm transition-colors outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
             />
-            <select
+            <AppSelect
                 v-model="form.category"
-                class="h-9 rounded-md border border-input bg-background px-3 text-sm transition-colors outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
-            >
-                <option value="operations">Operaciones</option>
-                <option value="catalog">Catalogo</option>
-                <option value="pos">POS</option>
-                <option value="imports">Importadores</option>
-                <option value="pricing">Precios</option>
-                <option value="stability">Estabilidad</option>
-                <option value="general">General</option>
-            </select>
+                :options="[
+                    { value: 'operations', label: 'Operaciones' },
+                    { value: 'catalog', label: 'Catalogo' },
+                    { value: 'pos', label: 'POS' },
+                    { value: 'imports', label: 'Importadores' },
+                    { value: 'pricing', label: 'Precios' },
+                    { value: 'stability', label: 'Estabilidad' },
+                    { value: 'general', label: 'General' },
+                ]"
+            />
         </div>
 
         <textarea

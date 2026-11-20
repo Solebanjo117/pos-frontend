@@ -2,6 +2,10 @@
 
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    appSelectButton,
+    chooseAppSelectOption,
+} from '@/lib/testing/appSelect';
 import TransactionsIndex from './Index.vue';
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +13,14 @@ const mocks = vi.hoisted(() => ({
     initWarehouse: vi.fn(),
     getWarehouseContext: vi.fn(),
     role: 'seller',
+    multiWarehouse: false,
+}));
+
+// El selector de sucursal solo existe con varios almacenes (config/features.ts).
+vi.mock('@/config/features', () => ({
+    get MULTI_WAREHOUSE_ENABLED() {
+        return mocks.multiWarehouse;
+    },
 }));
 
 vi.mock('@inertiajs/vue3', () => ({
@@ -138,14 +150,24 @@ describe('Transactions index', () => {
         expect(wrapper.text()).toContain('100.00');
     });
 
-    it('lets an admin filter an authorized warehouse without changing global context', async () => {
+    it('hides the branch selector while working with a single warehouse', async () => {
         mocks.role = 'admin';
+        mocks.multiWarehouse = false;
         const wrapper = mount(TransactionsIndex);
         await flushPromises();
 
-        const selector = wrapper.find('select[aria-label="Sucursal"]');
+        expect(appSelectButton(wrapper, 'Sucursal').exists()).toBe(false);
+    });
+
+    it('lets an admin filter an authorized warehouse without changing global context', async () => {
+        mocks.role = 'admin';
+        mocks.multiWarehouse = true;
+        const wrapper = mount(TransactionsIndex);
+        await flushPromises();
+
+        const selector = appSelectButton(wrapper, 'Sucursal');
         expect(selector.exists()).toBe(true);
-        await selector.setValue('2');
+        await chooseAppSelectOption(selector, 'Sucursal Dos');
         await wrapper.find('form').trigger('submit');
         await flushPromises();
 

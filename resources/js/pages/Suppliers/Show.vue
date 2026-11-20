@@ -22,9 +22,14 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
-import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
+import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { suppliersService } from '@/services/suppliers';
@@ -588,7 +593,7 @@ const removeVariant = async (variantId?: number | null) => {
 <template>
     <Head :title="supplier?.name || 'Proveedor'" />
     <AppLayout>
-        <div class="mx-auto max-w-6xl space-y-6">
+        <div class="mx-auto w-full max-w-6xl space-y-6">
             <div
                 class="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm dark:border-emerald-900/30 dark:bg-card"
             >
@@ -657,7 +662,7 @@ const removeVariant = async (variantId?: number | null) => {
                         <Link
                             v-if="supplier"
                             :href="`/suppliers/${supplier.id}/edit`"
-                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-white transition hover:bg-emerald-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="inline-flex items-center gap-2 transition h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         >
                             <Pencil :size="18" />
                             Editar
@@ -763,12 +768,9 @@ const removeVariant = async (variantId?: number | null) => {
                     </nav>
                 </div>
 
-                <div
-                    v-if="purchaseHistoryError"
-                    class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300"
-                >
+                <ErrorMessage v-if="purchaseHistoryError">
                     {{ purchaseHistoryError }}
-                </div>
+                </ErrorMessage>
 
                 <div
                     v-if="activeTab === 'summary'"
@@ -951,19 +953,10 @@ const removeVariant = async (variantId?: number | null) => {
                                 class="h-9 w-64 rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-border dark:bg-muted dark:text-white"
                                 @keyup.enter="searchPurchaseHistory"
                             />
-                            <select
-                                v-model="purchaseHistoryFilters.payment_status"
-                                class="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                @change="searchPurchaseHistory"
-                            >
-                                <option value="">Pago: todos</option>
-                                <option value="pending">Pendiente</option>
-                                <option value="partial">Parcial</option>
-                                <option value="paid">Pagado</option>
-                            </select>
+                            <AppSelect v-model="purchaseHistoryFilters.payment_status" @update:model-value="searchPurchaseHistory()" :options="[{ value: '', label: 'Pago: todos' }, { value: 'pending', label: 'Pendiente' }, { value: 'partial', label: 'Parcial' }, { value: 'paid', label: 'Pagado' }]" />
                             <button
                                 type="button"
-                                class="inline-flex h-9 items-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                                class="inline-flex items-center gap-2 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                                 @click="searchPurchaseHistory"
                             >
                                 <Search :size="15" />
@@ -971,12 +964,7 @@ const removeVariant = async (variantId?: number | null) => {
                             </button>
                         </div>
                     </div>
-                    <div
-                        v-if="purchaseHistoryLoading"
-                        class="p-8 text-sm text-gray-500"
-                    >
-                        Cargando historial...
-                    </div>
+                    <LoadingState v-if="purchaseHistoryLoading" label="Cargando historial..." />
                     <div v-else class="overflow-x-auto">
                         <table class="min-w-full text-sm">
                             <thead
@@ -985,7 +973,7 @@ const removeVariant = async (variantId?: number | null) => {
                                 <tr>
                                     <th class="px-3 py-2 text-left">OC</th>
                                     <th class="px-3 py-2 text-left">Fecha</th>
-                                    <th class="px-3 py-2 text-left">
+                                    <th v-if="multiWarehouse" class="px-3 py-2 text-left">
                                         Sucursal
                                     </th>
                                     <th class="px-3 py-2 text-right">Items</th>
@@ -1033,7 +1021,7 @@ const removeVariant = async (variantId?: number | null) => {
                                     <td class="px-3 py-2 text-gray-600">
                                         {{ formatDate(order.order_date) }}
                                     </td>
-                                    <td class="px-3 py-2 text-gray-600">
+                                    <td v-if="multiWarehouse" class="px-3 py-2 text-gray-600">
                                         {{ order.warehouse?.name || '-' }}
                                     </td>
                                     <td class="px-3 py-2 text-right font-mono">
@@ -1146,7 +1134,7 @@ const removeVariant = async (variantId?: number | null) => {
                                     <td class="px-3 py-2">
                                         <Link
                                             v-if="item.product_id"
-                                            :href="`/products/${item.product_id}`"
+                                            :href="`/inventory/products/${item.product_id}`"
                                             class="font-semibold text-indigo-600 hover:underline"
                                         >
                                             {{
@@ -1226,7 +1214,7 @@ const removeVariant = async (variantId?: number | null) => {
                             <Link
                                 v-if="hasAccountsPayableOrders"
                                 :href="`/accounts-payable?supplier_id=${supplier.id}`"
-                                class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                                class="inline-flex items-center gap-2 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                             >
                                 <Banknote :size="15" />
                                 Ver en Cuentas por Pagar
@@ -1345,7 +1333,7 @@ const removeVariant = async (variantId?: number | null) => {
                         </div>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="inline-flex items-center gap-2 transition disabled:cursor-not-allowed disabled:opacity-60 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                             :disabled="linkingProducts"
                             @click="openProductPicker"
                         >
@@ -1358,12 +1346,9 @@ const removeVariant = async (variantId?: number | null) => {
                         </button>
                     </div>
 
-                    <div
-                        v-if="supplierProductActionError"
-                        class="border-b border-red-200 bg-red-50 px-6 py-3 text-sm font-medium text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"
-                    >
+                    <ErrorMessage v-if="supplierProductActionError">
                         {{ supplierProductActionError }}
-                    </div>
+                    </ErrorMessage>
 
                     <div
                         class="border-b border-gray-200 bg-gray-50 p-4 dark:border-border dark:bg-muted/20"
@@ -1393,14 +1378,7 @@ const removeVariant = async (variantId?: number | null) => {
                         </div>
                     </div>
 
-                    <div v-if="loadingSupplierProducts" class="p-8 text-center">
-                        <div
-                            class="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600"
-                        ></div>
-                        <p class="mt-3 text-sm text-gray-500">
-                            Cargando productos suministrados...
-                        </p>
-                    </div>
+                    <LoadingState v-if="loadingSupplierProducts" label="Cargando productos suministrados..." />
 
                     <div
                         v-else-if="groupedSupplierProducts.length"
@@ -1430,7 +1408,7 @@ const removeVariant = async (variantId?: number | null) => {
                                 </span>
                                 <span>
                                     <Link
-                                        :href="`/products/${group.product_id}`"
+                                        :href="`/inventory/products/${group.product_id}`"
                                         class="font-medium text-emerald-600 hover:underline dark:text-emerald-400"
                                         @click.stop
                                     >
@@ -1495,7 +1473,7 @@ const removeVariant = async (variantId?: number | null) => {
                                                 Lead time
                                             </th>
                                             <th class="py-2 text-center">
-                                                Preferido
+                                                Por defecto
                                             </th>
                                             <th class="py-2 text-right">
                                                 Pendiente
@@ -1694,21 +1672,13 @@ const removeVariant = async (variantId?: number | null) => {
                                                 </span>
                                             </td>
                                             <td class="py-3 pr-4 text-center">
-                                                <input
-                                                    v-if="row.variant_id"
-                                                    v-model="
-                                                        editForms[
-                                                            row.variant_id
-                                                        ].is_preferred
-                                                    "
-                                                    type="checkbox"
-                                                    class="rounded border-gray-300"
-                                                />
+                                                <!-- Automático (2026-11-17): el proveedor más barato de la marca. -->
                                                 <span
-                                                    v-else-if="row.is_preferred"
-                                                    class="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700"
+                                                    v-if="row.is_preferred"
+                                                    title="El proveedor más barato de esta marca. Se calcula solo con el costo de la última compra."
+                                                    class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700"
                                                 >
-                                                    Preferido
+                                                    Más barato
                                                 </span>
                                                 <span
                                                     v-else
@@ -1857,7 +1827,7 @@ const removeVariant = async (variantId?: number | null) => {
                         </div>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm text-white transition hover:bg-emerald-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="inline-flex items-center gap-1 transition h-8 rounded-md px-3 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                             @click="openBrandSelector"
                         >
                             <Plus :size="16" />
@@ -1870,24 +1840,10 @@ const removeVariant = async (variantId?: number | null) => {
                         class="border-b border-gray-200 bg-gray-50 px-6 py-4 dark:border-border dark:bg-muted/30"
                     >
                         <div class="flex items-center gap-3">
-                            <select
-                                v-model="selectedBrandId"
-                                class="flex-1 rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="null" disabled>
-                                    Seleccionar marca...
-                                </option>
-                                <option
-                                    v-for="brand in brandsNotYetLinked"
-                                    :key="brand.id"
-                                    :value="brand.id"
-                                >
-                                    {{ brand.name }}
-                                </option>
-                            </select>
+                            <AppSelect v-model="selectedBrandId" class="flex-1" placeholder="Seleccionar marca..." :options="[...((brandsNotYetLinked) ?? []).map((brand) => ({ value: brand.id, label: String(brand.name) }))]" />
                             <button
                                 type="button"
-                                class="rounded-md bg-green-600 px-4 py-2 text-sm text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                class="transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                                 :disabled="!selectedBrandId || attachingBrand"
                                 @click="attachSelectedBrand"
                             >
@@ -1913,6 +1869,11 @@ const removeVariant = async (variantId?: number | null) => {
                     </div>
 
                     <div class="p-6">
+                        <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                            Las marcas de las piezas que tienen este proveedor
+                            aparecen solas. Agrega a mano las que trae pero
+                            todavía no tienen piezas registradas.
+                        </p>
                         <div
                             v-if="loadingBrands"
                             class="flex justify-center py-4"
@@ -1936,10 +1897,21 @@ const removeVariant = async (variantId?: number | null) => {
                                 >
                                     {{ brand.name }}
                                 </Link>
+                                <span
+                                    data-test="supplier-brand-origin"
+                                    class="text-xs font-normal text-blue-500 dark:text-blue-300/80"
+                                    >{{
+                                        (brand.pieces ?? 0) > 0
+                                            ? `· ${brand.pieces} ${brand.pieces === 1 ? 'pieza' : 'piezas'}`
+                                            : '· marcada a mano'
+                                    }}</span
+                                >
+                                <!-- Solo se quitan las marcadas a mano; las de piezas dependen de sus piezas. -->
                                 <button
+                                    v-if="(brand.pieces ?? 0) === 0"
                                     type="button"
                                     class="ml-0.5 text-blue-400 transition hover:text-red-500"
-                                    title="Desasociar marca"
+                                    title="Quitar marca"
                                     @click="removeBrand(brand.id)"
                                 >
                                     <X :size="14" />
@@ -1954,7 +1926,7 @@ const removeVariant = async (variantId?: number | null) => {
                                 class="mx-auto mb-2 text-gray-300"
                                 :size="36"
                             />
-                            <p>No hay marcas asociadas a este proveedor</p>
+                            <EmptyState compact>No hay marcas asociadas a este proveedor</EmptyState>
                         </div>
                     </div>
                 </div>

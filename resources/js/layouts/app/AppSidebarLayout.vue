@@ -25,7 +25,10 @@ withDefaults(defineProps<Props>(), {
                 :breadcrumbs="breadcrumbs"
                 :show-warehouse-selector="showWarehouseSelector"
             />
-            <slot />
+            <!-- Margen interior único para todas las páginas (ver .app-page en app.css). -->
+            <div class="app-page flex flex-1 flex-col" data-testid="app-page">
+                <slot />
+            </div>
             <footer
                 class="mt-auto border-t border-gray-200 px-6 py-3 text-center text-xs text-gray-400 dark:border-gray-700/50 dark:text-gray-500"
             >

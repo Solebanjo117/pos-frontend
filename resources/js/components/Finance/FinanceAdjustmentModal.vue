@@ -10,11 +10,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import { financialAdjustmentsService } from '@/services/financial-adjustments';
 import type {
     AdjustmentOption,
@@ -229,6 +233,8 @@ const canContinue = computed(() => {
     return true;
 });
 
+const { currentWarehouseId } = usePosSettings();
+
 watch(
     () => props.open,
     async (open) => {
@@ -242,6 +248,13 @@ watch(
         loading.value = true;
         try {
             options.value = await financialAdjustmentsService.options();
+            // Con un solo almacén el campo está oculto: se usa el almacén actual (o el único disponible).
+            if (!multiWarehouse) {
+                const onlyWarehouse = options.value.warehouses[0];
+                form.value.warehouse_id =
+                    currentWarehouseId.value ??
+                    (onlyWarehouse ? Number(onlyWarehouse.value) : null);
+            }
             await nextTick();
             if (
                 form.value.type === 'accounts_receivable' &&
@@ -374,19 +387,10 @@ async function submit(): Promise<void> {
                 </DialogDescription>
             </DialogHeader>
 
-            <div
-                v-if="error"
-                role="alert"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-if="error" role="alert">
                 {{ error }}
-            </div>
-            <div
-                v-if="loading"
-                class="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"
-            >
-                <LoaderCircle class="size-4 animate-spin" /> Cargando opciones…
-            </div>
+            </ErrorMessage>
+            <LoadingState v-if="loading" label="Cargando opciones..." />
 
             <div v-else-if="confirmation" class="space-y-4">
                 <div class="rounded-xl border bg-muted/30 p-4">
@@ -560,7 +564,7 @@ async function submit(): Promise<void> {
                     </div>
                 </template>
                 <template v-if="form.type === 'inventory'">
-                    <div>
+                    <div v-if="multiWarehouse">
                         <Label>Almacén</Label
                         ><SearchableSelect
                             v-model="form.warehouse_id"

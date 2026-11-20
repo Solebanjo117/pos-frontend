@@ -23,11 +23,11 @@ const selectedVehicle = ref<{
     <Head title="Buscador de Vehículos" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-7xl space-y-6 p-6">
-            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+        <div class="mx-auto w-full max-w-7xl space-y-6">
+            <h1 class="text-2xl font-semibold tracking-tight text-foreground">
                 Buscador y Selector de Vehículos
             </h1>
-            <p class="text-gray-500 dark:text-gray-400">
+            <p class="text-sm text-muted-foreground">
                 Prueba del componente de selección jerárquica (Año > Marca >
                 Modelo > Motor).
             </p>

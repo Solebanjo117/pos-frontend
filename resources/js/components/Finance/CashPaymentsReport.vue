@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { onMounted, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { useAuth } from '@/composables/useAuth';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
 import { validateFinancialReportDates } from '@/utils/financialReport';
 import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
@@ -221,10 +223,12 @@ onMounted(async () => {
 </script>
 
 <template>
-    <main class="space-y-4 p-4 md:p-6">
+    <main class="space-y-4">
         <header class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h1 class="text-xl font-semibold">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     {{
                         reportMode
                             ? 'Cobros por método'
@@ -271,30 +275,29 @@ onMounted(async () => {
                 load();
             "
         >
-            <label class="text-xs"
-                >Sucursal<select
+            <label v-if="multiWarehouse" class="text-xs"
+                >Sucursal<AppSelect
                     v-model="filters.warehouse_id"
-                    class="mt-1 block rounded-md border bg-background p-2"
-                >
-                    <option value="">Sucursal activa</option>
-                    <option
-                        v-for="warehouse in filterOptions.warehouses"
-                        :key="warehouse.id"
-                        :value="warehouse.id"
-                    >
-                        {{ warehouse.name }}
-                    </option>
-                </select></label
+                    class="mt-1 block"
+                    :options="[
+                        { value: '', label: 'Sucursal activa' },
+                        ...(filterOptions.warehouses ?? []).map(
+                            (warehouse) => ({
+                                value: warehouse.id,
+                                label: String(warehouse.name),
+                            }),
+                        ),
+                    ]" /></label
             ><label v-if="!reportMode" class="text-xs"
-                >Operación<select
+                >Operación<AppSelect
                     v-model="filters.scope"
-                    class="mt-1 block rounded-md border bg-background p-2"
-                >
-                    <option value="sales">Ventas y devoluciones</option>
-                    <option value="operations">Gastos y aportaciones</option>
-                    <option value="purchases">Pagos de compras</option>
-                </select></label
-            >
+                    class="mt-1 block"
+                    :options="[
+                        { value: 'sales', label: 'Ventas y devoluciones' },
+                        { value: 'operations', label: 'Gastos y aportaciones' },
+                        { value: 'purchases', label: 'Pagos de compras' },
+                    ]"
+            /></label>
             <ReportPeriod
                 v-if="reportMode"
                 v-model:from="filters.date_from"
@@ -313,50 +316,41 @@ onMounted(async () => {
                     class="mt-1 block rounded-md border bg-background p-2"
             /></label>
             <label class="text-xs"
-                >Método<select
+                >Método<AppSelect
                     v-model="filters.method"
-                    class="mt-1 block rounded-md border bg-background p-2"
-                >
-                    <option value="">Todos</option>
-                    <option
-                        v-for="method in filterOptions.methods"
-                        :key="method.code"
-                        :value="method.code"
-                    >
-                        {{ method.name || method.code }}
-                    </option>
-                </select></label
-            >
+                    class="mt-1 block"
+                    :options="[
+                        { value: '', label: 'Todos' },
+                        ...(filterOptions.methods ?? []).map((method) => ({
+                            value: method.code,
+                            label: String(method.name || method.code),
+                        })),
+                    ]"
+            /></label>
             <label class="text-xs"
-                >Sesión<select
+                >Sesión<AppSelect
                     v-model="filters.pos_session_id"
-                    class="mt-1 block rounded-md border bg-background p-2"
-                >
-                    <option value="">Todas</option>
-                    <option
-                        v-for="session in filterOptions.sessions"
-                        :key="session.id"
-                        :value="session.id"
-                    >
-                        Caja #{{ session.id }}
-                    </option>
-                </select></label
-            >
+                    class="mt-1 block"
+                    :options="[
+                        { value: '', label: 'Todas' },
+                        ...(filterOptions.sessions ?? []).map((session) => ({
+                            value: session.id,
+                            label: `Caja #${session.id}`,
+                        })),
+                    ]"
+            /></label>
             <label class="text-xs"
-                >Operador<select
+                >Operador<AppSelect
                     v-model="filters.user_id"
-                    class="mt-1 block rounded-md border bg-background p-2"
-                >
-                    <option value="">Todos</option>
-                    <option
-                        v-for="operator in filterOptions.operators"
-                        :key="operator.id"
-                        :value="operator.id"
-                    >
-                        {{ operator.name }}
-                    </option>
-                </select></label
-            >
+                    class="mt-1 block"
+                    :options="[
+                        { value: '', label: 'Todos' },
+                        ...(filterOptions.operators ?? []).map((operator) => ({
+                            value: operator.id,
+                            label: String(operator.name),
+                        })),
+                    ]"
+            /></label>
             <label class="flex items-center gap-2 text-sm"
                 ><input
                     v-model="filters.pending_account"
@@ -472,22 +466,22 @@ onMounted(async () => {
                                     >Pendiente de asignar cuenta</span
                                 >
                                 <div v-if="isManager" class="mt-1 flex gap-2">
-                                    <select
+                                    <AppSelect
                                         v-model="
                                             accountSelection[
                                                 `${row.scope}-${row.id}`
                                             ]
                                         "
-                                        class="max-w-48 rounded border bg-background p-1"
-                                    >
-                                        <option
-                                            v-for="account in accounts"
-                                            :key="account.endpoint_id"
-                                            :value="account.endpoint_id"
-                                        >
-                                            {{ account.name }}
-                                        </option></select
-                                    ><button
+                                        class="max-w-48"
+                                        :options="[
+                                            ...(accounts ?? []).map(
+                                                (account) => ({
+                                                    value: account.endpoint_id,
+                                                    label: String(account.name),
+                                                }),
+                                            ),
+                                        ]"
+                                    /><button
                                         :disabled="
                                             saving ||
                                             !accountSelection[

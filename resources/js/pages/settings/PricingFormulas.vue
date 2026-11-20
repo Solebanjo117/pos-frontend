@@ -12,6 +12,8 @@ import {
     AlertCircle,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePricingFormulas } from '@/composables/usePricingFormulas';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -141,7 +143,7 @@ const toggleActive = async (formula: PricingFormula) => {
 <template>
     <Head title="Fórmulas de Precio - Configuración" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
+        <div class="mx-auto w-full max-w-5xl space-y-6">
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -152,11 +154,11 @@ const toggleActive = async (formula: PricingFormula) => {
                     </div>
                     <div>
                         <h1
-                            class="text-2xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             Fórmulas de Precio
                         </h1>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                        <p class="text-sm text-muted-foreground">
                             Administra las fórmulas dinámicas para calcular
                             precios de venta
                         </p>
@@ -188,23 +190,18 @@ const toggleActive = async (formula: PricingFormula) => {
                 </div>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Formulas List -->
             <div
                 class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
             >
-                <div
+                <LoadingState
                     v-if="loading && formulas.length === 0"
-                    class="p-8 text-center text-gray-500"
-                >
-                    Cargando fórmulas...
-                </div>
+                    label="Cargando fórmulas..."
+                />
 
                 <table
                     v-else
@@ -353,12 +350,9 @@ const toggleActive = async (formula: PricingFormula) => {
                     </div>
 
                     <div class="space-y-4 overflow-y-auto p-4">
-                        <div
-                            v-if="formError"
-                            class="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                        >
+                        <ErrorMessage v-if="formError">
                             {{ formError }}
-                        </div>
+                        </ErrorMessage>
 
                         <div
                             v-if="form.is_preset"

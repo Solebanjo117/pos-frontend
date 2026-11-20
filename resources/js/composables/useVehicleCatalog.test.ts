@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useVehicleCatalog } from './useVehicleCatalog';
+import {
+    engineSheet,
+    engineSpecsLabel,
+    useVehicleCatalog,
+} from './useVehicleCatalog';
 
 const { get, post, patch, put, remove } = vi.hoisted(() => ({
     get: vi.fn(),
@@ -157,5 +161,34 @@ describe('useVehicleCatalog', () => {
             engine_id: 10,
         });
         expect(remove).toHaveBeenCalledWith('/vehicle-configurations/7/9');
+    });
+});
+
+describe('engine sheet labels', () => {
+    it('builds the short sheet like the workshop catalog', () => {
+        expect(
+            engineSheet({
+                displacement: '1.8L',
+                valves: '16V',
+                cam_type: 'DOHC',
+            }),
+        ).toBe('1.8L 16V DOHC');
+    });
+
+    it('adds cylinders fuel in spanish and aspiration to the full label', () => {
+        expect(
+            engineSpecsLabel({
+                displacement: '3.0L',
+                valves: '24V',
+                cam_type: 'SOHC',
+                cylinders: 6,
+                fuel_type: 'Diesel',
+                aspiration: 'Turbo',
+            }),
+        ).toBe('3.0L 24V SOHC · 6 cil. · Diésel · Turbo');
+    });
+
+    it('falls back when the engine has no data', () => {
+        expect(engineSpecsLabel({})).toBe('Sin especificaciones');
     });
 });

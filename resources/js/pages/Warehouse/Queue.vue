@@ -4,6 +4,8 @@ import { PackageSearch, Package, CheckCircle, X } from 'lucide-vue-next';
 import { ref, onMounted, onUnmounted } from 'vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import SalesQueueCard from '@/components/Queues/SalesQueueCard.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useWarehouseQueue,
     type WarehouseOrder,
@@ -97,7 +99,7 @@ const handlePrepare = async (order: WarehouseOrder) => {
         <div class="flex items-center justify-between">
             <div>
                 <h1
-                    class="flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white"
+                    class="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <PackageSearch
                         class="h-8 w-8 text-indigo-600 dark:text-indigo-400"
@@ -110,22 +112,17 @@ const handlePrepare = async (order: WarehouseOrder) => {
                         {{ count }}
                     </span>
                 </h1>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Órdenes pendientes de agrupar y preparar para su entrega
                 </p>
             </div>
         </div>
 
         <!-- Loading -->
-        <div
+        <LoadingState
             v-if="loading && orders.length === 0"
-            class="py-16 text-center text-gray-500"
-        >
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
-            ></div>
-            Cargando órdenes pendientes...
-        </div>
+            label="Cargando órdenes pendientes..."
+        />
 
         <!-- Error -->
         <div
@@ -154,9 +151,10 @@ const handlePrepare = async (order: WarehouseOrder) => {
             >
                 Bodega al día
             </h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                No hay órdenes pendientes de preparación en este momento.
-            </p>
+            <EmptyState compact
+                >No hay órdenes pendientes de preparación en este
+                momento.</EmptyState
+            >
         </div>
 
         <!-- Cards Grid -->
@@ -187,7 +185,7 @@ const handlePrepare = async (order: WarehouseOrder) => {
                     <button
                         @click="handlePrepare(order)"
                         :disabled="processingId === order.id"
-                        class="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <div
                             v-if="processingId === order.id"

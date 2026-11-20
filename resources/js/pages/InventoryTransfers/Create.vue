@@ -8,6 +8,7 @@ import {
     Building2,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -17,8 +18,8 @@ import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Transferencias', href: '/inventory-transfers' },
-    { title: 'Nueva Transferencia', href: '/inventory-transfers/create' },
+    { title: 'Transferencias', href: '/inventory/transfers' },
+    { title: 'Nueva Transferencia', href: '/inventory/transfers/create' },
 ];
 
 interface Warehouse {
@@ -158,16 +159,16 @@ const submit = async () => {
 <template>
     <Head title="Nueva Transferencia" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-4xl space-y-6 p-4">
+        <div class="mx-auto w-full max-w-4xl space-y-6">
             <!-- Header -->
             <div>
                 <h1
-                    class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                    class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <ArrowLeftRight :size="32" class="text-indigo-500" />
                     Nueva Transferencia
                 </h1>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Enviar mercancía de una sucursal a otra
                 </p>
             </div>
@@ -338,17 +339,14 @@ const submit = async () => {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="errorMsg"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-            >
+            <ErrorMessage v-if="errorMsg">
                 {{ errorMsg }}
-            </div>
+            </ErrorMessage>
 
             <!-- Submit -->
             <div class="flex justify-end gap-3">
                 <a
-                    href="/inventory-transfers"
+                    href="/inventory/transfers"
                     class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-border dark:text-gray-300"
                 >
                     Cancelar
@@ -356,7 +354,7 @@ const submit = async () => {
                 <button
                     @click="submit"
                     :disabled="submitting"
-                    class="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
                 >
                     <Plus :size="16" />
                     {{

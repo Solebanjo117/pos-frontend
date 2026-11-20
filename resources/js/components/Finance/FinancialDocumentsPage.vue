@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
-    AlertCircle,
     ChevronLeft,
     ChevronRight,
     FileText,
-    LoaderCircle,
     Pencil,
     Plus,
     RefreshCw,
@@ -15,6 +13,8 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import FinancialDocumentPaymentDialog from '@/components/Finance/FinancialDocumentPaymentDialog.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -218,17 +218,17 @@ onMounted(load);
                 >
                     <div>
                         <h1
-                            class="text-2xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             {{ copy.title }}
                         </h1>
-                        <p class="text-sm text-gray-500">
+                        <p class="text-sm text-muted-foreground">
                             {{ copy.description }}
                         </p>
                     </div>
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="payableDocuments.length === 0"
                         @click="openPrimaryAction"
                     >
@@ -237,13 +237,9 @@ onMounted(load);
                     </button>
                 </header>
 
-                <div
-                    v-if="error"
-                    class="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
-                >
-                    <AlertCircle :size="16" />
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div
@@ -382,15 +378,10 @@ onMounted(load);
                                 class="divide-y divide-gray-100 dark:divide-border"
                             >
                                 <tr v-if="loading">
-                                    <td
-                                        colspan="8"
-                                        class="px-4 py-12 text-center text-gray-500"
-                                    >
-                                        <LoaderCircle
-                                            :size="22"
-                                            class="mx-auto mb-2 animate-spin"
+                                    <td colspan="8">
+                                        <LoadingState
+                                            label="Cargando documentos..."
                                         />
-                                        Cargando documentos...
                                     </td>
                                 </tr>
                                 <tr v-else-if="documents.length === 0">
@@ -500,12 +491,10 @@ onMounted(load);
                     <div
                         class="divide-y divide-gray-100 md:hidden dark:divide-border"
                     >
-                        <div
+                        <LoadingState
                             v-if="loading"
-                            class="p-10 text-center text-sm text-gray-500"
-                        >
-                            Cargando documentos...
-                        </div>
+                            label="Cargando documentos..."
+                        />
                         <div
                             v-else-if="documents.length === 0"
                             class="p-10 text-center text-sm text-gray-500"
@@ -759,7 +748,7 @@ onMounted(load);
                                       .can_register_receipt
                         "
                         type="button"
-                        class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white"
+                        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         @click="openPayment(selectedDocument)"
                     >
                         {{ copy.action }}

@@ -10,9 +10,11 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { CustomersApiService } from '@/services/customers';
 import { InventoryApiService } from '@/services/inventory';
@@ -125,13 +127,13 @@ onMounted(async () => {
     <Head title="Clientes y referencias" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-4 p-4">
+        <div class="space-y-4">
             <div
                 class="flex flex-col gap-3 border-b border-gray-200 pb-4 lg:flex-row lg:items-center lg:justify-between dark:border-border"
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                     >
                         <Users :size="26" class="text-cyan-600" />
                         Clientes y referencias
@@ -163,7 +165,7 @@ onMounted(async () => {
                         v-model:to="filters.date_to"
                         class="md:col-span-2"
                     />
-                    <SearchableSelect
+                    <SearchableSelect v-if="multiWarehouse"
                         v-model="filters.warehouse_id"
                         :options="warehouseOptions"
                         placeholder="Sucursal"
@@ -175,7 +177,7 @@ onMounted(async () => {
                     />
                     <button
                         type="button"
-                        class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gray-900 px-4 text-sm font-medium text-white disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
+                        class="inline-flex items-center justify-center gap-2 disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         :disabled="loading"
                         @click="fetchReport"
                     >
@@ -185,12 +187,9 @@ onMounted(async () => {
                 </div>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <section class="grid gap-3 md:grid-cols-4">
                 <div

@@ -26,6 +26,8 @@ import UnifiedPaymentPanel from '@/components/POS/UnifiedPaymentPanel.vue';
 import VariantSelectModal from '@/components/POS/VariantSelectModal.vue';
 import VehicleContextHeader from '@/components/POS/VehicleContextHeader.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSession } from '@/composables/usePosSession';
@@ -936,6 +938,26 @@ const modalSort = ref<string | undefined>(undefined);
 const modalCategoryIds = ref<number[] | undefined>(undefined);
 const modalBrandIds = ref<number[] | undefined>(undefined);
 
+// Vehículo para filtrar la búsqueda: el del cliente seleccionado o, si no hay, el vehículo de catálogo
+// elegido en la cabecera. Se envía el modelo para distinguir vehículos que comparten motor.
+const vehicleSearchFilter = () => {
+    const customerVehicle = selectedCustomerVehicle.value;
+    if (customerVehicle?.vehicle_engine_id) {
+        return {
+            vehicle_engine_id: customerVehicle.vehicle_engine_id,
+            vehicle_model_id: customerVehicle.vehicle_model_id || undefined,
+            vehicle_chassis_id: customerVehicle.vehicle_chassis_id ?? undefined,
+        };
+    }
+    if (catalogVehicle.value?.engine_id) {
+        return {
+            vehicle_engine_id: catalogVehicle.value.engine_id,
+            vehicle_model_id: catalogVehicle.value.model_id,
+        };
+    }
+    return {};
+};
+
 // Build filters
 const buildFilters = () => ({
     search: searchQuery.value || undefined,
@@ -953,9 +975,7 @@ const buildFilters = () => ({
     min_price: modalMinPrice.value,
     max_price: modalMaxPrice.value,
     in_stock: modalInStock.value || undefined,
-    vehicle_engine_id: selectedCustomerVehicle.value?.vehicle_engine_id,
-    vehicle_chassis_id:
-        selectedCustomerVehicle.value?.vehicle_chassis_id ?? undefined,
+    ...vehicleSearchFilter(),
     sort: modalSort.value || undefined,
     per_page: 20,
 });
@@ -1393,7 +1413,6 @@ const quoteTotalHasChanged = computed(
             Number(quoteSessionInfo.value.confirmedTotal) - cartTotal.value,
         ) >= 0.01,
 );
-
 
 const returnToCashierQueue = () => {
     if (isStrictCashier.value) {
@@ -2178,7 +2197,7 @@ onUnmounted(() => {
     />
 
     <div
-        class="flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-[#F8F9FB] text-gray-900 dark:bg-background dark:text-foreground"
+        class="app-page-full-bleed flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-[#F8F9FB] text-gray-900 dark:bg-background dark:text-foreground"
         style="font-family: 'Inter', sans-serif"
     >
         <!-- Return Mode Header -->
@@ -2774,27 +2793,21 @@ onUnmounted(() => {
                         >
                             Vehículo del cliente
                         </label>
-                        <select
+                        <AppSelect
                             id="customer-vehicle"
-                            v-model.number="customer_vehicle_id"
-                            class="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                        >
-                            <option :value="undefined">
-                                Sin vehículo relacionado
-                            </option>
-                            <option
-                                v-for="vehicle in customerVehicles"
-                                :key="vehicle.id"
-                                :value="vehicle.id"
-                            >
-                                {{ vehicle.display_name }}
-                                {{
-                                    vehicle.plate_number
-                                        ? `· ${vehicle.plate_number}`
-                                        : ''
-                                }}
-                            </option>
-                        </select>
+                            v-model="customer_vehicle_id"
+                            class="w-full"
+                            :options="[
+                                {
+                                    value: undefined,
+                                    label: 'Sin vehículo relacionado',
+                                },
+                                ...(customerVehicles ?? []).map((vehicle) => ({
+                                    value: vehicle.id,
+                                    label: `${vehicle.display_name} ${vehicle.plate_number ? `· ${vehicle.plate_number}` : ''}`,
+                                })),
+                            ]"
+                        />
                         <p class="text-xs text-muted-foreground">
                             La búsqueda de repuestos usará el motor y chasis de
                             este vehículo.
@@ -2834,24 +2847,21 @@ onUnmounted(() => {
                 >
                     {{ quoteDraft.error.value }}
                 </div>
-                <div
+                <ErrorMessage
                     v-if="error && !props.returnMode && !props.editMode"
-                    class="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm whitespace-pre-line text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
+                    class="mb-3 whitespace-pre-line"
                 >
                     <div class="flex items-start gap-2">
                         <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
                         <span>{{ error }}</span>
                     </div>
-                </div>
+                </ErrorMessage>
                 <div class="mt-auto shrink-0 pt-4">
                     <!-- Return Mode: Show Confirm Return button -->
                     <div v-if="props.returnMode" class="space-y-3">
-                        <div
-                            v-if="returnError"
-                            class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-                        >
+                        <ErrorMessage v-if="returnError">
                             {{ returnError }}
-                        </div>
+                        </ErrorMessage>
                         <button
                             @click="confirmReturn"
                             :disabled="returnLoading || cart.length === 0"
@@ -2891,12 +2901,9 @@ onUnmounted(() => {
 
                     <!-- Edit Mode: Show Confirm Edit button or Payment Modal -->
                     <div v-else-if="props.editMode" class="space-y-3">
-                        <div
-                            v-if="editError"
-                            class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-                        >
+                        <ErrorMessage v-if="editError">
                             {{ editError }}
-                        </div>
+                        </ErrorMessage>
 
                         <div
                             v-if="
@@ -2998,7 +3005,7 @@ onUnmounted(() => {
                             v-if="isPostSaleAmendment && orderDiff.total > 0"
                             @click="openPaymentModal()"
                             :disabled="editLoading"
-                            class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-blue-600 text-lg font-bold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
+                            class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
                         >
                             <svg
                                 v-if="editLoading"
@@ -3030,7 +3037,7 @@ onUnmounted(() => {
                             v-else-if="isEditableDraftOrder"
                             @click="saveEditableOrder"
                             :disabled="editLoading || cart.length === 0"
-                            class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-blue-600 text-lg font-bold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
+                            class="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-[0.98] disabled:bg-gray-300 dark:disabled:bg-muted"
                         >
                             <svg
                                 v-if="editLoading"
@@ -3214,7 +3221,7 @@ onUnmounted(() => {
                 </div>
                 <button
                     @click="showShortcutsHelp = false"
-                    class="mt-4 w-full rounded-xl bg-indigo-600 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="mt-4 h-9 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
                     Cerrar
                 </button>

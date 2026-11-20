@@ -15,6 +15,7 @@ import ProductVariantFormModal from '@/components/Products/ProductVariantFormMod
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import {
     DropdownMenu,
     DropdownMenuTrigger,
@@ -22,6 +23,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -29,6 +31,7 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useSuppliers } from '@/composables/useSuppliers';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
@@ -1019,7 +1022,7 @@ watch(
         :title="isEditing ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'"
     />
     <AppLayout>
-        <PurchaseOrderToolbar
+        <PurchaseOrderToolbar class="app-page-full-bleed"
             :title="toolbarTitle"
             :subtitle="toolbarSubtitle"
             status-label="Borrador"
@@ -1036,7 +1039,7 @@ watch(
                     type="submit"
                     form="purchase-order-form"
                     :disabled="loading || form.items.length === 0"
-                    class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                    class="inline-flex items-center gap-2 shadow-sm disabled:opacity-50 h-8 rounded-md px-3 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     <Save :size="16" />
                     {{ loading ? 'Guardando...' : 'Guardar cambios' }}
@@ -1044,13 +1047,10 @@ watch(
             </template>
         </PurchaseOrderToolbar>
 
-        <div class="mx-auto max-w-7xl space-y-4 p-3">
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+        <div class="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <form
                 id="purchase-order-form"
@@ -1087,7 +1087,7 @@ watch(
                                     placeholder="Selecciona un proveedor"
                                 />
                             </div>
-                            <div>
+                            <div v-if="multiWarehouse">
                                 <label
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >Almacén destino *</label
@@ -1226,15 +1226,7 @@ watch(
                                         class="mb-1 block text-xs font-semibold text-gray-500 uppercase dark:text-gray-400"
                                         >Origen</label
                                     >
-                                    <select
-                                        v-model="candidateSource"
-                                        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                    >
-                                        <option value="low_stock">
-                                            Stock bajo
-                                        </option>
-                                        <option value="daily">OC diaria</option>
-                                    </select>
+                                    <AppSelect v-model="candidateSource" class="w-full" :options="[{ value: 'low_stock', label: 'Stock bajo' }, { value: 'daily', label: 'OC diaria' }]" />
                                 </div>
                                 <div v-if="candidateSource === 'daily'">
                                     <label
@@ -1255,7 +1247,7 @@ watch(
                                             loadingCandidates ||
                                             !canLoadCandidates
                                         "
-                                        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                        class="inline-flex items-center gap-2 transition disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                                     >
                                         <Search :size="16" />
                                         {{
@@ -1273,12 +1265,9 @@ watch(
                                 </div>
                             </div>
 
-                            <div
-                                v-if="candidateError"
-                                class="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400"
-                            >
+                            <ErrorMessage v-if="candidateError" class="mt-3">
                                 {{ candidateError }}
-                            </div>
+                            </ErrorMessage>
 
                             <div
                                 v-if="candidateRows.length"
@@ -1437,7 +1426,7 @@ watch(
                                         type="button"
                                         @click="addSelectedCandidates"
                                         :disabled="selectedCandidateCount === 0"
-                                        class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:opacity-50"
+                                        class="inline-flex items-center gap-2 transition disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                                     >
                                         <Plus :size="16" />
                                         Agregar seleccionados
@@ -1670,7 +1659,7 @@ watch(
                                                         as-child
                                                     >
                                                         <a
-                                                            :href="`/products/${(item as any).product_id}`"
+                                                            :href="`/inventory/products/${(item as any).product_id}`"
                                                             target="_blank"
                                                             class="flex items-center gap-2"
                                                         >
@@ -1752,7 +1741,7 @@ watch(
                         <button
                             type="submit"
                             :disabled="loading || form.items.length === 0"
-                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2 text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                            class="inline-flex items-center gap-2 transition disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         >
                             <Save :size="18" />
                             {{
@@ -1812,7 +1801,7 @@ watch(
                 >
                     <button
                         type="button"
-                        class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                        class="h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         @click="closePurchaseNotice"
                     >
                         Entendido
@@ -1851,12 +1840,9 @@ watch(
                         Puedes vincularla ahora para futuras compras, continuar
                         dejando advertencia en la orden, o cancelar.
                     </p>
-                    <p
-                        v-if="candidateError"
-                        class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300"
-                    >
+                    <ErrorMessage v-if="candidateError">
                         {{ candidateError }}
-                    </p>
+                    </ErrorMessage>
                 </div>
                 <div
                     class="flex flex-wrap justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-border"
@@ -1877,7 +1863,7 @@ watch(
                     </button>
                     <button
                         type="button"
-                        class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        class="disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         :disabled="linkingSupplierVariant"
                         @click="linkPromptedSupplierVariant"
                     >

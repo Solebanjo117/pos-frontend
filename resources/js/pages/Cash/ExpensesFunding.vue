@@ -2,6 +2,9 @@
 import { Head, Link } from '@inertiajs/vue3';
 import { Banknote, Clock3, Pencil, Plus, Send } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import {
@@ -160,7 +163,7 @@ onUnmounted(() => {
 <template>
     <Head title="Gastos / Funding" />
     <AppLayout :show-warehouse-selector="false">
-        <main class="mx-auto w-full max-w-4xl space-y-5 p-4 sm:p-6">
+        <main class="mx-auto w-full max-w-4xl space-y-5">
             <header class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p
@@ -168,7 +171,9 @@ onUnmounted(() => {
                     >
                         Caja · Operaciones
                     </p>
-                    <h1 class="mt-1 text-2xl font-semibold">
+                    <h1
+                        class="mt-1 text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Gastos / Funding
                     </h1>
                     <p class="mt-1 text-sm text-muted-foreground">
@@ -251,30 +256,23 @@ onUnmounted(() => {
                                 Administrar categorías
                             </button></span
                         >
-                        <select
+                        <AppSelect
                             v-model="categoryId"
                             :disabled="
                                 loadingCategories ||
                                 availableCategories.length === 0
                             "
-                            required
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option :value="null" disabled>
-                                {{
-                                    loadingCategories
-                                        ? 'Cargando…'
-                                        : 'Selecciona una categoría'
-                                }}
-                            </option>
-                            <option
-                                v-for="category in availableCategories"
-                                :key="category.id"
-                                :value="category.id"
-                            >
-                                {{ category.name }}
-                            </option>
-                        </select>
+                            class="w-full"
+                            placeholder="{{ loadingCategories ? 'Cargando…' : 'Selecciona una categoría' }}"
+                            :options="[
+                                ...(availableCategories ?? []).map(
+                                    (category) => ({
+                                        value: category.id,
+                                        label: String(category.name),
+                                    }),
+                                ),
+                            ]"
+                        />
                         <span
                             v-if="
                                 operationType === 'funding' &&
@@ -305,7 +303,7 @@ onUnmounted(() => {
                                 :disabled="
                                     categorySaving || !categoryName.trim()
                                 "
-                                class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                                class="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                 @click="createCategory"
                             >
                                 <Plus class="size-4" /> Crear
@@ -348,12 +346,9 @@ onUnmounted(() => {
                                     </button>
                                 </div>
                             </div>
-                            <p
-                                v-if="fundingCategories.length === 0"
-                                class="px-3 py-4 text-center text-sm text-muted-foreground"
+                            <EmptyState v-if="fundingCategories.length === 0"
+                                >No hay categorías registradas.</EmptyState
                             >
-                                No hay categorías registradas.
-                            </p>
                         </div>
                     </section>
                     <label class="space-y-1.5 text-sm"
@@ -377,13 +372,9 @@ onUnmounted(() => {
                             placeholder="Información opcional para el cajero"
                         />
                     </label>
-                    <p
-                        v-if="error"
-                        role="alert"
-                        class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200"
-                    >
+                    <ErrorMessage v-if="error" role="alert">
                         {{ error }}
-                    </p>
+                    </ErrorMessage>
                 </div>
                 <div
                     class="flex justify-end border-t bg-muted/20 px-5 py-4 sm:px-6"
@@ -391,7 +382,7 @@ onUnmounted(() => {
                     <button
                         type="submit"
                         :disabled="!canSubmit"
-                        class="inline-flex items-center gap-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <Send class="size-4" />
                         {{ submitting ? 'Enviando…' : 'Enviar a caja' }}

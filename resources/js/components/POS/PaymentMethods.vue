@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import { formatCurrency } from '@/utils/formatters';
 
@@ -52,12 +53,9 @@ defineExpose({ total });
         </h3>
 
         <div class="flex-1 overflow-auto">
-            <div
-                v-if="otherMethods.length === 0"
-                class="py-4 text-center text-sm text-gray-400 dark:text-gray-500"
+            <EmptyState v-if="otherMethods.length === 0"
+                >No hay métodos adicionales configurados</EmptyState
             >
-                No hay métodos adicionales configurados
-            </div>
             <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div
                     v-for="method in otherMethods"

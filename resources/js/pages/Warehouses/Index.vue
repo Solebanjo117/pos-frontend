@@ -2,6 +2,9 @@
 import { Head } from '@inertiajs/vue3';
 import { CheckCircle } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -89,22 +92,22 @@ const formatUtilization = (warehouse: any) => {
     <Head title="Almacenes" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- Header -->
             <div class="mb-8 flex items-center justify-between">
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Almacenes
                     </h1>
-                    <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Gestiona los almacenes y ubicaciones del sistema
                     </p>
                 </div>
                 <a
                     href="/warehouses/create"
-                    class="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                     Nuevo Almacén
                 </a>
@@ -136,20 +139,21 @@ const formatUtilization = (warehouse: any) => {
                         >
                             Estado
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.status"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option value="active">Activo</option>
-                            <option value="inactive">Inactivo</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: undefined, label: 'Todos' },
+                                { value: 'active', label: 'Activo' },
+                                { value: 'inactive', label: 'Inactivo' },
+                            ]"
+                        />
                     </div>
 
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:focus:ring-offset-gray-800"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
                         >
                             Filtrar
                         </button>
@@ -164,22 +168,12 @@ const formatUtilization = (warehouse: any) => {
             </div>
 
             <!-- Loading State -->
-            <div v-if="loading" class="py-12 text-center">
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                ></div>
-                <p class="mt-2 text-gray-800 dark:text-gray-200">
-                    Cargando almacenes...
-                </p>
-            </div>
+            <LoadingState v-if="loading" label="Cargando almacenes..." />
 
             <!-- Error State -->
-            <div
-                v-else-if="error"
-                class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error">
                 <p>{{ error }}</p>
-            </div>
+            </ErrorMessage>
 
             <!-- Warehouses Table -->
             <div
@@ -405,7 +399,7 @@ const formatUtilization = (warehouse: any) => {
                 <div class="mt-6">
                     <a
                         href="/warehouses/create"
-                        class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     >
                         Nuevo Almacén
                     </a>

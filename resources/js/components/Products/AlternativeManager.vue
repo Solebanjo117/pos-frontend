@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import apiClient from '@/services/api/client';
 
 interface Alternative {
@@ -187,20 +190,21 @@ onMounted(() => {
                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                     >Tipo de relación</label
                 >
-                <select
+                <AppSelect
                     v-model="relationshipType"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                >
-                    <option value="compatible">Compatible</option>
-                    <option value="substitute">Sustituto</option>
-                    <option value="upgrade">Upgrade</option>
-                </select>
+                    class="w-full"
+                    :options="[
+                        { value: 'compatible', label: 'Compatible' },
+                        { value: 'substitute', label: 'Sustituto' },
+                        { value: 'upgrade', label: 'Upgrade' },
+                    ]"
+                />
             </div>
             <div class="sm:col-span-3">
                 <button
                     @click="addAlternative"
                     :disabled="!selectedProduct || adding"
-                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="h-9 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                 >
                     {{ adding ? '...' : 'Agregar upsale' }}
                 </button>
@@ -212,19 +216,14 @@ onMounted(() => {
         <div
             class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
         >
-            <div
+            <LoadingState
                 v-if="loading && displayedAlternatives.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500"
-            >
-                Cargando upsales...
-            </div>
+                label="Cargando upsales..."
+            />
 
-            <div
-                v-else-if="displayedAlternatives.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+            <EmptyState v-else-if="displayedAlternatives.length === 0"
+                >No hay upsales pendientes por vincular.</EmptyState
             >
-                No hay upsales pendientes por vincular.
-            </div>
 
             <table v-else class="w-full text-left text-sm">
                 <thead class="bg-gray-50 dark:bg-card">

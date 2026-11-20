@@ -2,14 +2,18 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useCustomers } from '@/composables/useCustomers';
+import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { CustomersApiService } from '@/services/customers';
 import type { CustomerVehicle } from '@/types/customer';
@@ -20,6 +24,12 @@ defineOptions({ layout: AppLayout });
 const { createSalesOrder, loading, error } = useSalesOrders();
 const { products, fetchProducts } = useProducts();
 const { warehouses, fetchWarehouses } = useWarehouses();
+const { currentWarehouseId, initWarehouse } = usePosSettings();
+// Con un solo almacén el campo está oculto: cada artículo usa el almacén actual.
+const defaultItemWarehouseId = (): number =>
+    multiWarehouse
+        ? 0
+        : (currentWarehouseId.value ?? warehouses.value[0]?.id ?? 0);
 const { customers, fetchCustomers } = useCustomers();
 const {
     fetchSettings: fetchStoreSettings,
@@ -217,7 +227,7 @@ const addItem = () => {
     // Reset
     newItem.value = {
         product_id: 0,
-        warehouse_id: 0,
+        warehouse_id: defaultItemWarehouseId(),
         quantity: 1,
         unit_price: 0,
         discount_percent: 0,
@@ -256,9 +266,11 @@ onMounted(async () => {
         fetchWarehouses(),
         fetchCustomers(),
         fetchStoreSettings(),
+        initWarehouse(),
     ]);
 
     newItem.value.tax_percent = defaultTaxRate();
+    newItem.value.warehouse_id = defaultItemWarehouseId();
 });
 </script>
 
@@ -275,22 +287,21 @@ onMounted(async () => {
                 <ArrowLeft :size="24" />
             </button>
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     Nueva Orden de Venta
                 </h1>
-                <p class="mt-1 text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Crea una nueva orden de venta
                 </p>
             </div>
         </div>
 
         <!-- Error -->
-        <div
-            v-if="error"
-            class="rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-        >
+        <ErrorMessage v-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <form
             @submit.prevent="handleSubmit"
@@ -370,13 +381,14 @@ onMounted(async () => {
                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="form.status"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="draft">Borrador</option>
-                            <option value="pending">Pendiente</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'draft', label: 'Borrador' },
+                                { value: 'pending', label: 'Pendiente' },
+                            ]"
+                        />
                     </div>
                 </div>
 
@@ -443,7 +455,7 @@ onMounted(async () => {
                         </div>
                     </div>
 
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                             >Almacén</label
@@ -485,7 +497,7 @@ onMounted(async () => {
                         <button
                             type="button"
                             @click="addItem"
-                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                             <Plus :size="18" />
                             Agregar
@@ -521,6 +533,7 @@ onMounted(async () => {
                                     Producto
                                 </th>
                                 <th
+                                    v-if="multiWarehouse"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400"
                                 >
                                     Almacén
@@ -574,6 +587,7 @@ onMounted(async () => {
                                     }}
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-6 py-4 text-sm text-gray-900 dark:text-white"
                                 >
                                     {{
@@ -703,7 +717,7 @@ onMounted(async () => {
                     :disabled="
                         loading || !form.items || form.items.length === 0
                     "
-                    class="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 text-white hover:bg-indigo-700 disabled:bg-gray-400 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:bg-gray-400"
                 >
                     <Save :size="18" />
                     {{ loading ? 'Guardando...' : 'Crear Orden' }}

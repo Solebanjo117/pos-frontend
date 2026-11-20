@@ -33,12 +33,16 @@ import { computed, onMounted, ref } from 'vue';
 import { Bar } from 'vue-chartjs';
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { CustomersApiService } from '@/services/customers';
 import { ReportsApiService } from '@/services/reports';
@@ -337,7 +341,7 @@ onMounted(async () => {
     <Head title="Ventas por Cliente" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <FinanceReportShell
                 eyebrow="Reporte comercial"
                 title="Ventas por Cliente"
@@ -413,7 +417,7 @@ onMounted(async () => {
                             @update:model-value="applyFilters"
                         />
                     </div>
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
                         >
@@ -464,22 +468,23 @@ onMounted(async () => {
                         >
                             Orden
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.sort_by"
-                            class="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            @change="applyFilters"
-                        >
-                            <option value="total_revenue">Total</option>
-                            <option value="orders_count">Facturas</option>
-                            <option value="total_paid">Cobrado</option>
-                            <option value="pending_amount">Pendiente</option>
-                            <option value="customer_name">Cliente</option>
-                        </select>
+                            class="w-full"
+                            @update:model-value="applyFilters()"
+                            :options="[
+                                { value: 'total_revenue', label: 'Total' },
+                                { value: 'orders_count', label: 'Facturas' },
+                                { value: 'total_paid', label: 'Cobrado' },
+                                { value: 'pending_amount', label: 'Pendiente' },
+                                { value: 'customer_name', label: 'Cliente' },
+                            ]"
+                        />
                     </div>
                     <div class="flex items-end">
                         <button
                             type="button"
-                            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700"
+                            class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             @click="applyFilters"
                         >
                             <Filter :size="16" />
@@ -551,13 +556,10 @@ onMounted(async () => {
                     </button>
                 </header>
 
-                <div
+                <LoadingState
                     v-if="loading && !report"
-                    class="py-16 text-center text-sm text-slate-500 dark:text-slate-400"
-                >
-                    <RefreshCw :size="20" class="mx-auto mb-3 animate-spin" />
-                    Cargando ventas por cliente...
-                </div>
+                    label="Cargando ventas por cliente..."
+                />
 
                 <div v-else class="overflow-x-auto">
                     <table
@@ -931,12 +933,11 @@ onMounted(async () => {
                                 </tr>
                             </template>
                             <tr v-if="rows.length === 0">
-                                <td
-                                    colspan="8"
-                                    class="px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    No hay ventas por cliente para los filtros
-                                    seleccionados.
+                                <td colspan="8">
+                                    <EmptyState
+                                        >No hay ventas por cliente para los
+                                        filtros seleccionados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

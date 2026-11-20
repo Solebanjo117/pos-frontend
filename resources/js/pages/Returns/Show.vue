@@ -10,9 +10,12 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type { SalesReturnOperationalDetail } from '@/types/sales-return';
 
@@ -152,16 +155,15 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
             Volver a devoluciones
         </button>
 
-        <div v-if="loading" class="rounded-lg border bg-white p-8 text-center">
-            Cargando devolución...
-        </div>
+        <LoadingState
+            v-if="loading"
+            class="rounded-lg border bg-white"
+            label="Cargando devolución..."
+        />
 
-        <div
-            v-else-if="error"
-            class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
-        >
+        <ErrorMessage v-else-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <template v-else-if="detail && currentReturn">
             <header class="rounded-lg border bg-white p-4">
@@ -169,7 +171,9 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                     <div>
                         <div class="flex items-center gap-2">
                             <RotateCcw class="h-6 w-6 text-cyan-700" />
-                            <h1 class="text-2xl font-semibold text-gray-950">
+                            <h1
+                                class="text-2xl font-semibold tracking-tight text-foreground"
+                            >
                                 {{
                                     currentReturn.return_number ||
                                     `DEV-${currentReturn.id}`
@@ -219,7 +223,7 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                         <button
                             v-if="detail.workflow.can_approve"
                             type="button"
-                            class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             :disabled="processing"
                             @click="processReturn('approve')"
                         >
@@ -272,7 +276,10 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                         {{ currentReturn.customer?.code || 'Sin código' }}
                     </p>
                 </div>
-                <div class="rounded-lg border bg-white p-3">
+                <div
+                    v-if="multiWarehouse"
+                    class="rounded-lg border bg-white p-3"
+                >
                     <p class="text-xs font-medium text-gray-500">Sucursal</p>
                     <p
                         class="mt-1 truncate text-lg font-semibold text-gray-950"
@@ -385,7 +392,7 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                                     class="font-medium text-cyan-700 hover:underline"
                                     @click="
                                         router.visit(
-                                            `/products/${item.product_id}`,
+                                            `/inventory/products/${item.product_id}`,
                                         )
                                     "
                                 >
@@ -512,7 +519,12 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                         <tr>
                             <th class="px-3 py-2 text-left">Movimiento</th>
                             <th class="px-3 py-2 text-left">Producto</th>
-                            <th class="px-3 py-2 text-left">Sucursal</th>
+                            <th
+                                v-if="multiWarehouse"
+                                class="px-3 py-2 text-left"
+                            >
+                                Sucursal
+                            </th>
                             <th class="px-3 py-2 text-right">Cantidad</th>
                             <th class="px-3 py-2 text-left">Fecha</th>
                         </tr>
@@ -525,7 +537,7 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                                     class="inline-flex items-center gap-1 text-cyan-700 hover:underline"
                                     @click="
                                         router.visit(
-                                            `/inventory-movements/${movement.id}`,
+                                            `/inventory/movements/${movement.id}`,
                                         )
                                     "
                                 >
@@ -536,7 +548,7 @@ const processReturn = async (action: 'approve' | 'reject'): Promise<void> => {
                             <td class="px-3 py-2">
                                 {{ movement.product_name || 'Producto' }}
                             </td>
-                            <td class="px-3 py-2">
+                            <td v-if="multiWarehouse" class="px-3 py-2">
                                 {{ movement.warehouse_name || 'N/A' }}
                             </td>
                             <td class="px-3 py-2 text-right tabular-nums">

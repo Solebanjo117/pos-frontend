@@ -11,6 +11,9 @@ import {
     Eye,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -18,7 +21,7 @@ import { type BreadcrumbItem } from '@/types';
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Transferencias', href: '/inventory-transfers' },
+    { title: 'Transferencias', href: '/inventory/transfers' },
 ];
 
 interface Transfer {
@@ -88,25 +91,25 @@ const totalItems = (items: any[]) =>
 <template>
     <Head title="Transferencias de Inventario" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-6 p-4">
+        <div class="space-y-6">
             <!-- Header -->
             <div
                 class="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center"
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                     >
                         <ArrowLeftRight :size="32" class="text-indigo-500" />
                         Transferencias de Inventario
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Enviar y recibir mercancía entre sucursales
                     </p>
                 </div>
                 <a
-                    href="/inventory-transfers/create"
-                    class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    href="/inventory/transfers/create"
+                    class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                 >
                     <Plus :size="16" />
                     Nueva Transferencia
@@ -115,28 +118,28 @@ const totalItems = (items: any[]) =>
 
             <!-- Filters -->
             <div class="flex gap-3">
-                <select
+                <AppSelect
                     v-model="statusFilter"
-                    @change="fetchTransfers"
-                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-gray-200"
-                >
-                    <option value="">Todos los estados</option>
-                    <option value="draft">Borrador</option>
-                    <option value="in_transit">En Tránsito</option>
-                    <option value="completed">Completada</option>
-                    <option value="cancelled">Cancelada</option>
-                </select>
+                    @update:model-value="fetchTransfers()"
+                    :options="[
+                        { value: '', label: 'Todos los estados' },
+                        { value: 'draft', label: 'Borrador' },
+                        { value: 'in_transit', label: 'En Tránsito' },
+                        { value: 'completed', label: 'Completada' },
+                        { value: 'cancelled', label: 'Cancelada' },
+                    ]"
+                />
             </div>
 
             <!-- Loading -->
-            <div v-if="loading" class="py-12 text-center text-gray-500">
-                Cargando...
-            </div>
+            <LoadingState v-if="loading" label="Cargando..." />
 
             <!-- Empty -->
             <div v-else-if="transfers.length === 0" class="py-12 text-center">
                 <ArrowLeftRight :size="48" class="mx-auto mb-4 text-gray-300" />
-                <p class="text-gray-500">No hay transferencias registradas</p>
+                <EmptyState compact
+                    >No hay transferencias registradas</EmptyState
+                >
             </div>
 
             <!-- Table -->
@@ -253,7 +256,7 @@ const totalItems = (items: any[]) =>
                             </td>
                             <td class="px-4 py-3 text-center">
                                 <a
-                                    :href="`/inventory-transfers/${t.id}`"
+                                    :href="`/inventory/transfers/${t.id}`"
                                     class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:text-primary"
                                 >
                                     <Eye :size="16" />

@@ -146,20 +146,20 @@ export interface ProductImage {
     category_media_id?: number | null;
 }
 
-export interface OemReference {
-    id?: number;
-    oem_code: string;
-    manufacturer: string | null;
-}
-
 export interface VehicleCompatibility {
     id?: number;
+    scope_type?: string | null;
+    make_id?: number | null;
+    model_id?: number | null;
     engine_id?: number | null;
     chassis_id?: number | null;
     make?: string | null;
     model?: string | null;
+    generation?: string | null;
     year_range?: string | null;
     engine?: string | null;
+    engine_code?: string | null;
+    raw_vehicle_text?: string | null;
     chassis?: {
         id: number;
         code: string;
@@ -168,6 +168,8 @@ export interface VehicleCompatibility {
     } | null;
     all_engines?: boolean;
     all_chassis?: boolean;
+    /** Carro principal del producto (uno solo). */
+    is_default?: boolean;
     notes?: string;
 }
 
@@ -184,14 +186,12 @@ export interface Product {
     id: number;
     system_id?: string;
     sku_base: string | null; // Compatibility alias for the primary commercial code
-    alternate_code?: string | null; // Alternate identifier
     primary_code?: string | null;
     codes?: ProductCode[];
     name: string;
     description?: string;
     image_url?: string | null;
-    status: 'active' | 'discontinued' | 'pending';
-    batch_tracking: boolean;
+    status: 'active' | 'discontinued';
     is_universal?: boolean;
     category_id?: number;
     product_line?: ProductLine;
@@ -204,6 +204,11 @@ export interface Product {
     extra_categories?: Array<{
         id: number;
         name: string;
+    }>;
+    /** Vehículos compatibles resumidos (solo en el listado de productos). */
+    vehicles?: Array<{
+        label: string;
+        detail: string | null;
     }>;
     pricing?: ProductPricing;
     // Variant information
@@ -284,6 +289,9 @@ export interface InventoryFifoLot {
     source_type?: string | null;
     source_id?: number | null;
     source_movement_id?: number | null;
+    /** Proveedor del lote (null = sin proveedor; se puede cargar a mano si no viene de una compra). */
+    supplier?: { id: number; name: string } | null;
+    supplier_editable?: boolean;
     batch_number?: string | null;
     received_quantity: number;
     quantity_available: number;
@@ -392,7 +400,6 @@ export interface ProductDetail extends Product {
     suppliers?: ProductSupplier[];
     media?: ProductMedia[];
     images?: ProductImage[];
-    oem_references?: OemReference[];
     alternatives?: AlternativeProduct[];
     compatibility?: VehicleCompatibility[];
     vins?: ProductVin[];
@@ -417,12 +424,12 @@ export interface ProductDetail extends Product {
 }
 
 // API Request Types
+/** Compatibilidad al guardar: vehículos exactos (modelo + motor) e ids de asignaciones anteriores que se conservan. */
 export interface ProductVehicleCompatibilityPayload {
-    engines: Array<{ engine_id: number }>;
-    chassis: Array<{ chassis_id: number }>;
-    all_engines: boolean;
-    all_chassis: boolean;
-    model_id?: number | null;
+    vehicles: Array<{ model_id: number; engine_id: number }>;
+    keep_ids: number[];
+    /** Carro principal: un registro que se conserva ({id}) o un vehículo exacto ({model_id, engine_id}). */
+    default?: { id: number } | { model_id: number; engine_id: number } | null;
 }
 
 export interface CreateProductRequest {
@@ -434,9 +441,7 @@ export interface CreateProductRequest {
     category_id?: number | null;
     extra_category_ids?: number[];
     engine_id?: number; // R21: motor as reusable entity
-    status?: 'active' | 'discontinued' | 'pending';
-    batch_tracking?: boolean;
-    alternate_code?: string; // alternate identifier
+    status?: 'active' | 'discontinued';
     pricing_formula?: string; // Excel-like pricing formula
     // Default variant fields
     brand_id?: number;
@@ -476,7 +481,6 @@ export interface CreateProductRequest {
 export interface UpdateProductRequest {
     sku_base?: string | null;
     upc?: string | null;
-    alternate_code?: string; // alternate identifier
     codes?: ProductCode[];
     pricing_formula?: string; // Excel-like pricing formula
     product_line_id?: number;
@@ -485,8 +489,7 @@ export interface UpdateProductRequest {
     engine_id?: number; // R21: motor as reusable entity
     name?: string;
     description?: string;
-    status?: 'active' | 'discontinued' | 'pending';
-    batch_tracking?: boolean;
+    status?: 'active' | 'discontinued';
     is_universal?: boolean;
     pricing?: {
         base_price?: number;
@@ -509,10 +512,6 @@ export interface UpdateProductRequest {
         type?: ProductAttributeType;
         options?: string[] | null;
     }>;
-    oem_references?: Array<{
-        oem_code: string;
-        manufacturer?: string | null;
-    }>;
     alternatives?: Array<{
         id?: number;
         alternative_product_id?: number;
@@ -522,19 +521,20 @@ export interface UpdateProductRequest {
 }
 
 export interface ProductFilters {
-    status?: 'active' | 'discontinued' | 'pending';
+    status?: 'active' | 'discontinued';
     brand_id?: number | number[];
     category_id?: number | number[];
     product_line_id?: number;
     search?: string;
     has_stock?: boolean;
     vehicle_engine_id?: number;
+    vehicle_model_id?: number;
+    vehicle_chassis_id?: number;
     strict_fitment?: boolean;
     warehouse_id?: number;
     per_page?: number;
     page?: number;
     // Deep linking filters
-    oem_code?: string;
     attribute_value?: string;
     vin?: string;
     // Sidebar advanced filters

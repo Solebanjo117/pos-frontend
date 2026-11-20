@@ -21,7 +21,6 @@ import {
     Phone,
     Plus,
     Receipt,
-    RefreshCw,
     Search,
     Trash2,
     UserCircle2,
@@ -30,6 +29,8 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import CustomerProfileMetric from '@/components/Customers/CustomerProfileMetric.vue';
 import OperationalExpenseHistoryPanel from '@/components/OperationalExpenses/OperationalExpenseHistoryPanel.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { CustomersApiService } from '@/services/customers';
@@ -652,9 +653,9 @@ onMounted(async () => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div
-            class="min-h-[calc(100vh-4.25rem)] bg-slate-50 p-4 dark:bg-slate-950"
+            class="app-page-full-bleed min-h-[calc(100vh-4.25rem)] bg-slate-50 p-4 md:p-6 dark:bg-slate-950"
         >
-            <div class="mx-auto max-w-[1500px] space-y-4">
+            <div class="mx-auto w-full max-w-[1500px] space-y-4">
                 <div
                     v-if="error"
                     class="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100"
@@ -663,13 +664,11 @@ onMounted(async () => {
                     {{ error }}
                 </div>
 
-                <div
+                <LoadingState
                     v-if="loading && !customer"
-                    class="rounded-lg border border-slate-200 bg-white py-20 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
-                >
-                    <RefreshCw :size="22" class="mx-auto mb-3 animate-spin" />
-                    Cargando perfil del cliente...
-                </div>
+                    class="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                    label="Cargando perfil del cliente..."
+                />
 
                 <template v-else-if="customer">
                     <section
@@ -697,7 +696,7 @@ onMounted(async () => {
                                         class="flex flex-wrap items-center gap-2"
                                     >
                                         <h1
-                                            class="truncate text-2xl font-bold text-slate-950 dark:text-slate-50"
+                                            class="truncate text-2xl font-semibold tracking-tight text-foreground"
                                         >
                                             {{ customer.name }}
                                         </h1>
@@ -765,7 +764,7 @@ onMounted(async () => {
                                 </Link>
                                 <Link
                                     :href="`/sales-orders/create?customer_id=${customerIdNumber}`"
-                                    class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                    class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                                 >
                                     <Plus :size="15" />
                                     Nueva Venta
@@ -1189,27 +1188,35 @@ onMounted(async () => {
                                                 "
                                             />
                                         </div>
-                                        <select
+                                        <AppSelect
                                             v-model="
                                                 historyFilters.payment_status
                                             "
-                                            class="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                            @change="applyHistoryFilters"
-                                        >
-                                            <option value="">
-                                                Pago: todos
-                                            </option>
-                                            <option value="paid">Pagada</option>
-                                            <option value="partial">
-                                                Parcial
-                                            </option>
-                                            <option value="pending">
-                                                Pendiente
-                                            </option>
-                                        </select>
+                                            @update:model-value="
+                                                applyHistoryFilters()
+                                            "
+                                            :options="[
+                                                {
+                                                    value: '',
+                                                    label: 'Pago: todos',
+                                                },
+                                                {
+                                                    value: 'paid',
+                                                    label: 'Pagada',
+                                                },
+                                                {
+                                                    value: 'partial',
+                                                    label: 'Parcial',
+                                                },
+                                                {
+                                                    value: 'pending',
+                                                    label: 'Pendiente',
+                                                },
+                                            ]"
+                                        />
                                         <button
                                             type="button"
-                                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700"
+                                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                                             @click="applyHistoryFilters"
                                         >
                                             Filtrar
@@ -1231,16 +1238,10 @@ onMounted(async () => {
                                     {{ historyError }}
                                 </div>
 
-                                <div
+                                <LoadingState
                                     v-if="historyLoading"
-                                    class="py-14 text-center text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    <RefreshCw
-                                        :size="19"
-                                        class="mx-auto mb-3 animate-spin"
-                                    />
-                                    Cargando historial...
-                                </div>
+                                    label="Cargando historial..."
+                                />
 
                                 <template v-else>
                                     <div
@@ -1547,19 +1548,18 @@ onMounted(async () => {
                                             </div>
                                             <Link
                                                 :href="createWorkOrderUrl()"
-                                                class="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                                                class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 dark:bg-white"
                                             >
                                                 <Plus :size="15" />
                                                 Nueva orden
                                             </Link>
                                         </div>
 
-                                        <div
+                                        <LoadingState
                                             v-if="workOrdersLoading"
-                                            class="rounded-lg border border-slate-200 p-8 text-center text-sm text-slate-500 dark:border-slate-800"
-                                        >
-                                            Cargando ordenes...
-                                        </div>
+                                            class="rounded-lg border border-slate-200 dark:border-slate-800"
+                                            label="Cargando ordenes..."
+                                        />
 
                                         <article
                                             v-for="workOrder in customerWorkOrders"
@@ -1966,26 +1966,28 @@ onMounted(async () => {
                                                     >
                                                         Marca
                                                     </label>
-                                                    <select
-                                                        v-model.number="
-                                                            selectedMakeId
+                                                    <AppSelect
+                                                        v-model="selectedMakeId"
+                                                        class="w-full"
+                                                        @update:model-value="
+                                                            loadVehicleModels()
                                                         "
-                                                        class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                                        @change="
-                                                            loadVehicleModels
-                                                        "
-                                                    >
-                                                        <option :value="null">
-                                                            Seleccionar
-                                                        </option>
-                                                        <option
-                                                            v-for="make in vehicleMakes"
-                                                            :key="make.id"
-                                                            :value="make.id"
-                                                        >
-                                                            {{ make.name }}
-                                                        </option>
-                                                    </select>
+                                                        :options="[
+                                                            {
+                                                                value: null,
+                                                                label: 'Seleccionar',
+                                                            },
+                                                            ...(
+                                                                vehicleMakes ??
+                                                                []
+                                                            ).map((make) => ({
+                                                                value: make.id,
+                                                                label: String(
+                                                                    make.name,
+                                                                ),
+                                                            })),
+                                                        ]"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label
@@ -1993,26 +1995,30 @@ onMounted(async () => {
                                                     >
                                                         Modelo
                                                     </label>
-                                                    <select
-                                                        v-model.number="
+                                                    <AppSelect
+                                                        v-model="
                                                             vehicleForm.vehicle_model_id
                                                         "
-                                                        class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                                        @change="
-                                                            loadVehicleConfiguration
+                                                        class="w-full"
+                                                        @update:model-value="
+                                                            loadVehicleConfiguration()
                                                         "
-                                                    >
-                                                        <option :value="0">
-                                                            Seleccionar
-                                                        </option>
-                                                        <option
-                                                            v-for="model in vehicleModels"
-                                                            :key="model.id"
-                                                            :value="model.id"
-                                                        >
-                                                            {{ model.name }}
-                                                        </option>
-                                                    </select>
+                                                        :options="[
+                                                            {
+                                                                value: 0,
+                                                                label: 'Seleccionar',
+                                                            },
+                                                            ...(
+                                                                vehicleModels ??
+                                                                []
+                                                            ).map((model) => ({
+                                                                value: model.id,
+                                                                label: String(
+                                                                    model.name,
+                                                                ),
+                                                            })),
+                                                        ]"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label
@@ -2020,29 +2026,25 @@ onMounted(async () => {
                                                     >
                                                         Motor
                                                     </label>
-                                                    <select
-                                                        v-model.number="
+                                                    <AppSelect
+                                                        v-model="
                                                             vehicleForm.vehicle_engine_id
                                                         "
-                                                        class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                                                    >
-                                                        <option :value="0">
-                                                            Seleccionar
-                                                        </option>
-                                                        <option
-                                                            v-for="engine in vehicleEngines"
-                                                            :key="engine.id"
-                                                            :value="engine.id"
-                                                        >
-                                                            {{
-                                                                engine.engine_code
-                                                            }}
-                                                            {{
-                                                                engine.displacement ||
-                                                                ''
-                                                            }}
-                                                        </option>
-                                                    </select>
+                                                        class="w-full"
+                                                        :options="[
+                                                            {
+                                                                value: 0,
+                                                                label: 'Seleccionar',
+                                                            },
+                                                            ...(
+                                                                vehicleEngines ??
+                                                                []
+                                                            ).map((engine) => ({
+                                                                value: engine.id,
+                                                                label: `${engine.engine_code} ${engine.displacement || ''}`,
+                                                            })),
+                                                        ]"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label
@@ -2059,7 +2061,7 @@ onMounted(async () => {
                                                 </div>
                                                 <button
                                                     type="submit"
-                                                    class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                                                    class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                                     :disabled="!canSaveVehicle"
                                                 >
                                                     <Plus :size="15" />

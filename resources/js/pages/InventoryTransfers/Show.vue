@@ -10,6 +10,8 @@ import {
     ArrowRight,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -18,7 +20,7 @@ const props = defineProps<{ transferId: number }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Transferencias', href: '/inventory-transfers' },
+    { title: 'Transferencias', href: '/inventory/transfers' },
     { title: 'Detalle', href: '#' },
 ];
 
@@ -137,10 +139,8 @@ const formatDate = (date: string | null) => {
 <template>
     <Head :title="`Transferencia ${transfer?.reference || ''}`" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-4xl space-y-6 p-4">
-            <div v-if="loading" class="py-12 text-center text-gray-500">
-                Cargando...
-            </div>
+        <div class="mx-auto w-full max-w-4xl space-y-6">
+            <LoadingState v-if="loading" label="Cargando..." />
 
             <template v-else-if="transfer">
                 <!-- Header -->
@@ -150,12 +150,12 @@ const formatDate = (date: string | null) => {
                     <div>
                         <div class="flex items-center gap-3">
                             <a
-                                href="/inventory-transfers"
+                                href="/inventory/transfers"
                                 class="text-2xl text-gray-400 hover:text-gray-600"
                                 >←</a
                             >
                             <h1
-                                class="font-mono text-3xl font-bold text-gray-900 dark:text-white"
+                                class="font-mono text-2xl font-semibold tracking-tight text-foreground"
                             >
                                 {{ transfer.reference }}
                             </h1>
@@ -185,7 +185,7 @@ const formatDate = (date: string | null) => {
                             v-if="transfer.status === 'in_transit'"
                             @click="handleReceive"
                             :disabled="actionLoading"
-                            class="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50"
+                            class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
                         >
                             <PackageCheck :size="16" />
                             Recibir
@@ -203,12 +203,9 @@ const formatDate = (date: string | null) => {
                 </div>
 
                 <!-- Error -->
-                <div
-                    v-if="errorMsg"
-                    class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-                >
+                <ErrorMessage v-if="errorMsg">
                     {{ errorMsg }}
-                </div>
+                </ErrorMessage>
 
                 <!-- Info Cards -->
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">

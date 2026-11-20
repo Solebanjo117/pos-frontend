@@ -12,6 +12,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import CustomerDialog from '@/components/Customers/CustomerDialog.vue';
 import Pagination from '@/components/Pagination.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import {
     Dialog,
     DialogContent,
@@ -19,6 +20,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import {
     useVehicleCatalog,
@@ -254,12 +258,16 @@ onMounted(async () => {
 <template>
     <Head title="Clientes" />
     <AppLayout :breadcrumbs="[{ title: 'Clientes', href: '/customers' }]">
-        <div class="space-y-5 p-1">
+        <div class="space-y-5">
             <header
                 class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
                 <div>
-                    <h1 class="text-2xl font-bold">Clientes</h1>
+                    <h1
+                        class="text-2xl font-semibold tracking-tight text-foreground"
+                    >
+                        Clientes
+                    </h1>
                     <p class="text-sm text-muted-foreground">
                         Clientes, crédito y vehículos asociados.
                     </p>
@@ -368,20 +376,17 @@ onMounted(async () => {
                             @keyup.enter="applyFilters"
                         />
                     </div>
-                    <select
+                    <AppSelect
                         v-model="filters.customer_type_id"
-                        class="rounded-md border bg-background px-3 py-2"
-                        @change="applyFilters"
-                    >
-                        <option :value="undefined">Todos los tipos</option>
-                        <option
-                            v-for="type in customerTypes"
-                            :key="type.id"
-                            :value="type.id"
-                        >
-                            {{ type.name }}
-                        </option>
-                    </select>
+                        @update:model-value="applyFilters()"
+                        :options="[
+                            { value: undefined, label: 'Todos los tipos' },
+                            ...(customerTypes ?? []).map((type) => ({
+                                value: type.id,
+                                label: String(type.name),
+                            })),
+                        ]"
+                    />
                     <button
                         class="rounded-md border px-4 py-2"
                         :disabled="loading"
@@ -390,12 +395,9 @@ onMounted(async () => {
                         Buscar
                     </button>
                 </div>
-                <div
-                    v-if="error"
-                    class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
                 <div class="overflow-hidden rounded-lg border bg-card">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
@@ -421,19 +423,16 @@ onMounted(async () => {
                             </thead>
                             <tbody class="divide-y">
                                 <tr v-if="loading">
-                                    <td
-                                        :colspan="canManageCustomers ? 7 : 6"
-                                        class="px-4 py-10 text-center text-muted-foreground"
-                                    >
-                                        Cargando...
+                                    <td :colspan="canManageCustomers ? 7 : 6">
+                                        <LoadingState label="Cargando..." />
                                     </td>
                                 </tr>
                                 <tr v-else-if="customers.length === 0">
-                                    <td
-                                        :colspan="canManageCustomers ? 7 : 6"
-                                        class="px-4 py-10 text-center text-muted-foreground"
-                                    >
-                                        No se encontraron clientes.
+                                    <td :colspan="canManageCustomers ? 7 : 6">
+                                        <EmptyState
+                                            >No se encontraron
+                                            clientes.</EmptyState
+                                        >
                                     </td>
                                 </tr>
                                 <tr
@@ -561,12 +560,10 @@ onMounted(async () => {
                         >Abrir administrador</Link
                     >
                 </div>
-                <div
+                <LoadingState
                     v-if="vehicleLoading"
-                    class="p-10 text-center text-muted-foreground"
-                >
-                    Cargando vehículos...
-                </div>
+                    label="Cargando vehículos..."
+                />
                 <div v-else class="divide-y">
                     <div
                         v-for="row in vehicleRows"
@@ -596,12 +593,9 @@ onMounted(async () => {
                             >{{ row.vins_count }} VIN</span
                         >
                     </div>
-                    <p
-                        v-if="vehicleRows.length === 0"
-                        class="p-10 text-center text-muted-foreground"
+                    <EmptyState v-if="vehicleRows.length === 0"
+                        >No hay configuraciones registradas.</EmptyState
                     >
-                        No hay configuraciones registradas.
-                    </p>
                 </div>
             </div>
             <div v-else class="space-y-3">
@@ -722,13 +716,14 @@ onMounted(async () => {
                     <div>
                         <label class="mb-1 block text-sm font-medium"
                             >Clasificación base</label
-                        ><select
+                        ><AppSelect
                             v-model="typeForm.base_kind"
-                            class="w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option value="individual">Persona</option>
-                            <option value="business">Empresa</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'individual', label: 'Persona' },
+                                { value: 'business', label: 'Empresa' },
+                            ]"
+                        />
                     </div>
                     <label
                         v-if="editingType"

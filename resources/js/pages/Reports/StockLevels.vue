@@ -19,6 +19,9 @@ import StockStatusChart from '@/components/charts/StockStatusChart.vue';
 import TopProductsChart from '@/components/charts/TopProductsChart.vue';
 import WarehouseDistributionChart from '@/components/charts/WarehouseDistributionChart.vue';
 import Pagination from '@/components/Pagination.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -27,6 +30,7 @@ import { useCategories } from '@/composables/useCategories';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import type { StockLevelsFilters } from '@/types/report';
@@ -286,7 +290,7 @@ const inventoryProductHref = (product: {
 
     const query = params.toString();
 
-    return `/inventory/products/${product.id}${query ? `?${query}` : ''}`;
+    return `/inventory/stock/${product.id}${query ? `?${query}` : ''}`;
 };
 </script>
 
@@ -294,19 +298,19 @@ const inventoryProductHref = (product: {
     <Head title="Reporte de Niveles de Stock" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-6 p-4">
+        <div class="space-y-6">
             <!-- Header -->
             <div
                 class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between dark:border-border dark:bg-card"
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                     >
                         <BarChart3 :size="24" />
                         Niveles de stock
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         {{ activeWarehouseName }} · {{ reportTotal }} registros
                         · {{ atRiskCount }} en atención
                     </p>
@@ -324,7 +328,7 @@ const inventoryProductHref = (product: {
                     <button
                         @click="handleExport('excel')"
                         :disabled="exporting || loading"
-                        class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                         <FileSpreadsheet :size="18" />
                         Excel
@@ -333,13 +337,9 @@ const inventoryProductHref = (product: {
             </div>
 
             <!-- Error Message -->
-            <div
-                v-if="error"
-                class="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
-                <AlertCircle :size="20" />
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <!-- Summary Cards -->
             <div
@@ -563,7 +563,7 @@ const inventoryProductHref = (product: {
                 </div>
                 <div class="grid items-end gap-4 md:grid-cols-4 lg:grid-cols-5">
                     <!-- Warehouse -->
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Almacén</label
@@ -607,22 +607,23 @@ const inventoryProductHref = (product: {
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filters.status"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todos los estados</option>
-                            <option value="critical">Crítico</option>
-                            <option value="low">Bajo</option>
-                            <option value="normal">Normal</option>
-                            <option value="optimal">Óptimo</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: null, label: 'Todos los estados' },
+                                { value: 'critical', label: 'Crítico' },
+                                { value: 'low', label: 'Bajo' },
+                                { value: 'normal', label: 'Normal' },
+                                { value: 'optimal', label: 'Óptimo' },
+                            ]"
+                        />
                     </div>
 
                     <div class="flex items-end gap-2">
                         <button
                             @click="applyFilters"
-                            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 flex-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                             Aplicar
                         </button>
@@ -727,7 +728,10 @@ const inventoryProductHref = (product: {
                                         />
                                     </button>
                                 </th>
-                                <th class="px-6 py-3 text-left">
+                                <th
+                                    v-if="multiWarehouse"
+                                    class="px-6 py-3 text-left"
+                                >
                                     <button
                                         type="button"
                                         :class="sortHeaderClass('warehouse')"
@@ -972,6 +976,7 @@ const inventoryProductHref = (product: {
                                     {{ product.brand || '-' }}
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
                                 >
                                     {{ product.warehouse }}
@@ -1028,14 +1033,7 @@ const inventoryProductHref = (product: {
             </div>
 
             <!-- Loading State -->
-            <div
-                v-else-if="loading"
-                class="flex items-center justify-center py-12"
-            >
-                <div class="text-gray-700 dark:text-gray-300">
-                    Cargando reporte...
-                </div>
-            </div>
+            <LoadingState v-else-if="loading" label="Cargando reporte..." />
         </div>
     </AppLayout>
 </template>

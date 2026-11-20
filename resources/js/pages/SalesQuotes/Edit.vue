@@ -15,6 +15,8 @@ import {
     AlertTriangle,
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -349,14 +351,9 @@ onMounted(async () => {
 <template>
     <Head :title="`Editar ${quoteNumber}`" />
 
-    <div class="mx-auto max-w-7xl">
+    <div class="mx-auto w-full max-w-7xl">
         <!-- Loading -->
-        <div v-if="loading" class="py-20 text-center text-gray-500">
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
-            ></div>
-            Cargando cotización...
-        </div>
+        <LoadingState v-if="loading" label="Cargando cotización..." />
 
         <!-- Error -->
         <div
@@ -395,11 +392,11 @@ onMounted(async () => {
                         </div>
                         <div>
                             <h1
-                                class="text-xl font-bold text-gray-900 dark:text-white"
+                                class="text-2xl font-semibold tracking-tight text-foreground"
                             >
                                 Editar Cotización
                             </h1>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                            <p class="text-sm text-muted-foreground">
                                 Modifica la cotización y guarda los cambios
                             </p>
                         </div>
@@ -637,18 +634,16 @@ onMounted(async () => {
                                 class="mb-1.5 block text-xs font-semibold tracking-wider text-gray-500 uppercase"
                                 >Estado</label
                             >
-                            <select
+                            <AppSelect
                                 v-model="status"
-                                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option
-                                    v-for="opt in statusOptions"
-                                    :key="opt.value"
-                                    :value="opt.value"
-                                >
-                                    {{ opt.label }}
-                                </option>
-                            </select>
+                                class="w-full"
+                                :options="[
+                                    ...(statusOptions ?? []).map((opt) => ({
+                                        value: opt.value,
+                                        label: String(opt.label),
+                                    })),
+                                ]"
+                            />
                         </div>
 
                         <div>
@@ -722,7 +717,7 @@ onMounted(async () => {
                     <button
                         @click="handleSave"
                         :disabled="saving || cart.length === 0"
-                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-lg font-bold text-white shadow-lg transition hover:bg-indigo-700 disabled:bg-gray-400 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-lg font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90 disabled:bg-gray-400"
                     >
                         <Save :size="20" />
                         {{ saving ? 'Guardando...' : 'Guardar Cambios' }}
@@ -775,7 +770,7 @@ onMounted(async () => {
                     <button
                         @click="handleSaveAndExit"
                         :disabled="saving"
-                        class="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition hover:bg-indigo-700"
+                        class="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
                     >
                         <Save :size="18" />
                         {{ saving ? 'Guardando...' : 'Guardar y salir' }}

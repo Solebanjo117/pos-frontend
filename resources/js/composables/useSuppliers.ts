@@ -10,7 +10,14 @@ import type {
     SupplierVariantPayload,
 } from '@/types/supplier';
 
-type BrandOption = { id: number; name: string };
+// Marca de un proveedor: por sus piezas (calculado) o marcada a mano.
+type BrandOption = {
+    id: number;
+    name: string;
+    manual?: boolean;
+    pieces?: number;
+    origin?: 'pieces' | 'manual';
+};
 
 export function useSuppliers() {
     const suppliers = ref<Supplier[]>([]);

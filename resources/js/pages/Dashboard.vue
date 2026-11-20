@@ -30,6 +30,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { Doughnut } from 'vue-chartjs';
 import SalesChart from '@/components/dashboard/SalesChart.vue';
 import PageShell from '@/components/PageShell.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboard } from '@/composables/useDashboard';
 import { usePosSettings } from '@/composables/usePosSettings';
@@ -69,6 +71,9 @@ const { currentWarehouseId, initWarehouse } = usePosSettings();
 
 const selectedPeriod = ref('month');
 const selectedWarehouseId = ref<number | null>(null);
+// Por ahora se trabaja con un solo almacén (2026-11-11): se ocultan el selector y el nombre del
+// almacén. Los datos siguen calculándose para el almacén actual del usuario.
+const showWarehouseControls = false;
 const compare = ref(true);
 const dateFrom = ref('');
 const dateTo = ref('');
@@ -221,7 +226,10 @@ const clientProgress = (client: DashboardTopClient): string => {
 };
 
 onMounted(async () => {
-    await Promise.all([initWarehouse(), loadWarehouses()]);
+    await Promise.all([
+        initWarehouse(),
+        showWarehouseControls ? loadWarehouses() : Promise.resolve(),
+    ]);
     selectedWarehouseId.value = currentWarehouseId.value ?? null;
     await loadDashboard();
     initializing.value = false;
@@ -262,22 +270,21 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                     </button>
 
                     <label
+                        v-if="showWarehouseControls"
+                        data-testid="dashboard-warehouse-filter"
                         class="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-muted-foreground"
                     >
                         <WarehouseIcon class="size-4 text-indigo-500" />
-                        <select
-                            v-model.number="selectedWarehouseId"
-                            class="bg-transparent text-sm font-medium text-foreground outline-none"
-                        >
-                            <option :value="null">Todas</option>
-                            <option
-                                v-for="warehouse in warehouses"
-                                :key="warehouse.id"
-                                :value="warehouse.id"
-                            >
-                                {{ warehouse.name }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="selectedWarehouseId"
+                            :options="[
+                                { value: null, label: 'Todas' },
+                                ...(warehouses ?? []).map((warehouse) => ({
+                                    value: warehouse.id,
+                                    label: String(warehouse.name),
+                                })),
+                            ]"
+                        />
                         <ChevronDown class="size-3" />
                     </label>
 
@@ -328,7 +335,7 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                 </label>
                 <button
                     type="button"
-                    class="h-9 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     @click="loadDashboard"
                 >
                     Aplicar
@@ -345,8 +352,15 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                         <CircleDollarSign class="size-6" />
                     </div>
                     <div>
-                        <p class="text-sm font-semibold text-foreground">
-                            {{ activeWarehouseName }}
+                        <p
+                            class="text-sm font-semibold text-foreground"
+                            data-testid="dashboard-period-title"
+                        >
+                            {{
+                                showWarehouseControls
+                                    ? activeWarehouseName
+                                    : 'Resumen del periodo'
+                            }}
                         </p>
                         <p class="text-xs text-muted-foreground">
                             Periodo:
@@ -376,12 +390,9 @@ watch([selectedPeriod, selectedWarehouseId, compare], async () => {
                 />
             </section>
 
-            <section
-                v-else-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-            >
+            <ErrorMessage v-else-if="error">
                 {{ error }}
-            </section>
+            </ErrorMessage>
 
             <template v-else>
                 <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

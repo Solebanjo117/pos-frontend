@@ -10,11 +10,16 @@ import {
     Warehouse,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -131,7 +136,7 @@ interface Filters {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Inventario', href: '/inventory' },
+    { title: 'Existencias', href: '/inventory/stock' },
 ];
 
 const { hasRole } = useAuth();
@@ -175,7 +180,9 @@ const tabs: Array<{ key: ViewMode; label: string }> = [
     { key: 'movements', label: 'Movimientos' },
 ];
 
-const showWarehouseColumn = computed(() => !filters.value.warehouse_id);
+const showWarehouseColumn = computed(
+    () => multiWarehouse && !filters.value.warehouse_id,
+);
 
 const lotsColspan = computed(() => (showWarehouseColumn.value ? 13 : 12));
 const movementsColspan = computed(() => (showWarehouseColumn.value ? 8 : 6));
@@ -374,7 +381,7 @@ function goToPage(page: number): void {
 }
 
 function viewMovement(id: number): void {
-    router.visit(`/inventory-movements/${id}`);
+    router.visit(`/inventory/movements/${id}`);
 }
 
 function viewInventoryProduct(
@@ -393,7 +400,7 @@ function viewInventoryProduct(
     }
 
     const query = params.toString();
-    router.visit(`/inventory/products/${productId}${query ? `?${query}` : ''}`);
+    router.visit(`/inventory/stock/${productId}${query ? `?${query}` : ''}`);
 }
 
 function historyKey(row: InventoryRow): string {
@@ -486,20 +493,20 @@ function pageItemLabel(): string {
 </script>
 
 <template>
-    <Head title="Inventario" />
+    <Head title="Existencias" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <div
                 class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
             >
                 <div>
                     <h1
-                        class="text-2xl font-semibold text-gray-950 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
-                        Inventario
+                        Existencias
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Stock operativo, lotes y movimientos por variante.
                     </p>
                 </div>
@@ -514,7 +521,7 @@ function pageItemLabel(): string {
                     </a>
                     <!--
                         Futuro: habilitar transferencia desde inventario cuando el flujo quede aprobado.
-                        <a href="/inventory-movements/transfer/create">Nueva Transferencia</a>
+                        <a href="/inventory/movements/transfer/create">Nueva Transferencia</a>
                     -->
                 </div>
             </div>
@@ -641,7 +648,7 @@ function pageItemLabel(): string {
                         </div>
                     </div>
 
-                    <div class="lg:col-span-2">
+                    <div v-if="multiWarehouse" class="lg:col-span-2">
                         <label
                             class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
                         >
@@ -660,16 +667,17 @@ function pageItemLabel(): string {
                         >
                             Estado
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.stock_status"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="undefined">Todos</option>
-                            <option value="out_of_stock">Sin stock</option>
-                            <option value="low_stock">Stock bajo</option>
-                            <option value="normal">Normal</option>
-                            <option value="optimal">Optimo</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: undefined, label: 'Todos' },
+                                { value: 'out_of_stock', label: 'Sin stock' },
+                                { value: 'low_stock', label: 'Stock bajo' },
+                                { value: 'normal', label: 'Normal' },
+                                { value: 'optimal', label: 'Óptimo' },
+                            ]"
+                        />
                     </div>
 
                     <template v-if="viewMode === 'movements'">
@@ -703,22 +711,26 @@ function pageItemLabel(): string {
                             >
                                 Tipo
                             </label>
-                            <select
+                            <AppSelect
                                 v-model="filters.movement_type"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="undefined">Todos</option>
-                                <option value="in">Entradas</option>
-                                <option value="out">Salidas</option>
-                                <option value="transfer">Transferencias</option>
-                            </select>
+                                class="w-full"
+                                :options="[
+                                    { value: undefined, label: 'Todos' },
+                                    { value: 'in', label: 'Entradas' },
+                                    { value: 'out', label: 'Salidas' },
+                                    {
+                                        value: 'transfer',
+                                        label: 'Transferencias',
+                                    },
+                                ]"
+                            />
                         </div>
                     </template>
 
                     <div class="flex items-end gap-2 lg:col-span-3">
                         <button
                             type="button"
-                            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             @click="applyFilters"
                         >
                             Filtrar
@@ -768,24 +780,15 @@ function pageItemLabel(): string {
                 </div>
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="rounded-lg border border-gray-200 bg-white py-12 text-center dark:border-border dark:bg-card"
-            >
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"
-                ></div>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                    Cargando inventario...
-                </p>
-            </div>
+                class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                label="Cargando inventario..."
+            />
 
-            <div
-                v-else-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-            >
+            <ErrorMessage v-else-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <div
                 v-else-if="viewMode === 'summary'"
@@ -930,11 +933,11 @@ function pageItemLabel(): string {
                                 </tr>
                             </template>
                             <tr v-if="inventoryRows.length === 0">
-                                <td
-                                    :colspan="showWarehouseColumn ? 9 : 8"
-                                    class="px-4 py-10 text-center text-sm text-gray-500"
-                                >
-                                    No se encontraron registros de inventario.
+                                <td :colspan="showWarehouseColumn ? 9 : 8">
+                                    <EmptyState
+                                        >No se encontraron registros de
+                                        inventario.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>
@@ -1062,11 +1065,10 @@ function pageItemLabel(): string {
                                 </td>
                             </tr>
                             <tr v-if="fifoLots.length === 0">
-                                <td
-                                    :colspan="lotsColspan"
-                                    class="px-4 py-10 text-center text-sm text-gray-500"
-                                >
-                                    No hay lotes abiertos.
+                                <td :colspan="lotsColspan">
+                                    <EmptyState
+                                        >No hay lotes abiertos.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>
@@ -1197,11 +1199,11 @@ function pageItemLabel(): string {
                                 </td>
                             </tr>
                             <tr v-if="movements.length === 0">
-                                <td
-                                    :colspan="movementsColspan"
-                                    class="px-4 py-10 text-center text-sm text-gray-500"
-                                >
-                                    No hay movimientos registrados.
+                                <td :colspan="movementsColspan">
+                                    <EmptyState
+                                        >No hay movimientos
+                                        registrados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

@@ -113,7 +113,7 @@ describe('ProductCodesEditor', () => {
                         name: 'Producto existente',
                         matched_code: '4550319155',
                         primary_code: '45503-19155',
-                        url: '/products/27/edit',
+                        url: '/inventory/products/27/edit',
                     },
                 ],
             },
@@ -129,11 +129,15 @@ describe('ProductCodesEditor', () => {
         await nextTick();
 
         expect(wrapper.text()).toContain('Producto existente');
-        expect(wrapper.get('a').attributes('href')).toBe('/products/27/edit');
-        expect(
-            (
-                editor.vm as unknown as { hasConflicts: () => boolean }
-            ).hasConflicts(),
-        ).toBe(true);
+        expect(wrapper.get('a').attributes('href')).toBe(
+            '/inventory/products/27/edit',
+        );
+        // Lo que ven las pantallas que usan el editor por ref: la API expuesta (defineExpose).
+        const exposed = (
+            editor.vm as unknown as {
+                $: { exposed: { hasConflicts: () => boolean } };
+            }
+        ).$.exposed;
+        expect(exposed.hasConflicts()).toBe(true);
     });
 });

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Trash2, Lock } from 'lucide-vue-next';
 import { computed, ref, onMounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useProductAttributes,
     type ProductAttribute,
@@ -249,7 +251,7 @@ const handleRemoveAttribute = async (attributeId: number) => {
                 <button
                     @click="handleAdd"
                     :disabled="!newName || !newValue || adding"
-                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="h-9 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                 >
                     {{ adding ? '...' : 'Agregar' }}
                 </button>
@@ -261,19 +263,14 @@ const handleRemoveAttribute = async (attributeId: number) => {
         <div
             class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
         >
-            <div
+            <LoadingState
                 v-if="loading && displayedAttributes.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500"
-            >
-                Cargando especificaciones...
-            </div>
+                label="Cargando especificaciones..."
+            />
 
-            <div
-                v-else-if="displayedAttributes.length === 0"
-                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+            <EmptyState v-else-if="displayedAttributes.length === 0"
+                >No hay especificaciones definidas.</EmptyState
             >
-                No hay especificaciones definidas.
-            </div>
 
             <table v-else class="w-full text-left text-sm">
                 <thead class="bg-gray-50 dark:bg-card">

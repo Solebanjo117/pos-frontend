@@ -2,6 +2,8 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -338,22 +340,21 @@ onMounted(async () => {
                 <ArrowLeft :size="24" />
             </button>
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     Editar {{ currentSalesOrder?.order_number }}
                 </h1>
-                <p class="mt-1 text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Modifica los detalles de la orden
                 </p>
             </div>
         </div>
 
         <!-- Error / Warning -->
-        <div
-            v-if="error"
-            class="rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-        >
+        <ErrorMessage v-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <div
             v-if="!canEdit"
@@ -545,7 +546,7 @@ onMounted(async () => {
                         <button
                             type="button"
                             @click="addItem"
-                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                             <Plus :size="18" />
                             Agregar
@@ -639,20 +640,18 @@ onMounted(async () => {
                                     }}
                                 </td>
                                 <td class="px-6 py-4">
-                                    <select
+                                    <AppSelect
                                         v-model="item.seller_id"
                                         :disabled="!canEdit"
-                                        class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white"
-                                    >
-                                        <option :value="undefined">—</option>
-                                        <option
-                                            v-for="user in users"
-                                            :key="user.id"
-                                            :value="user.id"
-                                        >
-                                            {{ user.name }}
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            { value: undefined, label: '—' },
+                                            ...(users ?? []).map((user) => ({
+                                                value: user.id,
+                                                label: String(user.name),
+                                            })),
+                                        ]"
+                                    />
                                 </td>
                                 <td
                                     class="px-6 py-4 text-right text-sm text-gray-900 dark:text-white"
@@ -768,7 +767,7 @@ onMounted(async () => {
                     :disabled="
                         loading || !form.items || form.items.length === 0
                     "
-                    class="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 text-white hover:bg-indigo-700 disabled:bg-gray-400 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:bg-gray-400"
                 >
                     <Save :size="18" />
                     {{ loading ? 'Guardando...' : 'Actualizar Orden' }}

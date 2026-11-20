@@ -1,11 +1,29 @@
 // @vitest-environment jsdom
 
-import { mount } from '@vue/test-utils';
+import { mount, type DOMWrapper } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import { nextTick } from 'vue';
 import VehicleCatalogDialog from './VehicleCatalogDialog.vue';
 
+// AppSelect funciona sobre el SearchableSelect simulado (un <select>): se elige por el texto visible.
+const chooseByLabel = async (
+    select: Omit<DOMWrapper<Element>, 'exists'>,
+    label: string,
+) => {
+    const option = select
+        .findAll('option')
+        .find((item) => item.text().trim() === label);
+    if (!option) throw new Error(`Opción "${label}" no encontrada`);
+    await select.setValue(option.element.getAttribute('value'));
+};
+
 const stubs = {
+    AppModal: {
+        props: ['open', 'title', 'description', 'size'],
+        emits: ['close', 'update:open'],
+        template:
+            '<div v-if="open"><h2>{{ title }}</h2><p>{{ description }}</p><slot /><footer><slot name="footer" /></footer></div>',
+    },
     Dialog: { template: '<div><slot /></div>' },
     DialogScrollContent: { template: '<div><slot /></div>' },
     DialogHeader: { template: '<header><slot /></header>' },
@@ -190,6 +208,49 @@ describe('VehicleCatalogDialog', () => {
         });
     });
 
+    it('sends the full engine sheet with valves cam type cylinders and nickname', async () => {
+        const wrapper = mount(VehicleCatalogDialog, {
+            props: { ...baseProps, tab: 'engines' },
+            global: { stubs },
+        });
+
+        await wrapper.findAll('select')[0].setValue('1');
+        await wrapper.get('#vehicle-engine-code').setValue('2L');
+        await wrapper.get('#vehicle-engine-nickname').setValue(' buzo ');
+        await wrapper.get('#vehicle-engine-displacement').setValue('2.4L');
+        await wrapper.get('#vehicle-engine-valves').setValue('8V');
+        await chooseByLabel(wrapper.get('#vehicle-engine-cam'), 'SOHC');
+        await wrapper.get('#vehicle-engine-cylinders').setValue('4');
+        await wrapper.get('form').trigger('submit');
+
+        expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+            engine_code: '2L',
+            nickname: 'buzo',
+            displacement: '2.4L',
+            valves: '8V',
+            cam_type: 'SOHC',
+            cylinders: 4,
+        });
+    });
+
+    it('sends empty engine sheet fields as null', async () => {
+        const wrapper = mount(VehicleCatalogDialog, {
+            props: { ...baseProps, tab: 'engines' },
+            global: { stubs },
+        });
+
+        await wrapper.findAll('select')[0].setValue('1');
+        await wrapper.get('#vehicle-engine-code').setValue('1NZFE');
+        await wrapper.get('form').trigger('submit');
+
+        expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+            nickname: null,
+            valves: null,
+            cam_type: null,
+            cylinders: null,
+        });
+    });
+
     it('locks the pair and linked VIN while preserving its data', async () => {
         const wrapper = mount(VehicleCatalogDialog, {
             props: {
@@ -262,5 +323,71 @@ describe('VehicleCatalogDialog', () => {
             year_from: 2020,
         });
         expect(wrapper.emitted('save')?.[0]?.[0]).not.toHaveProperty('year_to');
+    });
+
+    describe('chasis del modelo', () => {
+        const chassis = [
+            { id: 11, code: 'E110', model: { make: { id: 1 } } },
+            { id: 12, code: 'E120', models: [{ make: { id: 1 } }] },
+            { id: 13, code: 'RD1', model: { make: { id: 5 } } },
+        ];
+
+        it('lists only the chassis of the chosen make and sends the selected one', async () => {
+            const wrapper = mount(VehicleCatalogDialog, {
+                props: { ...baseProps, tab: 'models', chassis },
+                global: { stubs },
+            });
+            const [makeSelect, chassisSelect] = wrapper.findAll('select');
+
+            await makeSelect.setValue('1');
+            expect(
+                chassisSelect.findAll('option').map((option) => option.text()),
+            ).toEqual(['E110', 'E120']);
+
+            await wrapper.get('#vehicle-model-name').setValue('Corolla');
+            await chassisSelect.setValue('12');
+            await wrapper.get('form').trigger('submit');
+
+            expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+                make_id: 1,
+                chassis_id: 12,
+                generation: null,
+            });
+        });
+
+        it('creates a new chassis code in uppercase', async () => {
+            const wrapper = mount(VehicleCatalogDialog, {
+                props: { ...baseProps, tab: 'models', chassis },
+                global: { stubs },
+            });
+
+            await wrapper.findAll('select')[0].setValue('1');
+            await wrapper.get('#vehicle-model-name').setValue('Corolla');
+            await wrapper
+                .findAll('button')
+                .find((button) => button.text() === '+ Nuevo código')!
+                .trigger('click');
+            await wrapper.get('#vehicle-chassis-code').setValue(' e140 ');
+            await wrapper.get('form').trigger('submit');
+
+            expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+                chassis_id: null,
+                generation: 'E140',
+            });
+        });
+
+        it('shows the current chassis of the model when editing', async () => {
+            const row = { ...baseProps.models[0], generation: 'E120' };
+            const wrapper = mount(VehicleCatalogDialog, {
+                props: { ...baseProps, tab: 'models', row, chassis },
+                global: { stubs },
+            });
+            await nextTick();
+
+            expect(
+                (wrapper.findAll('select')[1].element as HTMLSelectElement)
+                    .value,
+            ).toBe('12');
+        });
     });
 });

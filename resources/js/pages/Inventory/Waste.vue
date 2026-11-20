@@ -9,10 +9,15 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 
@@ -261,17 +266,17 @@ onMounted(async () => {
     <Head title="Registro de mermas" />
 
     <AppLayout>
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <div
                 class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
             >
                 <div>
                     <h1
-                        class="text-2xl font-semibold text-gray-950 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Registro de mermas
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Descuenta stock por dano, perdida, caducidad o ajuste
                         fisico.
                     </p>
@@ -293,15 +298,12 @@ onMounted(async () => {
                     {{ successMsg }}
                 </div>
             </div>
-            <div
-                v-if="errorMsg"
-                class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
-            >
+            <ErrorMessage v-if="errorMsg">
                 <div class="flex items-center gap-2">
                     <AlertTriangle class="h-4 w-4" />
                     {{ errorMsg }}
                 </div>
-            </div>
+            </ErrorMessage>
 
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
                 <section
@@ -337,25 +339,21 @@ onMounted(async () => {
                             >
                                 Variante
                             </label>
-                            <select
+                            <AppSelect
                                 v-model="selectedVariant"
-                                class="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                @change="fetchStock"
-                            >
-                                <option :value="null" disabled>
-                                    Selecciona variante
-                                </option>
-                                <option
-                                    v-for="variant in variants"
-                                    :key="variant.id"
-                                    :value="variant"
-                                >
-                                    {{ variantLabel(variant) }}
-                                </option>
-                            </select>
+                                class="w-full"
+                                @update:model-value="fetchStock()"
+                                placeholder="Selecciona variante"
+                                :options="[
+                                    ...(variants ?? []).map((variant) => ({
+                                        value: variant,
+                                        label: String(variantLabel(variant)),
+                                    })),
+                                ]"
+                            />
                         </div>
 
-                        <div>
+                        <div v-if="multiWarehouse">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                             >
@@ -401,21 +399,17 @@ onMounted(async () => {
                             >
                                 Motivo
                             </label>
-                            <select
+                            <AppSelect
                                 v-model="reason"
-                                class="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option value="" disabled>
-                                    Selecciona motivo
-                                </option>
-                                <option
-                                    v-for="reasonOption in reasons"
-                                    :key="reasonOption"
-                                    :value="reasonOption"
-                                >
-                                    {{ reasonOption }}
-                                </option>
-                            </select>
+                                class="w-full"
+                                placeholder="Selecciona motivo"
+                                :options="[
+                                    ...(reasons ?? []).map((reasonOption) => ({
+                                        value: reasonOption,
+                                        label: String(reasonOption),
+                                    })),
+                                ]"
+                            />
                         </div>
 
                         <div class="lg:col-span-2">
@@ -473,7 +467,10 @@ onMounted(async () => {
                                     {{ variantLabel(selectedVariant) }}
                                 </dd>
                             </div>
-                            <div class="flex items-start justify-between gap-3">
+                            <div
+                                v-if="multiWarehouse"
+                                class="flex items-start justify-between gap-3"
+                            >
                                 <dt class="text-gray-500">Almacen</dt>
                                 <dd
                                     class="text-right font-medium text-gray-950 dark:text-white"
@@ -577,19 +574,19 @@ onMounted(async () => {
                     </button>
                 </div>
 
-                <div v-if="historyLoading" class="px-4 py-10 text-center">
-                    <PackageSearch class="mx-auto h-8 w-8 text-gray-400" />
-                    <p class="mt-2 text-sm text-gray-500">Cargando...</p>
-                </div>
+                <LoadingState
+                    v-if="historyLoading"
+                    label="Cargando historial..."
+                />
 
                 <div
                     v-else-if="history.length === 0"
                     class="px-4 py-10 text-center"
                 >
                     <PackageSearch class="mx-auto h-8 w-8 text-gray-400" />
-                    <p class="mt-2 text-sm text-gray-500">
-                        No hay mermas registradas.
-                    </p>
+                    <EmptyState compact class="mt-2"
+                        >No hay mermas registradas.</EmptyState
+                    >
                 </div>
 
                 <div v-else class="overflow-x-auto">
@@ -600,7 +597,9 @@ onMounted(async () => {
                             <tr>
                                 <th class="px-4 py-3">Producto</th>
                                 <th class="px-4 py-3">Variante / SKU</th>
-                                <th class="px-4 py-3">Almacen</th>
+                                <th v-if="multiWarehouse" class="px-4 py-3">
+                                    Almacen
+                                </th>
                                 <th class="px-4 py-3 text-right">Cantidad</th>
                                 <th class="px-4 py-3">Motivo</th>
                                 <th class="px-4 py-3">Usuario</th>
@@ -632,7 +631,7 @@ onMounted(async () => {
                                         {{ entry.sku }}
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td v-if="multiWarehouse" class="px-4 py-3">
                                     <div class="flex items-center gap-2">
                                         <Warehouse
                                             class="h-4 w-4 text-gray-400"

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { Product } from '@/types/product';
+import { productDetailTitle } from '@/utils/productDetailTitle';
 
 interface Props {
     product: Product;
@@ -46,11 +49,6 @@ interface ProductAttribute {
     value: string;
     unit?: string | null;
 }
-interface OemReference {
-    id?: number;
-    oem_code: string;
-    manufacturer: string;
-}
 interface AlternativeRecord {
     id: number;
     sku: string;
@@ -83,7 +81,7 @@ interface VehicleRow {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const deepLink = (param: string, value: string | number) =>
-    `/products?${param}=${encodeURIComponent(String(value))}`;
+    `/inventory/products?${param}=${encodeURIComponent(String(value))}`;
 
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', {
@@ -512,8 +510,27 @@ const groupedVehicles = computed(() => {
     return Array.from(groups.values());
 });
 
-// ── OEM + Alternatives ────────────────────────────────────────────────────────
-const oemData = ref<OemReference[]>([]);
+// Título de la cabecera: categoría · carro por defecto (el primero compatible).
+const defaultVehicleLabel = computed(() => {
+    const fromList = props.product.vehicles?.[0]?.label;
+    if (fromList) return fromList;
+    const first = groupedVehicles.value[0];
+    if (!first) return null;
+    const years = [first.year_from, first.year_to].filter(Boolean).join('-');
+    return [first.make, first.model, years]
+        .filter((part) => part && part !== '—')
+        .join(' ');
+});
+const headerTitle = computed(() =>
+    productDetailTitle({
+        categoryName: props.product.category?.name,
+        defaultVehicle: defaultVehicleLabel.value,
+        isUniversal: Boolean(props.product.is_universal),
+        productName: props.product.name,
+    }),
+);
+
+// ── Alternatives ────────────────────────────────────────────────────────
 const alternativesData = ref<AlternativeRecord[]>([]);
 const loadingRefs = ref(false);
 const showAlternatives = ref(false);
@@ -523,7 +540,6 @@ const resetModalStateForProduct = () => {
     currentImageIdx.value = 0;
     attributesData.value = [];
     vehicleRows.value = [];
-    oemData.value = [];
     alternativesData.value = [];
     showAlternatives.value = false;
     activeVariantId.value =
@@ -556,12 +572,10 @@ const loadProductDetails = async () => {
         })(),
         (async () => {
             try {
-                const [oemRes, altRes] = await Promise.all([
-                    apiClient.get(`/products/${productId}/oem-references`),
-                    apiClient.get(`/products/${productId}/alternatives`),
-                ]);
+                const altRes = await apiClient.get(
+                    `/products/${productId}/alternatives`,
+                );
                 if (productId !== props.product.id) return;
-                oemData.value = oemRes.data.data ?? [];
                 alternativesData.value = altRes.data.data ?? [];
             } catch (e) {
                 console.error(e);
@@ -608,18 +622,20 @@ const handleViewAlternative = async (altId: number) => {
         @click.self="emit('close')"
     >
         <div
-            class="relative max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-card"
+            class="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-card"
         >
             <!-- Header -->
             <div
-                class="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-border dark:bg-card/95"
+                class="z-10 flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-4 dark:border-border dark:bg-card"
             >
-                <div>
+                <div class="min-w-0">
                     <div class="flex items-center gap-2">
                         <h2
-                            class="text-xl font-bold text-gray-900 dark:text-white"
+                            class="truncate text-xl font-bold text-gray-900 dark:text-white"
+                            data-testid="product-detail-title"
+                            :title="headerTitle"
                         >
-                            {{ product.name }}
+                            {{ headerTitle }}
                         </h2>
                         <span
                             v-if="product.is_universal"
@@ -628,6 +644,13 @@ const handleViewAlternative = async (altId: number) => {
                             >🌐 Universal</span
                         >
                     </div>
+                    <p
+                        v-if="headerTitle !== product.name"
+                        class="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400"
+                        data-testid="product-detail-name"
+                    >
+                        {{ product.name }}
+                    </p>
                     <p
                         v-if="product.sku_base && !blindMode"
                         class="mt-0.5 font-mono text-xs text-gray-400"
@@ -644,79 +667,72 @@ const handleViewAlternative = async (altId: number) => {
                         }}
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <!-- Blind Mode Toggle -->
-                    <button
-                        @click="toggleBlindMode"
-                        :class="[
-                            'relative inline-flex h-7 w-14 shrink-0 items-center rounded-full transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none',
-                            blindMode
-                                ? 'bg-amber-500 focus:ring-amber-400'
-                                : 'bg-gray-300 focus:ring-gray-400 dark:bg-gray-600',
-                        ]"
-                        :title="
-                            blindMode
-                                ? 'Modo Cliente activo — muestra precio de venta'
-                                : 'Modo Normal — muestra toda la información'
-                        "
+                <div class="flex shrink-0 items-center gap-2">
+                    <!-- Interruptores con el mismo tamaño y estilo que los de Variantes -->
+                    <div
+                        class="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 dark:border-border dark:bg-muted/40"
                     >
                         <span
-                            :class="[
-                                'inline-flex h-5 w-5 transform items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-200',
-                                blindMode ? 'translate-x-8' : 'translate-x-1',
-                            ]"
+                            class="text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                            >Vista</span
                         >
-                            <svg
-                                v-if="blindMode"
-                                class="h-3 w-3 text-amber-500"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18"
-                                />
-                            </svg>
-                            <svg
-                                v-else
-                                class="h-3 w-3 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                />
-                            </svg>
-                        </span>
-                    </button>
-                    <span
-                        class="text-[10px] font-medium tracking-wider uppercase"
-                        :class="blindMode ? 'text-amber-500' : 'text-gray-400'"
-                        >{{ blindMode ? 'Cliente' : 'Normal' }}</span
-                    >
-
-                    <!-- ITBM toggle (available in both normal and client mode) -->
-                    <div class="ml-1 flex items-center gap-1.5">
                         <button
+                            type="button"
+                            role="switch"
+                            :aria-checked="blindMode"
+                            data-testid="blind-mode-toggle"
+                            @click="toggleBlindMode"
+                            :class="[
+                                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none',
+                                blindMode
+                                    ? 'bg-amber-500 focus:ring-amber-400'
+                                    : 'bg-gray-300 focus:ring-gray-400 dark:bg-gray-600',
+                            ]"
+                            :title="
+                                blindMode
+                                    ? 'Modo Cliente activo — muestra precio de venta'
+                                    : 'Modo Normal — muestra toda la información'
+                            "
+                        >
+                            <span
+                                :class="[
+                                    'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200',
+                                    blindMode
+                                        ? 'translate-x-5'
+                                        : 'translate-x-0.5',
+                                ]"
+                            />
+                        </button>
+                        <span
+                            class="w-11 text-[10px] font-medium"
+                            :class="
+                                blindMode
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-gray-500 dark:text-gray-300'
+                            "
+                            >{{ blindMode ? 'Cliente' : 'Normal' }}</span
+                        >
+                    </div>
+
+                    <!-- ITBM (en modo normal y cliente) -->
+                    <div
+                        class="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 dark:border-border dark:bg-muted/40"
+                    >
+                        <span
+                            class="text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                            >ITBM</span
+                        >
+                        <button
+                            type="button"
+                            role="switch"
+                            :aria-checked="includeITBM"
+                            data-testid="itbm-toggle"
                             @click="toggleIncludeITBM"
                             :class="[
-                                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none',
+                                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none',
                                 includeITBM
-                                    ? 'bg-green-500'
-                                    : 'bg-gray-300 dark:bg-gray-600',
+                                    ? 'bg-emerald-500 focus:ring-emerald-400'
+                                    : 'bg-gray-300 focus:ring-gray-400 dark:bg-gray-600',
                             ]"
                             :title="
                                 includeITBM
@@ -728,17 +744,19 @@ const handleViewAlternative = async (altId: number) => {
                                 :class="[
                                     'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200',
                                     includeITBM
-                                        ? 'translate-x-4'
+                                        ? 'translate-x-5'
                                         : 'translate-x-0.5',
                                 ]"
                             />
                         </button>
                         <span
-                            class="text-[10px] font-medium"
+                            class="w-11 text-[10px] font-medium"
                             :class="
-                                includeITBM ? 'text-green-500' : 'text-gray-400'
+                                includeITBM
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-gray-500 dark:text-gray-300'
                             "
-                            >ITBM</span
+                            >{{ includeITBM ? '+ITBM' : 'Sin ITBM' }}</span
                         >
                     </div>
 
@@ -764,7 +782,11 @@ const handleViewAlternative = async (altId: number) => {
                 </div>
             </div>
 
-            <div class="space-y-6 p-6">
+            <!-- Solo el cuerpo se desplaza; la cabecera queda fija arriba. -->
+            <div
+                class="min-h-0 flex-1 space-y-6 overflow-y-auto p-6"
+                data-testid="product-detail-body"
+            >
                 <!-- ══════════════════════════════════════════════════════ -->
                 <!--  TOP PANEL: Photo (left) + Variants (right)          -->
                 <!-- ══════════════════════════════════════════════════════ -->
@@ -958,12 +980,10 @@ const handleViewAlternative = async (altId: number) => {
                                 >
                                     Especificaciones Técnicas
                                 </h6>
-                                <div
+                                <LoadingState
                                     v-if="loadingAttrs"
-                                    class="animate-pulse py-2 text-sm text-gray-400"
-                                >
-                                    Cargando especificaciones...
-                                </div>
+                                    label="Cargando especificaciones..."
+                                />
                                 <div
                                     v-else-if="mergedSpecs.length === 0"
                                     class="py-2 text-sm text-gray-400 italic"
@@ -1222,7 +1242,7 @@ const handleViewAlternative = async (altId: number) => {
                                                     (variant.total_stock ??
                                                         0) === 0
                                                 "
-                                                class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-transform hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                                class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-transform hover:bg-primary/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                                                 title="Agregar al carrito"
                                             >
                                                 <svg
@@ -1256,9 +1276,9 @@ const handleViewAlternative = async (altId: number) => {
                                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                                         />
                                     </svg>
-                                    <p class="text-gray-500">
-                                        No hay marcas disponibles.
-                                    </p>
+                                    <EmptyState compact
+                                        >No hay marcas disponibles.</EmptyState
+                                    >
                                 </div>
                             </div>
 
@@ -1316,12 +1336,10 @@ const handleViewAlternative = async (altId: number) => {
                         </div>
 
                         <div class="custom-scrollbar flex-1 overflow-y-auto">
-                            <div
+                            <LoadingState
                                 v-if="loadingVehicle"
-                                class="animate-pulse p-4 text-sm text-gray-400"
-                            >
-                                Cargando compatibilidad...
-                            </div>
+                                label="Cargando compatibilidad..."
+                            />
                             <div
                                 v-else-if="product.is_universal"
                                 class="bg-blue-50/50 p-6 text-center text-sm text-blue-600 italic dark:bg-blue-900/10 dark:text-blue-400"
@@ -1470,72 +1488,6 @@ const handleViewAlternative = async (altId: number) => {
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- OEM Referencias (Full Width) -->
-                    <div
-                        v-if="!loadingRefs && oemData.length > 0"
-                        class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
-                    >
-                        <div
-                            class="flex items-center gap-2 rounded-t-lg border-b border-gray-100 bg-gray-50 p-4 font-bold text-gray-900 dark:border-border dark:bg-background dark:text-white"
-                        >
-                            <svg
-                                class="h-5 w-5 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z"
-                                />
-                            </svg>
-                            Referencias OEM
-                            <span
-                                class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-normal text-gray-500 dark:bg-muted"
-                            >
-                                {{ oemData.length }}
-                            </span>
-                        </div>
-                        <div class="overflow-x-auto rounded-b-lg">
-                            <table
-                                class="min-w-full divide-y divide-gray-200 text-sm dark:divide-border"
-                            >
-                                <tbody
-                                    class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
-                                >
-                                    <tr
-                                        v-for="oem in oemData"
-                                        :key="oem.oem_code"
-                                        class="hover:bg-gray-50 dark:hover:bg-muted/50"
-                                    >
-                                        <td
-                                            class="px-4 py-3 font-mono font-semibold text-amber-700 dark:text-amber-400"
-                                        >
-                                            <a
-                                                :href="
-                                                    deepLink(
-                                                        'oem_code',
-                                                        oem.oem_code,
-                                                    )
-                                                "
-                                                target="_blank"
-                                                class="hover:underline"
-                                                >{{ oem.oem_code }}</a
-                                            >
-                                        </td>
-                                        <td
-                                            class="px-4 py-3 text-gray-600 dark:text-gray-400"
-                                        >
-                                            {{ oem.manufacturer || '—' }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
                         </div>
                     </div>
 

@@ -28,7 +28,7 @@ defineProps<{
                         class="mb-1 hidden items-center gap-1.5 text-xs font-medium text-gray-500 md:flex dark:text-gray-400"
                     >
                         <Link
-                            href="/inventory"
+                            href="/purchases"
                             class="hover:text-emerald-700 dark:hover:text-emerald-300"
                         >
                             Compras

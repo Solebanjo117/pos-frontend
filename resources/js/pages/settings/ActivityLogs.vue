@@ -10,6 +10,10 @@ import {
     Filter,
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 
@@ -104,16 +108,16 @@ onMounted(() => fetchLogs());
 <template>
     <Head title="Bitácora de Actividad" />
 
-    <div class="mx-auto max-w-6xl p-6">
+    <div class="mx-auto w-full max-w-6xl">
         <!-- Header -->
         <div class="mb-6">
             <h1
-                class="flex items-center gap-3 text-2xl font-bold text-gray-900 dark:text-white"
+                class="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground"
             >
                 <Activity class="h-7 w-7 text-indigo-600 dark:text-primary" />
                 Bitácora de Actividad
             </h1>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-muted-foreground">
                 Registro de accesos y acciones del sistema
             </p>
         </div>
@@ -127,32 +131,32 @@ onMounted(() => fetchLogs());
                     <label class="mb-1 block text-xs font-medium text-gray-500"
                         >Tipo</label
                     >
-                    <select
+                    <AppSelect
                         v-model="filterLogName"
-                        @change="fetchLogs(1)"
-                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                    >
-                        <option value="">Todos</option>
-                        <option value="auth">Autenticación</option>
-                        <option value="default">General</option>
-                    </select>
+                        @update:model-value="fetchLogs(1)"
+                        :options="[
+                            { value: '', label: 'Todos' },
+                            { value: 'auth', label: 'Autenticación' },
+                            { value: 'default', label: 'General' },
+                        ]"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-gray-500"
                         >Evento</label
                     >
-                    <select
+                    <AppSelect
                         v-model="filterEvent"
-                        @change="fetchLogs(1)"
-                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                    >
-                        <option value="">Todos</option>
-                        <option value="login">Login</option>
-                        <option value="logout">Logout</option>
-                        <option value="created">Creado</option>
-                        <option value="updated">Actualizado</option>
-                        <option value="deleted">Eliminado</option>
-                    </select>
+                        @update:model-value="fetchLogs(1)"
+                        :options="[
+                            { value: '', label: 'Todos' },
+                            { value: 'login', label: 'Login' },
+                            { value: 'logout', label: 'Logout' },
+                            { value: 'created', label: 'Creado' },
+                            { value: 'updated', label: 'Actualizado' },
+                            { value: 'deleted', label: 'Eliminado' },
+                        ]"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-gray-500"
@@ -185,30 +189,20 @@ onMounted(() => fetchLogs());
         </div>
 
         <!-- Loading -->
-        <div v-if="loading" class="py-12 text-center text-gray-500">
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
-            ></div>
-            Cargando registros...
-        </div>
+        <LoadingState v-if="loading" label="Cargando registros..." />
 
         <!-- Error -->
-        <div
-            v-else-if="error"
-            class="rounded-xl bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400"
-        >
+        <ErrorMessage v-else-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <!-- Log List -->
         <div v-else class="space-y-2">
-            <div
+            <EmptyState
                 v-if="logs.length === 0"
-                class="rounded-xl bg-white p-12 text-center text-gray-400 dark:bg-card"
+                class="rounded-xl bg-white dark:bg-card"
+                >No hay registros para los filtros seleccionados.</EmptyState
             >
-                <Activity class="mx-auto mb-3 h-12 w-12 opacity-30" />
-                No hay registros para los filtros seleccionados.
-            </div>
 
             <div
                 v-for="log in logs"

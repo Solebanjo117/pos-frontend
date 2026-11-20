@@ -2,6 +2,10 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import {
+    appSelectButton,
+    chooseAppSelectOption,
+} from '@/lib/testing/appSelect';
 import apiClient from '@/services/api/client';
 import { reportPeriod } from '@/utils/moneyReports';
 import CashPaymentsReport from './CashPaymentsReport.vue';
@@ -312,7 +316,10 @@ it('usa el calendario de Resumen para aplicar, limpiar y restablecer el rango de
         },
     });
     await flushPromises();
-    await wrapper.get('select[aria-label="Consulta"]').setValue('period');
+    await chooseAppSelectOption(
+        appSelectButton(wrapper, 'Consulta'),
+        'Movimientos del período',
+    );
     await wrapper.get('button[aria-haspopup="dialog"]').trigger('click');
     expect(document.querySelectorAll('[role="dialog"] section')).toHaveLength(
         3,

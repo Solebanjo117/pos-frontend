@@ -9,6 +9,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useToast } from '@/composables/useToast';
 import { categoriesService } from '@/services/categories';
 
@@ -334,7 +335,7 @@ onBeforeUnmount(() => {
 
             <button
                 type="button"
-                class="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="uploadingImage || deletingImage"
                 @click="openFilePicker"
             >
@@ -413,13 +414,11 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-else>
-            <div
+            <LoadingState
                 v-if="loadingImages"
-                class="flex min-h-56 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-            >
-                <Loader2 class="mr-2 h-5 w-5 animate-spin" />
-                Cargando imágenes
-            </div>
+                class="min-h-56"
+                label="Cargando imágenes..."
+            />
 
             <div
                 v-else-if="categoryImages.length === 0"

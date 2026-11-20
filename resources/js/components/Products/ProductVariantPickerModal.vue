@@ -13,6 +13,7 @@ import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import ProductFilters from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import apiClient from '@/services/api/client';
@@ -594,7 +595,7 @@ watch(
                         </button>
                         <button
                             type="button"
-                            class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                            class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                             @click="emitFilters"
                         >
                             <Search class="h-4 w-4" />
@@ -686,9 +687,9 @@ watch(
                             class="flex flex-col items-center justify-center px-6 py-16 text-center"
                         >
                             <Package class="mb-3 h-12 w-12 text-gray-300" />
-                            <p class="text-sm font-medium text-gray-500">
-                                No se encontraron productos
-                            </p>
+                            <EmptyState compact
+                                >No se encontraron productos</EmptyState
+                            >
                             <p class="mt-1 text-xs text-gray-400">
                                 Intenta con otro termino de busqueda
                             </p>

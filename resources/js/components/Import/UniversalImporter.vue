@@ -35,6 +35,7 @@ import ImportHistoryPanel from '@/components/Import/ImportHistoryPanel.vue';
 import ImportPreviewTable from '@/components/Import/ImportPreviewTable.vue';
 import ImportResultsPanel from '@/components/Import/ImportResultsPanel.vue';
 import ImportSheetMapper from '@/components/Import/ImportSheetMapper.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
@@ -44,6 +45,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import {
     Tooltip,
@@ -905,14 +909,10 @@ const requestPreviewPerPage = (value: number): void => {
     });
 };
 
-const requestPreviewPerPageFromEvent = (event: Event): void => {
-    const select = event.target as HTMLSelectElement;
-    const previousValue = previewPerPage.value;
-    requestPreviewPerPage(Number(select.value));
-
-    if (hasUnsavedPersistedRowChanges.value) {
-        select.value = String(previousValue);
-    }
+// El selector es controlado (:model-value="previewPerPage"): si hay cambios sin guardar y no se
+// cambia de página, sigue mostrando el valor anterior sin tocar el DOM.
+const requestPreviewPerPageFromEvent = (value: unknown): void => {
+    requestPreviewPerPage(Number(value));
 };
 
 watch([previewPage, previewPerPage, activePreviewFilter, previewSearch], () => {
@@ -2671,8 +2671,8 @@ const hydrateRunMappingState = (run: ImportResult | ImportRun | null) => {
     ensureDetectedColumns();
 };
 
-const handleSheetChange = async (event: Event) => {
-    const value = Number((event.target as HTMLSelectElement).value);
+const handleSheetChange = async (selected: unknown) => {
+    const value = Number(selected);
     selectedSheetIndex.value = Number.isNaN(value) ? null : value;
     resetMapping();
 
@@ -4386,12 +4386,12 @@ const formatFileSize = (bytes: number) => {
     <div ref="importerRootRef" :class="importerShellClass">
         <div class="mb-4">
             <h1
-                class="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white"
+                class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
             >
                 <FileSpreadsheet class="h-6 w-6 text-emerald-600" />
                 {{ config.title }}
             </h1>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-muted-foreground">
                 {{ config.description }}
             </p>
         </div>
@@ -4582,7 +4582,7 @@ const formatFileSize = (bytes: number) => {
                             : undefined
                     "
                     @click="requestImportConfirmation('file')"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-1.5 transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     <UploadCloud class="h-4 w-4" />
                     {{
@@ -4714,30 +4714,11 @@ const formatFileSize = (bytes: number) => {
                     <div
                         class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center"
                     >
-                        <select
-                            id="import-sheet-select"
-                            :value="selectedSheetIndex ?? ''"
-                            :disabled="
+                        <AppSelect id="import-sheet-select" :model-value="selectedSheetIndex ?? ''" :disabled="
                                 metadataLoading ||
                                 previewLoading ||
                                 fullImportRunning
-                            "
-                            class="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-none disabled:opacity-60 dark:border-amber-700 dark:bg-background dark:text-white"
-                            @change="handleSheetChange"
-                        >
-                            <option
-                                v-for="sheet in importSheets"
-                                :key="sheet.index"
-                                :value="sheet.index"
-                            >
-                                {{ sheet.name }} - {{ sheet.row_count }} filas -
-                                {{ sheet.matched_headers?.length ?? 0 }}
-                                columnas
-                                {{
-                                    sheet.is_recommended ? ' - recomendada' : ''
-                                }}
-                            </option>
-                        </select>
+                            " class="w-full" @update:model-value="handleSheetChange" :options="[...((importSheets) ?? []).map((sheet) => ({ value: sheet.index, label: `${sheet.name} - ${sheet.row_count} filas - ${sheet.matched_headers?.length ?? 0} columnas ${sheet.is_recommended ? ' - recomendada' : ''}` }))]" />
                         <p class="text-xs text-amber-800 dark:text-amber-300">
                             La importacion completa usara esta misma hoja.
                         </p>
@@ -4881,34 +4862,8 @@ const formatFileSize = (bytes: number) => {
                             Perfil y modo
                         </p>
                         <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                            <select
-                                v-model="selectedProfileId"
-                                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card dark:text-white"
-                                @change="applySelectedProfile"
-                            >
-                                <option :value="null">Sin perfil</option>
-                                <option
-                                    v-for="profile in usableImportProfiles"
-                                    :key="profile.id"
-                                    :value="profile.id"
-                                >
-                                    {{ profile.name }}
-                                </option>
-                            </select>
-                            <select
-                                v-model="importMode"
-                                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-card dark:text-white"
-                            >
-                                <option value="create_update">
-                                    Crear y actualizar
-                                </option>
-                                <option value="create_only">
-                                    Solo crear nuevos
-                                </option>
-                                <option value="update_stock_price">
-                                    Solo stock/precio
-                                </option>
-                            </select>
+                            <AppSelect v-model="selectedProfileId" @update:model-value="applySelectedProfile()" :options="[{ value: null, label: 'Sin perfil' }, ...((usableImportProfiles) ?? []).map((profile) => ({ value: profile.id, label: String(profile.name) }))]" />
+                            <AppSelect v-model="importMode" :options="[{ value: 'create_update', label: 'Crear y actualizar' }, { value: 'create_only', label: 'Solo crear nuevos' }, { value: 'update_stock_price', label: 'Solo stock/precio' }]" />
                         </div>
                         <button
                             type="button"
@@ -4950,33 +4905,16 @@ const formatFileSize = (bytes: number) => {
                                         {{ field.key }}
                                     </p>
                                 </div>
-                                <select
-                                    :value="sourceColumnForTarget(field.key)"
-                                    class="rounded border border-gray-300 bg-white px-2 py-1 dark:border-border dark:bg-card dark:text-white"
-                                    :disabled="
+                                <AppSelect :model-value="sourceColumnForTarget(field.key)" :disabled="
                                         metadataLoading ||
                                         previewLoading ||
                                         mappingReplacementRunId !== null ||
                                         operationalMappingApplying ||
                                         persistedRowsRevalidationActive
-                                    "
-                                    @change="
-                                        updateTargetFieldMapping(
+                                    " @update:model-value="updateTargetFieldMapping(
                                             field.key,
-                                            ($event.target as HTMLSelectElement)
-                                                .value,
-                                        )
-                                    "
-                                >
-                                    <option value="">Sin columna</option>
-                                    <option
-                                        v-for="column in detectedColumns"
-                                        :key="column.key"
-                                        :value="column.key"
-                                    >
-                                        {{ column.label }}
-                                    </option>
-                                </select>
+                                            $event,
+                                        )" :options="[{ value: '', label: 'Sin columna' }, ...((detectedColumns) ?? []).map((column) => ({ value: column.key, label: String(column.label) }))]" />
                             </div>
                         </div>
                         <p
@@ -5155,16 +5093,7 @@ const formatFileSize = (bytes: number) => {
                 </button>
             </div>
 
-            <div
-                v-if="
-                    importHistoryExpanded &&
-                    importRunsLoading &&
-                    importRuns.length === 0
-                "
-                class="px-6 py-6 text-sm text-gray-500 dark:text-gray-400"
-            >
-                Cargando historial...
-            </div>
+            <LoadingState v-if=" importHistoryExpanded && importRunsLoading && importRuns.length === 0 " label="Cargando historial..." />
             <div
                 v-else-if="importHistoryExpanded && importRuns.length === 0"
                 class="px-6 py-6 text-sm text-gray-500 dark:text-gray-400"
@@ -5389,12 +5318,9 @@ const formatFileSize = (bytes: number) => {
         </ImportHistoryPanel>
 
         <!-- Error message -->
-        <div
-            v-if="error"
-            class="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
-        >
-            <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />{{ error }}
-        </div>
+        <ErrorMessage v-if="error">
+            {{ error }}
+        </ErrorMessage>
 
         <!-- Step 2: Preview Editable -->
         <ImportPreviewTable v-if="hasPreview" :shell-class="previewShellClass">
@@ -5931,21 +5857,7 @@ const formatFileSize = (bytes: number) => {
                         Mostrando {{ previewPageStart }}-{{ previewPageEnd }} de
                         {{ previewTotalItems }} {{ previewItemLabel }}
                     </span>
-                    <select
-                        :value="previewPerPage"
-                        aria-label="Filas por pagina del preview"
-                        class="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-700 focus:border-blue-400 focus:outline-none dark:border-border dark:bg-background dark:text-gray-200"
-                        :disabled="previewViewControlsDisabled"
-                        @change="requestPreviewPerPageFromEvent"
-                    >
-                        <option
-                            v-for="option in previewPerPageOptions"
-                            :key="option"
-                            :value="option"
-                        >
-                            {{ option }} por pagina
-                        </option>
-                    </select>
+                    <AppSelect :model-value="previewPerPage" aria-label="Filas por pagina del preview" :disabled="previewViewControlsDisabled" @update:model-value="requestPreviewPerPageFromEvent" :options="[...((previewPerPageOptions) ?? []).map((option) => ({ value: option, label: `${option} por pagina` }))]" />
                     <button
                         type="button"
                         aria-label="Pagina anterior del preview"
@@ -6823,11 +6735,9 @@ const formatFileSize = (bytes: number) => {
                             >
                                 <td
                                     :colspan="2 + productBaseColumns.length + 2"
-                                    class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
-                                >
-                                    No hay grupos para el filtro
-                                    {{ activeFilterLabel }}.
-                                </td>
+                                    
+                                ><EmptyState>No hay grupos para el filtro
+                                    {{ activeFilterLabel }}.</EmptyState></td>
                             </tr>
                         </tbody>
                     </table>
@@ -7537,13 +7447,8 @@ const formatFileSize = (bytes: number) => {
                                                         </tbody>
                                                     </table>
                                                 </div>
-                                                <div
-                                                    v-else
-                                                    class="px-3 py-3 text-gray-500 dark:text-gray-400"
-                                                >
-                                                    No hay cambios de campo para
-                                                    esta fila.
-                                                </div>
+                                                <EmptyState v-else>No hay cambios de campo para
+                                                    esta fila.</EmptyState>
                                             </div>
                                             <div
                                                 v-if="row.__conflicts?.length"
@@ -7572,11 +7477,9 @@ const formatFileSize = (bytes: number) => {
                                         editableColumns.length +
                                         actionColumns.length
                                     "
-                                    class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
-                                >
-                                    No hay filas para el filtro
-                                    {{ activeFilterLabel }}.
-                                </td>
+                                    
+                                ><EmptyState>No hay filas para el filtro
+                                    {{ activeFilterLabel }}.</EmptyState></td>
                             </tr>
                         </tbody>
                     </table>
@@ -7607,7 +7510,7 @@ const formatFileSize = (bytes: number) => {
                     type="button"
                     :disabled="!canImport"
                     @click="requestImportConfirmation('preview')"
-                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-2 transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     <UploadCloud class="h-4 w-4" />
                     {{ importRunning ? 'Importando...' : 'Importar' }}
@@ -7618,7 +7521,7 @@ const formatFileSize = (bytes: number) => {
                     :disabled="!canRunFullFile"
                     :title="fullFileImportBlockedReason ?? undefined"
                     @click="requestImportConfirmation('file')"
-                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-2 transition disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     <UploadCloud class="h-4 w-4" />
                     Importar archivo completo
@@ -7843,7 +7746,7 @@ const formatFileSize = (bytes: number) => {
                     <button
                         type="button"
                         :disabled="!profileNameIsValid || profileSaving"
-                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="disabled:cursor-not-allowed disabled:opacity-50 h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         @click="saveCurrentProfile"
                     >
                         {{ profileSaving ? 'Guardando...' : 'Guardar' }}
@@ -7943,7 +7846,7 @@ const formatFileSize = (bytes: number) => {
                     </button>
                     <button
                         type="button"
-                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                        class="h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         @click="confirmSafetyAction"
                     >
                         {{ safetyConfirmationSummary.primaryLabel }}
@@ -7998,7 +7901,7 @@ const formatFileSize = (bytes: number) => {
                     </button>
                     <button
                         type="button"
-                        class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                        class="h-9 rounded-md px-4 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
                         @click="confirmImport"
                     >
                         {{ importConfirmationSummary.primaryLabel }}

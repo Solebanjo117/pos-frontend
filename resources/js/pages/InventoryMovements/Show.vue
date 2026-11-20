@@ -16,7 +16,11 @@ import { computed, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useInventoryMovements } from '@/composables/useInventoryMovements';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { transactionTraceService } from '@/services/transaction-traces';
 import { type BreadcrumbItem } from '@/types';
@@ -30,8 +34,8 @@ const props = defineProps<{
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
-    { title: 'Detalle', href: `/inventory-movements/${props.id}` },
+    { title: 'Movimientos', href: '/inventory/movements' },
+    { title: 'Detalle', href: `/inventory/movements/${props.id}` },
 ];
 
 const {
@@ -172,12 +176,12 @@ function lotValue(lot: NonNullable<InventoryMovement['fifo_lots']>[number]) {
 }
 
 function goBack(): void {
-    router.visit('/inventory');
+    router.visit('/inventory/movements');
 }
 
 function viewProduct(id?: number): void {
     if (id) {
-        router.visit(`/products/${id}`);
+        router.visit(`/inventory/products/${id}`);
     }
 }
 
@@ -192,20 +196,16 @@ function openReference(): void {
     <Head title="Detalle de movimiento" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
-            <div
+        <div class="space-y-5">
+            <LoadingState
                 v-if="loading"
-                class="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-border dark:bg-card dark:text-gray-300"
-            >
-                Cargando movimiento...
-            </div>
+                class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                label="Cargando movimiento..."
+            />
 
-            <div
-                v-else-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <template v-else-if="currentMovement">
                 <div
@@ -214,7 +214,7 @@ function openReference(): void {
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h1
-                                class="text-xl font-semibold text-gray-950 dark:text-white"
+                                class="text-2xl font-semibold tracking-tight text-foreground"
                             >
                                 Movimiento #{{ currentMovement.id }}
                             </h1>
@@ -293,6 +293,7 @@ function openReference(): void {
                     </div>
 
                     <div
+                        v-if="multiWarehouse"
                         class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                     >
                         <div
@@ -312,6 +313,7 @@ function openReference(): void {
                     </div>
 
                     <div
+                        v-if="multiWarehouse"
                         class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
                     >
                         <div
@@ -459,10 +461,7 @@ function openReference(): void {
                                         }}
                                     </td>
                                     <td class="px-4 py-3 font-mono text-xs">
-                                        {{
-                                            currentMovement.product_batch
-                                                ?.batch_number || '-'
-                                        }}
+                                        {{ fifoLots[0]?.batch_number || '-' }}
                                     </td>
                                     <td
                                         class="max-w-md px-4 py-3 text-gray-600 dark:text-gray-300"
@@ -668,12 +667,10 @@ function openReference(): void {
                                 Movimientos relacionados
                             </h2>
                         </div>
-                        <div
+                        <LoadingState
                             v-if="loadingRelated"
-                            class="px-4 py-6 text-sm text-gray-500"
-                        >
-                            Cargando relacionados...
-                        </div>
+                            label="Cargando relacionados..."
+                        />
                         <div v-else class="overflow-x-auto">
                             <table class="min-w-full text-left text-sm">
                                 <thead
@@ -685,7 +682,12 @@ function openReference(): void {
                                         <th class="px-4 py-3 text-right">
                                             Cantidad
                                         </th>
-                                        <th class="px-4 py-3">Almacen</th>
+                                        <th
+                                            v-if="multiWarehouse"
+                                            class="px-4 py-3"
+                                        >
+                                            Almacen
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -700,7 +702,7 @@ function openReference(): void {
                                                 class="font-medium text-blue-600 hover:underline dark:text-primary"
                                                 @click="
                                                     router.visit(
-                                                        `/inventory-movements/${movement.id}`,
+                                                        `/inventory/movements/${movement.id}`,
                                                     )
                                                 "
                                             >
@@ -726,18 +728,21 @@ function openReference(): void {
                                                 formatNumber(movement.quantity)
                                             }}
                                         </td>
-                                        <td class="px-4 py-3">
+                                        <td
+                                            v-if="multiWarehouse"
+                                            class="px-4 py-3"
+                                        >
                                             {{
                                                 movement.warehouse?.name || '-'
                                             }}
                                         </td>
                                     </tr>
                                     <tr v-if="relatedMovements.length === 0">
-                                        <td
-                                            colspan="4"
-                                            class="px-4 py-8 text-center text-sm text-gray-500"
-                                        >
-                                            No hay movimientos relacionados.
+                                        <td colspan="4">
+                                            <EmptyState
+                                                >No hay movimientos
+                                                relacionados.</EmptyState
+                                            >
                                         </td>
                                     </tr>
                                 </tbody>

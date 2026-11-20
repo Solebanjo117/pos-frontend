@@ -11,7 +11,10 @@ import {
     GripVertical,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useReorderableColumns } from '@/composables/useReorderableColumns';
 import { useSalesOrders } from '@/composables/useSalesOrders';
@@ -334,11 +337,11 @@ watch(currentWarehouseId, async () => {
         >
             <div>
                 <h1
-                    class="text-2xl font-semibold text-gray-900 dark:text-white"
+                    class="text-2xl font-semibold tracking-tight text-foreground"
                 >
                     Órdenes de Venta
                 </h1>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Gestiona las órdenes de venta y pedidos de clientes
                 </p>
             </div>
@@ -401,22 +404,20 @@ watch(currentWarehouseId, async () => {
                     >
                         Estado
                     </label>
-                    <select
+                    <AppSelect
                         v-model="filters.status"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        @change="
+                        class="w-full"
+                        @update:model-value="
                             currentPage = 1;
                             loadSalesOrders();
                         "
-                    >
-                        <option
-                            v-for="option in statusOptions"
-                            :key="option.value"
-                            :value="option.value"
-                        >
-                            {{ option.label }}
-                        </option>
-                    </select>
+                        :options="[
+                            ...(statusOptions ?? []).map((option) => ({
+                                value: option.value,
+                                label: String(option.label),
+                            })),
+                        ]"
+                    />
                 </div>
 
                 <div>
@@ -425,22 +426,20 @@ watch(currentWarehouseId, async () => {
                     >
                         Pago
                     </label>
-                    <select
+                    <AppSelect
                         v-model="filters.payment_status"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        @change="
+                        class="w-full"
+                        @update:model-value="
                             currentPage = 1;
                             loadSalesOrders();
                         "
-                    >
-                        <option
-                            v-for="option in paymentStatusOptions"
-                            :key="option.value"
-                            :value="option.value"
-                        >
-                            {{ option.label }}
-                        </option>
-                    </select>
+                        :options="[
+                            ...(paymentStatusOptions ?? []).map((option) => ({
+                                value: option.value,
+                                label: String(option.label),
+                            })),
+                        ]"
+                    />
                 </div>
 
                 <DateRangeInput
@@ -530,19 +529,15 @@ watch(currentWarehouseId, async () => {
                         class="divide-y divide-gray-200 bg-white dark:divide-border dark:bg-card"
                     >
                         <tr v-if="loading">
-                            <td
-                                colspan="7"
-                                class="px-4 py-12 text-center text-gray-500 dark:text-gray-400"
-                            >
-                                Cargando órdenes...
+                            <td colspan="7">
+                                <LoadingState label="Cargando órdenes..." />
                             </td>
                         </tr>
                         <tr v-else-if="!loading && salesOrders.length === 0">
-                            <td
-                                colspan="7"
-                                class="px-4 py-12 text-center text-gray-500 dark:text-gray-400"
-                            >
-                                No se encontraron órdenes
+                            <td colspan="7">
+                                <EmptyState
+                                    >No se encontraron órdenes</EmptyState
+                                >
                             </td>
                         </tr>
                         <tr

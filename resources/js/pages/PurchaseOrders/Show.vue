@@ -18,9 +18,13 @@ import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSecti
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { purchaseOrdersService } from '@/services/purchase-orders';
@@ -291,9 +295,8 @@ async function handleDuplicate() {
     router.visit(`/purchase-orders/${duplicated.id}`);
 }
 
-async function handleStatusAction(event: Event) {
-    const action = (event.target as HTMLSelectElement).value;
-    (event.target as HTMLSelectElement).value = '';
+async function handleStatusAction(selected: unknown) {
+    const action = String(selected ?? '');
 
     if (action === 'send') {
         await handleSend();
@@ -322,6 +325,7 @@ onMounted(async () => {
     <Head :title="purchaseOrder?.po_number || 'Orden de Compra'" />
     <AppLayout>
         <PurchaseOrderToolbar
+            class="app-page-full-bleed"
             :title="`Orden de compra ${purchaseOrder?.po_number || `#${purchaseOrderId}`}`"
             :subtitle="purchaseOrder?.supplier?.name || 'OC diaria general'"
             :status-label="purchaseOrder?.status_label"
@@ -365,60 +369,49 @@ onMounted(async () => {
                     <Copy :size="15" />
                     Duplicar
                 </button>
-                <select
+                <!-- Menú de acciones del estado: siempre muestra "Estado: …" y ejecuta la acción elegida. -->
+                <AppSelect
                     v-if="purchaseOrder"
-                    class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-border dark:bg-muted dark:text-white"
-                    @change="handleStatusAction"
-                >
-                    <option value="">
-                        Estado: {{ purchaseOrder.status_label }}
-                    </option>
-                    <option
-                        v-if="purchaseOrder.status === 'draft'"
-                        value="send"
-                    >
-                        Enviar
-                    </option>
-                    <option
-                        v-if="
-                            ['sent', 'partial', 'open'].includes(
-                                purchaseOrder.status,
-                            )
-                        "
-                        value="receive"
-                    >
-                        Recibir
-                    </option>
-                    <option
-                        v-if="
-                            !['received', 'cancelled'].includes(
-                                purchaseOrder.status,
-                            )
-                        "
-                        value="cancel"
-                    >
-                        Cancelar
-                    </option>
-                </select>
+                    class="w-44"
+                    model-value=""
+                    aria-label="Acciones de la orden de compra"
+                    :options="[
+                        {
+                            value: '',
+                            label: `Estado: ${purchaseOrder.status_label}`,
+                        },
+                        ...(purchaseOrder.status === 'draft'
+                            ? [{ value: 'send', label: 'Enviar' }]
+                            : []),
+                        ...(['sent', 'partial', 'open'].includes(
+                            purchaseOrder.status,
+                        )
+                            ? [{ value: 'receive', label: 'Recibir' }]
+                            : []),
+                        ...(!['received', 'cancelled'].includes(
+                            purchaseOrder.status,
+                        )
+                            ? [{ value: 'cancel', label: 'Cancelar' }]
+                            : []),
+                    ]"
+                    @update:model-value="handleStatusAction"
+                />
             </template>
         </PurchaseOrderToolbar>
 
         <div
             class="min-h-[calc(100vh-4.25rem)] bg-gray-50/60 dark:bg-background"
         >
-            <main class="mx-auto max-w-7xl min-w-0 p-4">
+            <main class="mx-auto w-full max-w-7xl min-w-0 p-4 md:p-6">
                 <div v-if="loading" class="flex justify-center py-12">
                     <div
                         class="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"
                     ></div>
                 </div>
 
-                <div
-                    v-else-if="error"
-                    class="border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400"
-                >
+                <ErrorMessage v-else-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <template v-else-if="purchaseOrder">
                     <div
@@ -562,11 +555,15 @@ onMounted(async () => {
                                             }}
                                         </div>
                                         <div
+                                            v-if="multiWarehouse"
                                             class="border-r border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
                                         >
                                             Almacen
                                         </div>
-                                        <div class="px-3 py-2">
+                                        <div
+                                            v-if="multiWarehouse"
+                                            class="px-3 py-2"
+                                        >
                                             {{
                                                 purchaseOrder.warehouse?.name ||
                                                 '-'
@@ -845,7 +842,7 @@ onMounted(async () => {
                                             <td class="px-3 py-2">
                                                 <Link
                                                     v-if="item.product"
-                                                    :href="`/products/${item.product.id}`"
+                                                    :href="`/inventory/products/${item.product.id}`"
                                                     class="font-semibold text-green-700 hover:underline dark:text-green-300"
                                                 >
                                                     {{ item.product.name }}
@@ -1189,11 +1186,12 @@ onMounted(async () => {
                                     }}
                                 </div>
                                 <div
+                                    v-if="multiWarehouse"
                                     class="border-r border-gray-200 bg-gray-50 px-3 py-2 font-medium dark:border-border dark:bg-muted/30"
                                 >
                                     Sucursal
                                 </div>
-                                <div class="px-3 py-2">
+                                <div v-if="multiWarehouse" class="px-3 py-2">
                                     {{ purchaseOrder.warehouse?.name || '-' }}
                                 </div>
                             </div>
@@ -1492,7 +1490,7 @@ onMounted(async () => {
                                             !activePaymentRequest
                                         "
                                         type="button"
-                                        class="inline-flex items-center gap-2 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
+                                        class="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                                         @click="
                                             requestedPaymentAmount = amountDue;
                                             showPaymentModal = true;
@@ -1503,12 +1501,9 @@ onMounted(async () => {
                                         Solicitar pago en Caja
                                     </button>
                                 </div>
-                                <p
-                                    v-if="payments.length === 0"
-                                    class="py-6 text-center text-sm text-gray-500"
+                                <EmptyState v-if="payments.length === 0"
+                                    >No hay pagos registrados.</EmptyState
                                 >
-                                    No hay pagos registrados.
-                                </p>
                                 <table v-else class="min-w-full text-sm">
                                     <thead
                                         class="border-b border-gray-200 text-xs text-gray-500 uppercase dark:border-border"

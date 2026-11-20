@@ -7,9 +7,8 @@ import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import type { PendingImage } from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
-import type { DraftCompatData } from '@/components/Products/VehicleCompatSection.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
-import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -17,6 +16,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
@@ -25,6 +26,7 @@ import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
+import { draftSuppliersPayload } from '@/services/variantSuppliers';
 import { type BreadcrumbItem } from '@/types';
 import type { Brand } from '@/types/brand';
 import type { Category } from '@/types/category';
@@ -34,15 +36,18 @@ import {
     normalizeInitialInventoryPayload,
     normalizePricingPayload,
     normalizeProductAttributesPayload,
-    normalizeVehicleCompatibilityPayload,
-    toPositiveInt,
 } from '@/utils/productPayload';
+import {
+    emptyCompatDraft,
+    vehicleCompatibilityPayload as buildVehicleCompatibilityPayload,
+    type DraftCompatData,
+} from '@/utils/vehicleFitment';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Productos', href: '/products' },
-    { title: 'Crear Producto', href: '/products/create' },
+    { title: 'Productos', href: '/inventory/products' },
+    { title: 'Crear Producto', href: '/inventory/products/create' },
 ];
 
 const { createProduct, loading, error } = useProducts();
@@ -69,7 +74,6 @@ const form = ref<CreateProductRequest>({
     category_id: undefined,
     engine_id: undefined,
     status: 'active',
-    alternate_code: '',
     pricing_formula: '',
     brand_id: undefined,
     sku: '',
@@ -103,13 +107,6 @@ const primaryCommercialCode = computed(
 const productCodesModel = computed({
     get: () => form.value.codes ?? [],
     set: (codes) => (form.value.codes = codes),
-});
-
-const computed_total = computed(() => {
-    const p = form.value.pricing;
-    const base = Number(p.base_price) || 0;
-    const rate = Number((p as any).sale_tax_rate ?? p.tax_rate) || 0;
-    return Number((base * (1 + rate / 100)).toFixed(2));
 });
 
 const validationErrors = ref<Record<string, string[]>>({});
@@ -416,76 +413,9 @@ const onNameInput = () => {
 };
 
 // === Vehicle compatibility (draft mode via component) ===
-const vehicleCompatRef = ref<InstanceType<typeof VehicleCompatSection> | null>(
-    null,
-);
-const vehicleModalsRef = ref<InstanceType<typeof VehicleInlineModals> | null>(
-    null,
-);
-const vehicleModalType = ref<
-    'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null
->(null);
-
-const vehicleCompat = ref<DraftCompatData>({
-    engines: [],
-    chassis: [],
-    allEngines: false,
-    allChassis: false,
-    isUniversal: false,
-    modelId: null,
-    makeId: null,
-});
-
-const openVehicleInline = (
-    type: 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis',
-) => {
-    vehicleModalType.value = type;
-    vehicleModalsRef.value?.open(type);
-};
-
-const closeVehicleInline = () => {
-    vehicleModalType.value = null;
-};
-
-const onMakeCreated = (make: { id: number; name: string }) => {
-    vehicleCompatRef.value?.addMake(make);
-    vehicleModalType.value = null;
-};
-
-const onModelCreated = (model: any) => {
-    vehicleCompatRef.value?.addModel(model);
-    vehicleModalType.value = null;
-};
-
-const onEngineCreated = (engine: any) => {
-    vehicleCompatRef.value?.addEngine(engine);
-    vehicleModalType.value = null;
-};
-
-const onChassisCreated = (chassis: any) => {
-    vehicleCompatRef.value?.addChassisToList(chassis);
-};
+const vehicleCompat = ref<DraftCompatData>(emptyCompatDraft());
 
 // === Name preview helpers ===
-const formatYearRange = (
-    model?: {
-        year_from?: number;
-        year_to?: number;
-        generation?: string;
-    } | null,
-): string => {
-    const from = model?.year_from;
-    const to = model?.year_to;
-    if (from && to) return from === to ? `${from}` : `${from}-${to}`;
-    if (from) return `${from}`;
-    if (to) return `${to}`;
-    return '';
-};
-
-const getModelChassis = (model?: { generation?: string } | null): string => {
-    return String(model?.generation ?? '').trim();
-};
-
 const engineCategoryKeywords = [
     'motor',
     'piston',
@@ -575,63 +505,22 @@ const namePreview = computed(() => {
         isEngineCategory(name),
     );
 
-    const addedEngines = vehicleCompat.value.engines;
-    const addedChassis = vehicleCompat.value.chassis;
-    const allEnginesFlag = vehicleCompat.value.allEngines;
-    const allChassisFlag = vehicleCompat.value.allChassis;
-
-    const selectedMake =
-        vehicleCompatRef.value?.vehicleMakes?.find(
-            (m) => m.id === vehicleCompatRef.value?.selectedMakeId,
-        )?.name || '';
-    const selectedModel = vehicleCompatRef.value?.vehicleModels?.find(
-        (m) => m.id === vehicleCompatRef.value?.selectedModelId,
-    );
-    const selectedModelName = selectedModel?.name || '';
-    const selectedYear = formatYearRange(selectedModel);
-    const selectedChassis = getModelChassis(selectedModel);
-
-    const chassisLabels = addedChassis
-        .map((entry) => buildChassisLevelLabel(entry))
-        .filter(Boolean);
-    const engineLabels = addedEngines
-        .map((entry) =>
-            engineCategory
-                ? buildEngineLevelLabel(entry)
-                : buildChassisLevelLabel(entry),
-        )
-        .filter(Boolean);
-
-    if (allChassisFlag && selectedModelName) {
-        const allChassisLabel = buildChassisLevelLabel({
-            make: selectedMake,
-            model: selectedModelName,
-            year: selectedYear,
-            chassis: selectedChassis || 'todos los chasis',
-        });
-        if (allChassisLabel) chassisLabels.push(allChassisLabel);
-    }
-
-    if (allEnginesFlag && selectedModelName) {
-        const allEnginesLabel = engineCategory
-            ? buildEngineLevelLabel({
-                  make: selectedMake,
-                  engine: 'todos los motores',
-                  model: selectedModelName,
-                  year: selectedYear,
-                  chassis: selectedChassis || 'todos los chasis',
-              })
-            : buildChassisLevelLabel({
-                  make: selectedMake,
-                  model: selectedModelName,
-                  year: selectedYear,
-                  chassis: selectedChassis,
-              });
-        if (allEnginesLabel) engineLabels.push(allEnginesLabel);
-    }
-
     const compatibilityLabels = [
-        ...new Set([...chassisLabels, ...engineLabels]),
+        ...new Set(
+            vehicleCompat.value.vehicles
+                .map((vehicle) => {
+                    const entry = {
+                        make: vehicle.make,
+                        model: vehicle.model,
+                        year: vehicle.years,
+                        engine: vehicle.engine,
+                    };
+                    return engineCategory
+                        ? buildEngineLevelLabel(entry)
+                        : buildChassisLevelLabel(entry);
+                })
+                .filter(Boolean),
+        ),
     ];
     if (compatibilityLabels.length === 0) return categoryName;
 
@@ -688,28 +577,6 @@ watch(
         }
     },
 );
-
-// === OEM refs (draft) ===
-type PendingOemReference = { oem_code: string; manufacturer: string | null };
-const addedRefs = ref<PendingOemReference[]>([]);
-const refInput = ref('');
-const refManufacturerInput = ref<string | null>(null);
-
-const addRef = () => {
-    const code = refInput.value.trim();
-    const manufacturer = (refManufacturerInput.value || '').trim() || null;
-    if (!code) return;
-    const exists = addedRefs.value.some(
-        (ref) =>
-            ref.oem_code.toLowerCase() === code.toLowerCase() &&
-            (ref.manufacturer ?? '') === (manufacturer ?? ''),
-    );
-    if (exists) return;
-    addedRefs.value.push({ oem_code: code, manufacturer });
-    refInput.value = '';
-    refManufacturerInput.value = null;
-};
-const removeRef = (idx: number) => addedRefs.value.splice(idx, 1);
 
 // === Upsales (draft) ===
 type UpsaleRelationship = 'compatible' | 'substitute' | 'upgrade';
@@ -844,9 +711,6 @@ const selectedExtraCategories = computed(() => {
         )
         .filter(Boolean) as Category[];
 });
-const oemBrandOptions = computed(() =>
-    brands.value.map((b) => ({ value: b.name, label: b.name })),
-);
 
 onMounted(async () => {
     await fetchStoreSettings();
@@ -902,19 +766,8 @@ const onDraftVariantsChanged = (variants: any[]) => {
     pendingVariants.value = variants;
 };
 
-const resolveVehicleModelId = (): number | null => {
-    return (
-        toPositiveInt(vehicleCompatRef.value?.selectedModelId) ??
-        toPositiveInt(vehicleCompat.value.modelId)
-    );
-};
-
-const vehicleCompatibilityPayload = () => {
-    return normalizeVehicleCompatibilityPayload(
-        vehicleCompat.value,
-        vehicleCompatRef.value?.selectedModelId,
-    );
-};
+const vehicleCompatibilityPayload = () =>
+    buildVehicleCompatibilityPayload(vehicleCompat.value);
 
 const handleSubmit = async () => {
     validationErrors.value = {};
@@ -932,17 +785,6 @@ const handleSubmit = async () => {
     if (form.value.brand_id && normalizedInitialInventory.length === 0) {
         toast.error(
             'Debes seleccionar un almacén cuando creas una variante con marca',
-        );
-        return;
-    }
-
-    // Require model selection when "todos los motores" or "todos los chasis" is checked.
-    if (
-        (vehicleCompat.value.allEngines || vehicleCompat.value.allChassis) &&
-        !resolveVehicleModelId()
-    ) {
-        toast.error(
-            'Debes seleccionar un modelo de vehículo antes de marcar "todos los motores" o "todos los chasis".',
         );
         return;
     }
@@ -974,32 +816,6 @@ const handleSubmit = async () => {
         const result = await createProduct(payload);
         const productId = (result as any)?.data?.id ?? (result as any)?.id;
 
-        if (productId && addedRefs.value.length > 0) {
-            const failedReferences: string[] = [];
-            for (const ref of addedRefs.value) {
-                try {
-                    await apiClient.post(
-                        `/products/${productId}/oem-references`,
-                        {
-                            oem_code: ref.oem_code,
-                            manufacturer: ref.manufacturer,
-                        },
-                    );
-                } catch (refError: any) {
-                    console.error(
-                        'Error creating OEM reference:',
-                        refError.response?.data || refError,
-                    );
-                    failedReferences.push(ref.oem_code);
-                }
-            }
-            if (failedReferences.length > 0) {
-                toast.error(
-                    `Producto creado, pero fallaron códigos alternos: ${failedReferences.join(', ')}`,
-                );
-            }
-        }
-
         if (productId && pendingVariants.value.length > 0) {
             const failedVariants: string[] = [];
             for (const variant of pendingVariants.value) {
@@ -1011,6 +827,10 @@ const handleSubmit = async () => {
                         status: variant.status || 'active',
                         pricing: variant.pricing,
                         initial_inventory: variant.initial_inventory || [],
+                        // Proveedores de la marca y del stock inicial (2026-11-18).
+                        suppliers: draftSuppliersPayload(
+                            variant.suppliers ?? [],
+                        ),
                     });
                 } catch (variantError: any) {
                     console.error(
@@ -1087,7 +907,7 @@ const handleSubmit = async () => {
         successMessage.value = 'Producto creado exitosamente';
         toast.success('Producto creado exitosamente');
         setTimeout(() => {
-            window.location.href = '/products';
+            window.location.href = '/inventory/products';
         }, 1000);
     } catch (err: any) {
         if (err.response?.data?.errors) {
@@ -1102,7 +922,7 @@ const handleSubmit = async () => {
 };
 
 const cancel = () => {
-    window.location.href = '/products';
+    window.location.href = '/inventory/products';
 };
 
 const validationErrorItems = computed(() =>
@@ -1123,13 +943,8 @@ const workbenchSections = [
 
 const statusLabels: Record<string, string> = {
     active: 'Activo',
-    pending: 'Pendiente',
-    discontinued: 'Descontinuado',
+    discontinued: 'Discontinuado',
 };
-
-const primaryCategoryName = computed(() => {
-    return categoryNameById((form.value as any).category_id) || 'Sin categoria';
-});
 
 const initialStockTotal = computed(() =>
     (form.value.initial_inventory ?? []).reduce(
@@ -1137,42 +952,6 @@ const initialStockTotal = computed(() =>
         0,
     ),
 );
-
-const summaryMetrics = computed(() => [
-    {
-        label: 'Categoria',
-        value: primaryCategoryName.value,
-        tone: 'indigo',
-    },
-    {
-        label: 'Codigo',
-        value: primaryCommercialCode.value || 'Sin código',
-        tone: primaryCommercialCode.value ? 'gray' : 'amber',
-    },
-    {
-        label: 'Variantes',
-        value:
-            pendingVariants.value.length > 0
-                ? `${pendingVariants.value.length} adicionales`
-                : 'Base',
-        tone: 'gray',
-    },
-    {
-        label: 'Stock inicial',
-        value: initialStockTotal.value.toLocaleString('es-MX'),
-        tone: initialStockTotal.value > 0 ? 'emerald' : 'amber',
-    },
-    {
-        label: 'Costo',
-        value: `$${Number(form.value.pricing.cost || 0).toFixed(2)}`,
-        tone: 'gray',
-    },
-    {
-        label: 'Precio',
-        value: `$${Number(computed_total.value || 0).toFixed(2)}`,
-        tone: 'emerald',
-    },
-]);
 
 const readinessItems = computed(() => [
     {
@@ -1201,7 +980,7 @@ const readinessItems = computed(() => [
 <template>
     <Head title="Crear Producto" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <!-- Header -->
             <div
                 class="flex flex-col gap-4 border-b border-gray-200 pb-4 lg:flex-row lg:items-start lg:justify-between dark:border-border"
@@ -1216,11 +995,11 @@ const readinessItems = computed(() => [
                         <span
                             class="rounded-md bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
                         >
-                            {{ statusLabels[form.status ?? 'pending'] }}
+                            {{ statusLabels[form.status ?? 'active'] }}
                         </span>
                     </div>
                     <h1
-                        class="text-2xl font-bold break-words text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight break-words text-foreground"
                     >
                         {{ form.name || namePreview || 'Nuevo producto' }}
                     </h1>
@@ -1242,40 +1021,10 @@ const readinessItems = computed(() => [
                         type="button"
                         @click="handleSubmit"
                         :disabled="loading"
-                        class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                         {{ loading ? 'Creando...' : 'Crear Producto' }}
                     </button>
-                </div>
-            </div>
-
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                <div
-                    v-for="metric in summaryMetrics"
-                    :key="metric.label"
-                    class="rounded-lg border bg-white p-3 shadow-sm dark:border-border dark:bg-card"
-                    :class="{
-                        'border-amber-200 dark:border-amber-900/60':
-                            metric.tone === 'amber',
-                        'border-emerald-200 dark:border-emerald-900/60':
-                            metric.tone === 'emerald',
-                        'border-indigo-200 dark:border-indigo-900/60':
-                            metric.tone === 'indigo',
-                        'border-gray-200': metric.tone === 'gray',
-                    }"
-                >
-                    <p
-                        class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                    >
-                        {{ metric.label }}
-                    </p>
-                    <p
-                        class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white"
-                        :class="{ 'font-mono': metric.label === 'Codigo' }"
-                        :title="metric.value"
-                    >
-                        {{ metric.value }}
-                    </p>
                 </div>
             </div>
 
@@ -1313,12 +1062,9 @@ const readinessItems = computed(() => [
                 </ul>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
                 <form
@@ -1347,7 +1093,6 @@ const readinessItems = computed(() => [
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >
                                     Descripción
-                                    <span class="text-red-500">*</span>
                                 </label>
                                 <input
                                     v-model="form.name"
@@ -1424,7 +1169,7 @@ const readinessItems = computed(() => [
                                     type="button"
                                     @click="addExtraCategory"
                                     :disabled="!selectedExtraCategoryId"
-                                    class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                                    class="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                                 >
                                     <Plus class="h-4 w-4" /> Agregar
                                 </button>
@@ -1469,12 +1214,18 @@ const readinessItems = computed(() => [
                                 <label
                                     class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >
-                                    Códigos comerciales
+                                    Números de parte
                                     <span
                                         class="text-xs font-normal text-gray-400"
                                         >(opcionales)</span
                                     >
                                 </label>
+                                <p class="mb-2 text-xs text-muted-foreground">
+                                    El principal es el número de parte del
+                                    producto y aplica a todas sus marcas. Agrega
+                                    otros números con los que se conoce la misma
+                                    pieza.
+                                </p>
                                 <ProductCodesEditor
                                     ref="productCodesRef"
                                     v-model="productCodesModel"
@@ -1485,140 +1236,25 @@ const readinessItems = computed(() => [
                                     class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                     >Estado</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="form.status"
-                                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="active">Activo</option>
-                                    <option value="pending">Pendiente</option>
-                                    <option value="discontinued">
-                                        Descontinuado
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- SECTION 3: Codigos alternos -->
-                    <div
-                        class="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-border dark:bg-card"
-                    >
-                        <h2
-                            class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                        >
-                            Códigos alternos
-                        </h2>
-                        <div class="grid items-end gap-3 sm:grid-cols-12">
-                            <div class="sm:col-span-5">
-                                <label
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                    >Código
-                                    <span class="text-red-500">*</span></label
-                                >
-                                <input
-                                    v-model="refInput"
-                                    type="text"
-                                    @keydown.enter.prevent="addRef"
-                                    class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm dark:border-border dark:bg-muted dark:text-white"
-                                    placeholder="Ej: 123-456-ABC"
+                                    class="w-full"
+                                    :options="[
+                                        { value: 'active', label: 'Activo' },
+                                        {
+                                            value: 'discontinued',
+                                            label: 'Descontinuado',
+                                        },
+                                    ]"
                                 />
                             </div>
-                            <div class="sm:col-span-4">
-                                <label
-                                    class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
-                                    >Marca</label
-                                >
-                                <SearchableSelect
-                                    :options="oemBrandOptions"
-                                    :model-value="refManufacturerInput"
-                                    @update:model-value="
-                                        (value) =>
-                                            (refManufacturerInput = value as
-                                                | string
-                                                | null)
-                                    "
-                                    :loading="loadingBrands"
-                                    placeholder="Sin marca"
-                                    search-placeholder="Buscar marca..."
-                                    :clearable="true"
-                                />
-                            </div>
-                            <div class="sm:col-span-3">
-                                <button
-                                    type="button"
-                                    @click="addRef"
-                                    :disabled="!refInput.trim()"
-                                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                                >
-                                    Agregar
-                                </button>
-                            </div>
-                        </div>
-
-                        <div
-                            class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
-                        >
-                            <div
-                                v-if="addedRefs.length === 0"
-                                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
-                            >
-                                No hay códigos alternos agregados.
-                            </div>
-                            <table v-else class="w-full text-left text-sm">
-                                <thead class="bg-gray-50 dark:bg-card">
-                                    <tr>
-                                        <th
-                                            class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                                        >
-                                            Código
-                                        </th>
-                                        <th
-                                            class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                                        >
-                                            Marca
-                                        </th>
-                                        <th class="w-12 px-4 py-2"></th>
-                                    </tr>
-                                </thead>
-                                <tbody
-                                    class="divide-y divide-gray-100 dark:divide-border/50"
-                                >
-                                    <tr
-                                        v-for="(ref, idx) in addedRefs"
-                                        :key="`${ref.oem_code}-${ref.manufacturer || ''}-${idx}`"
-                                    >
-                                        <td
-                                            class="px-4 py-2 font-mono text-gray-900 dark:text-white"
-                                        >
-                                            {{ ref.oem_code }}
-                                        </td>
-                                        <td
-                                            class="px-4 py-2 text-gray-700 dark:text-gray-300"
-                                        >
-                                            {{ ref.manufacturer || '-' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-right">
-                                            <button
-                                                type="button"
-                                                @click="removeRef(idx)"
-                                                class="text-xs font-semibold text-red-500 hover:text-red-700"
-                                            >
-                                                Eliminar
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
                         </div>
                     </div>
 
                     <!-- SECTION 4: Compatibilidad Vehicular -->
                     <VehicleCompatSection
                         id="compatibilidad"
-                        ref="vehicleCompatRef"
-                        mode="draft"
                         v-model="vehicleCompat"
-                        @open-inline="openVehicleInline"
                     />
 
                     <!-- SECTION 5: Variantes -->
@@ -1688,7 +1324,7 @@ const readinessItems = computed(() => [
                             <button
                                 type="button"
                                 @click="addCustomAttribute"
-                                class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                                class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                             >
                                 <Plus class="h-3.5 w-3.5" /> Agregar atributo
                             </button>
@@ -1896,25 +1532,28 @@ const readinessItems = computed(() => [
                                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                                     >Tipo de relación</label
                                 >
-                                <select
+                                <AppSelect
                                     v-model="upsaleRelationshipType"
-                                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="compatible">
-                                        Compatible
-                                    </option>
-                                    <option value="substitute">
-                                        Sustituto
-                                    </option>
-                                    <option value="upgrade">Upgrade</option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        {
+                                            value: 'compatible',
+                                            label: 'Compatible',
+                                        },
+                                        {
+                                            value: 'substitute',
+                                            label: 'Sustituto',
+                                        },
+                                        { value: 'upgrade', label: 'Upgrade' },
+                                    ]"
+                                />
                             </div>
                             <div class="sm:col-span-3">
                                 <button
                                     type="button"
                                     @click="addUpsale"
                                     :disabled="!selectedUpsaleProduct"
-                                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                    class="h-9 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                                 >
                                     Agregar upsale
                                 </button>
@@ -1924,12 +1563,10 @@ const readinessItems = computed(() => [
                         <div
                             class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-background"
                         >
-                            <div
-                                v-if="pendingUpsales.length === 0"
-                                class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+                            <EmptyState v-if="pendingUpsales.length === 0"
+                                >No hay upsales pendientes por
+                                vincular.</EmptyState
                             >
-                                No hay upsales pendientes por vincular.
-                            </div>
                             <table v-else class="w-full text-left text-sm">
                                 <thead class="bg-gray-50 dark:bg-card">
                                     <tr>
@@ -2060,7 +1697,7 @@ const readinessItems = computed(() => [
                                 type="button"
                                 @click="handleSubmit"
                                 :disabled="loading"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
+                                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             >
                                 {{ loading ? 'Creando...' : 'Crear producto' }}
                             </button>
@@ -2077,7 +1714,7 @@ const readinessItems = computed(() => [
             </div>
         </div>
 
-        <!-- Inline Creation Modal (Category & Brand only — vehicle modals use VehicleInlineModals) -->
+        <!-- Inline Creation Modal (Category & Brand) -->
         <Dialog
             :open="inlineModal !== null"
             @update:open="
@@ -2159,18 +1796,5 @@ const readinessItems = computed(() => [
                 </form>
             </DialogContent>
         </Dialog>
-
-        <!-- Vehicle Inline Modals -->
-        <VehicleInlineModals
-            ref="vehicleModalsRef"
-            :current-modal="vehicleModalType"
-            :selected-make-id="vehicleCompatRef?.selectedMakeId ?? null"
-            :selected-model-id="vehicleCompatRef?.selectedModelId ?? null"
-            @close="closeVehicleInline"
-            @make-created="onMakeCreated"
-            @model-created="onModelCreated"
-            @engine-created="onEngineCreated"
-            @chassis-created="onChassisCreated"
-        />
     </AppLayout>
 </template>

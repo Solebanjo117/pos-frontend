@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, Plus, Save, X } from 'lucide-vue-next';
-import { ref, onMounted, computed } from 'vue';
+import { ArrowLeft, Save } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
 import CategoryImagesSection from '@/components/Categories/CategoryImagesSection.vue';
-import SearchableSelect, {
-    type SelectOption,
-} from '@/components/ui/SearchableSelect.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import { Checkbox } from '@/components/ui/checkbox';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type {
     UpdateCategoryData,
-    Category,
     CategoryDefaultAttribute,
 } from '@/types/category';
 
@@ -21,18 +21,9 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const {
-    category,
-    loading,
-    error,
-    fetchCategoryById,
-    updateCategory,
-    fetchCategoriesWithParent,
-} = useCategories();
+const { category, loading, error, fetchCategoryById, updateCategory } =
+    useCategories();
 const { fetchSettings, defaultTaxRate, resolveTaxRate } = useStoreSettings();
-
-const parentCategories = ref<Category[]>([]);
-const selectedParentCategoryId = ref<number | null>(null);
 
 type CategoryAttributeDraft = {
     name: string;
@@ -73,44 +64,6 @@ function addAttribute() {
 
 function removeAttribute(index: number) {
     form.value.default_attributes.splice(index, 1);
-}
-
-function toCategoryId(value: number | string | null): number | null {
-    if (value === null || value === '') {
-        return null;
-    }
-
-    const categoryId = Number(value);
-
-    return Number.isFinite(categoryId) ? categoryId : null;
-}
-
-function formatCategoryLabel(category: Category): string {
-    return category.parent
-        ? `${category.parent.name} > ${category.name}`
-        : category.name;
-}
-
-function addParentCategory() {
-    if (
-        selectedParentCategoryId.value === null ||
-        form.value.parent_ids.includes(selectedParentCategoryId.value)
-    ) {
-        return;
-    }
-
-    form.value.parent_ids.push(selectedParentCategoryId.value);
-    selectedParentCategoryId.value = null;
-}
-
-function removeParentCategory(categoryId: number) {
-    form.value.parent_ids = form.value.parent_ids.filter(
-        (parentId) => parentId !== categoryId,
-    );
-
-    if (selectedParentCategoryId.value === categoryId) {
-        selectedParentCategoryId.value = null;
-    }
 }
 
 function parseSelectOptions(optionsText: string): string[] {
@@ -160,21 +113,13 @@ function toPayloadDefaultAttributes(): CategoryDefaultAttribute[] {
     );
 }
 
+// El ITBM de la categoría es siempre el de la tienda (Ajustes > Tienda); no se edita aquí.
 function normalizeItbmPercent() {
-    if (
-        form.value.itbm_percent === null ||
-        form.value.itbm_percent === undefined
-    )
-        return;
-    const parsed = Number(form.value.itbm_percent);
-    form.value.itbm_percent = Number.isFinite(parsed)
-        ? Math.max(0, Math.min(100, Math.round(parsed)))
-        : defaultTaxRate();
+    form.value.itbm_percent = defaultTaxRate();
 }
 
 onMounted(async () => {
     await Promise.all([fetchSettings(), fetchCategoryById(Number(props.id))]);
-    parentCategories.value = await fetchCategoriesWithParent();
 
     if (category.value) {
         form.value = {
@@ -224,34 +169,12 @@ async function handleSubmit() {
 function goBack() {
     router.visit('/categories');
 }
-
-// Filter out current category and its descendants from parent options
-const availableParents = computed(() =>
-    parentCategories.value.filter((c) => c.id !== Number(props.id)),
-);
-
-const parentCategoryOptions = computed<SelectOption[]>(() =>
-    availableParents.value
-        .filter((category) => !form.value.parent_ids.includes(category.id))
-        .map((category) => ({
-            value: category.id,
-            label: formatCategoryLabel(category),
-        })),
-);
-
-const selectedParentCategories = computed(() =>
-    form.value.parent_ids
-        .map((parentId) =>
-            availableParents.value.find((category) => category.id === parentId),
-        )
-        .filter((category): category is Category => Boolean(category)),
-);
 </script>
 
 <template>
     <Head title="Editar Categoría" />
     <AppLayout>
-        <div class="mx-auto max-w-2xl space-y-6">
+        <div class="mx-auto w-full max-w-2xl space-y-6">
             <!-- Header -->
             <div class="flex items-center gap-4">
                 <button
@@ -262,34 +185,27 @@ const selectedParentCategories = computed(() =>
                 </button>
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Editar Categoría
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Modifica la información de la categoría
                     </p>
                 </div>
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Loading or Form -->
-            <div
+            <LoadingState
                 v-if="loading && !category"
-                class="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-border dark:bg-card"
-            >
-                <div
-                    class="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                ></div>
-                <p class="mt-4 text-gray-500">Cargando...</p>
-            </div>
+                class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                label="Cargando..."
+            />
 
             <form
                 v-else
@@ -317,70 +233,6 @@ const selectedParentCategories = computed(() =>
                         class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
                         placeholder="Ej: Motor, Suspensión, Frenos..."
                     />
-                </div>
-
-                <!-- Parent Categories -->
-                <div>
-                    <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                        Categorías padre
-                    </label>
-                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                        <SearchableSelect
-                            :options="parentCategoryOptions"
-                            :model-value="selectedParentCategoryId"
-                            @update:model-value="
-                                (value) =>
-                                    (selectedParentCategoryId =
-                                        toCategoryId(value))
-                            "
-                            placeholder="Buscar categoría padre"
-                            search-placeholder="Buscar categoría padre"
-                            empty-results-text="Sin categorías disponibles"
-                            :loading="loading"
-                            :clearable="true"
-                        />
-                        <button
-                            type="button"
-                            @click="addParentCategory"
-                            :disabled="!selectedParentCategoryId"
-                            class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                        >
-                            <Plus class="h-4 w-4" />
-                            Agregar
-                        </button>
-                    </div>
-                    <div
-                        v-if="selectedParentCategories.length > 0"
-                        class="mt-2 flex flex-wrap gap-2"
-                    >
-                        <span
-                            v-for="category in selectedParentCategories"
-                            :key="category.id"
-                            class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
-                        >
-                            {{ formatCategoryLabel(category) }}
-                            <button
-                                type="button"
-                                @click="removeParentCategory(category.id)"
-                                class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
-                                :aria-label="`Quitar ${category.name}`"
-                            >
-                                <X class="h-3 w-3" />
-                            </button>
-                        </span>
-                    </div>
-                    <p
-                        v-else
-                        class="mt-2 text-xs text-gray-500 dark:text-gray-400"
-                    >
-                        Sin categorías padre seleccionadas
-                    </p>
-                    <p class="mt-1 text-xs text-gray-500">
-                        Agrega una o más categorías padre si esta es una
-                        subcategoría
-                    </p>
                 </div>
 
                 <!-- Description -->
@@ -441,22 +293,25 @@ const selectedParentCategories = computed(() =>
                                 >
                                     Tipo
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="attr.type"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="string">Texto</option>
-                                    <option value="select">Lista</option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        { value: 'string', label: 'Texto' },
+                                        { value: 'select', label: 'Lista' },
+                                    ]"
+                                />
                             </div>
                             <div class="flex items-end sm:col-span-2 sm:pb-2">
                                 <label
-                                    class="flex items-center gap-1 text-xs whitespace-nowrap text-gray-600 dark:text-gray-400"
+                                    class="flex cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap text-gray-600 dark:text-gray-400"
                                 >
-                                    <input
-                                        type="checkbox"
-                                        v-model="attr.required"
-                                        class="rounded"
+                                    <Checkbox
+                                        :model-value="attr.required"
+                                        @update:model-value="
+                                            (value) =>
+                                                (attr.required = value === true)
+                                        "
                                     />
                                     Obligatorio
                                 </label>
@@ -510,15 +365,18 @@ const selectedParentCategories = computed(() =>
                     <div
                         class="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-muted/30"
                     >
-                        <!-- ITBM Checkbox + Porcentaje -->
-                        <div class="space-y-2">
+                        <!-- ITBM: solo si aplica; el porcentaje es siempre el de la tienda -->
+                        <div class="space-y-1">
                             <label
                                 class="flex cursor-pointer items-center gap-2"
                             >
-                                <input
-                                    type="checkbox"
-                                    v-model="form.applies_itbm"
-                                    class="rounded"
+                                <Checkbox
+                                    :model-value="form.applies_itbm"
+                                    data-testid="applies-itbm"
+                                    @update:model-value="
+                                        (value) =>
+                                            (form.applies_itbm = value === true)
+                                    "
                                 />
                                 <span
                                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -526,25 +384,16 @@ const selectedParentCategories = computed(() =>
                                     categoría</span
                                 >
                             </label>
-
-                            <div
+                            <p
                                 v-if="form.applies_itbm"
-                                class="flex items-center gap-3 pl-6"
+                                class="pl-6 text-xs text-gray-500 dark:text-gray-400"
+                                data-testid="itbm-store-rate"
                             >
-                                <label
-                                    class="text-sm text-gray-600 dark:text-gray-400"
-                                    >Porcentaje ITBM:</label
-                                >
-                                <input
-                                    v-model.number="form.itbm_percent"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="1"
-                                    class="w-20 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                />
-                                <span class="text-sm text-gray-500">%</span>
-                            </div>
+                                Se aplica el ITBM de la tienda ({{
+                                    defaultTaxRate()
+                                }}%). El porcentaje se cambia en Ajustes →
+                                Tienda.
+                            </p>
                         </div>
 
                         <!-- Pricing Formula -->
@@ -621,7 +470,7 @@ const selectedParentCategories = computed(() =>
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                     >
                         <Save :size="18" />
                         Actualizar

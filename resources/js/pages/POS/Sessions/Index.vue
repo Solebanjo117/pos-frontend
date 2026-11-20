@@ -22,7 +22,11 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import CloseSessionModal from '@/components/POS/CloseSessionModal.vue';
 import SessionDetailModal from '@/components/POS/SessionDetailModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -30,6 +34,7 @@ import { usePosSession } from '@/composables/usePosSession';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     PosSessionsApiService,
@@ -574,7 +579,7 @@ onBeforeUnmount(() => {
     <Head title="Cierres de Caja" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <header
                 class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
             >
@@ -587,13 +592,11 @@ onBeforeUnmount(() => {
                         </div>
                         <div>
                             <h1
-                                class="text-2xl font-bold text-slate-950 dark:text-white"
+                                class="text-2xl font-semibold tracking-tight text-foreground"
                             >
                                 Cierres de Caja
                             </h1>
-                            <p
-                                class="text-sm text-slate-500 dark:text-slate-400"
-                            >
+                            <p class="text-sm text-muted-foreground">
                                 Conciliación, arqueo y ventas por turno
                             </p>
                         </div>
@@ -604,7 +607,7 @@ onBeforeUnmount(() => {
                     <button
                         type="button"
                         :disabled="!hasOpenSession || closeSessionLoading"
-                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white"
                         @click="showCloseSessionModal = true"
                     >
                         <Lock :size="16" />
@@ -663,7 +666,7 @@ onBeforeUnmount(() => {
                                     {{ activeSessionUserName }}
                                 </p>
                             </div>
-                            <div>
+                            <div v-if="multiWarehouse">
                                 <p
                                     class="text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
                                 >
@@ -745,7 +748,7 @@ onBeforeUnmount(() => {
                         <button
                             type="button"
                             :disabled="closeSessionLoading"
-                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white"
                             @click="showCloseSessionModal = true"
                         >
                             <Lock :size="16" />
@@ -886,7 +889,7 @@ onBeforeUnmount(() => {
                         label="Rango de fechas"
                     />
 
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-1.5 flex items-center gap-1 text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
                         >
@@ -919,14 +922,15 @@ onBeforeUnmount(() => {
                             class="mb-1.5 block text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filterStatus"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="">Todos</option>
-                            <option value="closed">Cerradas</option>
-                            <option value="open">Abiertas</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: '', label: 'Todos' },
+                                { value: 'closed', label: 'Cerradas' },
+                                { value: 'open', label: 'Abiertas' },
+                            ]"
+                        />
                     </div>
 
                     <div>
@@ -934,24 +938,26 @@ onBeforeUnmount(() => {
                             class="mb-1.5 block text-xs font-bold text-slate-500 uppercase dark:text-slate-400"
                             >Diferencia</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filterDifference"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="">Todas</option>
-                            <option value="balanced">Cuadradas</option>
-                            <option value="with_difference">
-                                Con diferencia
-                            </option>
-                            <option value="missing">Faltante</option>
-                            <option value="surplus">Sobrante</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: '', label: 'Todas' },
+                                { value: 'balanced', label: 'Cuadradas' },
+                                {
+                                    value: 'with_difference',
+                                    label: 'Con diferencia',
+                                },
+                                { value: 'missing', label: 'Faltante' },
+                                { value: 'surplus', label: 'Sobrante' },
+                            ]"
+                        />
                     </div>
 
                     <div class="flex flex-wrap gap-2">
                         <button
                             type="button"
-                            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
                             @click="applyFilters"
                         >
                             <Search :size="16" />
@@ -969,24 +975,17 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
-            <div
-                v-if="error"
-                class="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200"
-            >
-                <AlertCircle :size="18" />
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <div
                 class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card"
             >
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="flex items-center justify-center py-16 text-sm text-slate-500 dark:text-slate-400"
-                >
-                    <RefreshCw :size="20" class="mr-2 animate-spin" />
-                    Cargando cierres de caja...
-                </div>
+                    label="Cargando cierres de caja..."
+                />
 
                 <div v-else class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -1155,12 +1154,11 @@ onBeforeUnmount(() => {
                                 </td>
                             </tr>
                             <tr v-if="filteredSessions.length === 0">
-                                <td
-                                    colspan="7"
-                                    class="px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    No se encontraron cierres de caja con los
-                                    filtros seleccionados.
+                                <td colspan="7">
+                                    <EmptyState
+                                        >No se encontraron cierres de caja con
+                                        los filtros seleccionados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

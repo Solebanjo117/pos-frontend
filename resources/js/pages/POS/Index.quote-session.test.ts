@@ -189,7 +189,10 @@ async function mountPos(props: Record<string, unknown> = {}) {
     const wrapper = mount(Index, {
         props,
         shallow: true,
-        global: { stubs: { ActionButtons: ActionButtonsStub } },
+        // ErrorMessage se renderiza de verdad: los mensajes de error de la pantalla viven en su slot.
+        global: {
+            stubs: { ActionButtons: ActionButtonsStub, ErrorMessage: false },
+        },
     });
     await flushPromises();
 
@@ -477,7 +480,9 @@ describe('POS stock warnings are advisory, never blocking', () => {
         mocks.apiPut.mockResolvedValue({
             data: {
                 data: { id: 19 },
-                warnings: [{ message: 'Filtro de aceite: sin stock disponible.' }],
+                warnings: [
+                    { message: 'Filtro de aceite: sin stock disponible.' },
+                ],
             },
         });
         const { wrapper, toast } = await mountPos();

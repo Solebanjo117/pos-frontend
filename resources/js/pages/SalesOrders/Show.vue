@@ -26,8 +26,12 @@ import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
 import TransactionRelationsPanel from '@/components/Traceability/TransactionRelationsPanel.vue';
 import TransactionTimeline from '@/components/Traceability/TransactionTimeline.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useSalesOrders } from '@/composables/useSalesOrders';
 import { useUsers } from '@/composables/useUsers';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { paymentMethodsService } from '@/services/paymentMethods';
@@ -601,19 +605,14 @@ onMounted(async () => {
     <Head :title="`Factura ${order?.order_number || ''}`" />
 
     <AppLayout>
-        <div
+        <LoadingState
             v-if="loading || operationalLoading"
-            class="p-8 text-sm text-gray-500"
-        >
-            Cargando ficha operativa...
-        </div>
+            label="Cargando ficha operativa..."
+        />
 
-        <div
-            v-else-if="error || operationalError"
-            class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
-        >
+        <ErrorMessage v-else-if="error || operationalError">
             {{ error || operationalError }}
-        </div>
+        </ErrorMessage>
 
         <div v-else-if="order && operationalDetail" class="space-y-4">
             <section
@@ -639,7 +638,7 @@ onMounted(async () => {
                                     Orden de venta / factura
                                 </p>
                                 <h1
-                                    class="font-mono text-2xl font-bold text-gray-900 dark:text-white"
+                                    class="font-mono text-2xl font-semibold tracking-tight text-foreground"
                                 >
                                     {{ order.order_number }}
                                 </h1>
@@ -708,7 +707,7 @@ onMounted(async () => {
                         <button
                             v-if="canEditBaseOrder"
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             @click="handleConfirm"
                         >
                             <CheckCircle :size="16" />
@@ -720,7 +719,7 @@ onMounted(async () => {
                                 currentSalesOrder?.status === 'processing'
                             "
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             @click="handleComplete"
                         >
                             <CheckCircle :size="16" />
@@ -889,7 +888,7 @@ onMounted(async () => {
                                 Sin sesión
                             </p>
                         </div>
-                        <div>
+                        <div v-if="multiWarehouse">
                             <p class="text-xs text-gray-500">Bodega</p>
                             <p
                                 class="font-semibold text-gray-900 dark:text-white"
@@ -1030,7 +1029,9 @@ onMounted(async () => {
                         >
                             <tr>
                                 <th class="px-3 py-2 text-left">Item</th>
-                                <th class="px-3 py-2 text-left">Bodega</th>
+                                <th class="px-3 py-2 text-left">
+                                    {{ multiWarehouse ? 'Bodega' : 'Vendedor' }}
+                                </th>
                                 <th class="px-3 py-2 text-right">Cant.</th>
                                 <th class="px-3 py-2 text-right">Precio</th>
                                 <th class="px-3 py-2 text-right">ITBM</th>
@@ -1053,7 +1054,7 @@ onMounted(async () => {
                                         class="text-left font-semibold text-indigo-600 hover:underline"
                                         @click="
                                             router.visit(
-                                                `/products/${item.product_id}`,
+                                                `/inventory/products/${item.product_id}`,
                                             )
                                         "
                                     >
@@ -1099,7 +1100,9 @@ onMounted(async () => {
                                 <td
                                     class="px-3 py-3 text-gray-700 dark:text-gray-300"
                                 >
-                                    {{ item.warehouse_name || 'N/A' }}
+                                    <template v-if="multiWarehouse">{{
+                                        item.warehouse_name || 'N/A'
+                                    }}</template>
                                     <p
                                         v-if="item.seller_name"
                                         class="text-xs text-gray-500"
@@ -1304,7 +1307,7 @@ onMounted(async () => {
                     <button
                         v-if="customer"
                         type="button"
-                        class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                        class="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         @click="router.visit(`/ar?customer_id=${customer.id}`)"
                     >
                         <DollarSign :size="15" />
@@ -1399,7 +1402,12 @@ onMounted(async () => {
                         <tr>
                             <th class="px-3 py-2 text-left">Movimiento</th>
                             <th class="px-3 py-2 text-left">Item</th>
-                            <th class="px-3 py-2 text-left">Bodega</th>
+                            <th
+                                v-if="multiWarehouse"
+                                class="px-3 py-2 text-left"
+                            >
+                                Bodega
+                            </th>
                             <th class="px-3 py-2 text-right">Cantidad</th>
                             <th class="px-3 py-2 text-left">Lotes</th>
                         </tr>
@@ -1420,7 +1428,7 @@ onMounted(async () => {
                                     class="font-mono font-semibold text-indigo-600 hover:underline"
                                     @click="
                                         router.visit(
-                                            `/inventory-movements/${movement.id}`,
+                                            `/inventory/movements/${movement.id}`,
                                         )
                                     "
                                 >
@@ -1459,7 +1467,7 @@ onMounted(async () => {
                                     }}
                                 </p>
                             </td>
-                            <td class="px-3 py-3">
+                            <td v-if="multiWarehouse" class="px-3 py-3">
                                 {{ movement.warehouse_name || 'N/A' }}
                             </td>
                             <td class="px-3 py-3 text-right font-mono">
@@ -1699,45 +1707,38 @@ onMounted(async () => {
                         class="block text-sm font-medium"
                     >
                         Resolución financiera
-                        <select
+                        <AppSelect
                             v-model="cancellationMethod"
-                            required
-                            class="mt-1 w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option value="" disabled>Seleccionar</option>
-                            <option
-                                v-for="method in cancellationOptions"
-                                :key="method.code"
-                                :value="method.code"
-                            >
-                                {{ method.name }}
-                            </option>
-                        </select>
+                            class="mt-1 w-full"
+                            placeholder="Seleccionar"
+                            :options="[
+                                ...(cancellationOptions ?? []).map(
+                                    (method) => ({
+                                        value: method.code,
+                                        label: String(method.name),
+                                    }),
+                                ),
+                            ]"
+                        />
                     </label>
                     <label
                         v-if="cancellationIsBank"
                         class="block text-sm font-medium"
                     >
                         Cuenta bancaria
-                        <select
-                            v-model.number="cancellationFinancialAccountId"
-                            required
-                            class="mt-1 w-full rounded-md border bg-background px-3 py-2"
-                        >
-                            <option :value="null">Seleccionar</option>
-                            <option
-                                v-for="account in cancellationFinancialAccounts"
-                                :key="account.endpoint_id"
-                                :value="account.endpoint_id"
-                            >
-                                {{ account.name
-                                }}{{
-                                    account.masked_number
-                                        ? ` · ${account.masked_number}`
-                                        : ''
-                                }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="cancellationFinancialAccountId"
+                            class="mt-1 w-full"
+                            :options="[
+                                { value: null, label: 'Seleccionar' },
+                                ...(cancellationFinancialAccounts ?? []).map(
+                                    (account) => ({
+                                        value: account.endpoint_id,
+                                        label: `${account.name}${account.masked_number ? ` · ${account.masked_number}` : ''}`,
+                                    }),
+                                ),
+                            ]"
+                        />
                         <span
                             v-if="cancellationAccountsError"
                             class="mt-1 block text-xs text-red-600"

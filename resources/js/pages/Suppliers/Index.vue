@@ -12,6 +12,8 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import Pagination from '@/components/Pagination.vue';
 import SupplierDialog from '@/components/Suppliers/SupplierDialog.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { brandsService } from '@/services/brands';
 import { categoriesService } from '@/services/categories';
@@ -248,7 +250,9 @@ onMounted(async () => {
                 class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
                 <div>
-                    <h1 class="text-2xl font-bold">
+                    <h1
+                        class="text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Categorías, marcas y proveedores
                     </h1>
                     <p class="text-sm text-muted-foreground">
@@ -257,18 +261,7 @@ onMounted(async () => {
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <Link
-                        v-if="canManageCatalog"
-                        :href="importHref"
-                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
-                        ><Upload :size="17" /> Importar</Link
-                    >
-                    <button
-                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
-                        @click="suppliersService.exportCatalog()"
-                    >
-                        <Download :size="17" /> Exportar
-                    </button>
+                    <!-- Primero la acción de crear y luego Importar / Exportar -->
                     <Link
                         v-if="canManageCatalog && activeTab === 'categories'"
                         href="/categories/create"
@@ -289,6 +282,18 @@ onMounted(async () => {
                         @click="openSupplier()"
                     >
                         <Plus :size="17" /> Nuevo proveedor
+                    </button>
+                    <Link
+                        v-if="canManageCatalog"
+                        :href="importHref"
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
+                        ><Upload :size="17" /> Importar</Link
+                    >
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2"
+                        @click="suppliersService.exportCatalog()"
+                    >
+                        <Download :size="17" /> Exportar
                     </button>
                 </div>
             </header>
@@ -326,12 +331,9 @@ onMounted(async () => {
                     />
                 </div>
             </div>
-            <div
-                v-if="error"
-                class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <div
                 v-if="canManageCatalog && selectedIds.length"
                 class="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm"
@@ -352,12 +354,7 @@ onMounted(async () => {
                 </button>
             </div>
             <div class="overflow-hidden rounded-lg border bg-card">
-                <div
-                    v-if="loading"
-                    class="p-12 text-center text-muted-foreground"
-                >
-                    Cargando...
-                </div>
+                <LoadingState v-if="loading" label="Cargando..." />
                 <table v-else class="w-full text-sm">
                     <thead
                         class="border-b bg-muted/40 text-left text-xs text-muted-foreground uppercase"

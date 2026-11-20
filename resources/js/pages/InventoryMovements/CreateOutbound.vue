@@ -4,6 +4,8 @@ import { PackageMinus, Trash2, Plus } from 'lucide-vue-next';
 import { ref, onMounted, computed, nextTick } from 'vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -11,6 +13,7 @@ import { useInventoryMovements } from '@/composables/useInventoryMovements';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -20,24 +23,21 @@ interface OutboundItem {
     id: string;
     product_id: number | null;
     variant_id: number | null; // Added
-    product_batch_id: number | null;
     quantity: number;
-    // Helpers
-    batches: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
+    { title: 'Movimientos', href: '/inventory/movements' },
     {
         title: 'Nueva Salida Masiva',
-        href: '/inventory-movements/outbound/create',
+        href: '/inventory/movements/outbound/create',
     },
 ];
 
 const { recordBulkOutbound, loading, error } = useInventoryMovements();
-const { products, fetchProducts, fetchBatches } = useProducts();
+const { products, fetchProducts } = useProducts();
 const { warehouses, fetchWarehouses } = useWarehouses();
 const {
     isSingleWarehouseMode,
@@ -81,7 +81,7 @@ const globalError = ref<string | null>(null);
 
 // Computed
 // Computed
-const showWarehouseSelect = computed(() => true);
+const showWarehouseSelect = computed(() => multiWarehouse);
 
 const warehouseOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Seleccionar...' },
@@ -117,9 +117,7 @@ const addItem = () => {
         id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         product_id: null,
         variant_id: null, // Added
-        product_batch_id: null,
         quantity: 1,
-        batches: [],
     });
 };
 
@@ -137,41 +135,10 @@ const handleProductSelect = async (
     const item = items.value[index];
     item.product_id = productId;
     item.variant_id = variantId || null;
-    item.product_batch_id = null;
-    item.batches = [];
-
-    if (productId && headerForm.value.warehouse_id) {
-        try {
-            const allBatches = await fetchBatches(
-                productId,
-                headerForm.value.warehouse_id,
-            );
-            item.batches = allBatches;
-        } catch (e) {
-            console.error('Error fetching batches', e);
-        }
-    }
 
     // Auto-add row if last item
     if (index === items.value.length - 1 && productId !== null) {
         nextTick(() => addItem());
-    }
-};
-
-const handleVariantChange = async (index: number) => {
-    const item = items.value[index];
-    // Re-fetch batches filtered for this variant if needed
-    if (item.product_id && headerForm.value.warehouse_id) {
-        try {
-            const allBatches = await fetchBatches(
-                item.product_id,
-                headerForm.value.warehouse_id,
-            );
-            item.batches = allBatches;
-            item.product_batch_id = null;
-        } catch (e) {
-            console.error('Error fetching batches', e);
-        }
     }
 };
 
@@ -278,13 +245,7 @@ const getProductDetails = (productId: number | null) => {
 const getStockAvailable = (item: OutboundItem) => {
     if (!item.product_id || !headerForm.value.warehouse_id) return null;
 
-    // If batch selected, limit by batch quantity
-    if (item.product_batch_id) {
-        const batch = item.batches.find((b) => b.id === item.product_batch_id);
-        return batch ? batch.quantity : 0;
-    }
-
-    // Otherwise, limit by global warehouse inventory for this variant
+    // Limit by warehouse inventory for this variant (FIFO decides the lots)
     const product = getProductDetails(item.product_id);
     if (!product || !product.inventory) return 0;
 
@@ -297,7 +258,7 @@ const getStockAvailable = (item: OutboundItem) => {
                 (item.variant_id === null && i.variant_id === null)),
     );
 
-    return inv ? inv.quantity_available : 0;
+    return inv?.quantity_available ?? 0;
 };
 
 const validateForm = () => {
@@ -330,15 +291,6 @@ const validateForm = () => {
                 `Excede stock (${stock})`;
             isValid = false;
         }
-
-        // Batch Req
-        const product = getProductDetails(item.product_id);
-        if (product && product.batch_tracking) {
-            if (item.batches.length > 0 && !item.product_batch_id) {
-                formErrors.value[`item_${item.id}_batch`] = 'Lote requerido';
-                isValid = false;
-            }
-        }
     });
 
     return isValid;
@@ -361,7 +313,6 @@ const handleSubmit = async () => {
                 reference_type: headerForm.value.reference_type,
                 reference_id: headerForm.value.reference_id || undefined,
                 notes: headerForm.value.notes || undefined,
-                product_batch_id: item.product_batch_id || undefined,
             })),
         };
 
@@ -369,7 +320,7 @@ const handleSubmit = async () => {
 
         successMessage.value = 'Salida masiva registrada exitosamente';
         setTimeout(() => {
-            router.visit('/inventory-movements');
+            router.visit('/inventory/movements');
         }, 1500);
     } catch (err: any) {
         globalError.value = error.value || 'Error al procesar salida';
@@ -377,7 +328,7 @@ const handleSubmit = async () => {
 };
 
 const cancel = () => {
-    router.visit('/inventory-movements');
+    router.visit('/inventory/movements');
 };
 </script>
 
@@ -385,22 +336,20 @@ const cancel = () => {
     <Head title="Nueva Salida Masiva" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
-            <div class="mx-auto max-w-7xl">
+        <div>
+            <div class="mx-auto w-full max-w-7xl">
                 <!-- Header -->
                 <div
                     class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center"
                 >
                     <div>
                         <h1
-                            class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                            class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                         >
                             <PackageMinus :size="32" />
                             Salida de Inventario (Masiva)
                         </h1>
-                        <p
-                            class="mt-1 text-sm text-gray-700 dark:text-gray-300"
-                        >
+                        <p class="mt-1 text-sm text-muted-foreground">
                             Registra salidas de múltiples productos
                             simultáneamente (Multialmacén)
                         </p>
@@ -431,12 +380,9 @@ const cancel = () => {
                 >
                     {{ successMessage }}
                 </div>
-                <div
-                    v-if="error || globalError"
-                    class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-                >
+                <ErrorMessage v-if="error || globalError" class="mb-4">
                     {{ error || globalError }}
-                </div>
+                </ErrorMessage>
 
                 <!-- Main Grid -->
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
@@ -474,21 +420,25 @@ const cancel = () => {
                                         class="mb-1 block text-sm font-medium text-gray-900 dark:text-white"
                                         >Tipo Referencia</label
                                     >
-                                    <select
+                                    <AppSelect
                                         v-model="headerForm.reference_type"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                    >
-                                        <option :value="undefined">
-                                            Ninguna
-                                        </option>
-                                        <option value="sale">Venta</option>
-                                        <option value="adjustment">
-                                            Ajuste (Pérdida/Daño)
-                                        </option>
-                                        <option value="transfer">
-                                            Transferencia
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            {
+                                                value: undefined,
+                                                label: 'Ninguna',
+                                            },
+                                            { value: 'sale', label: 'Venta' },
+                                            {
+                                                value: 'adjustment',
+                                                label: 'Ajuste (Pérdida/Daño)',
+                                            },
+                                            {
+                                                value: 'transfer',
+                                                label: 'Transferencia',
+                                            },
+                                        ]"
+                                    />
                                 </div>
 
                                 <div v-if="headerForm.reference_type">
@@ -567,12 +517,6 @@ const cancel = () => {
                                             </th>
                                             <th
                                                 scope="col"
-                                                class="px-3 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-300"
-                                            >
-                                                Lote (Stock)
-                                            </th>
-                                            <th
-                                                scope="col"
                                                 class="w-24 px-3 py-3 text-center text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-300"
                                             >
                                                 Cant.
@@ -634,42 +578,28 @@ const cancel = () => {
                                                     <div
                                                         class="flex items-center gap-1"
                                                     >
-                                                        <select
+                                                        <AppSelect
                                                             v-model="
                                                                 item.variant_id
                                                             "
-                                                            @change="
-                                                                handleVariantChange(
-                                                                    index,
-                                                                )
-                                                            "
-                                                            class="w-full rounded-md border-gray-300 py-1.5 text-sm shadow-sm dark:border-border dark:bg-muted"
-                                                        >
-                                                            <option
-                                                                :value="null"
-                                                            >
-                                                                Genérico /
-                                                                Default
-                                                            </option>
-                                                            <option
-                                                                v-for="v in getProductDetails(
-                                                                    item.product_id,
-                                                                )?.variants ||
-                                                                []"
-                                                                :key="v.id"
-                                                                :value="v.id"
-                                                            >
-                                                                {{ v.sku }}
-                                                                {{
-                                                                    v.brand
-                                                                        ? '- ' +
-                                                                          v
-                                                                              .brand
-                                                                              .name
-                                                                        : ''
-                                                                }}
-                                                            </option>
-                                                        </select>
+                                                            class="w-full"
+                                                            :options="[
+                                                                {
+                                                                    value: null,
+                                                                    label: 'Genérico / Default',
+                                                                },
+                                                                ...(
+                                                                    getProductDetails(
+                                                                        item.product_id,
+                                                                    )
+                                                                        ?.variants ||
+                                                                    []
+                                                                ).map((v) => ({
+                                                                    value: v.id,
+                                                                    label: `${v.sku} ${v.brand ? '- ' + v.brand.name : ''}`,
+                                                                })),
+                                                            ]"
+                                                        />
                                                         <button
                                                             @click="
                                                                 refreshVariants(
@@ -700,7 +630,7 @@ const cancel = () => {
                                                         </button>
                                                     </div>
                                                     <a
-                                                        :href="`/products/${item.product_id}/edit`"
+                                                        :href="`/inventory/products/${item.product_id}/edit`"
                                                         target="_blank"
                                                         class="mt-1 flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400 dark:text-primary"
                                                     >
@@ -714,59 +644,6 @@ const cancel = () => {
                                                     Solo disponible al elegir
                                                     base
                                                 </div>
-                                            </td>
-                                            <td class="px-3 py-4 align-top">
-                                                <div
-                                                    v-if="
-                                                        item.batches.length > 0
-                                                    "
-                                                >
-                                                    <select
-                                                        v-model="
-                                                            item.product_batch_id
-                                                        "
-                                                        class="w-full rounded-md border-gray-300 py-1.5 text-sm shadow-sm dark:border-border dark:bg-muted"
-                                                        :class="{
-                                                            'border-red-500':
-                                                                formErrors[
-                                                                    `item_${item.id}_batch`
-                                                                ],
-                                                        }"
-                                                    >
-                                                        <option :value="null">
-                                                            Seleccionar lote...
-                                                        </option>
-                                                        <option
-                                                            v-for="b in item.batches"
-                                                            :key="b.id"
-                                                            :value="b.id"
-                                                        >
-                                                            {{ b.batch_number }}
-                                                            - Stock:
-                                                            {{ b.quantity }}
-                                                        </option>
-                                                    </select>
-                                                </div>
-                                                <div
-                                                    v-else-if="item.product_id"
-                                                    class="mt-2 text-xs text-gray-500 italic"
-                                                >
-                                                    Sin lotes registrados
-                                                </div>
-                                                <p
-                                                    v-if="
-                                                        formErrors[
-                                                            `item_${item.id}_batch`
-                                                        ]
-                                                    "
-                                                    class="mt-1 text-xs text-red-600"
-                                                >
-                                                    {{
-                                                        formErrors[
-                                                            `item_${item.id}_batch`
-                                                        ]
-                                                    }}
-                                                </p>
                                             </td>
                                             <td class="px-3 py-4 align-top">
                                                 <input

@@ -8,6 +8,7 @@ import {
     Send,
 } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { cashOperationsService } from '@/services/cash-operations';
 import { formatReportDateTime } from '@/utils/formatters';
@@ -64,7 +65,7 @@ onUnmounted(() => {
 <template>
     <Head title="Agregar / Retirar" />
     <AppLayout :show-warehouse-selector="false">
-        <main class="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
+        <main class="mx-auto w-full max-w-3xl space-y-5">
             <header class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p
@@ -72,7 +73,9 @@ onUnmounted(() => {
                     >
                         Caja · Operaciones
                     </p>
-                    <h1 class="mt-1 text-2xl font-semibold">
+                    <h1
+                        class="mt-1 text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Agregar / Retirar
                     </h1>
                     <p class="mt-1 text-sm text-muted-foreground">
@@ -163,13 +166,9 @@ onUnmounted(() => {
                             placeholder="Información opcional para el cajero"
                         />
                     </label>
-                    <p
-                        v-if="error"
-                        role="alert"
-                        class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200"
-                    >
+                    <ErrorMessage v-if="error" role="alert">
                         {{ error }}
-                    </p>
+                    </ErrorMessage>
                 </div>
                 <div
                     class="flex justify-end border-t bg-muted/20 px-5 py-4 sm:px-6"
@@ -177,7 +176,7 @@ onUnmounted(() => {
                     <button
                         type="submit"
                         :disabled="!canSubmit"
-                        class="inline-flex items-center gap-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <Send class="size-4" />
                         {{ submitting ? 'Enviando…' : 'Enviar a caja' }}

@@ -464,7 +464,8 @@ export function usePOS() {
                 variant_id: variant?.id,
                 variant_brand: variant?.brand?.name ?? undefined,
                 product_name: product.name,
-                product_sku: variant?.sku || (product as any).sku_base || '',
+                // Número principal del producto (las marcas no tienen código propio).
+                product_sku: (product as any).sku_base || variant?.sku || '',
                 product_price: resolvedPrice,
                 quantity,
                 available_stock: availableStock,
@@ -1184,8 +1185,8 @@ export function usePOS() {
                 variant_brand: item.variant?.brand?.name ?? undefined,
                 product_name: item.product_name,
                 product_sku:
-                    item.variant?.sku ||
                     item.product_sku ||
+                    item.variant?.sku ||
                     (item.is_custom_line ? 'MISC' : ''),
                 is_custom_line: !!item.is_custom_line,
                 custom_description: item.custom_description ?? undefined,

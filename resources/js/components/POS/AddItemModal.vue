@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { X, Search, Plus, Package, ChevronDown } from 'lucide-vue-next';
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import apiClient from '@/services/api/client';
 import type { User } from '@/types';
@@ -269,12 +271,9 @@ const handleSubmit = async () => {
                         <!-- Body -->
                         <div class="flex-1 space-y-5 overflow-y-auto p-6">
                             <!-- Error -->
-                            <div
-                                v-if="errorMsg"
-                                class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20"
-                            >
+                            <ErrorMessage v-if="errorMsg">
                                 {{ errorMsg }}
-                            </div>
+                            </ErrorMessage>
 
                             <!-- Search -->
                             <div class="relative">
@@ -427,31 +426,30 @@ const handleSubmit = async () => {
                                                     class="px-3 py-3 text-center"
                                                 >
                                                     <div class="relative">
-                                                        <select
-                                                            v-model.number="
+                                                        <AppSelect
+                                                            v-model="
                                                                 item.tax_percent
                                                             "
-                                                            class="w-full cursor-pointer appearance-none rounded-lg border border-gray-300 bg-white py-1 pr-6 pl-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                                        >
-                                                            <option :value="0">
-                                                                0%
-                                                            </option>
-                                                            <option
-                                                                :value="
-                                                                    storeDefaultTaxRate()
-                                                                "
-                                                            >
-                                                                {{
-                                                                    storeDefaultTaxRate()
-                                                                }}%
-                                                            </option>
-                                                            <option :value="10">
-                                                                10%
-                                                            </option>
-                                                            <option :value="15">
-                                                                15%
-                                                            </option>
-                                                        </select>
+                                                            class="w-full"
+                                                            :options="[
+                                                                {
+                                                                    value: 0,
+                                                                    label: '0%',
+                                                                },
+                                                                {
+                                                                    value: storeDefaultTaxRate(),
+                                                                    label: `${storeDefaultTaxRate()}%`,
+                                                                },
+                                                                {
+                                                                    value: 10,
+                                                                    label: '10%',
+                                                                },
+                                                                {
+                                                                    value: 15,
+                                                                    label: '15%',
+                                                                },
+                                                            ]"
+                                                        />
                                                         <ChevronDown
                                                             class="pointer-events-none absolute top-1/2 right-2 h-3 w-3 -translate-y-1/2 text-gray-400"
                                                         />
@@ -471,25 +469,26 @@ const handleSubmit = async () => {
                                                 </td>
                                                 <td class="px-3 py-3">
                                                     <div class="relative">
-                                                        <select
+                                                        <AppSelect
                                                             v-model="
                                                                 item.seller_id
                                                             "
-                                                            class="w-full cursor-pointer appearance-none rounded-lg border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                                        >
-                                                            <option
-                                                                :value="null"
-                                                            >
-                                                                — Sin asignar —
-                                                            </option>
-                                                            <option
-                                                                v-for="u in users"
-                                                                :key="u.id"
-                                                                :value="u.id"
-                                                            >
-                                                                {{ u.name }}
-                                                            </option>
-                                                        </select>
+                                                            class="w-full"
+                                                            :options="[
+                                                                {
+                                                                    value: null,
+                                                                    label: '— Sin asignar —',
+                                                                },
+                                                                ...(
+                                                                    users ?? []
+                                                                ).map((u) => ({
+                                                                    value: u.id,
+                                                                    label: String(
+                                                                        u.name,
+                                                                    ),
+                                                                })),
+                                                            ]"
+                                                        />
                                                         <ChevronDown
                                                             class="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400"
                                                         />
@@ -556,7 +555,7 @@ const handleSubmit = async () => {
                                 :disabled="
                                     pendingItems.length === 0 || submitting
                                 "
-                                class="rounded-xl bg-green-600 px-6 py-2.5 font-bold text-white transition-colors hover:bg-green-700 disabled:opacity-40"
+                                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
                             >
                                 {{
                                     submitting

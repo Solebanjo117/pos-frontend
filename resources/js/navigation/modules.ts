@@ -32,6 +32,7 @@ import {
     Wrench,
 } from 'lucide-vue-next';
 import type { LucideIcon } from 'lucide-vue-next';
+import { MULTI_WAREHOUSE_ENABLED } from '@/config/features';
 import type { BreadcrumbItem } from '@/types';
 
 export type AppRole =
@@ -65,6 +66,8 @@ export interface ModuleActionDefinition {
     icon: LucideIcon;
     roles?: AppRole[];
     feature?: ModuleFeature;
+    /** Oculta la acción de los menús; la pantalla sigue existiendo y conserva sus migas de pan. */
+    hidden?: boolean;
 }
 
 export interface ModuleSectionDefinition {
@@ -341,14 +344,10 @@ export const moduleDefinitions: ModuleDefinition[] = [
         id: 'inventory',
         title: 'Inventario',
         description: 'Productos, existencias, movimientos y catálogos.',
-        href: '/inventory/overview',
+        href: '/inventory',
         icon: Warehouse,
         activePaths: [
-            '/inventory/overview',
             '/inventory',
-            '/products',
-            '/inventory-movements',
-            '/inventory-transfers',
             '/returns',
             '/brands',
             '/categories',
@@ -360,7 +359,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 actions: [
                     {
                         title: 'Existencias',
-                        href: '/inventory',
+                        href: '/inventory/stock',
                         description:
                             'Consultar stock, lotes y valor disponible.',
                         icon: Boxes,
@@ -368,25 +367,12 @@ export const moduleDefinitions: ModuleDefinition[] = [
                     },
                     {
                         title: 'Productos',
-                        href: '/products',
+                        href: '/inventory/products',
                         description:
                             'Buscar y administrar el catálogo de artículos.',
                         icon: Package,
                     },
-                    {
-                        title: 'Nuevo producto',
-                        href: '/products/create',
-                        description: 'Registrar un artículo en el catálogo.',
-                        icon: Plus,
-                        roles: roles.purchasing,
-                    },
-                    {
-                        title: 'Importar productos',
-                        href: '/products/import',
-                        description: 'Cargar artículos desde un archivo.',
-                        icon: PackagePlus,
-                        roles: roles.adminManager,
-                    },
+                    // Crear e importar productos (2026-11-18): solo con los botones dentro de Productos.
                 ],
             },
             {
@@ -394,23 +380,27 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 actions: [
                     {
                         title: 'Movimientos',
-                        href: '/inventory-movements',
+                        href: '/inventory/movements',
                         description:
                             'Consultar entradas, salidas y trazabilidad.',
                         icon: History,
                     },
+                    // "Registrar entrada" oculta por ahora (2026-11-10): la entrada manual no se usa.
                     {
                         title: 'Registrar entrada',
-                        href: '/inventory-movements/inbound/create',
+                        href: '/inventory/movements/inbound/create',
                         description: 'Ingresar existencias manualmente.',
                         icon: PackagePlus,
                         roles: roles.inventory,
+                        hidden: true,
                     },
+                    // Transferencias: solo con varios almacenes (config/features.ts).
                     {
                         title: 'Transferencias',
-                        href: '/inventory-transfers',
+                        href: '/inventory/transfers',
                         description: 'Consultar movimientos entre bodegas.',
                         icon: Truck,
+                        hidden: !MULTI_WAREHOUSE_ENABLED,
                     },
                     {
                         title: 'Mermas',
@@ -429,7 +419,9 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 ],
             },
             {
-                title: 'Catálogos y bodegas',
+                title: MULTI_WAREHOUSE_ENABLED
+                    ? 'Catálogos y bodegas'
+                    : 'Catálogos',
                 actions: [
                     {
                         title: 'Categorías',
@@ -450,6 +442,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                         href: '/warehouses',
                         description: 'Consultar y administrar ubicaciones.',
                         icon: Warehouse,
+                        hidden: !MULTI_WAREHOUSE_ENABLED,
                     },
                 ],
             },
@@ -681,7 +674,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
                 actions: [
                     {
                         title: 'Movimientos de inventario',
-                        href: '/inventory-movements',
+                        href: '/inventory/movements',
                         description: 'Historial operativo por artículo.',
                         icon: History,
                         roles: roles.adminManager,
@@ -695,10 +688,11 @@ export const moduleDefinitions: ModuleDefinition[] = [
                     },
                     {
                         title: 'Transferencias',
-                        href: '/inventory-transfers',
+                        href: '/inventory/transfers',
                         description: 'Movimientos entre bodegas.',
                         icon: Truck,
                         roles: roles.adminManager,
+                        hidden: !MULTI_WAREHOUSE_ENABLED,
                     },
                 ],
             },
@@ -966,6 +960,7 @@ export const getVisibleModules = (
                     ...section,
                     actions: section.actions.filter(
                         (action) =>
+                            !action.hidden &&
                             roleAllowsAction(action, role) &&
                             featureAllowsAction(action, features),
                     ),

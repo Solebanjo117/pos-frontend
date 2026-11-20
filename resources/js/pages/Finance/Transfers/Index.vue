@@ -5,6 +5,9 @@ import { onMounted, ref } from 'vue';
 import PageShell from '@/components/PageShell.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { financialTransfersService } from '@/services/financial-transfers';
 import type { BreadcrumbItem } from '@/types';
@@ -63,24 +66,21 @@ onMounted(loadTransfers);
                 </Button>
             </template>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <div class="overflow-hidden rounded-xl border bg-card">
-                <div
+                <LoadingState
                     v-if="loading && transfers.length === 0"
-                    class="p-10 text-center text-sm text-muted-foreground"
-                >
-                    Cargando transferencias…
-                </div>
+                    label="Cargando transferencias..."
+                />
                 <div
                     v-else-if="transfers.length === 0"
                     class="p-10 text-center"
                 >
-                    <p class="font-medium">Todavía no hay transferencias</p>
+                    <EmptyState compact
+                        >Todavía no hay transferencias</EmptyState
+                    >
                     <p class="mt-1 text-sm text-muted-foreground">
                         La primera operación aparecerá aquí con su folio y
                         trazabilidad.

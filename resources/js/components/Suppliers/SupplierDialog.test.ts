@@ -21,11 +21,12 @@ vi.mock('@/services/suppliers', () => ({
 }));
 
 const stubs = {
-    Dialog: { template: '<div><slot /></div>' },
-    DialogScrollContent: { template: '<div><slot /></div>' },
-    DialogHeader: { template: '<header><slot /></header>' },
-    DialogTitle: { template: '<h2><slot /></h2>' },
-    DialogFooter: { template: '<footer><slot /></footer>' },
+    // AppModal real: cabecera, cuerpo con scroll y pie fijo. Aquí solo se renderizan sus partes.
+    AppModal: {
+        props: ['open', 'title'],
+        template:
+            '<div><h2>{{ title }}</h2><div data-test="modal-body"><slot /></div><footer data-test="modal-footer"><slot name="footer" /></footer></div>',
+    },
     Link: { template: '<a><slot /></a>' },
 };
 
@@ -69,5 +70,94 @@ describe('SupplierDialog', () => {
         expect(wrapper.text()).toContain('El correo no es válido.');
         expect(wrapper.text()).toContain('Una marca seleccionada no existe.');
         expect(wrapper.emitted('saved')).toBeUndefined();
+    });
+
+    it('puts Cancel and Save in the modal footer and submits the form from there', async () => {
+        vi.mocked(suppliersService.create).mockResolvedValue({
+            id: 3,
+            name: 'Proveedor nuevo',
+        } as any);
+
+        const wrapper = mount(SupplierDialog, {
+            props: { open: true, supplier: null },
+            global: { stubs },
+        });
+        await flushPromises();
+
+        const body = wrapper.get('[data-test="modal-body"]');
+        const footer = wrapper.get('[data-test="modal-footer"]');
+        const form = body.get('form');
+        const save = footer
+            .findAll('button')
+            .find((button) => button.text().includes('Guardar proveedor'))!;
+
+        expect(body.text()).not.toContain('Guardar proveedor');
+        expect(footer.text()).toContain('Cancelar');
+        expect(save.attributes('type')).toBe('submit');
+        expect(save.attributes('form')).toBe(form.attributes('id'));
+
+        await wrapper.find('input[required]').setValue('Proveedor nuevo');
+        await form.trigger('submit');
+        await flushPromises();
+
+        expect(suppliersService.create).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'Proveedor nuevo' }),
+        );
+        expect(wrapper.emitted('saved')).toHaveLength(1);
+    });
+
+    it('searches supplied brands without losing the ones already checked', async () => {
+        vi.mocked(brandsService.getAllActive).mockResolvedValue([
+            { id: 7, name: 'Bosch' },
+            { id: 8, name: 'Denso' },
+            { id: 9, name: 'Nippón Parts' },
+        ]);
+        vi.mocked(suppliersService.create).mockResolvedValue({
+            id: 3,
+            name: 'Proveedor',
+        } as any);
+
+        // Se abre después de montar, como en la página: así carga las marcas.
+        const wrapper = mount(SupplierDialog, {
+            props: { open: false, supplier: null },
+            global: { stubs },
+        });
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+
+        const brandLabels = () =>
+            wrapper
+                .findAll('label')
+                .filter((label) =>
+                    label.find('input[type="checkbox"]').exists(),
+                )
+                .map((label) => label.text());
+        const checkboxFor = (name: string) =>
+            wrapper
+                .findAll('label')
+                .find((label) => label.text() === name)!
+                .get('input[type="checkbox"]');
+
+        await checkboxFor('Bosch').trigger('change');
+        expect(wrapper.get('[data-testid="brand-selected-count"]').text()).toBe(
+            '1 seleccionada(s)',
+        );
+
+        // Sin tildes ni mayúsculas.
+        await wrapper.get('[data-testid="brand-search"]').setValue('NIPPON');
+        expect(brandLabels()).toEqual(['Nippón Parts']);
+
+        await wrapper.get('[data-testid="brand-search"]').setValue('zzz');
+        expect(brandLabels()).toEqual([]);
+        expect(wrapper.text()).toContain('Ninguna marca coincide');
+
+        await wrapper.find('input[required]').setValue('Proveedor');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        // Bosch sigue marcada aunque el filtro la oculte.
+        expect(suppliersService.create).toHaveBeenCalledWith(
+            expect.objectContaining({ brand_ids: [7] }),
+        );
     });
 });

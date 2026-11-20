@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
+import BrandTierPicker from '@/components/Brands/BrandTierPicker.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
-import type { UpdateBrandData } from '@/types/brand';
+import type { CreateBrandData } from '@/types/brand';
 import type { Supplier } from '@/types/supplier';
+import { normalizeBrandTier } from '@/utils/brandTier';
 
 interface Props {
     id: string;
@@ -16,15 +21,17 @@ interface Props {
 const props = defineProps<Props>();
 
 const { brand, loading, error, fetchBrandById, updateBrand } = useBrands();
+const piecesSuppliers = computed(() =>
+    (brand.value?.supplier_links ?? []).filter((link) => link.pieces > 0),
+);
 const { fetchActiveSuppliers } = useSuppliers();
 const toast = useToast();
 const availableSuppliers = ref<Supplier[]>([]);
 
-const form = ref<UpdateBrandData>({
+const form = ref<CreateBrandData>({
     name: '',
     description: '',
-    logo_url: '',
-    website: '',
+    tier: 'standard',
     supplier_ids: [],
 });
 
@@ -39,8 +46,7 @@ onMounted(async () => {
         form.value = {
             name: brand.value.name,
             description: brand.value.description || '',
-            logo_url: brand.value.logo_url || '',
-            website: brand.value.website || '',
+            tier: normalizeBrandTier(brand.value.tier),
             supplier_ids:
                 brand.value.suppliers?.map((supplier) => supplier.id) || [],
         };
@@ -67,7 +73,8 @@ function goBack() {
 <template>
     <Head title="Editar Marca" />
     <AppLayout>
-        <div class="mx-auto max-w-2xl space-y-6">
+        <!-- w-full: dentro del layout flex, mx-auto solo encogería el formulario al ancho de su contenido. -->
+        <div class="mx-auto w-full max-w-3xl space-y-6">
             <!-- Header -->
             <div class="flex items-center gap-4">
                 <button
@@ -78,34 +85,27 @@ function goBack() {
                 </button>
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Editar Marca
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Modifica la información de la marca
                     </p>
                 </div>
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Loading or Form -->
-            <div
+            <LoadingState
                 v-if="loading && !brand"
-                class="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-border dark:bg-card"
-            >
-                <div
-                    class="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                ></div>
-                <p class="mt-4 text-gray-500">Cargando...</p>
-            </div>
+                class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                label="Cargando..."
+            />
 
             <form
                 v-else
@@ -149,45 +149,43 @@ function goBack() {
                     ></textarea>
                 </div>
 
-                <!-- Logo URL -->
+                <!-- Gama: cada marca es Standard o Premium -->
                 <div>
                     <label
                         class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                        URL del Logo
+                        Gama <span class="text-red-500">*</span>
                     </label>
-                    <input
-                        v-model="form.logo_url"
-                        type="url"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="https://ejemplo.com/logo.png"
-                    />
-                    <p class="mt-1 text-xs text-gray-500">
-                        Logo de la marca (opcional)
-                    </p>
-                </div>
-
-                <!-- Website -->
-                <div>
-                    <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                        Sitio Web
-                    </label>
-                    <input
-                        v-model="form.website"
-                        type="url"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="https://www.ejemplo.com"
-                    />
+                    <BrandTierPicker v-model="form.tier" />
                 </div>
 
                 <div>
                     <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
                         Proveedores
                     </label>
+                    <!-- Calculado (2026-11-18): proveedores que tienen piezas de esta marca. -->
+                    <div
+                        v-if="piecesSuppliers.length"
+                        data-test="brand-piece-suppliers"
+                        class="mb-3 flex flex-wrap gap-2"
+                    >
+                        <span
+                            v-for="link in piecesSuppliers"
+                            :key="link.id"
+                            class="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700 dark:border-border dark:bg-muted/40 dark:text-gray-200"
+                        >
+                            {{ link.name }} ·
+                            {{ link.pieces }}
+                            {{ link.pieces === 1 ? 'pieza' : 'piezas' }}
+                        </span>
+                    </div>
+                    <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                        Los proveedores de sus piezas aparecen solos. Marca a
+                        mano los que traen esta marca pero todavía no tienen
+                        piezas registradas.
+                    </p>
                     <div
                         class="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-border dark:bg-muted"
                     >
@@ -204,16 +202,13 @@ function goBack() {
                             />
                             <span>{{ supplier.name }}</span>
                         </label>
-                        <p
-                            v-if="availableSuppliers.length === 0"
-                            class="text-sm text-gray-500 dark:text-gray-400"
+                        <EmptyState v-if="availableSuppliers.length === 0"
+                            >No hay proveedores activos disponibles.</EmptyState
                         >
-                            No hay proveedores activos disponibles.
-                        </p>
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {{ form.supplier_ids?.length || 0 }} proveedor(es)
-                        seleccionado(s)
+                        marcado(s) a mano
                     </p>
                 </div>
 
@@ -231,7 +226,7 @@ function goBack() {
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                     >
                         <Save :size="18" />
                         Actualizar

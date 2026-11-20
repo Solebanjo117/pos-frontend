@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import type { Product } from '@/types/product';
 import ProductCard from './ProductCard.vue';
 import ProductDetailModal from './ProductDetailModal.vue';
@@ -87,9 +89,9 @@ const normalizeQuery = (value?: string) => (value ?? '').trim().toLowerCase();
 const searchMatchesProduct = (product: Product, query: string) => {
     const matchesName = product.name.toLowerCase().includes(query);
     const matchesSku = product.sku_base?.toLowerCase().includes(query);
-    const matchesAlternateCode = product.alternate_code
-        ?.toLowerCase()
-        .includes(query);
+    const matchesOtherCode = product.codes?.some((code) =>
+        code.code?.toLowerCase().includes(query),
+    );
     const matchesVariantSku = product.variants?.some((v) =>
         v.sku?.toLowerCase().includes(query),
     );
@@ -111,7 +113,7 @@ const searchMatchesProduct = (product: Product, query: string) => {
     return (
         matchesName ||
         matchesSku ||
-        matchesAlternateCode ||
+        matchesOtherCode ||
         matchesVariantSku ||
         matchesBrand ||
         matchesCategory ||
@@ -342,14 +344,7 @@ const requestNextPage = () => {
             <!-- Product Grid/List -->
             <main class="flex-1">
                 <!-- Loading -->
-                <div v-if="loading" class="py-16 text-center">
-                    <div
-                        class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                    ></div>
-                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                        Cargando catálogo...
-                    </p>
-                </div>
+                <LoadingState v-if="loading" label="Cargando catálogo..." />
 
                 <!-- Empty State -->
                 <div
@@ -369,10 +364,10 @@ const requestNextPage = () => {
                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                         />
                     </svg>
-                    <p class="mt-3 text-gray-500 dark:text-gray-400">
-                        No se encontraron productos con los filtros
-                        seleccionados
-                    </p>
+                    <EmptyState compact class="mt-3"
+                        >No se encontraron productos con los filtros
+                        seleccionados</EmptyState
+                    >
                 </div>
 
                 <!-- Products -->

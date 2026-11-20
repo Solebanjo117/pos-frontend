@@ -18,9 +18,13 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useToast } from '@/composables/useToast';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { productsApi } from '@/services/api/products';
 import { type BreadcrumbItem } from '@/types';
@@ -60,8 +64,8 @@ const selectedFifoVariantId = ref<number | null>(null);
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Productos', href: '/products' },
-    { title: 'Detalle', href: `/products/${props.productId}` },
+    { title: 'Productos', href: '/inventory/products' },
+    { title: 'Detalle', href: `/inventory/products/${props.productId}` },
 ];
 
 const product = computed<ProductDetail | null>(() => currentProduct.value);
@@ -275,7 +279,12 @@ const reorderAlerts = computed(
     () => product.value?.inventory?.filter((item) => item.needs_reorder) ?? [],
 );
 
-const oemReferences = computed(() => product.value?.oem_references ?? []);
+// Todos los números de la pieza (el principal primero): reemplazan a las "referencias OEM".
+const partNumbers = computed(() =>
+    [...(product.value?.codes ?? [])].sort(
+        (a, b) => Number(b.is_primary) - Number(a.is_primary),
+    ),
+);
 const alternatives = computed<AlternativeProduct[]>(
     () => product.value?.alternatives ?? [],
 );
@@ -285,9 +294,8 @@ const attributes = computed(() => product.value?.attributes ?? []);
 const statusLabel = computed(() => {
     return {
         active: 'Activo',
-        discontinued: 'Descontinuado',
-        pending: 'Pendiente',
-    }[product.value?.status ?? 'pending'];
+        discontinued: 'Discontinuado',
+    }[product.value?.status ?? 'active'];
 });
 
 const statusClass = computed(() => {
@@ -295,9 +303,7 @@ const statusClass = computed(() => {
         active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
         discontinued:
             'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
-        pending:
-            'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-    }[product.value?.status ?? 'pending'];
+    }[product.value?.status ?? 'active'];
 });
 
 function formatCurrency(value?: number | string | null): string {
@@ -432,7 +438,7 @@ async function handleDuplicate() {
         }
 
         toast.success('Producto duplicado. Ajusta los campos necesarios.');
-        window.location.href = `/products/${duplicatedProductId}/edit`;
+        window.location.href = `/inventory/products/${duplicatedProductId}/edit`;
     } catch (err: any) {
         toast.error(
             err.response?.data?.message || 'Error al duplicar producto',
@@ -461,15 +467,17 @@ watch(effectiveImages, () => {
     <Head :title="product?.name || 'Detalle del producto'" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-[calc(100vh-4rem)] bg-gray-50/60 dark:bg-background">
-            <div class="mx-auto max-w-7xl space-y-4 p-4">
+        <div
+            class="app-page-full-bleed min-h-[calc(100vh-4rem)] bg-gray-50/60 dark:bg-background"
+        >
+            <div class="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
                 <div
                     class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
                 >
                     <div class="min-w-0">
                         <div class="mb-2 flex flex-wrap items-center gap-2">
                             <Link
-                                href="/products"
+                                href="/inventory/products"
                                 class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-50 dark:border-border dark:bg-card dark:text-gray-300 dark:hover:bg-muted"
                             >
                                 <ArrowLeft :size="15" />
@@ -492,13 +500,13 @@ watch(effectiveImages, () => {
                             </span>
                         </div>
                         <h1
-                            class="text-2xl font-semibold break-words text-gray-950 lg:text-3xl dark:text-white"
+                            class="text-2xl font-semibold tracking-tight break-words text-foreground"
                         >
                             {{ product?.name || 'Detalle del producto' }}
                         </h1>
                         <p
                             v-if="product"
-                            class="mt-1 flex flex-wrap gap-2 text-sm text-gray-500 dark:text-gray-400"
+                            class="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground"
                         >
                             <span class="font-mono">{{
                                 product.sku_base
@@ -524,8 +532,8 @@ watch(effectiveImages, () => {
                         </button>
                         <Link
                             v-if="canManageProducts"
-                            :href="`/products/${productId}/edit`"
-                            class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+                            :href="`/inventory/products/${productId}/edit`"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
                         >
                             <Pencil :size="16" />
                             Editar
@@ -533,24 +541,15 @@ watch(effectiveImages, () => {
                     </div>
                 </div>
 
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-border dark:bg-card"
-                >
-                    <div
-                        class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-emerald-600 border-r-transparent"
-                    ></div>
-                    <p class="mt-3 text-sm text-gray-500">
-                        Cargando producto...
-                    </p>
-                </div>
+                    class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
+                    label="Cargando producto..."
+                />
 
-                <div
-                    v-else-if="error"
-                    class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
-                >
+                <ErrorMessage v-else-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <template v-else-if="product">
                     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -570,6 +569,7 @@ watch(effectiveImages, () => {
                             </p>
                         </div>
                         <div
+                            v-if="multiWarehouse"
                             class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
                         >
                             <div
@@ -777,9 +777,9 @@ watch(effectiveImages, () => {
                                         }}
                                     </p>
                                 </div>
-                                <p v-else class="text-sm text-gray-500">
-                                    No hay proveedores vinculados.
-                                </p>
+                                <EmptyState v-else
+                                    >No hay proveedores vinculados.</EmptyState
+                                >
                             </div>
                         </section>
                     </div>
@@ -988,7 +988,11 @@ watch(effectiveImages, () => {
                                 <h2
                                     class="font-semibold text-gray-950 dark:text-white"
                                 >
-                                    Inventario por almacen
+                                    {{
+                                        multiWarehouse
+                                            ? 'Inventario por almacén'
+                                            : 'Inventario'
+                                    }}
                                 </h2>
                             </div>
                         </div>
@@ -998,7 +1002,10 @@ watch(effectiveImages, () => {
                                     class="bg-gray-50 text-xs text-gray-500 uppercase dark:bg-muted/40"
                                 >
                                     <tr>
-                                        <th class="px-4 py-2 text-left">
+                                        <th
+                                            v-if="multiWarehouse"
+                                            class="px-4 py-2 text-left"
+                                        >
                                             Almacen
                                         </th>
                                         <th class="px-4 py-2 text-right">
@@ -1027,7 +1034,10 @@ watch(effectiveImages, () => {
                                         :key="item.id"
                                         class="border-t border-gray-100 dark:border-border"
                                     >
-                                        <td class="px-4 py-3 font-medium">
+                                        <td
+                                            v-if="multiWarehouse"
+                                            class="px-4 py-3 font-medium"
+                                        >
                                             {{ item.warehouse?.name || '-' }}
                                         </td>
                                         <td
@@ -1473,7 +1483,7 @@ watch(effectiveImages, () => {
                                 <Link
                                     v-for="attribute in attributes"
                                     :key="`${attribute.name}-${attribute.value}`"
-                                    :href="`/products?attribute_value=${encodeURIComponent(String(attribute.value))}`"
+                                    :href="`/inventory/products?attribute_value=${encodeURIComponent(String(attribute.value))}`"
                                     class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm hover:border-emerald-200 hover:bg-emerald-50 dark:border-border dark:bg-muted/30"
                                 >
                                     <span class="block text-xs text-gray-500">{{
@@ -1503,29 +1513,31 @@ watch(effectiveImages, () => {
                                 <h2
                                     class="font-semibold text-gray-950 dark:text-white"
                                 >
-                                    Referencias OEM
+                                    Números de parte
                                 </h2>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <Link
-                                    v-for="reference in oemReferences"
-                                    :key="`${reference.manufacturer}-${reference.oem_code}`"
-                                    :href="`/products?oem_code=${encodeURIComponent(reference.oem_code)}`"
+                                    v-for="partNumber in partNumbers"
+                                    :key="partNumber.code"
+                                    :href="`/inventory/products?search=${encodeURIComponent(partNumber.code)}`"
                                     class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm hover:border-emerald-200 hover:bg-emerald-50 dark:border-border dark:bg-muted/30"
                                 >
                                     <span
                                         class="block font-mono font-semibold"
-                                        >{{ reference.oem_code }}</span
+                                        >{{ partNumber.code }}</span
                                     >
                                     <span class="text-xs text-gray-500">{{
-                                        reference.manufacturer || '-'
+                                        partNumber.is_primary
+                                            ? 'Principal'
+                                            : 'Adicional'
                                     }}</span>
                                 </Link>
                                 <p
-                                    v-if="!oemReferences.length"
+                                    v-if="!partNumbers.length"
                                     class="text-sm text-gray-500"
                                 >
-                                    Sin referencias OEM.
+                                    Sin números de parte.
                                 </p>
                             </div>
                         </div>
@@ -1584,9 +1596,9 @@ watch(effectiveImages, () => {
                                 </p>
                             </div>
                         </div>
-                        <p v-else class="text-sm text-gray-500">
-                            No hay compatibilidad definida.
-                        </p>
+                        <EmptyState v-else
+                            >No hay compatibilidad definida.</EmptyState
+                        >
                     </section>
 
                     <section
@@ -1633,7 +1645,7 @@ watch(effectiveImages, () => {
                                     >
                                         <td class="px-4 py-3">
                                             <Link
-                                                :href="`/products/${alternative.id}`"
+                                                :href="`/inventory/products/${alternative.id}`"
                                                 class="font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
                                             >
                                                 {{ alternative.name }}

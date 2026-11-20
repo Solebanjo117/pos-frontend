@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -419,22 +420,19 @@ watch(
             </p>
             <div class="flex flex-wrap items-end gap-3">
                 <label class="text-sm"
-                    >Banco de destino<select
+                    >Banco de destino<AppSelect
                         v-model="bankId"
                         :disabled="saving"
                         aria-label="Banco de destino"
-                        class="mt-1 block rounded-md border bg-background p-2"
-                    >
-                        <option value="">Seleccione una cuenta</option>
-                        <option
-                            v-for="bank in banks"
-                            :key="bank.endpoint_id"
-                            :value="bank.endpoint_id"
-                        >
-                            {{ bank.name }} · {{ bank.currency }}
-                        </option>
-                    </select></label
-                >
+                        class="mt-1 block"
+                        :options="[
+                            { value: '', label: 'Seleccione una cuenta' },
+                            ...(banks ?? []).map((bank) => ({
+                                value: bank.endpoint_id,
+                                label: `${bank.name} · ${bank.currency}`,
+                            })),
+                        ]"
+                /></label>
                 <label class="text-sm"
                     >Referencia<input
                         v-model="reference"

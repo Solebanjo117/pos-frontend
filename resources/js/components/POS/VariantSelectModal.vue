@@ -2,6 +2,7 @@
 import { X, Package, Layers, ShoppingCart, Truck } from 'lucide-vue-next';
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
 import type { Product, ProductVariant } from '@/types/product';
 
@@ -247,9 +248,9 @@ const handlePurchaseSuccess = (result: {
                                 class="flex flex-col items-center justify-center px-6 py-16 text-center"
                             >
                                 <Package class="mb-3 h-12 w-12 text-gray-300" />
-                                <p class="text-sm font-medium text-gray-500">
-                                    No hay variantes disponibles
-                                </p>
+                                <EmptyState compact
+                                    >No hay variantes disponibles</EmptyState
+                                >
                             </div>
 
                             <table v-else class="w-full text-left">

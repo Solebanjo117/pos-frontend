@@ -14,7 +14,11 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { productsApi } from '@/services/api/products';
@@ -57,10 +61,10 @@ const error = ref<string | null>(null);
 
 const breadcrumbs = computed<BreadcrumbItem[]>(() => [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Inventario', href: '/inventory' },
+    { title: 'Existencias', href: '/inventory/stock' },
     {
         title: product.value?.name ?? 'Producto',
-        href: `/inventory/products/${props.productId}`,
+        href: `/inventory/stock/${props.productId}`,
     },
 ]);
 
@@ -234,7 +238,6 @@ async function fetchProduct(): Promise<void> {
                 'inventory',
                 'suppliers',
                 'compatibility',
-                'oem',
             ].join(','),
             warehouse_id: selectedWarehouseId.value || undefined,
         });
@@ -370,7 +373,7 @@ function selectVariant(variant: ProductVariant): void {
     window.history.replaceState(
         {},
         '',
-        `/inventory/products/${props.productId}?${query.toString()}`,
+        `/inventory/stock/${props.productId}?${query.toString()}`,
     );
 }
 
@@ -394,7 +397,7 @@ function applyWarehouseFilter(): void {
     window.history.replaceState(
         {},
         '',
-        `/inventory/products/${props.productId}?${query.toString()}`,
+        `/inventory/stock/${props.productId}?${query.toString()}`,
     );
 }
 
@@ -404,7 +407,7 @@ function refreshPage(): void {
 }
 
 function goBackToInventory(): void {
-    router.visit('/inventory');
+    router.visit('/inventory/stock');
 }
 
 function statusLabel(status: VariantStatus): string {
@@ -437,7 +440,7 @@ function statusClass(status: VariantStatus): string {
     <Head :title="`Movimientos - ${product?.name ?? 'Inventario'}`" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <div
                 class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
             >
@@ -451,7 +454,7 @@ function statusClass(status: VariantStatus): string {
                         Inventario
                     </button>
                     <h1
-                        class="text-2xl font-semibold text-gray-950 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         {{ product?.name ?? 'Movimientos de inventario' }}
                     </h1>
@@ -468,15 +471,15 @@ function statusClass(status: VariantStatus): string {
 
                 <div class="flex flex-wrap gap-2">
                     <Link
-                        :href="`/products/${productId}`"
+                        :href="`/inventory/products/${productId}`"
                         class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-border dark:text-gray-100 dark:hover:bg-muted"
                     >
                         <Box class="h-4 w-4" />
                         Ver producto
                     </Link>
                     <Link
-                        :href="`/products/${productId}/edit`"
-                        class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                        :href="`/inventory/products/${productId}/edit`"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     >
                         <Pencil class="h-4 w-4" />
                         Editar producto
@@ -484,12 +487,9 @@ function statusClass(status: VariantStatus): string {
                 </div>
             </div>
 
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
                 <div
@@ -587,25 +587,25 @@ function statusClass(status: VariantStatus): string {
                 class="sticky top-0 z-10 rounded-lg border border-gray-200 bg-white/95 p-4 backdrop-blur dark:border-border dark:bg-card/95"
             >
                 <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
-                    <div class="lg:col-span-4">
+                    <div v-if="multiWarehouse" class="lg:col-span-4">
                         <label
                             class="mb-1 block text-xs font-semibold text-gray-500 uppercase"
                         >
                             Almacén
                         </label>
-                        <select
-                            v-model.number="selectedWarehouseId"
-                            class="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-border dark:bg-muted dark:text-white"
-                            @change="applyWarehouseFilter"
-                        >
-                            <option
-                                v-for="warehouse in productWarehouseOptions"
-                                :key="warehouse.id"
-                                :value="warehouse.id"
-                            >
-                                {{ warehouse.name }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="selectedWarehouseId"
+                            class="w-full"
+                            @update:model-value="applyWarehouseFilter()"
+                            :options="[
+                                ...(productWarehouseOptions ?? []).map(
+                                    (warehouse) => ({
+                                        value: warehouse.id,
+                                        label: String(warehouse.name),
+                                    }),
+                                ),
+                            ]"
+                        />
                     </div>
                     <div class="lg:col-span-3">
                         <label
@@ -634,7 +634,7 @@ function statusClass(status: VariantStatus): string {
                     <div class="flex items-end lg:col-span-2">
                         <button
                             type="button"
-                            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                            class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
                             :disabled="loading"
                             title="Actualizar producto e historial"
                             @click="refreshPage"
@@ -787,12 +787,11 @@ function statusClass(status: VariantStatus): string {
                             </div>
                         </button>
 
-                        <div
+                        <EmptyState
                             v-if="filteredVariantRows.length === 0"
-                            class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500 dark:border-border"
+                            class="rounded-lg border border-dashed border-gray-300 dark:border-border"
+                            >No hay variantes para el filtro actual.</EmptyState
                         >
-                            No hay variantes para el filtro actual.
-                        </div>
                     </div>
                 </aside>
 
@@ -844,6 +843,7 @@ function statusClass(status: VariantStatus): string {
                             </div>
 
                             <p
+                                v-if="multiWarehouse"
                                 class="text-sm font-medium text-gray-500 dark:text-gray-400"
                             >
                                 Almacén:
@@ -926,12 +926,12 @@ function statusClass(status: VariantStatus): string {
                         @updated="refreshPage"
                     />
 
-                    <div
+                    <EmptyState
                         v-else-if="!loading"
-                        class="rounded-lg border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500 dark:border-border dark:bg-card"
+                        class="rounded-lg border border-gray-200 bg-white dark:border-border dark:bg-card"
+                        >No hay variante disponible para mostrar
+                        movimientos.</EmptyState
                     >
-                        No hay variante disponible para mostrar movimientos.
-                    </div>
                 </section>
             </div>
         </div>

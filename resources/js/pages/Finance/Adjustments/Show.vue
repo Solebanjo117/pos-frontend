@@ -13,8 +13,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { financialAdjustmentsService } from '@/services/financial-adjustments';
 import type { BreadcrumbItem } from '@/types';
@@ -44,7 +46,7 @@ const reportLink = computed(() => {
     if (adjustment.value.type === 'accounts_receivable') return '/ar';
     if (adjustment.value.type === 'accounts_payable')
         return '/accounts-payable';
-    if (adjustment.value.type === 'inventory') return '/inventory';
+    if (adjustment.value.type === 'inventory') return '/inventory/stock';
     return '/reports/financial';
 });
 const canReverse = computed(
@@ -110,27 +112,14 @@ onMounted(load);
                     ><RotateCcw class="size-4" />Revertir ajuste</Button
                 ></template
             >
-            <div
-                v-if="loading"
-                class="p-12 text-center text-sm text-muted-foreground"
-            >
-                Cargando ajuste…
-            </div>
-            <div
-                v-else-if="error && !adjustment"
-                role="alert"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <LoadingState v-if="loading" label="Cargando ajuste..." />
+            <ErrorMessage v-else-if="error && !adjustment" role="alert">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <template v-else-if="adjustment">
-                <div
-                    v-if="error"
-                    role="alert"
-                    class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-                >
+                <ErrorMessage v-if="error" role="alert">
                     {{ error }}
-                </div>
+                </ErrorMessage>
                 <section class="rounded-xl border bg-card p-5">
                     <div
                         class="flex flex-wrap items-start justify-between gap-4 border-b pb-5"

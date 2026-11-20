@@ -2,7 +2,6 @@
 import {
     X,
     RotateCcw,
-    AlertCircle,
     Package,
     Search,
     Banknote,
@@ -12,6 +11,9 @@ import {
     ChevronDown,
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import apiClient from '@/services/api/client';
 import type { User as UserType } from '@/types';
@@ -464,13 +466,9 @@ const refundMethodColor = (method: string, color: string) => {
                         <!-- ═══════════ BODY ═══════════ -->
                         <div class="flex-1 space-y-5 overflow-y-auto p-6">
                             <!-- Error -->
-                            <div
-                                v-if="error"
-                                class="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20"
-                            >
-                                <AlertCircle class="h-4 w-4 flex-shrink-0" />
+                            <ErrorMessage v-if="error">
                                 {{ error }}
-                            </div>
+                            </ErrorMessage>
 
                             <div
                                 class="grid gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-4 dark:border-border dark:bg-background/50"
@@ -738,27 +736,28 @@ const refundMethodColor = (method: string, color: string) => {
                                                 <!-- Who is returning (per-row seller) -->
                                                 <td class="px-3 py-3">
                                                     <div class="relative">
-                                                        <select
+                                                        <AppSelect
                                                             v-model="
                                                                 returnUsers[
                                                                     item.id
                                                                 ]
                                                             "
-                                                            class="w-full cursor-pointer appearance-none rounded-lg border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 focus:border-transparent focus:ring-2 focus:ring-red-500 dark:border-border dark:bg-muted dark:text-white"
-                                                        >
-                                                            <option
-                                                                :value="null"
-                                                            >
-                                                                — Sin asignar —
-                                                            </option>
-                                                            <option
-                                                                v-for="u in users"
-                                                                :key="u.id"
-                                                                :value="u.id"
-                                                            >
-                                                                {{ u.name }}
-                                                            </option>
-                                                        </select>
+                                                            class="w-full"
+                                                            :options="[
+                                                                {
+                                                                    value: null,
+                                                                    label: '— Sin asignar —',
+                                                                },
+                                                                ...(
+                                                                    users ?? []
+                                                                ).map((u) => ({
+                                                                    value: u.id,
+                                                                    label: String(
+                                                                        u.name,
+                                                                    ),
+                                                                })),
+                                                            ]"
+                                                        />
                                                         <ChevronDown
                                                             class="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400"
                                                         />
@@ -826,26 +825,22 @@ const refundMethodColor = (method: string, color: string) => {
                                 >
                                     Cuenta bancaria
                                 </label>
-                                <select
-                                    v-model.number="financialAccountId"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option :value="null">
-                                        Selecciona una cuenta
-                                    </option>
-                                    <option
-                                        v-for="account in financialAccounts"
-                                        :key="account.endpoint_id"
-                                        :value="account.endpoint_id"
-                                    >
-                                        {{ account.name
-                                        }}{{
-                                            account.masked_number
-                                                ? ` · ${account.masked_number}`
-                                                : ''
-                                        }}
-                                    </option>
-                                </select>
+                                <AppSelect
+                                    v-model="financialAccountId"
+                                    class="w-full"
+                                    :options="[
+                                        {
+                                            value: null,
+                                            label: 'Selecciona una cuenta',
+                                        },
+                                        ...(financialAccounts ?? []).map(
+                                            (account) => ({
+                                                value: account.endpoint_id,
+                                                label: `${account.name}${account.masked_number ? ` · ${account.masked_number}` : ''}`,
+                                            }),
+                                        ),
+                                    ]"
+                                />
                                 <p
                                     v-if="financialAccountsError"
                                     class="mt-1 text-xs text-red-600 dark:text-red-400"
@@ -1088,12 +1083,12 @@ const refundMethodColor = (method: string, color: string) => {
                                                     0
                                                 "
                                             >
-                                                <td
-                                                    colspan="5"
-                                                    class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
-                                                >
-                                                    No hay artículos de esta
-                                                    factura que coincidan.
+                                                <td colspan="5">
+                                                    <EmptyState
+                                                        >No hay artículos de
+                                                        esta factura que
+                                                        coincidan.</EmptyState
+                                                    >
                                                 </td>
                                             </tr>
                                         </tbody>

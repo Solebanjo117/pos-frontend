@@ -15,6 +15,10 @@ import {
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import OperationalPaymentPanel from '@/components/POS/OperationalPaymentPanel.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     useCashierQueue,
     type CashierQueueEntry,
@@ -576,7 +580,7 @@ async function confirmRemove() {
         <header class="flex items-center justify-between gap-4">
             <div>
                 <h1
-                    class="flex items-center gap-2 text-2xl font-bold text-foreground"
+                    class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <Inbox class="h-6 w-6 text-sky-600" />
                     Cola de Caja
@@ -604,24 +608,19 @@ async function confirmRemove() {
             </button>
         </header>
 
-        <div
+        <LoadingState
             v-if="loading && !entries.length"
-            class="py-14 text-center text-sm text-muted-foreground"
-        >
-            Cargando cola...
-        </div>
-        <div
-            v-else-if="error"
-            class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-        >
+            label="Cargando cola..."
+        />
+        <ErrorMessage v-else-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
         <div
             v-else-if="!entries.length"
             class="rounded-md border bg-card py-14 text-center"
         >
             <Inbox class="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p class="font-medium">No hay movimientos pendientes</p>
+            <EmptyState compact>No hay movimientos pendientes</EmptyState>
             <p class="mt-1 text-sm text-muted-foreground">
                 Los registros enviados a Caja apareceran aqui.
             </p>
@@ -719,7 +718,7 @@ async function confirmRemove() {
                                         </button>
                                         <button
                                             type="button"
-                                            class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                                             :disabled="processingId !== null"
                                             title="Cobrar"
                                             @click="startCharge(entry)"
@@ -821,7 +820,7 @@ async function confirmRemove() {
                             </button>
                             <button
                                 type="button"
-                                class="flex min-w-0 flex-col items-center gap-1 rounded-md bg-sky-600 px-2 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                class="flex h-8 min-w-0 flex-col items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                 :disabled="processingId !== null"
                                 title="Cobrar"
                                 @click="startCharge(entry)"
@@ -963,7 +962,7 @@ async function confirmRemove() {
                         </button>
                         <button
                             type="button"
-                            class="flex flex-1 items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                            class="flex h-9 flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             :disabled="processingId === entry.id"
                             @click="processEntry(entry)"
                         >
@@ -1096,19 +1095,16 @@ async function confirmRemove() {
                     class="space-y-1 text-sm"
                 >
                     <span>Metodo de pago</span>
-                    <select
+                    <AppSelect
                         v-model="settlement.payment_method"
-                        :required="returnNeedsMoney || !isReturnSettlement"
-                        class="w-full rounded-md border bg-background px-3 py-2"
-                    >
-                        <option
-                            v-for="method in paymentMethods"
-                            :key="method.code"
-                            :value="method.code"
-                        >
-                            {{ method.name }}
-                        </option>
-                    </select>
+                        class="w-full"
+                        :options="[
+                            ...(paymentMethods ?? []).map((method) => ({
+                                value: method.code,
+                                label: String(method.name),
+                            })),
+                        ]"
+                    />
                 </label>
                 <label
                     v-if="
@@ -1159,7 +1155,7 @@ async function confirmRemove() {
                 </button>
                 <button
                     type="submit"
-                    class="rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     :disabled="processingId === settlementEntry.id"
                 >
                     {{
@@ -1297,12 +1293,10 @@ async function confirmRemove() {
                 </button>
             </div>
             <div class="flex-1 overflow-y-auto px-5 py-4">
-                <div
+                <LoadingState
                     v-if="summaryLoading"
-                    class="py-10 text-center text-sm text-muted-foreground"
-                >
-                    Cargando pedido...
-                </div>
+                    label="Cargando pedido..."
+                />
                 <div v-else-if="summaryEntry" class="space-y-3">
                     <article
                         v-for="item in summaryEntry.items"
@@ -1379,7 +1373,7 @@ async function confirmRemove() {
             <div class="flex justify-end border-t px-5 py-4">
                 <button
                     type="button"
-                    class="rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     @click="notice = null"
                 >
                     Entendido

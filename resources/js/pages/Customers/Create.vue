@@ -2,6 +2,8 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save, Building2, User } from 'lucide-vue-next';
 import { ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useCustomers } from '@/composables/useCustomers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -64,22 +66,21 @@ const goBack = () => {
                 <ArrowLeft :size="24" />
             </button>
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     Nuevo Cliente
                 </h1>
-                <p class="mt-1 text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Registra un nuevo cliente en el sistema
                 </p>
             </div>
         </div>
 
         <!-- Error message -->
-        <div
-            v-if="error"
-            class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-700 dark:bg-red-900 dark:text-red-200"
-        >
+        <ErrorMessage v-if="error" class="mb-6">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <!-- Form -->
         <form
@@ -226,14 +227,15 @@ const goBack = () => {
                             class="mb-1 block text-sm font-medium text-gray-700"
                             >Estado</label
                         >
-                        <select
+                        <AppSelect
                             v-model="form.status"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option value="active">Activo</option>
-                            <option value="inactive">Inactivo</option>
-                            <option value="blocked">Bloqueado</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'active', label: 'Activo' },
+                                { value: 'inactive', label: 'Inactivo' },
+                                { value: 'blocked', label: 'Bloqueado' },
+                            ]"
+                        />
                     </div>
                 </div>
             </div>
@@ -453,7 +455,7 @@ const goBack = () => {
                 </button>
                 <button
                     type="submit"
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                     :disabled="loading"
                 >
                     <Save :size="20" />

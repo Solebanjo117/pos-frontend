@@ -2,7 +2,6 @@
 import { Head, Link } from '@inertiajs/vue3';
 import {
     Clock,
-    AlertCircle,
     TrendingUp,
     Download,
     Calendar,
@@ -18,7 +17,10 @@ import MovementTrendChart from '@/components/charts/MovementTrendChart.vue';
 import MovementTypeChart from '@/components/charts/MovementTypeChart.vue';
 import Pagination from '@/components/Pagination.vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -27,6 +29,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useReports } from '@/composables/useReports';
 import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { formatCurrency, formatReportDateTime } from '@/utils/formatters';
@@ -315,7 +318,7 @@ const inventoryProductHref = (productId: number, variantId?: number | null) => {
 
     const query = params.toString();
 
-    return `/inventory/products/${productId}${query ? `?${query}` : ''}`;
+    return `/inventory/stock/${productId}${query ? `?${query}` : ''}`;
 };
 
 const sourceHref = (movement: {
@@ -327,7 +330,7 @@ const sourceHref = (movement: {
     const id = movement.reference_id;
 
     if (!id) {
-        return `/inventory-movements/${movement.id}`;
+        return `/inventory/movements/${movement.id}`;
     }
 
     if (type.includes('purchase')) {
@@ -339,10 +342,10 @@ const sourceHref = (movement: {
     }
 
     if (type.includes('transfer')) {
-        return `/inventory-transfers/${id}`;
+        return `/inventory/transfers/${id}`;
     }
 
-    return `/inventory-movements/${movement.id}`;
+    return `/inventory/movements/${movement.id}`;
 };
 
 const sourceLabel = (movement: {
@@ -376,19 +379,19 @@ const sourceLabel = (movement: {
     <Head title="Histórico de Movimientos" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-6 p-4">
+        <div class="space-y-6">
             <!-- Header -->
             <div
                 class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between dark:border-border dark:bg-card"
             >
                 <div>
                     <h1
-                        class="flex items-center gap-2 text-2xl font-semibold text-gray-900 dark:text-white"
+                        class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                     >
                         <Clock :size="24" />
                         Histórico de movimientos
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         {{ activeWarehouseName }} ·
                         {{ reportTotal }} movimientos ·
                         {{ filters.date_from }} a
@@ -412,7 +415,7 @@ const sourceLabel = (movement: {
                         :disabled="
                             exporting || loading || !movementHistoryReport
                         "
-                        class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                         <FileSpreadsheet :size="18" />
                         Excel
@@ -421,13 +424,9 @@ const sourceLabel = (movement: {
             </div>
 
             <!-- Error Message -->
-            <div
-                v-if="error"
-                class="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
-                <AlertCircle :size="20" />
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <!-- Filters -->
             <div class="rounded-lg bg-white p-6 shadow dark:bg-card">
@@ -461,7 +460,7 @@ const sourceLabel = (movement: {
                         class="md:col-span-2"
                     />
 
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Almacén</label
@@ -502,15 +501,16 @@ const sourceLabel = (movement: {
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Tipo</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filters.movement_type"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null">Todos los tipos</option>
-                            <option value="in">Entradas</option>
-                            <option value="out">Salidas</option>
-                            <option value="transfer">Transferencias</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: null, label: 'Todos los tipos' },
+                                { value: 'in', label: 'Entradas' },
+                                { value: 'out', label: 'Salidas' },
+                                { value: 'transfer', label: 'Transferencias' },
+                            ]"
+                        />
                     </div>
 
                     <div>
@@ -518,14 +518,15 @@ const sourceLabel = (movement: {
                             class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
                             >Agrupar por</label
                         >
-                        <select
+                        <AppSelect
                             v-model="filters.group_by"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="day">Día</option>
-                            <option value="week">Semana</option>
-                            <option value="month">Mes</option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                { value: 'day', label: 'Día' },
+                                { value: 'week', label: 'Semana' },
+                                { value: 'month', label: 'Mes' },
+                            ]"
+                        />
                     </div>
 
                     <div
@@ -533,7 +534,7 @@ const sourceLabel = (movement: {
                     >
                         <button
                             @click="applyFilters"
-                            class="h-[42px] flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 h-[42px] flex-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                             Aplicar
                         </button>
@@ -865,11 +866,13 @@ const sourceLabel = (movement: {
                                     Producto
                                 </th>
                                 <th
+                                    v-if="multiWarehouse"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
                                 >
                                     Almacén
                                 </th>
                                 <th
+                                    v-if="multiWarehouse"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase dark:text-gray-300"
                                 >
                                     Destino
@@ -959,11 +962,13 @@ const sourceLabel = (movement: {
                                     </p>
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
                                 >
                                     {{ movement.warehouse }}
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300"
                                 >
                                     {{ movement.destination_warehouse || '-' }}
@@ -1053,14 +1058,7 @@ const sourceLabel = (movement: {
             </div>
 
             <!-- Loading State -->
-            <div
-                v-else-if="loading"
-                class="flex items-center justify-center py-12"
-            >
-                <div class="text-gray-700 dark:text-gray-300">
-                    Cargando reporte...
-                </div>
-            </div>
+            <LoadingState v-else-if="loading" label="Cargando reporte..." />
         </div>
     </AppLayout>
 </template>

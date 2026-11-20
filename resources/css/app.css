@@ -77,6 +77,42 @@
     ::file-selector-button {
         border-color: var(--color-gray-200, currentColor);
     }
+
+    /* Tailwind v4 dejó los botones con cursor por defecto; se restaura la mano de v3. */
+    button:not(:disabled),
+    [role='button']:not(:disabled) {
+        cursor: pointer;
+    }
+
+    /* Barras de desplazamiento delgadas con los colores del tema (claro y oscuro). */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(
+                in oklab,
+                var(--muted-foreground) 45%,
+                transparent
+            )
+            transparent;
+    }
+
+    /* Navegadores sin scrollbar-color (Safari): mismo aspecto con los pseudoelementos WebKit. */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        border-radius: 9999px;
+        background: color-mix(
+            in oklab,
+            var(--muted-foreground) 45%,
+            transparent
+        );
+    }
 }
 
 @layer utilities {
@@ -229,3 +265,25 @@
         appearance: textfield;
     }
 }
+
+/*
+ * Margen interior estándar de todas las páginas (lo pone el layout, no cada página).
+ * Una página a pantalla completa (punto de venta, órdenes de trabajo, compras con barra fija…)
+ * marca su contenedor raíz con .app-page-full-bleed y maneja su propio espacio.
+ */
+@layer components {
+    .app-page {
+        padding: 1rem;
+    }
+
+    @media (width >= 48rem) {
+        .app-page {
+            padding: 1.5rem;
+        }
+    }
+
+    .app-page:has(> .app-page-full-bleed) {
+        padding: 0;
+    }
+}
+

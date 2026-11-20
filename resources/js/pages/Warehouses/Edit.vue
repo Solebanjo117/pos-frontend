@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { ref, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -75,34 +78,29 @@ const handleCancel = () => {
     <Head title="Editar Almacén" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- Header -->
             <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     Editar Almacén
                 </h1>
-                <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Actualiza la información del almacén
                 </p>
             </div>
 
             <!-- Loading State -->
-            <div v-if="loading && !currentWarehouse" class="py-12 text-center">
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                ></div>
-                <p class="mt-2 text-gray-800 dark:text-gray-200">
-                    Cargando almacén...
-                </p>
-            </div>
+            <LoadingState
+                v-if="loading && !currentWarehouse"
+                label="Cargando almacén..."
+            />
 
             <!-- Error Alert -->
-            <div
-                v-else-if="error"
-                class="mb-6 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error" class="mb-6">
                 <p>{{ error }}</p>
-            </div>
+            </ErrorMessage>
 
             <!-- Form -->
             <form
@@ -206,15 +204,15 @@ const handleCancel = () => {
                         >
                             Estado <span class="text-red-500">*</span>
                         </label>
-                        <select
+                        <AppSelect
                             id="status"
                             v-model="form.status"
-                            required
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option value="active">Activo</option>
-                            <option value="inactive">Inactivo</option>
-                        </select>
+                            class="mt-1 w-full"
+                            :options="[
+                                { value: 'active', label: 'Activo' },
+                                { value: 'inactive', label: 'Inactivo' },
+                            ]"
+                        />
                     </div>
 
                     <!-- Notes -->
@@ -246,7 +244,7 @@ const handleCancel = () => {
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                         {{ loading ? 'Guardando...' : 'Actualizar Almacén' }}
                     </button>

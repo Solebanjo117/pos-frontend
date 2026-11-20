@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import {
     useVehicleCatalog,
     type VehicleConfigurationRow,
@@ -388,23 +389,26 @@ const emitChange = () => {
                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                     >Marca</label
                 >
-                <select
+                <AppSelect
                     v-model="selectedMakeId"
                     :disabled="loadingMakes"
-                    @change="onMakeChange"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 sm:text-sm dark:border-border dark:bg-muted dark:text-white"
-                >
-                    <option value="">
-                        {{ loadingMakes ? 'Cargando...' : 'Selecciona Marca' }}
-                    </option>
-                    <option
-                        v-for="make in makes"
-                        :key="make.id"
-                        :value="make.id"
-                    >
-                        {{ make.name }}
-                    </option>
-                </select>
+                    class="w-full min-w-0"
+                    @update:model-value="onMakeChange()"
+                    :options="[
+                        {
+                            value: '',
+                            label: String(
+                                loadingMakes
+                                    ? 'Cargando...'
+                                    : 'Selecciona Marca',
+                            ),
+                        },
+                        ...(makes ?? []).map((make) => ({
+                            value: make.id,
+                            label: String(make.name),
+                        })),
+                    ]"
+                />
             </div>
 
             <!-- Modelo -->
@@ -413,30 +417,29 @@ const emitChange = () => {
                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                     >Modelo</label
                 >
-                <select
+                <AppSelect
                     v-model="selectedModelId"
+                    class="w-full min-w-0"
                     :disabled="!selectedMakeId || loadingModels"
-                    @change="onModelChange"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 sm:text-sm dark:border-border dark:bg-muted dark:text-white"
-                >
-                    <option value="">
-                        {{
-                            loadingModels ? 'Cargando...' : 'Selecciona Modelo'
-                        }}
-                    </option>
-                    <option
-                        v-for="model in models"
-                        :key="model.id"
-                        :value="model.id"
-                    >
-                        {{ model.name }}
-                        <template v-if="model.year_from">
-                            ({{ model.year_from }}–{{
-                                model.year_to ?? 'Presente'
-                            }})
-                        </template>
-                    </option>
-                </select>
+                    :placeholder="
+                        loadingModels ? 'Cargando...' : 'Selecciona Modelo'
+                    "
+                    :options="[
+                        {
+                            value: '',
+                            label: loadingModels
+                                ? 'Cargando...'
+                                : 'Selecciona Modelo',
+                        },
+                        ...(models ?? []).map((model) => ({
+                            value: model.id,
+                            label: model.year_from
+                                ? `${model.name} (${model.year_from}–${model.year_to ?? 'Presente'})`
+                                : String(model.name),
+                        })),
+                    ]"
+                    @update:model-value="onModelChange()"
+                />
             </div>
 
             <!-- Año del modelo -->
@@ -445,21 +448,19 @@ const emitChange = () => {
                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                     >Año</label
                 >
-                <select
+                <AppSelect
                     v-model="selectedYear"
                     :disabled="!selectedModelId"
-                    @change="emitChange"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 sm:text-sm dark:border-border dark:bg-muted dark:text-white"
-                >
-                    <option value="">Selecciona Año</option>
-                    <option
-                        v-for="year in yearOptions"
-                        :key="year"
-                        :value="year"
-                    >
-                        {{ year }}
-                    </option>
-                </select>
+                    class="w-full min-w-0"
+                    @update:model-value="emitChange()"
+                    :options="[
+                        { value: '', label: 'Selecciona Año' },
+                        ...(yearOptions ?? []).map((year) => ({
+                            value: year,
+                            label: String(year),
+                        })),
+                    ]"
+                />
             </div>
 
             <!-- Motor de la configuración -->
@@ -468,21 +469,19 @@ const emitChange = () => {
                     class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
                     >Motor</label
                 >
-                <select
+                <AppSelect
                     v-model="selectedEngineId"
                     :disabled="!selectedModelId || loadingEngines"
-                    @change="emitChange"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 sm:text-sm dark:border-border dark:bg-muted dark:text-white"
-                >
-                    <option value="">Selecciona Motor</option>
-                    <option
-                        v-for="engine in engines"
-                        :key="engine.id"
-                        :value="engine.id"
-                    >
-                        {{ engineLabel(engine) }}
-                    </option>
-                </select>
+                    class="w-full min-w-0"
+                    @update:model-value="emitChange()"
+                    :options="[
+                        { value: '', label: 'Selecciona Motor' },
+                        ...(engines ?? []).map((engine) => ({
+                            value: engine.id,
+                            label: String(engineLabel(engine)),
+                        })),
+                    ]"
+                />
             </div>
         </div>
     </div>

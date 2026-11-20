@@ -15,7 +15,11 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWorkOrders } from '@/composables/useWorkOrders';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     WorkOrdersApiService,
@@ -178,9 +182,9 @@ onMounted(loadWorkOrders);
     <Head title="Ordenes de Trabajo" />
 
     <div
-        class="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100"
+        class="app-page-full-bleed min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100"
     >
-        <div class="space-y-5 p-4 sm:p-6">
+        <div class="space-y-5 p-4 md:p-6">
             <div
                 class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
             >
@@ -191,17 +195,19 @@ onMounted(loadWorkOrders);
                         <Wrench class="h-4 w-4" />
                         Taller
                     </div>
-                    <h1 class="mt-1 text-2xl font-semibold tracking-normal">
+                    <h1
+                        class="mt-1 text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Ordenes de Trabajo
                     </h1>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                    <p class="text-sm text-muted-foreground">
                         Seguimiento operativo por cliente, vehiculo y mecanico
                         asignado.
                     </p>
                 </div>
 
                 <button
-                    class="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                    class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 dark:bg-white"
                     @click="newOrder"
                 >
                     <Plus class="h-4 w-4" />
@@ -250,19 +256,16 @@ onMounted(loadWorkOrders);
                             @keyup.enter="applyFilters"
                         />
                     </label>
-                    <select
+                    <AppSelect
                         v-model="filters.status"
-                        class="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-950"
-                        @change="applyFilters"
-                    >
-                        <option
-                            v-for="status in statusOptions"
-                            :key="status.value"
-                            :value="status.value"
-                        >
-                            {{ status.label }}
-                        </option>
-                    </select>
+                        @update:model-value="applyFilters()"
+                        :options="[
+                            ...(statusOptions ?? []).map((status) => ({
+                                value: status.value,
+                                label: String(status.label),
+                            })),
+                        ]"
+                    />
                     <input
                         v-model="filters.date_from"
                         type="date"
@@ -295,12 +298,7 @@ onMounted(loadWorkOrders);
             <div
                 class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
             >
-                <div
-                    v-if="loading"
-                    class="flex items-center justify-center py-16 text-sm text-slate-500"
-                >
-                    Cargando ordenes...
-                </div>
+                <LoadingState v-if="loading" label="Cargando ordenes..." />
 
                 <div
                     v-else-if="workOrders.length === 0"
@@ -309,11 +307,11 @@ onMounted(loadWorkOrders);
                     <Wrench
                         class="h-10 w-10 text-slate-300 dark:text-slate-600"
                     />
-                    <p class="mt-3 text-sm font-semibold">
-                        No hay ordenes con estos filtros.
-                    </p>
+                    <EmptyState compact class="mt-3"
+                        >No hay ordenes con estos filtros.</EmptyState
+                    >
                     <button
-                        class="mt-4 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-950"
+                        class="mt-4 h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 dark:bg-white"
                         @click="newOrder"
                     >
                         Crear orden
@@ -366,7 +364,10 @@ onMounted(loadWorkOrders);
                                     >
                                         {{ order.folio }}
                                     </Link>
-                                    <div class="mt-1 text-xs text-slate-500">
+                                    <div
+                                        v-if="multiWarehouse"
+                                        class="mt-1 text-xs text-slate-500"
+                                    >
                                         {{
                                             order.warehouse?.name ??
                                             `Sucursal #${order.warehouse_id}`

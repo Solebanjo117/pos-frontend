@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { X } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import apiClient from '@/services/api/client';
 import { categoriesService } from '@/services/categories';
 
@@ -288,12 +290,11 @@ onMounted(() => {
             Las imágenes se cargarán automáticamente al crear el producto.
         </p>
 
-        <div
+        <EmptyState
             v-if="pendingImages.length === 0"
-            class="rounded-md border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-border dark:text-gray-400"
+            class="rounded-md border border-dashed border-gray-300 dark:border-border"
+            >No hay imágenes seleccionadas.</EmptyState
         >
-            No hay imágenes seleccionadas.
-        </div>
         <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div
                 v-for="item in pendingImages"
@@ -337,17 +338,7 @@ onMounted(() => {
                 seleccionadas.
             </p>
 
-            <div
-                v-if="inheritedImagesLoading"
-                class="flex items-center justify-center py-4"
-            >
-                <div
-                    class="h-5 w-5 animate-spin rounded-full border-2 border-blue-400 border-r-transparent"
-                ></div>
-                <span class="ml-2 text-sm text-blue-600 dark:text-blue-400"
-                    >Cargando...</span
-                >
-            </div>
+            <LoadingState v-if="inheritedImagesLoading" label="Cargando..." />
 
             <div
                 v-else-if="!hasInheritedImages"
@@ -575,17 +566,7 @@ onMounted(() => {
                 seleccionadas.
             </p>
 
-            <div
-                v-if="inheritedImagesLoading"
-                class="flex items-center justify-center py-4"
-            >
-                <div
-                    class="h-5 w-5 animate-spin rounded-full border-2 border-blue-400 border-r-transparent"
-                ></div>
-                <span class="ml-2 text-sm text-blue-600 dark:text-blue-400"
-                    >Cargando...</span
-                >
-            </div>
+            <LoadingState v-if="inheritedImagesLoading" label="Cargando..." />
 
             <div
                 v-else-if="!hasInheritedImages"

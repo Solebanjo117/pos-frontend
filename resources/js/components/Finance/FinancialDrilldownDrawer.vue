@@ -3,6 +3,9 @@ import { AlertTriangle, ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 import TraceableCell from '@/components/Traceability/TraceableCell.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import type { FinancialDrilldownReport } from '@/types/report';
 import type { TransactionTraceNode } from '@/types/transaction-trace';
 import { formatReportDateTime } from '@/utils/formatters';
@@ -38,8 +41,8 @@ const nodeFor = (
 ): TransactionTraceNode | null =>
     (row[`${columnKey}_node`] as TransactionTraceNode | undefined) ?? null;
 
-const changePerPage = (event: Event): void => {
-    const perPage = Number((event.target as HTMLSelectElement).value);
+const changePerPage = (value: unknown): void => {
+    const perPage = Number(value);
     if (perPageOptions.includes(perPage)) {
         emit('per-page', perPage);
     }
@@ -161,20 +164,17 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                 <div class="flex items-center gap-2">
                     <label class="flex items-center gap-1.5">
                         <span>Mostrar</span>
-                        <select
-                            :value="report.meta.per_page"
-                            class="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                        <AppSelect
+                            :model-value="report.meta.per_page"
                             aria-label="Registros por pagina"
-                            @change="changePerPage"
-                        >
-                            <option
-                                v-for="option in perPageOptions"
-                                :key="option"
-                                :value="option"
-                            >
-                                {{ option }}
-                            </option>
-                        </select>
+                            @update:model-value="changePerPage"
+                            :options="[
+                                ...(perPageOptions ?? []).map((option) => ({
+                                    value: option,
+                                    label: String(option),
+                                })),
+                            ]"
+                        />
                     </label>
                     <button
                         class="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
@@ -198,12 +198,11 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
             </div>
 
             <div class="min-h-0 flex-1 overflow-auto p-4">
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="rounded-md border border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400"
-                >
-                    Cargando detalle...
-                </div>
+                    class="rounded-md border border-slate-200 dark:border-slate-800"
+                    label="Cargando detalle..."
+                />
 
                 <template v-else-if="report?.rows?.length">
                     <div class="space-y-2 md:hidden">
@@ -319,12 +318,12 @@ const openNestedDrilldown = (row: Record<string, unknown>): void => {
                     </table>
                 </template>
 
-                <div
+                <EmptyState
                     v-else
-                    class="rounded-md border border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400"
+                    class="rounded-md border border-slate-200 dark:border-slate-800"
+                    >No hay registros para este indicador en el
+                    periodo.</EmptyState
                 >
-                    No hay registros para este indicador en el periodo.
-                </div>
             </div>
 
             <footer

@@ -4,12 +4,13 @@ import { Archive, Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next';
 import { ref, onMounted, watch, computed } from 'vue';
 import AlternativeManager from '@/components/Products/AlternativeManager.vue';
 import AttributeManager from '@/components/Products/AttributeManager.vue';
-import OemReferenceManager from '@/components/Products/OemReferenceManager.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
-import VehicleInlineModals from '@/components/Products/VehicleInlineModals.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes';
 import { useProducts } from '@/composables/useProducts';
@@ -21,12 +22,17 @@ import { productsApi } from '@/services/api/products';
 import { type BreadcrumbItem } from '@/types';
 import type { Category } from '@/types/category';
 import type { UpdateProductRequest } from '@/types/product';
+import { codesForEditing } from '@/utils/productCodes';
 import {
     normalizeAlternativesPayload,
-    normalizeOemReferencesPayload,
     normalizeProductAttributesPayload,
-    normalizeVehicleCompatibilityPayload,
 } from '@/utils/productPayload';
+import {
+    draftFromCompatibility,
+    emptyCompatDraft,
+    vehicleCompatibilityPayload as buildVehicleCompatibilityPayload,
+    type DraftCompatData,
+} from '@/utils/vehicleFitment';
 
 const props = defineProps<{
     productId: number;
@@ -34,40 +40,11 @@ const props = defineProps<{
 
 const { resolveTaxRate } = useStoreSettings();
 
-interface DraftOemReference {
-    id: number;
-    oem_code: string;
-    manufacturer: string | null;
-}
-
 interface DraftAlternative {
     id: number;
     sku: string;
     name: string;
     relationship_type: 'compatible' | 'substitute' | 'upgrade';
-}
-
-interface DraftCompatData {
-    engines: Array<{
-        engine_id: number;
-        make: string;
-        model: string;
-        engine: string;
-        year: string;
-        chassis: string;
-    }>;
-    chassis: Array<{
-        chassis_id: number;
-        make: string;
-        model: string;
-        year: string;
-        chassis: string;
-    }>;
-    allEngines: boolean;
-    allChassis: boolean;
-    isUniversal: boolean;
-    modelId?: number | null;
-    makeId?: number | null;
 }
 
 const { currentProduct, updateProduct, fetchProduct, loading, error } =
@@ -79,15 +56,14 @@ const archiving = ref(false);
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Productos', href: '/products' },
-    { title: 'Editar', href: `/products/${props.productId}/edit` },
+    { title: 'Productos', href: '/inventory/products' },
+    { title: 'Editar', href: `/inventory/products/${props.productId}/edit` },
 ];
 
 const form = ref<UpdateProductRequest>({
     sku_base: '',
     codes: [],
     upc: '',
-    alternate_code: '',
     product_line_id: undefined,
     name: '',
     description: '',
@@ -126,17 +102,8 @@ const attributeManagerRef = ref<InstanceType<typeof AttributeManager> | null>(
 const metadataInitialized = ref(false);
 const draftIdCounter = ref(-1000);
 const draftAttributes = ref<EditableProductAttribute[]>([]);
-const draftOemReferences = ref<DraftOemReference[]>([]);
 const draftAlternatives = ref<DraftAlternative[]>([]);
-const draftCompatibility = ref<DraftCompatData>({
-    engines: [],
-    chassis: [],
-    allEngines: false,
-    allChassis: false,
-    isUniversal: false,
-    modelId: null,
-    makeId: null,
-});
+const draftCompatibility = ref<DraftCompatData>(emptyCompatDraft());
 
 const categoryOptions = computed(() =>
     categories.value.map((c) => ({
@@ -188,11 +155,6 @@ const normalizeAttributeOptions = (options: unknown): string[] => {
     return options
         .map((option) => String(option ?? '').trim())
         .filter((option) => option !== '');
-};
-
-const formatYearRange = (yearRange: string | null | undefined): string => {
-    if (!yearRange) return '';
-    return yearRange;
 };
 
 const normalizeDraftAttributes = (
@@ -250,16 +212,6 @@ const normalizeDraftAttributes = (
     });
 };
 
-const normalizeDraftOemReferences = (
-    references: any[] = [],
-): DraftOemReference[] => {
-    return references.map((reference) => ({
-        id: Number(reference.id ?? nextDraftId()),
-        oem_code: String(reference.oem_code ?? ''),
-        manufacturer: reference.manufacturer ?? null,
-    }));
-};
-
 const normalizeDraftAlternatives = (
     alternatives: any[] = [],
 ): DraftAlternative[] => {
@@ -276,50 +228,6 @@ const normalizeDraftAlternatives = (
             relationship_type:
                 alternative.relationship_type as DraftAlternative['relationship_type'],
         }));
-};
-
-const normalizeDraftCompatibility = (
-    compatibility: any[] = [],
-    isUniversal = false,
-): DraftCompatData => {
-    const scopedCompatibility = compatibility.find(
-        (item) => (item.all_engines || item.all_chassis) && item.model_id,
-    );
-    const scopedModel = scopedCompatibility?.model ?? null;
-    const scopedMake = scopedCompatibility?.make ?? scopedModel?.make ?? null;
-
-    return {
-        engines: compatibility
-            .filter((item) => item.engine_id)
-            .map((item) => ({
-                engine_id: Number(item.engine_id),
-                make: String(item.make ?? ''),
-                model: String(item.model ?? ''),
-                engine: String(item.engine ?? ''),
-                year: formatYearRange(item.year_range),
-                chassis: String(item.chassis?.code ?? item.chassis ?? ''),
-            })),
-        chassis: compatibility
-            .filter((item) => item.chassis_id)
-            .map((item) => ({
-                chassis_id: Number(item.chassis_id),
-                make: String(item.make ?? ''),
-                model: String(item.model ?? ''),
-                year: formatYearRange(item.year_range),
-                chassis: String(item.chassis?.code ?? item.chassis ?? ''),
-            })),
-        allEngines: compatibility.some((item) => item.all_engines),
-        allChassis: compatibility.some((item) => item.all_chassis),
-        isUniversal,
-        modelId: scopedCompatibility?.model_id
-            ? Number(scopedCompatibility.model_id)
-            : null,
-        makeId:
-            scopedCompatibility?.make_id ??
-            scopedMake?.id ??
-            scopedModel?.make_id ??
-            null,
-    };
 };
 
 const extraCategoryOptions = computed(() => {
@@ -545,38 +453,28 @@ const initializeProductDraft = async () => {
 
     form.value = {
         sku_base: currentProduct.value.sku_base || '',
-        codes:
-            currentProduct.value.codes?.map((code) => ({ ...code })) ??
-            (currentProduct.value.sku_base
-                ? [
-                      {
-                          code: currentProduct.value.sku_base,
-                          type: 'sku' as const,
-                          is_primary: true,
-                      },
-                  ]
-                : []),
+        // Sin códigos guardados se muestran (y conservan al guardar) el SKU base y el UPC.
+        codes: codesForEditing(
+            currentProduct.value.codes,
+            currentProduct.value.sku_base,
+            currentProduct.value.default_variant?.upc,
+        ),
         upc: currentProduct.value.default_variant?.upc || '',
-        alternate_code: (currentProduct.value as any).alternate_code || '',
         category_id: categoryId ?? undefined,
         name: currentProduct.value.name,
         description: currentProduct.value.description || '',
         status: currentProduct.value.status,
         is_universal: currentProduct.value.is_universal ?? false,
-        batch_tracking: currentProduct.value.batch_tracking,
         extra_category_ids: extraCategoryIds.value,
     };
 
     draftAttributes.value = normalizeDraftAttributes(
         currentProduct.value.attributes ?? [],
     );
-    draftOemReferences.value = normalizeDraftOemReferences(
-        currentProduct.value.oem_references ?? [],
-    );
     draftAlternatives.value = normalizeDraftAlternatives(
         currentProduct.value.alternatives ?? [],
     );
-    draftCompatibility.value = normalizeDraftCompatibility(
+    draftCompatibility.value = draftFromCompatibility(
         currentProduct.value.compatibility ?? [],
         currentProduct.value.is_universal ?? false,
     );
@@ -585,14 +483,10 @@ const initializeProductDraft = async () => {
     metadataInitialized.value = true;
 };
 
-onMounted(async () => {
-    const params = new URLSearchParams(window.location.search);
-    const variantParam = Number(params.get('variant'));
-    initialEditVariantId.value =
-        Number.isInteger(variantParam) && variantParam > 0
-            ? variantParam
-            : null;
+// Hasta terminar la primera carga se muestra "Cargando producto…" (nunca el formulario vacío).
+const initialLoading = ref(true);
 
+const loadCategories = async () => {
     loadingCategories.value = true;
     try {
         const response = await apiClient.get('/categories');
@@ -605,9 +499,25 @@ onMounted(async () => {
     } finally {
         loadingCategories.value = false;
     }
+};
 
-    await fetchProduct(props.productId);
-    await initializeProductDraft();
+onMounted(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const variantParam = Number(params.get('variant'));
+    initialEditVariantId.value =
+        Number.isInteger(variantParam) && variantParam > 0
+            ? variantParam
+            : null;
+
+    try {
+        // Categorías y producto a la vez; el borrador necesita ambos.
+        await Promise.all([loadCategories(), fetchProduct(props.productId)]);
+        await initializeProductDraft();
+    } catch {
+        /* el error de carga se muestra en la página */
+    } finally {
+        initialLoading.value = false;
+    }
 });
 
 watch(selectedCategoryId, async (newCategoryId) => {
@@ -650,18 +560,16 @@ const metadataPayload = (): UpdateProductRequest => {
         ...categoryPayload(),
         is_universal: draftCompatibility.value.isUniversal,
         attributes: normalizeProductAttributesPayload(draftAttributes.value),
-        oem_references: normalizeOemReferencesPayload(draftOemReferences.value),
         alternatives: normalizeAlternativesPayload(draftAlternatives.value),
         vehicle_compatibility: vehicleCompatibilityPayload(),
     };
 };
 
-const vehicleCompatibilityPayload = () => {
-    return normalizeVehicleCompatibilityPayload(
-        draftCompatibility.value,
-        vehicleCompatRef.value?.selectedModelId,
-    );
-};
+const vehicleCompatibilityPayload = () =>
+    buildVehicleCompatibilityPayload(draftCompatibility.value);
+
+// Solo mientras se guarda: `loading` también se enciende al leer el producto o sus datos.
+const saving = ref(false);
 
 const handleSubmit = async () => {
     validationErrors.value = {};
@@ -673,6 +581,8 @@ const handleSubmit = async () => {
         return;
     }
 
+    if (saving.value) return;
+    saving.value = true;
     try {
         await updateProduct(props.productId, metadataPayload());
         await fetchProduct(props.productId);
@@ -683,6 +593,8 @@ const handleSubmit = async () => {
         if (err.response?.data?.errors) {
             validationErrors.value = err.response.data.errors;
         }
+    } finally {
+        saving.value = false;
     }
 };
 
@@ -700,7 +612,7 @@ const handleArchive = async () => {
     try {
         await productsApi.deleteProduct(props.productId);
         toast.success('Producto archivado correctamente');
-        window.location.href = '/products';
+        window.location.href = '/inventory/products';
     } catch (err: any) {
         toast.error(
             err.response?.data?.message || 'Error al archivar producto',
@@ -711,7 +623,7 @@ const handleArchive = async () => {
 };
 
 const cancel = () => {
-    window.location.href = '/products';
+    window.location.href = '/inventory/products';
 };
 
 const handleDuplicate = async () => {
@@ -727,7 +639,7 @@ const handleDuplicate = async () => {
         }
 
         toast.success('Producto duplicado. Ajusta los campos necesarios.');
-        window.location.href = `/products/${duplicatedProductId}/edit`;
+        window.location.href = `/inventory/products/${duplicatedProductId}/edit`;
     } catch (err: any) {
         toast.error(
             err.response?.data?.message || 'Error al duplicar producto',
@@ -759,47 +671,6 @@ const handleRegenerateName = async () => {
     }
 };
 
-// === Vehicle Inline Modals ===
-const vehicleCompatRef = ref<InstanceType<typeof VehicleCompatSection> | null>(
-    null,
-);
-const vehicleModalsRef = ref<InstanceType<typeof VehicleInlineModals> | null>(
-    null,
-);
-const vehicleModalType = ref<
-    'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis' | null
->(null);
-
-const openVehicleInline = (
-    type: 'vehicleMake' | 'vehicleModel' | 'vehicleEngine' | 'vehicleChassis',
-) => {
-    vehicleModalType.value = type;
-    vehicleModalsRef.value?.open(type);
-};
-
-const closeVehicleInline = () => {
-    vehicleModalType.value = null;
-};
-
-const onMakeCreated = (make: { id: number; name: string }) => {
-    vehicleCompatRef.value?.addMake(make);
-    vehicleModalType.value = null;
-};
-
-const onModelCreated = (model: any) => {
-    vehicleCompatRef.value?.addModel(model);
-    vehicleModalType.value = null;
-};
-
-const onEngineCreated = (engine: any) => {
-    vehicleCompatRef.value?.addEngine(engine);
-    vehicleModalType.value = null;
-};
-
-const onChassisCreated = (chassis: any) => {
-    vehicleCompatRef.value?.addChassisToList(chassis);
-};
-
 const workbenchSections = [
     { id: 'identidad', label: 'Resumen' },
     { id: 'codigos', label: 'Codigos' },
@@ -812,17 +683,8 @@ const workbenchSections = [
 
 const statusLabels: Record<string, string> = {
     active: 'Activo',
-    pending: 'Pendiente',
-    discontinued: 'Descontinuado',
+    discontinued: 'Discontinuado',
 };
-
-const editCategoryName = computed(() => {
-    return (
-        categoryNameById(selectedCategoryId.value) ||
-        currentProduct.value?.category?.name ||
-        'Sin categoria'
-    );
-});
 
 const editVariantCount = computed(() => {
     return (
@@ -844,56 +706,6 @@ const editTotalStock = computed(() => {
         0,
     );
 });
-
-const editPrimaryPricing = computed(() => {
-    const pricing =
-        currentProduct.value?.default_variant?.pricing ??
-        currentProduct.value?.pricing ??
-        null;
-
-    return {
-        cost: Number(pricing?.cost ?? pricing?.cost_total ?? 0),
-        price: Number(
-            pricing?.current_sale_price ??
-                pricing?.base_price ??
-                pricing?.calculated_price ??
-                0,
-        ),
-    };
-});
-
-const summaryMetrics = computed(() => [
-    {
-        label: 'Categoria',
-        value: editCategoryName.value,
-        tone: 'indigo',
-    },
-    {
-        label: 'Codigo',
-        value: primaryCommercialCode.value || 'Sin código',
-        tone: primaryCommercialCode.value ? 'gray' : 'amber',
-    },
-    {
-        label: 'Variantes',
-        value: editVariantCount.value.toLocaleString('es-MX'),
-        tone: editVariantCount.value > 0 ? 'gray' : 'amber',
-    },
-    {
-        label: 'Stock',
-        value: editTotalStock.value.toLocaleString('es-MX'),
-        tone: editTotalStock.value > 0 ? 'emerald' : 'amber',
-    },
-    {
-        label: 'Costo',
-        value: `$${editPrimaryPricing.value.cost.toFixed(2)}`,
-        tone: 'gray',
-    },
-    {
-        label: 'Precio',
-        value: `$${editPrimaryPricing.value.price.toFixed(2)}`,
-        tone: 'emerald',
-    },
-]);
 
 const readinessItems = computed(() => [
     {
@@ -929,7 +741,7 @@ const validationErrorItems = computed(() =>
     <Head title="Editar Producto" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <!-- Header -->
             <div
                 class="flex flex-col gap-4 border-b border-gray-200 pb-4 lg:flex-row lg:items-start lg:justify-between dark:border-border"
@@ -949,11 +761,11 @@ const validationErrorItems = computed(() =>
                                     : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
                             "
                         >
-                            {{ statusLabels[form.status ?? 'pending'] }}
+                            {{ statusLabels[form.status ?? 'active'] }}
                         </span>
                     </div>
                     <h1
-                        class="text-2xl font-bold break-words text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight break-words text-foreground"
                     >
                         {{ form.name || currentProduct?.name || 'Producto' }}
                     </h1>
@@ -987,41 +799,11 @@ const validationErrorItems = computed(() =>
                     <button
                         type="button"
                         @click="handleSubmit"
-                        :disabled="loading"
-                        class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        :disabled="saving || initialLoading"
+                        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
-                        {{ loading ? 'Guardando...' : 'Guardar Cambios' }}
+                        {{ saving ? 'Guardando...' : 'Guardar Cambios' }}
                     </button>
-                </div>
-            </div>
-
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                <div
-                    v-for="metric in summaryMetrics"
-                    :key="metric.label"
-                    class="rounded-lg border bg-white p-3 shadow-sm dark:border-border dark:bg-card"
-                    :class="{
-                        'border-amber-200 dark:border-amber-900/60':
-                            metric.tone === 'amber',
-                        'border-emerald-200 dark:border-emerald-900/60':
-                            metric.tone === 'emerald',
-                        'border-indigo-200 dark:border-indigo-900/60':
-                            metric.tone === 'indigo',
-                        'border-gray-200': metric.tone === 'gray',
-                    }"
-                >
-                    <p
-                        class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
-                    >
-                        {{ metric.label }}
-                    </p>
-                    <p
-                        class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white"
-                        :class="{ 'font-mono': metric.label === 'Codigo' }"
-                        :title="metric.value"
-                    >
-                        {{ metric.value }}
-                    </p>
                 </div>
             </div>
 
@@ -1060,12 +842,10 @@ const validationErrorItems = computed(() =>
             </div>
 
             <!-- Loading -->
-            <div v-if="loading && !currentProduct" class="py-12 text-center">
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                ></div>
-                <p class="mt-2 text-gray-600">Cargando producto...</p>
-            </div>
+            <LoadingState
+                v-if="initialLoading || (loading && !currentProduct)"
+                label="Cargando producto..."
+            />
 
             <div v-else class="space-y-4">
                 <!-- Success Message -->
@@ -1077,12 +857,9 @@ const validationErrorItems = computed(() =>
                 </div>
 
                 <!-- Error Message -->
-                <div
-                    v-if="error"
-                    class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                >
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
                     <div class="space-y-4">
@@ -1117,13 +894,12 @@ const validationErrorItems = computed(() =>
                                             class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                                         >
                                             Descripción
-                                            <span class="text-red-500">*</span>
                                         </label>
                                         <div class="mt-1 flex gap-2">
                                             <input
                                                 v-model="form.name"
                                                 type="text"
-                                                required
+                                                placeholder="Vacía: se genera con categoría + compatibilidad vehicular"
                                                 class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
                                             />
                                             <button
@@ -1194,7 +970,7 @@ const validationErrorItems = computed(() =>
                                             type="button"
                                             @click="addExtraCategory"
                                             :disabled="!selectedExtraCategoryId"
-                                            class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                                            class="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                                         >
                                             <Plus class="h-4 w-4" /> Agregar
                                         </button>
@@ -1245,12 +1021,20 @@ const validationErrorItems = computed(() =>
                                         <label
                                             class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                         >
-                                            Códigos comerciales
+                                            Números de parte
                                             <span
                                                 class="text-xs font-normal text-gray-400"
                                                 >(opcionales)</span
                                             >
                                         </label>
+                                        <p
+                                            class="mb-2 text-xs text-muted-foreground"
+                                        >
+                                            El principal es el número de parte
+                                            del producto y aplica a todas sus
+                                            marcas. Agrega otros números con los
+                                            que se conoce la misma pieza.
+                                        </p>
                                         <ProductCodesEditor
                                             ref="productCodesRef"
                                             v-model="productCodesModel"
@@ -1271,40 +1055,29 @@ const validationErrorItems = computed(() =>
                                             class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                             >Estado</label
                                         >
-                                        <select
+                                        <AppSelect
                                             v-model="form.status"
-                                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                                        >
-                                            <option value="active">
-                                                Activo
-                                            </option>
-                                            <option value="discontinued">
-                                                Discontinuado
-                                            </option>
-                                            <option value="pending">
-                                                Pendiente
-                                            </option>
-                                        </select>
+                                            class="w-full"
+                                            :options="[
+                                                {
+                                                    value: 'active',
+                                                    label: 'Activo',
+                                                },
+                                                {
+                                                    value: 'discontinued',
+                                                    label: 'Discontinuado',
+                                                },
+                                            ]"
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </form>
 
-                        <!-- SECTION 3: Códigos Alternos -->
-                        <OemReferenceManager
-                            v-model="draftOemReferences"
-                            mode="draft"
-                            :product-id="props.productId"
-                        />
-
                         <!-- SECTION 4: Compatibilidad Vehicular -->
                         <VehicleCompatSection
                             id="compatibilidad"
-                            ref="vehicleCompatRef"
                             v-model="draftCompatibility"
-                            mode="draft"
-                            :product-id="props.productId"
-                            @open-inline="openVehicleInline"
                         />
 
                         <!-- SECTION 5: Variantes -->
@@ -1444,11 +1217,11 @@ const validationErrorItems = computed(() =>
                                 <button
                                     type="button"
                                     @click="handleSubmit"
-                                    :disabled="loading"
-                                    class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
+                                    :disabled="saving || initialLoading"
+                                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                 >
                                     {{
-                                        loading
+                                        saving
                                             ? 'Guardando...'
                                             : 'Guardar cambios'
                                     }}
@@ -1509,16 +1282,4 @@ const validationErrorItems = computed(() =>
             </div>
         </div>
     </AppLayout>
-    <!-- Vehicle Inline Modals -->
-    <VehicleInlineModals
-        ref="vehicleModalsRef"
-        :current-modal="vehicleModalType"
-        :selected-make-id="vehicleCompatRef?.selectedMakeId ?? null"
-        :selected-model-id="vehicleCompatRef?.selectedModelId ?? null"
-        @close="closeVehicleInline"
-        @make-created="onMakeCreated"
-        @model-created="onModelCreated"
-        @engine-created="onEngineCreated"
-        @chassis-created="onChassisCreated"
-    />
 </template>

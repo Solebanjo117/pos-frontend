@@ -4,6 +4,7 @@ import { Lock, Pencil, Plus, Save } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import ReportPeriod from '@/components/Finance/ReportPeriod.vue';
 import PageShell from '@/components/PageShell.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +15,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -196,12 +200,9 @@ onMounted(load);
                     Nueva cuenta
                 </Button>
             </template>
-            <div
-                v-if="error"
-                class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
             <form
                 class="flex flex-wrap items-end gap-3 rounded-lg border p-3"
                 @submit.prevent="
@@ -216,49 +217,46 @@ onMounted(load);
                         class="mt-1 block rounded border bg-background p-2"
                 /></label>
                 <label class="text-xs"
-                    >Tipo<select
+                    >Tipo<AppSelect
                         v-model="accountFilters.type"
-                        class="mt-1 block rounded border bg-background p-2"
-                    >
-                        <option value="">Todos</option>
-                        <option
-                            v-for="option in typeOptions"
-                            :key="String(option.value)"
-                            :value="option.value"
-                        >
-                            {{ option.label }}
-                        </option>
-                    </select></label
-                >
+                        class="mt-1 block"
+                        :options="[
+                            { value: '', label: 'Todos' },
+                            ...(typeOptions ?? []).map((option) => ({
+                                value: option.value,
+                                label: String(option.label),
+                            })),
+                        ]"
+                /></label>
                 <label class="text-xs"
-                    >Estado<select
+                    >Estado<AppSelect
                         v-model="accountFilters.status"
-                        class="mt-1 block rounded border bg-background p-2"
-                    >
-                        <option value="">Todos</option>
-                        <option value="active">Activas</option>
-                        <option value="inactive">Inactivas</option>
-                    </select></label
-                >
+                        class="mt-1 block"
+                        :options="[
+                            { value: '', label: 'Todos' },
+                            { value: 'active', label: 'Activas' },
+                            { value: 'inactive', label: 'Inactivas' },
+                        ]"
+                /></label>
                 <label class="text-xs"
-                    >Orden<select
+                    >Orden<AppSelect
                         v-model="accountFilters.sort_by"
-                        class="mt-1 block rounded border bg-background p-2"
-                    >
-                        <option value="name">Nombre</option>
-                        <option value="type">Tipo</option>
-                        <option value="current_balance">Saldo</option>
-                        <option value="created_at">Registro</option>
-                    </select></label
-                >
-                <select
+                        class="mt-1 block"
+                        :options="[
+                            { value: 'name', label: 'Nombre' },
+                            { value: 'type', label: 'Tipo' },
+                            { value: 'current_balance', label: 'Saldo' },
+                            { value: 'created_at', label: 'Registro' },
+                        ]"
+                /></label>
+                <AppSelect
                     v-model="accountFilters.sort_direction"
                     aria-label="Dirección de orden"
-                    class="rounded border bg-background p-2 text-sm"
-                >
-                    <option value="asc">Ascendente</option>
-                    <option value="desc">Descendente</option></select
-                ><Button :disabled="loading">Consultar</Button>
+                    :options="[
+                        { value: 'asc', label: 'Ascendente' },
+                        { value: 'desc', label: 'Descendente' },
+                    ]"
+                /><Button :disabled="loading">Consultar</Button>
             </form>
             <div class="flex flex-wrap gap-3">
                 <span
@@ -397,19 +395,16 @@ onMounted(load);
                                 </td>
                             </tr>
                             <tr v-if="!loading && accounts.length === 0">
-                                <td
-                                    colspan="9"
-                                    class="px-3 py-10 text-center text-sm text-muted-foreground"
-                                >
-                                    Aún no hay cuentas financieras registradas.
+                                <td colspan="9">
+                                    <EmptyState
+                                        >Aún no hay cuentas financieras
+                                        registradas.</EmptyState
+                                    >
                                 </td>
                             </tr>
                             <tr v-if="loading">
-                                <td
-                                    colspan="9"
-                                    class="px-3 py-10 text-center text-sm text-muted-foreground"
-                                >
-                                    Cargando cuentas…
+                                <td colspan="9">
+                                    <LoadingState label="Cargando cuentas..." />
                                 </td>
                             </tr>
                         </tbody>

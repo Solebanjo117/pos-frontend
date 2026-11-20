@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { operationalExpensesService } from '@/services/operational-expenses';
 import type {
     OperationalExpense,
@@ -90,7 +92,7 @@ onMounted(load);
             </div>
             <button
                 type="button"
-                class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 @click="load"
             >
                 Filtrar
@@ -118,19 +120,13 @@ onMounted(load);
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-border">
                     <tr v-if="loading">
-                        <td
-                            colspan="5"
-                            class="px-4 py-8 text-center text-gray-500"
-                        >
-                            Cargando historial...
+                        <td colspan="5">
+                            <LoadingState label="Cargando historial..." />
                         </td>
                     </tr>
                     <tr v-else-if="expenses.length === 0">
-                        <td
-                            colspan="5"
-                            class="px-4 py-8 text-center text-gray-500"
-                        >
-                            No hay gastos relacionados.
+                        <td colspan="5">
+                            <EmptyState>No hay gastos relacionados.</EmptyState>
                         </td>
                     </tr>
                     <tr v-for="expense in expenses" v-else :key="expense.id">

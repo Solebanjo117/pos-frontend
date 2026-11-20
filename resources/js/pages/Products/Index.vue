@@ -7,27 +7,45 @@ import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
 import ProductFiltersComponent from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
+import ProductVariantFormModal from '@/components/Products/ProductVariantFormModal.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import PriceDisplay from '@/components/ui/PriceDisplay.vue';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import type { SelectOption } from '@/components/ui/SearchableSelect.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useCategories } from '@/composables/useCategories';
 import { usePOS } from '@/composables/usePOS';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 
-import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { productsApi } from '@/services/api/products';
 import { ReportsApiService } from '@/services/reports';
 import { type BreadcrumbItem } from '@/types';
 import type { Product, ProductFilters } from '@/types/product';
-import { canManagePurchasingRecords } from '@/utils/catalogPermissions';
+import {
+    canManageCatalog,
+    canManagePurchasingRecords,
+} from '@/utils/catalogPermissions';
 
 const page = usePage();
+// Crear: admin, gerente o comprador. Importar: admin o gerente (igual que el backend).
 const canManageProducts = computed(() =>
     canManagePurchasingRecords((page.props.auth?.user as any)?.role),
 );
+const canImportProducts = computed(() =>
+    canManageCatalog((page.props.auth?.user as any)?.role),
+);
 const { currentWarehouseId, initWarehouse } = usePosSettings();
-const { warehouses } = useWarehouses();
+
+// Opciones de la cabecera (null = "Todos").
+const statusFilterOptions: SelectOption[] = [
+    { value: null, label: 'Todos' },
+    { value: 'active', label: 'Activo' },
+    { value: 'discontinued', label: 'Discontinuado' },
+];
 const { categories, fetchCategories } = useCategories();
 const { brands, fetchBrands: fetchBrandsList } = useBrands();
 
@@ -102,7 +120,7 @@ const handleSortChange = async (sortVal: string) => {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Productos', href: '/products' },
+    { title: 'Productos', href: '/inventory/products' },
 ];
 
 const {
@@ -126,7 +144,7 @@ const addVariantToCart = (product: any, variant: any) => {
     const cartProduct = {
         id: product.id,
         name: `${product.name} - ${variant.brand?.name || ''}`,
-        sku_base: variant.sku || product.sku_base,
+        sku_base: product.sku_base || variant.sku,
         pricing: product.pricing,
         default_variant: {
             id: variant.id,
@@ -153,7 +171,6 @@ const filters = ref<ProductFilters>({
     search: '',
     status: undefined,
     brand_id: undefined,
-    oem_code: undefined,
     warehouse_id: currentWarehouseId.value || undefined,
     has_stock: false,
 });
@@ -182,7 +199,8 @@ type ProductsTableColumn =
     | 'expander'
     | 'image'
     | 'sku'
-    | 'product'
+    | 'category'
+    | 'vehicle'
     | 'attributes'
     | 'stock'
     | 'actions';
@@ -193,7 +211,8 @@ const tableColumns: ProductsTableColumn[] = [
     'expander',
     'image',
     'sku',
-    'product',
+    'category',
+    'vehicle',
     'attributes',
     'stock',
     'actions',
@@ -202,7 +221,8 @@ const defaultColumnWidths: Record<ProductsTableColumn, number> = {
     expander: 56,
     image: 72,
     sku: 170,
-    product: 360,
+    category: 170,
+    vehicle: 230,
     attributes: 280,
     stock: 92,
     actions: 150,
@@ -211,7 +231,8 @@ const minColumnWidths: Record<ProductsTableColumn, number> = {
     expander: 44,
     image: 64,
     sku: 130,
-    product: 240,
+    category: 120,
+    vehicle: 160,
     attributes: 180,
     stock: 84,
     actions: 120,
@@ -393,6 +414,32 @@ const handleRestore = async (product: Product) => {
 };
 
 const expandedRows = ref<Set<number>>(new Set());
+// Editar una marca (variante) desde la lista, sin salir de Productos.
+const variantEditTarget = ref<{
+    productId: number;
+    variantId: number;
+    productName: string;
+    categoryId: number | null;
+} | null>(null);
+const showVariantEditModal = ref(false);
+const openVariantEdit = (product: any, variant: any) => {
+    variantEditTarget.value = {
+        productId: product.id,
+        variantId: variant.id,
+        productName: product.name,
+        categoryId: product.category_id ?? product.category?.id ?? null,
+    };
+    showVariantEditModal.value = true;
+};
+const variantEditCategory = computed<any>(() =>
+    variantEditTarget.value?.categoryId
+        ? ((categories.value as any[]).find(
+              (category) => category.id === variantEditTarget.value?.categoryId,
+          ) ?? null)
+        : null,
+);
+const refreshAfterVariantChange = () => fetchProducts(buildFetchFilters());
+
 const selectedProduct = ref<Product | null>(null);
 
 const openDetail = (product: Product) => {
@@ -411,9 +458,12 @@ const toggleRow = (productId: number) => {
 };
 
 // Fetch products on mount — read any URL query params for deep linking
+// Hasta terminar la primera carga se muestra "Cargando productos…" (nunca "No hay productos").
+// Las recargas posteriores mantienen la tabla visible y solo la atenúan.
+const hasLoadedOnce = ref(false);
+
 onMounted(async () => {
     await initWarehouse();
-    await Promise.all([fetchCategories(), fetchBrandsList()]);
     loadColumnWidths();
     const params = new URLSearchParams(window.location.search);
     if (params.has('search')) filters.value.search = params.get('search') ?? '';
@@ -425,10 +475,16 @@ onMounted(async () => {
     if (params.has('product_line_id'))
         filters.value.product_line_id =
             Number(params.get('product_line_id')) || undefined;
-    if (params.has('oem_code'))
-        filters.value.oem_code = params.get('oem_code') ?? undefined;
     filters.value.warehouse_id = currentWarehouseId.value || undefined;
-    await fetchProducts(buildFetchFilters());
+    try {
+        await Promise.all([
+            fetchCategories(),
+            fetchBrandsList(),
+            fetchProducts(buildFetchFilters()),
+        ]);
+    } finally {
+        hasLoadedOnce.value = true;
+    }
 });
 
 onUnmounted(() => {
@@ -438,6 +494,7 @@ onUnmounted(() => {
 
 // Watch warehouse changes
 watch(currentWarehouseId, (newId) => {
+    if (!hasLoadedOnce.value) return;
     if (filters.value.warehouse_id !== newId) {
         filters.value.warehouse_id = newId || undefined;
         fetchProducts(buildFetchFilters());
@@ -483,7 +540,6 @@ const clearFilters = () => {
         status: undefined,
         brand_id: undefined,
         category_id: undefined,
-        oem_code: undefined,
         warehouse_id: currentWarehouseId.value || undefined,
         has_stock: false,
         min_price: undefined,
@@ -605,16 +661,16 @@ const getTechnicalSpecsTooltip = (product: any): string => {
     <Head title="Productos" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- ========== PAGE HEADER with View Toggle ========== -->
             <div class="mb-6 flex items-center justify-between">
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Productos
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         {{
                             viewMode === 'table'
                                 ? 'Gestiona el catálogo de productos del sistema'
@@ -682,7 +738,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     <a
                         v-if="cartItemCount > 0"
                         href="/pos"
-                        class="relative inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700"
+                        class="relative inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                     >
                         <ShoppingCart class="mr-1 h-4 w-4" /> Carrito
                         <span
@@ -692,7 +748,8 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     </a>
 
                     <a
-                        href="/products/import"
+                        v-if="canImportProducts"
+                        href="/inventory/products/import"
                         class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
                     >
                         <Upload class="h-4 w-4" />
@@ -727,8 +784,9 @@ const getTechnicalSpecsTooltip = (product: any): string => {
 
                     <!-- New Product Button -->
                     <a
-                        href="/products/create"
-                        class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        v-if="canManageProducts"
+                        href="/inventory/products/create"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                     >
                         <svg
                             class="h-4 w-4"
@@ -849,7 +907,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 <div
                     class="mb-4 rounded-lg bg-white p-4 shadow dark:bg-card dark:shadow-gray-900/50"
                 >
-                    <div class="flex flex-wrap items-end gap-3">
+                    <div class="flex flex-wrap items-end gap-4">
                         <div class="min-w-[200px] flex-1">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
@@ -860,53 +918,39 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                 v-model="filters.search"
                                 type="text"
                                 placeholder="Nombre, SKU, VIN, OEM, categoría, marca, atributo..."
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
+                                class="h-9 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white dark:placeholder-gray-400"
                                 @keyup.enter="applyFilters"
                             />
                         </div>
 
-                        <div class="w-36">
+                        <!-- Estado y Orden: mismo selector y altura (36 px). El almacén es siempre el actual. -->
+                        <div class="w-44">
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
                             >
                                 Estado
                             </label>
-                            <select
-                                v-model="filters.status"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="undefined">Todos</option>
-                                <option value="active">Activo</option>
-                                <option value="discontinued">
-                                    Discontinuado
-                                </option>
-                                <option value="pending">Pendiente</option>
-                            </select>
+                            <SearchableSelect
+                                :options="statusFilterOptions"
+                                :model-value="filters.status ?? null"
+                                :searchable="false"
+                                aria-label="Filtrar por estado"
+                                data-testid="status-filter"
+                                @update:model-value="
+                                    (value) =>
+                                        (filters.status =
+                                            (value as ProductFilters['status']) ??
+                                            undefined)
+                                "
+                            />
                         </div>
 
-                        <!-- Warehouse Filter -->
-                        <div class="w-40">
+                        <div>
                             <label
                                 class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100"
                             >
-                                Almacén
+                                Ordenar
                             </label>
-                            <select
-                                v-model="filters.warehouse_id"
-                                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option :value="undefined">Todos</option>
-                                <option
-                                    v-for="w in warehouses"
-                                    :key="w.id"
-                                    :value="w.id"
-                                >
-                                    {{ w.name }}
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="flex items-center gap-2">
                             <ProductSort
                                 :model-value="sidebarSortValue"
                                 @update:model-value="handleSortChange"
@@ -916,13 +960,13 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                         <div class="flex items-end gap-2">
                             <button
                                 @click="applyFilters"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:focus:ring-offset-gray-800"
+                                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
                             >
                                 Filtrar
                             </button>
                             <button
                                 @click="clearFilters"
-                                class="rounded-lg bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none dark:bg-muted dark:text-gray-100 dark:hover:bg-muted/80 dark:focus:ring-offset-gray-800"
+                                class="h-9 rounded-lg bg-gray-200 px-4 text-sm text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none dark:bg-muted dark:text-gray-100 dark:hover:bg-muted/80 dark:focus:ring-offset-gray-800"
                             >
                                 Limpiar
                             </button>
@@ -931,7 +975,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                 @click="
                                     showSidebarFilters = !showSidebarFilters
                                 "
-                                class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors md:hidden"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm transition-colors md:hidden"
                                 :class="
                                     showSidebarFilters
                                         ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
@@ -950,23 +994,16 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     </div>
                 </div>
 
-                <!-- Loading State -->
-                <div v-if="loading" class="py-12 text-center">
-                    <div
-                        class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                    ></div>
-                    <p class="mt-2 text-gray-800 dark:text-gray-200">
-                        Cargando productos...
-                    </p>
-                </div>
+                <!-- Loading State (solo primera carga) -->
+                <LoadingState
+                    v-if="!hasLoadedOnce"
+                    label="Cargando productos..."
+                />
 
                 <!-- Error State -->
-                <div
-                    v-else-if="error"
-                    class="rounded-lg bg-red-50 p-4 text-red-800"
-                >
+                <ErrorMessage v-else-if="error">
                     <p>{{ error }}</p>
-                </div>
+                </ErrorMessage>
 
                 <!-- ========== SIDEBAR + TABLE LAYOUT ========== -->
                 <div v-else class="flex min-h-0 flex-col gap-4 lg:flex-row">
@@ -1011,10 +1048,22 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                     <!-- Products Table -->
                     <div
                         ref="tableContainerRef"
-                        class="min-w-0 flex-1 overflow-x-auto rounded-lg bg-white shadow dark:bg-card"
+                        class="relative min-w-0 flex-1 overflow-x-auto rounded-lg bg-white shadow transition-opacity dark:bg-card"
+                        :class="{ 'opacity-60': loading }"
+                        :aria-busy="loading"
                     >
                         <div
-                            v-if="products.length === 0"
+                            v-if="loading"
+                            class="absolute top-2 right-3 z-10 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-gray-600 shadow dark:bg-card dark:text-gray-300"
+                            role="status"
+                        >
+                            <span
+                                class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-blue-600 border-r-transparent dark:border-primary"
+                            ></span>
+                            Actualizando…
+                        </div>
+                        <div
+                            v-if="products.length === 0 && !loading"
                             class="py-12 text-center"
                         >
                             <svg
@@ -1035,10 +1084,10 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                             >
                                 No hay productos
                             </h3>
-                            <p class="mt-1 text-sm text-gray-500">
-                                No hay productos que coincidan con los filtros
-                                actuales.
-                            </p>
+                            <EmptyState compact class="mt-1"
+                                >No hay productos que coincidan con los filtros
+                                actuales.</EmptyState
+                            >
                         </div>
 
                         <div v-else>
@@ -1150,64 +1199,40 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                             ></span>
                                         </th>
                                         <th
-                                            @click="toggleSort('name')"
-                                            :style="getColumnStyle('product')"
-                                            class="relative cursor-pointer px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-900 uppercase transition-colors select-none hover:bg-gray-100 dark:text-white dark:hover:bg-muted/50"
+                                            :style="getColumnStyle('category')"
+                                            class="relative px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-900 uppercase dark:text-white"
                                         >
-                                            <span
-                                                class="inline-flex items-center gap-1"
-                                            >
-                                                Producto
-                                                <svg
-                                                    v-if="sortField === 'name'"
-                                                    class="h-3 w-3"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        v-if="
-                                                            sortDirection ===
-                                                            'asc'
-                                                        "
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M5 15l7-7 7 7"
-                                                    />
-                                                    <path
-                                                        v-else
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M19 9l-7 7-7-7"
-                                                    />
-                                                </svg>
-                                                <svg
-                                                    v-else
-                                                    class="h-3 w-3 opacity-30"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                                    />
-                                                </svg>
-                                            </span>
+                                            Categoría
                                             <span
                                                 :class="
                                                     getResizeHandleClass(
-                                                        'product',
+                                                        'category',
                                                     )
                                                 "
                                                 @mousedown.stop.prevent="
                                                     startColumnResize(
                                                         $event,
-                                                        'product',
+                                                        'category',
+                                                    )
+                                                "
+                                                @click.stop.prevent
+                                            ></span>
+                                        </th>
+                                        <th
+                                            :style="getColumnStyle('vehicle')"
+                                            class="relative px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-900 uppercase dark:text-white"
+                                        >
+                                            Carro
+                                            <span
+                                                :class="
+                                                    getResizeHandleClass(
+                                                        'vehicle',
+                                                    )
+                                                "
+                                                @mousedown.stop.prevent="
+                                                    startColumnResize(
+                                                        $event,
+                                                        'vehicle',
                                                     )
                                                 "
                                                 @click.stop.prevent
@@ -1296,7 +1321,8 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 class="px-6 py-4 text-sm"
                                             >
                                                 <button
-                                                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                                    type="button"
+                                                    class="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                                                 >
                                                     <svg
                                                         v-if="
@@ -1392,37 +1418,90 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                             </td>
                                             <td
                                                 :style="
-                                                    getColumnStyle('product')
+                                                    getColumnStyle('category')
                                                 "
-                                                class="px-6 py-4 align-top"
+                                                class="px-6 py-4 text-sm break-words whitespace-normal text-gray-900 dark:text-white"
                                             >
-                                                <div
-                                                    class="flex min-w-0 items-start gap-2"
+                                                <span v-if="product.category">{{
+                                                    product.category.name
+                                                }}</span>
+                                                <span
+                                                    v-else
+                                                    class="text-xs text-gray-400"
+                                                    >—</span
                                                 >
-                                                    <div
-                                                        class="min-w-0 text-sm leading-snug font-medium break-words whitespace-normal text-gray-900 dark:text-white"
+                                            </td>
+                                            <td
+                                                :style="
+                                                    getColumnStyle('vehicle')
+                                                "
+                                                class="px-6 py-4 text-sm"
+                                            >
+                                                <span
+                                                    v-if="product.is_universal"
+                                                    class="inline-flex items-center gap-0.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-blue-500/10 ring-inset dark:bg-blue-900/30 dark:text-blue-400 dark:ring-blue-500/30"
+                                                    title="Compatible con todos los vehículos"
+                                                >
+                                                    🌐 Universal
+                                                </span>
+                                                <div
+                                                    v-else-if="
+                                                        product.vehicles?.length
+                                                    "
+                                                    class="flex flex-col gap-0.5"
+                                                    :title="
+                                                        product.vehicles
+                                                            .map((vehicle) =>
+                                                                vehicle.detail
+                                                                    ? `${vehicle.label} · ${vehicle.detail}`
+                                                                    : vehicle.label,
+                                                            )
+                                                            .join('\n')
+                                                    "
+                                                >
+                                                    <span
+                                                        v-for="vehicle in product.vehicles.slice(
+                                                            0,
+                                                            2,
+                                                        )"
+                                                        :key="
+                                                            vehicle.label +
+                                                            vehicle.detail
+                                                        "
+                                                        class="leading-snug break-words text-gray-900 dark:text-white"
                                                     >
-                                                        {{ product.name }}
-                                                    </div>
+                                                        {{ vehicle.label
+                                                        }}<span
+                                                            v-if="
+                                                                vehicle.detail
+                                                            "
+                                                            class="text-xs text-gray-500 dark:text-gray-400"
+                                                        >
+                                                            ·
+                                                            {{
+                                                                vehicle.detail
+                                                            }}</span
+                                                        >
+                                                    </span>
                                                     <span
                                                         v-if="
-                                                            product.is_universal
+                                                            product.vehicles
+                                                                .length > 2
                                                         "
-                                                        class="inline-flex flex-shrink-0 items-center gap-0.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-blue-500/10 ring-inset dark:bg-blue-900/30 dark:text-blue-400 dark:ring-blue-500/30"
-                                                        title="Universal"
+                                                        class="text-xs text-gray-500 dark:text-gray-400"
                                                     >
-                                                        🌐 Universal
+                                                        +{{
+                                                            product.vehicles
+                                                                .length - 2
+                                                        }}
+                                                        más
                                                     </span>
                                                 </div>
-                                                <div
-                                                    v-if="product.product_line"
-                                                    class="mt-1 min-w-0 text-sm leading-snug break-words whitespace-normal text-gray-500 dark:text-gray-400"
+                                                <span
+                                                    v-else
+                                                    class="text-xs text-gray-400"
+                                                    >—</span
                                                 >
-                                                    {{
-                                                        product.product_line
-                                                            .name
-                                                    }}
-                                                </div>
                                             </td>
                                             <td
                                                 :style="
@@ -1480,27 +1559,29 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 class="px-6 py-4 text-right text-sm font-medium"
                                                 @click.stop
                                             >
-                                                <template
+                                                <div
                                                     v-if="
                                                         archiveTab === 'active'
                                                     "
+                                                    class="flex flex-col items-end gap-1"
                                                 >
                                                     <button
+                                                        type="button"
                                                         @click="
                                                             openDetail(product)
                                                         "
-                                                        class="mr-3 font-medium text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:text-primary dark:hover:text-blue-300"
+                                                        class="cursor-pointer font-medium text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:text-primary dark:hover:text-blue-300"
                                                     >
                                                         Ver Detalle
                                                     </button>
                                                     <a
                                                         v-if="canManageProducts"
-                                                        :href="`/products/${product.id}/edit`"
-                                                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
+                                                        :href="`/inventory/products/${product.id}/edit`"
+                                                        class="cursor-pointer text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
                                                     >
                                                         Editar
                                                     </a>
-                                                </template>
+                                                </div>
                                                 <template
                                                     v-else-if="
                                                         canManageProducts
@@ -1512,7 +1593,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                 product,
                                                             )
                                                         "
-                                                        class="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
+                                                        class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                                                     >
                                                         <svg
                                                             class="h-3.5 w-3.5"
@@ -1538,7 +1619,7 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                             v-if="expandedRows.has(product.id)"
                                             class="bg-gray-50 dark:bg-muted"
                                         >
-                                            <td colspan="7" class="px-6 py-4">
+                                            <td colspan="8" class="px-6 py-4">
                                                 <div class="ml-12">
                                                     <h4
                                                         class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -1722,15 +1803,22 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                                                 class="h-3.5 w-3.5"
                                                                             />
                                                                         </button>
-                                                                        <a
+                                                                        <button
                                                                             v-if="
                                                                                 canManageProducts
                                                                             "
-                                                                            :href="`/products/${product.id}/edit?variant=${variant.id}`"
+                                                                            type="button"
+                                                                            data-test="edit-variant"
                                                                             class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:text-primary dark:hover:text-indigo-300"
+                                                                            @click="
+                                                                                openVariantEdit(
+                                                                                    product,
+                                                                                    variant,
+                                                                                )
+                                                                            "
                                                                         >
                                                                             Editar
-                                                                        </a>
+                                                                        </button>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
@@ -1824,6 +1912,23 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                 :product="selectedProduct"
                 @close="closeDetail"
                 @view-alternative="(p: any) => (selectedProduct = p)"
+            />
+
+            <ProductVariantFormModal
+                v-if="variantEditTarget"
+                v-model:open="showVariantEditModal"
+                :product-id="variantEditTarget.productId"
+                :variant-id="variantEditTarget.variantId"
+                :product-name="variantEditTarget.productName"
+                :category-formula="variantEditCategory?.pricing_formula ?? null"
+                :category-margin="
+                    variantEditCategory?.default_margin_percent ?? null
+                "
+                :category-itbm-percent="
+                    variantEditCategory?.itbm_percent ?? null
+                "
+                @saved="refreshAfterVariantChange"
+                @stock-adjusted="refreshAfterVariantChange"
             />
         </div>
     </AppLayout>

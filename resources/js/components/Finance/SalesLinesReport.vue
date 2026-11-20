@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import apiClient from '@/services/api/client';
 import { validateFinancialReportDates } from '@/utils/financialReport';
 import type { FinancialReportFilters } from '@/utils/financialReport';
@@ -228,20 +230,17 @@ onMounted(() => {
                 v-model:to="filters.date_to"
             />
             <label class="text-xs"
-                >Agrupar<select
+                >Agrupar<AppSelect
                     v-model="filters.group_by"
                     aria-label="Agrupar"
-                    class="mt-1 block rounded border bg-background p-2"
-                >
-                    <option
-                        v-for="(name, key) in groups"
-                        :key="key"
-                        :value="key"
-                    >
-                        {{ name }}
-                    </option>
-                </select></label
-            >
+                    class="mt-1 block"
+                    :options="[
+                        ...Object.entries(groups).map(([key, name]) => ({
+                            value: key,
+                            label: String(name),
+                        })),
+                    ]"
+            /></label>
             <label class="text-xs"
                 >Documento / artículo<input
                     v-model="filters.search"
@@ -250,12 +249,16 @@ onMounted(() => {
             /></label>
             <details class="w-full">
                 <summary class="cursor-pointer text-sm text-primary">
-                    Filtros de sucursal, producto, marca, categoría, cliente y
-                    vendedor
+                    {{
+                        multiWarehouse
+                            ? 'Filtros de sucursal, producto, marca, categoría, cliente y vendedor'
+                            : 'Filtros de producto, marca, categoría, cliente y vendedor'
+                    }}
                 </summary>
                 <div class="mt-3 flex flex-wrap gap-3">
                     <label
                         v-for="(name, key) in selectors"
+                        v-show="multiWarehouse || key !== 'warehouse_id'"
                         :key="key"
                         class="text-xs"
                         >{{ name
@@ -269,28 +272,25 @@ onMounted(() => {
                                     key,
                                     ($event.target as HTMLInputElement).value,
                                 )
-                            "
-                        /><select
+                            " /><AppSelect
                             v-model="filters[key]"
                             :aria-label="name"
-                            class="mt-1 block max-w-56 rounded border bg-background p-2"
-                        >
-                            <option value="">
-                                {{
-                                    key === 'warehouse_id'
-                                        ? 'Sucursal activa'
-                                        : 'Todos'
-                                }}
-                            </option>
-                            <option
-                                v-for="option in options[key]"
-                                :key="option.id"
-                                :value="option.id"
-                            >
-                                {{ option.name }}
-                            </option>
-                        </select></label
-                    >
+                            class="mt-1 block max-w-56"
+                            :options="[
+                                {
+                                    value: '',
+                                    label: String(
+                                        key === 'warehouse_id'
+                                            ? 'Sucursal activa'
+                                            : 'Todos',
+                                    ),
+                                },
+                                ...(options[key] ?? []).map((option) => ({
+                                    value: option.id,
+                                    label: String(option.name),
+                                })),
+                            ]"
+                    /></label>
                 </div>
             </details>
             <button

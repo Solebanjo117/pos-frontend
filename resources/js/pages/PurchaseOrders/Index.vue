@@ -20,10 +20,14 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
-import DateRangeInput from '@/components/ui/DateRangeInput.vue';
 import { useAuth } from '@/composables/useAuth';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import { useSuppliers } from '@/composables/useSuppliers';
@@ -367,7 +371,7 @@ onMounted(async () => {
     <Head title="Órdenes de Compra" />
 
     <AppLayout>
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <header
                 class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
             >
@@ -379,11 +383,11 @@ onMounted(async () => {
                     </div>
                     <div>
                         <h1
-                            class="text-2xl font-bold text-slate-950 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             Órdenes de Compra
                         </h1>
-                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                        <p class="text-sm text-muted-foreground">
                             Compras, recepción, pagos y deuda a proveedores
                         </p>
                     </div>
@@ -393,7 +397,7 @@ onMounted(async () => {
                     <Link
                         v-if="canManagePurchases"
                         href="/purchase-orders/create"
-                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 dark:bg-white"
                     >
                         <Plus :size="16" />
                         Nueva OC
@@ -569,18 +573,16 @@ onMounted(async () => {
                         >
                             Estado
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.status"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option
-                                v-for="option in statusOptions"
-                                :key="option.value"
-                                :value="option.value || undefined"
-                            >
-                                {{ option.label }}
-                            </option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                ...(statusOptions ?? []).map((option) => ({
+                                    value: option.value || undefined,
+                                    label: String(option.label),
+                                })),
+                            ]"
+                        />
                     </div>
 
                     <div>
@@ -590,18 +592,18 @@ onMounted(async () => {
                             <CreditCard :size="13" />
                             Pago
                         </label>
-                        <select
+                        <AppSelect
                             v-model="filters.payment_status"
-                            class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition outline-none focus:border-slate-500 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option
-                                v-for="option in paymentStatusOptions"
-                                :key="option.value"
-                                :value="option.value || undefined"
-                            >
-                                {{ option.label }}
-                            </option>
-                        </select>
+                            class="w-full"
+                            :options="[
+                                ...(paymentStatusOptions ?? []).map(
+                                    (option) => ({
+                                        value: option.value || undefined,
+                                        label: String(option.label),
+                                    }),
+                                ),
+                            ]"
+                        />
                     </div>
 
                     <div>
@@ -626,7 +628,7 @@ onMounted(async () => {
                     <div class="flex flex-wrap items-end gap-2">
                         <button
                             type="button"
-                            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
                             @click="loadOrders"
                         >
                             <Search :size="16" />
@@ -660,24 +662,17 @@ onMounted(async () => {
                 </div>
             </section>
 
-            <div
-                v-if="error"
-                class="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200"
-            >
-                <AlertCircle :size="18" />
+            <ErrorMessage v-if="error">
                 {{ error }}
-            </div>
+            </ErrorMessage>
 
             <section
                 class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card"
             >
-                <div
+                <LoadingState
                     v-if="loading"
-                    class="flex items-center justify-center py-16 text-sm text-slate-500 dark:text-slate-400"
-                >
-                    <RefreshCw :size="20" class="mr-2 animate-spin" />
-                    Cargando órdenes de compra...
-                </div>
+                    label="Cargando órdenes de compra..."
+                />
 
                 <div v-else class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -896,12 +891,11 @@ onMounted(async () => {
                             </tr>
 
                             <tr v-if="purchaseOrders.length === 0">
-                                <td
-                                    colspan="8"
-                                    class="px-4 py-14 text-center text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    No se encontraron órdenes de compra con los
-                                    filtros seleccionados.
+                                <td colspan="8">
+                                    <EmptyState
+                                        >No se encontraron órdenes de compra con
+                                        los filtros seleccionados.</EmptyState
+                                    >
                                 </td>
                             </tr>
                         </tbody>

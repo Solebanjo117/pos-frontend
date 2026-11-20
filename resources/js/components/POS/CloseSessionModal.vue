@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { AlertCircle, Calculator, RotateCcw, Send, X } from 'lucide-vue-next';
+import { Calculator, RotateCcw, Send, X } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import { formatCurrency, roundMoney } from '@/utils/formatters';
 import type { PosSession, PosSessionSummary } from '../../types/pos-session';
@@ -336,13 +337,9 @@ watch(
                 </div>
             </header>
 
-            <div
-                v-if="error"
-                class="mx-5 mt-3 flex items-center gap-2 border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
-            >
-                <AlertCircle :size="15" />
+            <ErrorMessage v-if="error" class="mx-5 mt-3">
                 <span>{{ error }}</span>
-            </div>
+            </ErrorMessage>
 
             <main
                 class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-3"

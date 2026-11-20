@@ -4,6 +4,8 @@ import type { AppPageProps } from './index';
 declare module 'vite/client' {
     interface ImportMetaEnv {
         readonly VITE_APP_NAME: string;
+        /** 'true' muestra la interfaz de varios almacenes (ver config/features.ts). */
+        readonly VITE_MULTI_WAREHOUSE?: string;
         [key: string]: string | boolean | undefined;
     }
 

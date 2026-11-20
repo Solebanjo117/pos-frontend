@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ArrowUpDown } from 'lucide-vue-next';
+import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 
-const props = defineProps<{
+defineProps<{
     modelValue: string;
 }>();
 
@@ -17,26 +17,18 @@ const sortOptions = [
     { value: 'newest', label: 'Más recientes' },
 ];
 
-const onChange = (e: Event) => {
-    emit('update:modelValue', (e.target as HTMLSelectElement).value);
+const onChange = (value: number | string | null) => {
+    if (typeof value === 'string') emit('update:modelValue', value);
 };
 </script>
 
 <template>
-    <div class="inline-flex items-center gap-1.5">
-        <ArrowUpDown class="h-3.5 w-3.5 shrink-0 text-gray-400" />
-        <select
-            :value="modelValue"
-            @change="onChange"
-            class="cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 pr-7 text-xs text-gray-700 transition-shadow focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 focus:outline-none dark:border-border dark:bg-muted dark:text-foreground"
-        >
-            <option
-                v-for="opt in sortOptions"
-                :key="opt.value"
-                :value="opt.value"
-            >
-                {{ opt.label }}
-            </option>
-        </select>
-    </div>
+    <SearchableSelect
+        class="w-52"
+        :options="sortOptions"
+        :model-value="modelValue"
+        :searchable="false"
+        aria-label="Ordenar productos"
+        @update:model-value="onChange"
+    />
 </template>

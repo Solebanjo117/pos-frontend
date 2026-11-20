@@ -13,6 +13,7 @@ import {
 import { computed, ref, onMounted } from 'vue';
 import PurchaseOrderSection from '@/components/PurchaseOrders/PurchaseOrderSection.vue';
 import PurchaseOrderToolbar from '@/components/PurchaseOrders/PurchaseOrderToolbar.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { formatCurrency } from '@/utils/formatters';
@@ -234,6 +235,7 @@ async function handleSubmit() {
     <Head title="Recepcion de OC" />
     <AppLayout>
         <PurchaseOrderToolbar
+            class="app-page-full-bleed"
             title="Recepcion de OC"
             :subtitle="`${purchaseOrder?.po_number || purchaseOrderId} | ${purchaseOrder?.supplier?.name || 'OC diaria general'}`"
             :status-label="purchaseOrder?.status_label"
@@ -250,7 +252,7 @@ async function handleSubmit() {
                     type="submit"
                     form="receive-form"
                     :disabled="loading || receivingPackages <= 0"
-                    class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                    class="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
                 >
                     <Save :size="16" />
                     {{ loading ? 'Procesando...' : 'Registrar recepcion' }}
@@ -261,7 +263,7 @@ async function handleSubmit() {
         <div
             class="min-h-[calc(100vh-4.25rem)] bg-gray-50/60 dark:bg-background"
         >
-            <main class="mx-auto max-w-7xl min-w-0 p-4">
+            <main class="mx-auto w-full max-w-7xl min-w-0 p-4 md:p-6">
                 <div
                     v-if="purchaseOrder"
                     class="mb-3 overflow-x-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm dark:border-border dark:bg-card"
@@ -284,12 +286,9 @@ async function handleSubmit() {
                     </nav>
                 </div>
 
-                <div
-                    v-if="error"
-                    class="mb-3 border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400"
-                >
+                <ErrorMessage v-if="error" class="mb-3">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <div
                     v-if="purchaseOrder && hasPreAppliedStock"
@@ -378,7 +377,7 @@ async function handleSubmit() {
                         <button
                             v-if="!allItemsReceived"
                             type="button"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
                             @click="handleMassReceive"
                         >
                             <PackageCheck :size="16" />

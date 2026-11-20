@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { UserIcon } from 'lucide-vue-next';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import type { TopCashier } from '@/types/dashboard';
 
 interface Props {
@@ -49,11 +50,8 @@ defineProps<Props>();
                 </div>
             </div>
         </template>
-        <div
-            v-else
-            class="py-4 text-center text-sm text-gray-500 dark:text-gray-400"
+        <EmptyState v-else
+            >No hay ventas registradas en este periodo.</EmptyState
         >
-            No hay ventas registradas en este periodo.
-        </div>
     </div>
 </template>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { X, AlertCircle, Save } from 'lucide-vue-next';
+import { X, Save } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import apiClient from '@/services/api/client';
 import { CustomersApiService } from '@/services/customers';
 import type { CustomerType } from '@/types/customer';
@@ -146,13 +148,9 @@ const handleSubmit = async () => {
 
                 <div class="space-y-4 p-6">
                     <!-- Error -->
-                    <div
-                        v-if="error"
-                        class="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20"
-                    >
-                        <AlertCircle class="h-4 w-4 flex-shrink-0" />
+                    <ErrorMessage v-if="error">
                         {{ error }}
-                    </div>
+                    </ErrorMessage>
 
                     <div>
                         <label
@@ -160,26 +158,18 @@ const handleSubmit = async () => {
                         >
                             Tipo de cliente *
                         </label>
-                        <select
-                            v-model.number="form.customer_type_id"
+                        <AppSelect
+                            v-model="form.customer_type_id"
                             :disabled="loadingTypes"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:opacity-50 dark:border-border dark:bg-muted dark:text-white"
-                        >
-                            <option :value="null" disabled>
-                                {{
-                                    loadingTypes
-                                        ? 'Cargando...'
-                                        : 'Selecciona un tipo'
-                                }}
-                            </option>
-                            <option
-                                v-for="type in activeCustomerTypes"
-                                :key="type.id"
-                                :value="type.id"
-                            >
-                                {{ type.name }}
-                            </option>
-                        </select>
+                            class="w-full"
+                            placeholder="{{ loadingTypes ? 'Cargando...' : 'Selecciona un tipo' }}"
+                            :options="[
+                                ...(activeCustomerTypes ?? []).map((type) => ({
+                                    value: type.id,
+                                    label: String(type.name),
+                                })),
+                            ]"
+                        />
                         <p
                             v-if="fieldErrors.customer_type_id?.[0]"
                             class="mt-1 text-xs text-red-600 dark:text-red-300"
@@ -290,7 +280,7 @@ const handleSubmit = async () => {
                             !form.name.trim() ||
                             !form.customer_type_id
                         "
-                        class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-bold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
                     >
                         <Save v-if="!loading" class="h-4 w-4" />
                         {{ loading ? 'Guardando...' : 'Guardar Cliente' }}

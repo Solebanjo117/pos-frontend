@@ -21,7 +21,9 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import PrintTicketModal from '@/components/POS/PrintTicketModal.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePOS } from '@/composables/usePOS';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
 import type {
@@ -234,13 +236,12 @@ onMounted(fetchDetail);
 <template>
     <Head :title="`Cotizacion ${quote?.quote_number || ''}`" />
 
-    <div class="mx-auto max-w-7xl space-y-5 p-4">
-        <div
+    <div class="mx-auto w-full max-w-7xl space-y-5">
+        <LoadingState
             v-if="loading"
-            class="flex min-h-80 items-center justify-center text-sm font-medium text-slate-500 dark:text-slate-400"
-        >
-            Cargando cotizacion...
-        </div>
+            class="min-h-80"
+            label="Cargando cotizacion..."
+        />
 
         <div
             v-else-if="error"
@@ -270,7 +271,7 @@ onMounted(fetchDetail);
                         <div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <h1
-                                    class="text-2xl font-bold text-slate-950 dark:text-white"
+                                    class="text-2xl font-semibold tracking-tight text-foreground"
                                 >
                                     {{ quote.quote_number }}
                                 </h1>
@@ -319,7 +320,7 @@ onMounted(fetchDetail);
                         v-if="workflow.actions.can_open_in_pos"
                         type="button"
                         :disabled="openingInPOS"
-                        class="inline-flex h-9 items-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                         @click="handleOpenInPOS"
                     >
                         <ShoppingCart :size="16" />
@@ -514,7 +515,12 @@ onMounted(fetchDetail);
                                 class="border-b border-slate-200 bg-slate-50 text-xs text-slate-500 uppercase dark:border-border dark:bg-muted/50"
                             >
                                 <th class="px-4 py-3 text-left">Item</th>
-                                <th class="px-4 py-3 text-left">Bodega</th>
+                                <th
+                                    v-if="multiWarehouse"
+                                    class="px-4 py-3 text-left"
+                                >
+                                    Bodega
+                                </th>
                                 <th class="px-4 py-3 text-right">Cant.</th>
                                 <th class="px-4 py-3 text-right">Precio</th>
                                 <th class="px-4 py-3 text-right">ITBM</th>
@@ -531,7 +537,7 @@ onMounted(fetchDetail);
                                             item.product?.id &&
                                             !item.is_custom_line
                                         "
-                                        :href="`/products/${item.product.id}`"
+                                        :href="`/inventory/products/${item.product.id}`"
                                         class="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300"
                                     >
                                         {{ itemTitle(item) }}
@@ -559,7 +565,10 @@ onMounted(fetchDetail);
                                         {{ item.notes }}
                                     </p>
                                 </td>
-                                <td class="px-4 py-3 text-slate-600">
+                                <td
+                                    v-if="multiWarehouse"
+                                    class="px-4 py-3 text-slate-600"
+                                >
                                     {{ item.warehouse?.name || 'Sin bodega' }}
                                 </td>
                                 <td class="px-4 py-3 text-right font-semibold">
@@ -671,7 +680,7 @@ onMounted(fetchDetail);
                             v-if="workflow.actions.can_send_to_cashier"
                             type="button"
                             :disabled="actionLoading === 'send-to-cashier'"
-                            class="inline-flex h-9 items-center gap-2 rounded-md bg-sky-600 px-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             @click="handleTransition('send-to-cashier')"
                         >
                             <ArrowRightLeft :size="16" />
@@ -681,7 +690,7 @@ onMounted(fetchDetail);
                             v-if="workflow.actions.can_mark_collected"
                             type="button"
                             :disabled="actionLoading === 'mark-collected'"
-                            class="inline-flex h-9 items-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             @click="handleTransition('mark-collected')"
                         >
                             <CheckCircle :size="16" />
@@ -691,7 +700,7 @@ onMounted(fetchDetail);
                             v-if="workflow.actions.can_convert"
                             type="button"
                             :disabled="actionLoading === 'convert'"
-                            class="inline-flex h-9 items-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                            class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             @click="handleConvert"
                         >
                             <FileCheck :size="16" />

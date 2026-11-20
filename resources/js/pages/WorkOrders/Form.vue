@@ -2,6 +2,9 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Plus, Save, Trash2, Wrench } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { productsApi } from '@/services/api/products';
 import { CustomersApiService } from '@/services/customers';
@@ -253,9 +256,9 @@ onMounted(async () => {
     <Head :title="pageTitle" />
 
     <div
-        class="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100"
+        class="app-page-full-bleed min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100"
     >
-        <div class="space-y-5 p-4 sm:p-6">
+        <div class="space-y-5 p-4 md:p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <Link
@@ -265,10 +268,14 @@ onMounted(async () => {
                         <ArrowLeft class="h-4 w-4" />
                         Volver
                     </Link>
-                    <h1 class="mt-2 text-2xl font-semibold">{{ pageTitle }}</h1>
+                    <h1
+                        class="mt-2 text-2xl font-semibold tracking-tight text-foreground"
+                    >
+                        {{ pageTitle }}
+                    </h1>
                 </div>
                 <button
-                    class="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                    class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 dark:bg-white"
                     :disabled="saving || loading"
                     @click="submit"
                 >
@@ -284,12 +291,11 @@ onMounted(async () => {
                 {{ error }}
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="rounded-md border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-            >
-                Cargando formulario...
-            </div>
+                class="rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                label="Cargando formulario..."
+            />
 
             <div v-else class="grid gap-5 xl:grid-cols-[1fr_360px]">
                 <div class="space-y-5">
@@ -303,81 +309,82 @@ onMounted(async () => {
                         <div class="grid gap-4 md:grid-cols-2">
                             <label class="space-y-1 text-sm">
                                 <span class="font-medium">Cliente</span>
-                                <select
+                                <AppSelect
                                     v-model="form.customer_id"
-                                    class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"
-                                >
-                                    <option :value="null">
-                                        Cliente rapido / sin registrar
-                                    </option>
-                                    <option
-                                        v-for="customer in customers"
-                                        :key="customer.id"
-                                        :value="customer.id"
-                                    >
-                                        {{ customer.name }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        {
+                                            value: null,
+                                            label: 'Cliente rapido / sin registrar',
+                                        },
+                                        ...(customers ?? []).map(
+                                            (customer) => ({
+                                                value: customer.id,
+                                                label: String(customer.name),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </label>
                             <label class="space-y-1 text-sm">
                                 <span class="font-medium"
                                     >Vehiculo del cliente</span
                                 >
-                                <select
+                                <AppSelect
                                     v-model="form.customer_vehicle_id"
-                                    class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"
+                                    class="w-full"
                                     :disabled="!form.customer_id"
-                                >
-                                    <option :value="null">
-                                        Usar descripcion manual
-                                    </option>
-                                    <option
-                                        v-for="vehicle in vehicles"
-                                        :key="vehicle.id"
-                                        :value="vehicle.id"
-                                    >
-                                        {{
-                                            vehicle.display_name ||
-                                            vehicle.label ||
-                                            vehicle.vin ||
-                                            `Vehiculo #${vehicle.id}`
-                                        }}
-                                    </option>
-                                </select>
+                                    :options="[
+                                        {
+                                            value: null,
+                                            label: 'Usar descripcion manual',
+                                        },
+                                        ...(vehicles ?? []).map((vehicle) => ({
+                                            value: vehicle.id,
+                                            label: String(
+                                                vehicle.display_name ||
+                                                    vehicle.label ||
+                                                    vehicle.vin ||
+                                                    `Vehiculo #${vehicle.id}`,
+                                            ),
+                                        })),
+                                    ]"
+                                />
                             </label>
-                            <label class="space-y-1 text-sm">
+                            <label
+                                v-if="multiWarehouse"
+                                class="space-y-1 text-sm"
+                            >
                                 <span class="font-medium">Sucursal</span>
-                                <select
+                                <AppSelect
                                     v-model="form.warehouse_id"
-                                    class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"
-                                >
-                                    <option :value="null">Seleccionar</option>
-                                    <option
-                                        v-for="warehouse in warehouses"
-                                        :key="warehouse.id"
-                                        :value="warehouse.id"
-                                    >
-                                        {{ warehouse.name }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        { value: null, label: 'Seleccionar' },
+                                        ...(warehouses ?? []).map(
+                                            (warehouse) => ({
+                                                value: warehouse.id,
+                                                label: String(warehouse.name),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </label>
                             <label class="space-y-1 text-sm">
                                 <span class="font-medium"
                                     >Mecanico / asignado</span
                                 >
-                                <select
+                                <AppSelect
                                     v-model="form.assigned_to"
-                                    class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"
-                                >
-                                    <option :value="null">Sin asignar</option>
-                                    <option
-                                        v-for="user in users"
-                                        :key="user.id"
-                                        :value="user.id"
-                                    >
-                                        {{ user.name }} · {{ user.role }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        { value: null, label: 'Sin asignar' },
+                                        ...(users ?? []).map((user) => ({
+                                            value: user.id,
+                                            label: `${user.name} · ${user.role}`,
+                                        })),
+                                    ]"
+                                />
                             </label>
                             <label class="space-y-1 text-sm">
                                 <span class="font-medium"
@@ -456,23 +463,16 @@ onMounted(async () => {
                                 :key="index"
                                 class="grid gap-3 rounded-md border border-slate-200 p-3 md:grid-cols-[1fr_130px_130px_130px_auto] dark:border-slate-800"
                             >
-                                <select
+                                <AppSelect
                                     v-model="item.product_id"
-                                    class="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
-                                >
-                                    <option :value="null">Producto</option>
-                                    <option
-                                        v-for="product in products"
-                                        :key="product.id"
-                                        :value="product.id"
-                                    >
-                                        {{
-                                            product.sku_base
-                                                ? `${product.sku_base} · `
-                                                : ''
-                                        }}{{ product.name }}
-                                    </option>
-                                </select>
+                                    :options="[
+                                        { value: null, label: 'Producto' },
+                                        ...(products ?? []).map((product) => ({
+                                            value: product.id,
+                                            label: `${product.sku_base ? `${product.sku_base} · ` : ''}${product.name}`,
+                                        })),
+                                    ]"
+                                />
                                 <input
                                     v-model.number="item.quantity"
                                     type="number"
@@ -488,18 +488,18 @@ onMounted(async () => {
                                     class="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
                                     placeholder="Precio"
                                 />
-                                <select
+                                <AppSelect
+                                    v-if="multiWarehouse"
                                     v-model="item.warehouse_id"
-                                    class="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
-                                >
-                                    <option
-                                        v-for="warehouse in warehouses"
-                                        :key="warehouse.id"
-                                        :value="warehouse.id"
-                                    >
-                                        {{ warehouse.name }}
-                                    </option>
-                                </select>
+                                    :options="[
+                                        ...(warehouses ?? []).map(
+                                            (warehouse) => ({
+                                                value: warehouse.id,
+                                                label: String(warehouse.name),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                                 <button
                                     class="rounded-md border border-slate-300 px-3 text-slate-500 hover:text-rose-600 dark:border-slate-700"
                                     @click="removeItem(index)"

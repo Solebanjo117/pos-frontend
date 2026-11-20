@@ -8,6 +8,9 @@ import {
     Gift,
 } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import apiClient from '@/services/api/client';
 import type { Customer } from '@/types/customer';
@@ -737,12 +740,9 @@ const handleCancel = () => {
                     </div>
 
                     <div class="flex-1 space-y-4 overflow-y-auto p-4">
-                        <div
-                            v-if="error"
-                            class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
-                        >
+                        <ErrorMessage v-if="error">
                             {{ error }}
-                        </div>
+                        </ErrorMessage>
 
                         <div
                             v-if="selectableMethods.length > 0"
@@ -816,12 +816,12 @@ const handleCancel = () => {
                             </button>
                         </div>
 
-                        <div
+                        <EmptyState
                             v-else
-                            class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                            class="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
+                            >No hay metodos de pago activos para
+                            venta.</EmptyState
                         >
-                            No hay metodos de pago activos para venta.
-                        </div>
 
                         <div
                             v-if="activeMethodCode === 'cash' && showCashMethod"
@@ -856,7 +856,7 @@ const handleCancel = () => {
                                 </div>
                                 <button
                                     type="button"
-                                    class="rounded-md bg-green-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-green-700"
+                                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                                     @click="handleMax('cash')"
                                 >
                                     Max
@@ -1039,7 +1039,7 @@ const handleCancel = () => {
                                 </div>
                                 <button
                                     type="button"
-                                    class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700"
+                                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                                     @click="handleMax('store_credit')"
                                 >
                                     Max
@@ -1102,7 +1102,7 @@ const handleCancel = () => {
                                     </div>
                                     <button
                                         type="button"
-                                        class="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                                        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                                         @click="
                                             handleMax(
                                                 selectedDynamicMethod.code,
@@ -1166,35 +1166,31 @@ const handleCancel = () => {
                                             >(opcional)</span
                                         >
                                     </label>
-                                    <select
-                                        v-model.number="
+                                    <AppSelect
+                                        v-model="
                                             paymentAccountIds[
                                                 selectedDynamicMethod.code
                                             ]
                                         "
-                                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                                    >
-                                        <option :value="null">
-                                            {{
-                                                selectedDynamicMethod.requires_financial_account ===
-                                                false
-                                                    ? 'Pendiente de asignar cuenta'
-                                                    : 'Selecciona una cuenta'
-                                            }}
-                                        </option>
-                                        <option
-                                            v-for="account in financialAccounts"
-                                            :key="account.endpoint_id"
-                                            :value="account.endpoint_id"
-                                        >
-                                            {{ account.name }}
-                                            {{
-                                                account.masked_number
-                                                    ? `· ${account.masked_number}`
-                                                    : ''
-                                            }}
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            {
+                                                value: null,
+                                                label: String(
+                                                    selectedDynamicMethod.requires_financial_account ===
+                                                        false
+                                                        ? 'Pendiente de asignar cuenta'
+                                                        : 'Selecciona una cuenta',
+                                                ),
+                                            },
+                                            ...(financialAccounts ?? []).map(
+                                                (account) => ({
+                                                    value: account.endpoint_id,
+                                                    label: `${account.name} ${account.masked_number ? `· ${account.masked_number}` : ''}`,
+                                                }),
+                                            ),
+                                        ]"
+                                    />
                                     <p
                                         v-if="financialAccountsError"
                                         class="mt-1 text-xs text-red-600 dark:text-red-400"
@@ -1395,7 +1391,7 @@ const handleCancel = () => {
                         <button
                             type="button"
                             :disabled="!canFinish"
-                            class="w-full rounded-lg bg-green-600 py-3 font-bold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            class="w-full rounded-lg bg-primary py-3 font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
                             @click="handleFinish"
                         >
                             {{ loading ? 'Guardando...' : primaryLabel }}

@@ -23,12 +23,6 @@ export interface InventoryMovement {
         name: string;
         code: string;
     } | null;
-    product_batch_id?: number | null;
-    product_batch?: {
-        id: number;
-        batch_number: string;
-        expiry_date?: string | null;
-    } | null;
     fifo_allocations?: Array<{
         lot_id: number;
         quantity: number;
@@ -104,7 +98,6 @@ export interface CreateOutboundMovementRequest {
     reference_type?: 'sale' | 'adjustment' | 'transfer';
     reference_id?: number;
     notes?: string;
-    product_batch_id?: number;
 }
 
 export interface CreateTransferMovementRequest {
@@ -114,7 +107,6 @@ export interface CreateTransferMovementRequest {
     destination_warehouse_id: number;
     quantity: number;
     notes?: string;
-    product_batch_id?: number;
 }
 
 export interface PaginatedMovementsResponse {

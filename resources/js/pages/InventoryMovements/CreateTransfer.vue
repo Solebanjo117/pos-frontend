@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowRightLeft, Trash2, Plus } from 'lucide-vue-next';
-import { ref, onMounted, computed, nextTick, watch } from 'vue';
+import { ref, onMounted, computed, nextTick } from 'vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -20,19 +22,16 @@ interface TransferItem {
     id: string;
     product_id: number | null;
     variant_id: number | null; // Added
-    product_batch_id: number | null;
     quantity: number;
-    // Helpers
-    batches: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
+    { title: 'Movimientos', href: '/inventory/movements' },
     {
         title: 'Nueva Transferencia',
-        href: '/inventory-movements/transfer/create',
+        href: '/inventory/movements/transfer/create',
     },
 ];
 
@@ -51,7 +50,7 @@ const { recordTransfer, loading, error } = useInventoryMovements(); // Check if 
 // PROBABLY NOT.
 // I will check useInventoryMovements in a moment.
 
-const { products, fetchProducts, fetchBatches } = useProducts();
+const { products, fetchProducts } = useProducts();
 const { warehouses, fetchWarehouses } = useWarehouses();
 
 const headerForm = ref({
@@ -117,9 +116,7 @@ const addItem = () => {
         id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         product_id: null,
         variant_id: null,
-        product_batch_id: null,
         quantity: 1,
-        batches: [],
     });
 };
 
@@ -137,20 +134,6 @@ const handleProductSelect = async (
     const item = items.value[index];
     item.product_id = productId;
     item.variant_id = variantId || null;
-    item.product_batch_id = null;
-    item.batches = [];
-
-    if (productId && headerForm.value.warehouse_id) {
-        try {
-            const allBatches = await fetchBatches(
-                productId,
-                headerForm.value.warehouse_id,
-            );
-            item.batches = allBatches;
-        } catch (e) {
-            console.error('Error fetching batches', e);
-        }
-    }
 
     if (index === items.value.length - 1 && productId !== null) {
         nextTick(() => addItem());
@@ -244,28 +227,6 @@ const addVariantSelections = async (selections: ProductVariantSelection[]) => {
     showProductPicker.value = false;
 };
 
-// Watch for origin warehouse change to refresh batches
-watch(
-    () => headerForm.value.warehouse_id,
-    async (newVal) => {
-        if (!newVal) {
-            items.value.forEach((item) => (item.batches = []));
-            return;
-        }
-        // Refresh batches for all selected products
-        for (const item of items.value) {
-            if (item.product_id) {
-                try {
-                    item.batches = await fetchBatches(item.product_id, newVal);
-                    item.product_batch_id = null; // Reset selection as batches changed
-                } catch (e) {
-                    console.error(e);
-                }
-            }
-        }
-    },
-);
-
 const getProductDetails = (productId: number | null) => {
     if (!productId) return null;
     return products.value.find((p) => p.id === productId);
@@ -273,11 +234,6 @@ const getProductDetails = (productId: number | null) => {
 
 const getStockAvailable = (item: TransferItem) => {
     if (!item.product_id || !headerForm.value.warehouse_id) return null;
-
-    if (item.product_batch_id) {
-        const batch = item.batches.find((b) => b.id === item.product_batch_id);
-        return batch ? batch.quantity : 0;
-    }
 
     const product = getProductDetails(item.product_id);
     if (!product || !product.inventory) return 0;
@@ -290,7 +246,7 @@ const getStockAvailable = (item: TransferItem) => {
                 (item.variant_id === null && i.variant_id === null)),
     );
 
-    return inv ? inv.quantity_available : 0;
+    return inv?.quantity_available ?? 0;
 };
 
 const validateForm = () => {
@@ -337,18 +293,6 @@ const validateForm = () => {
                 `Excede stock disponible (${stock})`;
             isValid = false;
         }
-
-        // Batch validation if product tracks batches
-        const product = getProductDetails(item.product_id);
-        if (
-            product &&
-            product.batch_tracking &&
-            item.batches.length > 0 &&
-            !item.product_batch_id
-        ) {
-            formErrors.value[`item_${item.id}_batch`] = 'Seleccione un lote';
-            isValid = false;
-        }
     });
 
     return isValid;
@@ -377,13 +321,12 @@ const handleSubmit = async () => {
                     headerForm.value.destination_warehouse_id!,
                 quantity: item.quantity,
                 notes: headerForm.value.notes,
-                product_batch_id: item.product_batch_id || undefined,
             });
         }
 
         successMessage.value = 'Transferencias registradas exitosamente';
         setTimeout(() => {
-            router.visit('/inventory-movements');
+            router.visit('/inventory/movements');
         }, 1500);
     } catch (err: any) {
         globalError.value = error.value || 'Error al procesar transferencia';
@@ -391,7 +334,7 @@ const handleSubmit = async () => {
 };
 
 const cancel = () => {
-    router.visit('/inventory-movements');
+    router.visit('/inventory/movements');
 };
 </script>
 
@@ -399,22 +342,20 @@ const cancel = () => {
     <Head title="Nueva Transferencia" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
-            <div class="mx-auto max-w-7xl">
+        <div>
+            <div class="mx-auto w-full max-w-7xl">
                 <!-- Header -->
                 <div
                     class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center"
                 >
                     <div>
                         <h1
-                            class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                            class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                         >
                             <ArrowRightLeft :size="32" />
                             Transferencia entre Almacenes
                         </h1>
-                        <p
-                            class="mt-1 text-sm text-gray-700 dark:text-gray-300"
-                        >
+                        <p class="mt-1 text-sm text-muted-foreground">
                             Mueve inventario de un almacén a otro.
                         </p>
                     </div>
@@ -430,7 +371,7 @@ const cancel = () => {
                             type="button"
                             @click="handleSubmit"
                             :disabled="loading"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                         >
                             {{
                                 loading
@@ -448,12 +389,9 @@ const cancel = () => {
                 >
                     {{ successMessage }}
                 </div>
-                <div
-                    v-if="error || globalError"
-                    class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-                >
+                <ErrorMessage v-if="error || globalError" class="mb-4">
                     {{ error || globalError }}
-                </div>
+                </ErrorMessage>
 
                 <!-- Main Grid -->
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
@@ -572,12 +510,6 @@ const cancel = () => {
                                             </th>
                                             <th
                                                 scope="col"
-                                                class="px-3 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-300"
-                                            >
-                                                Lote (Origen)
-                                            </th>
-                                            <th
-                                                scope="col"
                                                 class="w-24 px-3 py-3 text-center text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-300"
                                             >
                                                 Cant.
@@ -644,59 +576,6 @@ const cancel = () => {
                                                         'Sin Cat'
                                                     }}
                                                 </div>
-                                            </td>
-                                            <td class="px-3 py-4 align-top">
-                                                <div
-                                                    v-if="
-                                                        item.batches.length > 0
-                                                    "
-                                                >
-                                                    <select
-                                                        v-model="
-                                                            item.product_batch_id
-                                                        "
-                                                        class="w-full rounded-md border-gray-300 py-1 text-sm shadow-sm dark:border-border dark:bg-muted"
-                                                        :class="{
-                                                            'border-red-500':
-                                                                formErrors[
-                                                                    `item_${item.id}_batch`
-                                                                ],
-                                                        }"
-                                                    >
-                                                        <option :value="null">
-                                                            Seleccionar lote...
-                                                        </option>
-                                                        <option
-                                                            v-for="b in item.batches"
-                                                            :key="b.id"
-                                                            :value="b.id"
-                                                        >
-                                                            {{ b.batch_number }}
-                                                            (Stock:
-                                                            {{ b.quantity }})
-                                                        </option>
-                                                    </select>
-                                                </div>
-                                                <div
-                                                    v-else-if="item.product_id"
-                                                    class="mt-2 text-xs text-gray-500 italic"
-                                                >
-                                                    Sin lotes / FIFO
-                                                </div>
-                                                <p
-                                                    v-if="
-                                                        formErrors[
-                                                            `item_${item.id}_batch`
-                                                        ]
-                                                    "
-                                                    class="mt-1 text-xs text-red-600"
-                                                >
-                                                    {{
-                                                        formErrors[
-                                                            `item_${item.id}_batch`
-                                                        ]
-                                                    }}
-                                                </p>
                                             </td>
                                             <td class="px-3 py-4 align-top">
                                                 <input

@@ -191,7 +191,7 @@ const getMinPrice = (product: Product): number | null => {
                         class="flex flex-wrap items-center gap-2 lg:justify-end"
                     >
                         <button
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                             @click.stop="selectProduct"
                         >
                             Ver opciones
@@ -472,7 +472,7 @@ const getMinPrice = (product: Product): number | null => {
                 </div>
 
                 <button
-                    class="w-full rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="h-8 w-full rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                     @click.stop="selectProduct"
                 >
                     Ver opciones

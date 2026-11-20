@@ -19,6 +19,8 @@ const props = withDefaults(defineProps<{
     emptyResultsText?: string
     clearable?: boolean
     ariaLabel?: string
+    /** false = lista corta sin buscador (p. ej. Estado u Orden). */
+    searchable?: boolean
 }>(), {
     placeholder: '-- Selecciona --',
     disabled: false,
@@ -28,6 +30,7 @@ const props = withDefaults(defineProps<{
     emptyResultsText: '',
     clearable: false,
     ariaLabel: 'Selector con búsqueda',
+    searchable: true,
 })
 
 const emit = defineEmits<{
@@ -46,32 +49,77 @@ const instanceUid = getCurrentInstance()?.uid ?? 0
 const dropdownId = `searchable-select-listbox-${instanceUid}`
 const searchInputId = `searchable-select-search-${instanceUid}`
 
-// Detect if this component is inside a Radix Dialog (focus trap)
-const insideDialog = ref(false)
+// Dentro de un diálogo (trampa de foco de reka-ui) la lista se lleva al propio diálogo, no al body,
+// para que el buscador reciba el foco. En ambos casos la lista FLOTA: no empuja el contenido ni
+// provoca el scroll del modal.
+const dialogEl = ref<HTMLElement | null>(null)
+const insideDialog = computed(() => dialogEl.value !== null)
 onMounted(() => {
-    insideDialog.value = !!containerRef.value?.closest('[role="dialog"]')
+    dialogEl.value = containerRef.value?.closest<HTMLElement>('[role="dialog"]') ?? null
 })
+const teleportTarget = computed<HTMLElement | string>(() => dialogEl.value ?? 'body')
 
-const { bottom, left, width, update: updateBounds } = useElementBounding(containerRef)
+const { top, bottom, left, width, update: updateBounds } = useElementBounding(containerRef)
+
+// La lista nunca es más angosta que 224 px, aunque el botón sí lo sea (p. ej. "Marca" junto a un botón "+").
+const MIN_DROPDOWN_WIDTH = 224
+const dropdownWidth = computed(() => `${Math.max(width.value, MIN_DROPDOWN_WIDTH)}px`)
+
+// Alto de referencia (buscador + lista) para decidir hacia dónde abrir antes de medir.
+const ESTIMATED_DROPDOWN_HEIGHT = 280
+const GAP = 4
+const VIEWPORT_MARGIN = 8
+const dropdownHeight = ref(ESTIMATED_DROPDOWN_HEIGHT)
+const viewportHeight = ref(typeof window === 'undefined' ? 800 : window.innerHeight)
+
+const spaceBelow = computed(() => viewportHeight.value - bottom.value - GAP - VIEWPORT_MARGIN)
+const spaceAbove = computed(() => top.value - GAP - VIEWPORT_MARGIN)
+// Se abre hacia arriba solo si abajo no cabe y arriba hay más espacio.
+const opensUpward = computed(
+    () => spaceBelow.value < dropdownHeight.value && spaceAbove.value > spaceBelow.value,
+)
+// Si no cabe completa en ningún lado, la lista se acorta (el buscador mide ~52 px).
+const listMaxHeight = computed(() => {
+    const available = (opensUpward.value ? spaceAbove.value : spaceBelow.value) - (props.searchable ? 52 : 0)
+    return `${Math.max(96, Math.min(224, available))}px`
+})
 
 const dropdownStyle = computed(() => {
-    if (insideDialog.value) {
-        // When inside a dialog, don't teleport — use absolute positioning
-        return { width: `${width.value}px` }
+    const height = Math.min(dropdownHeight.value, opensUpward.value ? spaceAbove.value : spaceBelow.value)
+    // Coordenadas en pantalla del borde superior de la lista.
+    const viewportTop = opensUpward.value ? top.value - GAP - height : bottom.value + GAP
+
+    if (dialogEl.value) {
+        // El diálogo tiene transform, así que es el bloque contenedor: coordenadas relativas a él.
+        const rect = dialogEl.value.getBoundingClientRect()
+        return {
+            top: `${viewportTop - rect.top + dialogEl.value.scrollTop}px`,
+            left: `${left.value - rect.left + dialogEl.value.scrollLeft}px`,
+            width: dropdownWidth.value,
+        }
     }
+
     return {
-        top: `${bottom.value + 4}px`,
+        top: `${viewportTop}px`,
         left: `${left.value}px`,
-        width: `${width.value}px`,
+        width: dropdownWidth.value,
     }
 })
 
+const refreshPosition = () => {
+    updateBounds()
+    viewportHeight.value = window.innerHeight
+    nextTick(() => {
+        if (dropdownRef.value) dropdownHeight.value = dropdownRef.value.offsetHeight || ESTIMATED_DROPDOWN_HEIGHT
+    })
+}
+
 useEventListener('scroll', () => {
-    if (isOpen.value) updateBounds()
+    if (isOpen.value) refreshPosition()
 }, { capture: true, passive: true })
 
 useEventListener('resize', () => {
-    if (isOpen.value) updateBounds()
+    if (isOpen.value) refreshPosition()
 }, { passive: true })
 
 const selectedLabel = computed(() => {
@@ -113,9 +161,11 @@ const open = () => {
     if (props.disabled || props.loading) return
     isOpen.value = true
     searchQuery.value = ''
-    highlightedIndex.value = -1
-    updateBounds()
-    nextTick(() => inputRef.value?.focus())
+    // Sin buscador se resalta la opción elegida y el foco queda en el botón (flechas, Enter, Esc).
+    highlightedIndex.value = props.searchable ? -1 : props.options.findIndex(o => o.value === props.modelValue)
+    dropdownHeight.value = ESTIMATED_DROPDOWN_HEIGHT
+    refreshPosition()
+    if (props.searchable) nextTick(() => inputRef.value?.focus())
 }
 
 const close = () => {
@@ -177,6 +227,7 @@ onUnmounted(() => document.removeEventListener('mousedown', handleClickOutside))
 
 // Reset highlight when search changes
 watch(searchQuery, (value) => {
+    if (!props.searchable) return
     highlightedIndex.value = 0
     emit('search', value)
 })
@@ -187,13 +238,14 @@ watch(searchQuery, (value) => {
         <!-- Trigger button -->
         <button
             type="button"
-            @click="open"
+            @click="isOpen && !searchable ? close() : open()"
+            @keydown="onKeydown"
             :disabled="disabled || loading"
             :aria-label="ariaLabel"
             aria-haspopup="listbox"
             :aria-expanded="isOpen"
             :aria-controls="dropdownId"
-            class="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 pr-14 text-left text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 flex items-center justify-between gap-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
+            class="w-full h-9 rounded-md border border-gray-300 bg-white px-3 py-1.5 pr-14 text-left text-sm dark:border-border dark:bg-muted dark:text-white disabled:opacity-50 flex items-center justify-between gap-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
         >
             <span class="truncate block" :class="selectedLabel ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'">
                 {{ loading ? loadingText : (selectedLabel || placeholder) }}
@@ -217,7 +269,7 @@ watch(searchQuery, (value) => {
         </svg>
 
         <!-- Dropdown -->
-        <Teleport to="body" :disabled="insideDialog">
+        <Teleport :to="teleportTarget">
             <Transition
                 enter-active-class="transition duration-100 ease-out"
                 enter-from-class="opacity-0 scale-95"
@@ -234,13 +286,14 @@ watch(searchQuery, (value) => {
                     :style="dropdownStyle"
                     @pointerdown.stop
                     @mousedown.stop
+                    :data-placement="opensUpward ? 'top' : 'bottom'"
                     :class="insideDialog
-                        ? 'absolute left-0 top-full mt-1 z-[9999] rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden'
+                        ? 'absolute z-[9999] pointer-events-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden'
                         : 'fixed z-[9999] pointer-events-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card overflow-hidden'
                     "
                 >
                 <!-- Search input -->
-                <div class="p-2 border-b border-gray-100 dark:border-border">
+                <div v-if="searchable" class="p-2 border-b border-gray-100 dark:border-border">
                     <div class="relative">
                         <svg class="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -261,7 +314,7 @@ watch(searchQuery, (value) => {
                 </div>
 
                 <!-- Options list -->
-                <ul ref="listRef" class="max-h-48 overflow-y-auto py-1">
+                <ul ref="listRef" class="overflow-x-hidden overflow-y-auto py-1" :style="{ maxHeight: listMaxHeight }">
                     <li
                         v-for="(opt, idx) in filteredOptions"
                         :key="String(opt.value)"
@@ -269,15 +322,16 @@ watch(searchQuery, (value) => {
                         @mouseenter="highlightedIndex = idx"
                         role="option"
                         :aria-selected="opt.value === modelValue"
-                        class="cursor-pointer px-3 py-2 text-sm transition-colors"
+                        :title="opt.sublabel ? `${opt.label} — ${opt.sublabel}` : opt.label"
+                        class="flex min-w-0 cursor-pointer items-center gap-1 px-3 py-2 text-sm transition-colors"
                         :class="[
                             idx === highlightedIndex ? 'bg-blue-50 text-blue-700 dark:bg-primary/10 dark:text-primary' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-muted',
                             opt.value === modelValue ? 'font-semibold' : ''
                         ]"
                     >
-                        <span>{{ opt.label }}</span>
-                        <span v-if="opt.sublabel" class="ml-2 text-xs text-gray-400">{{ opt.sublabel }}</span>
-                        <svg v-if="opt.value === modelValue" class="inline ml-1 h-3.5 w-3.5 text-blue-500 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span class="truncate">{{ opt.label }}</span>
+                        <span v-if="opt.sublabel" class="ml-1 truncate text-xs text-gray-400">{{ opt.sublabel }}</span>
+                        <svg v-if="opt.value === modelValue" class="ml-auto h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
                     </li>

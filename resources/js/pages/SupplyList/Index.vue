@@ -18,12 +18,16 @@ import { ref, onMounted, computed } from 'vue';
 import ProductSearchModal from '@/components/POS/ProductSearchModal.vue';
 import QuickPurchaseModal from '@/components/POS/QuickPurchaseModal.vue';
 import ProductDetailModal from '@/components/Products/ProductDetailModal.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     smartReorderService,
@@ -377,10 +381,12 @@ onMounted(async () => {
         <!-- Header -->
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     OC Diaria
                 </h1>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Busca productos para agregar, edita inline y convierte en
                     Órdenes de Compra.
                 </p>
@@ -413,7 +419,7 @@ onMounted(async () => {
                 <button
                     @click="handleConvert"
                     :disabled="filteredItems.length === 0 || converting"
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                 >
                     <ArrowRight :size="18" />
                     <span v-if="selectedSupplierFilter !== null">
@@ -432,6 +438,7 @@ onMounted(async () => {
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div
+                v-if="multiWarehouse"
                 class="rounded-lg border border-gray-200 bg-white p-4 dark:border-border dark:bg-card"
             >
                 <div
@@ -664,29 +671,24 @@ onMounted(async () => {
         </div>
 
         <!-- Error -->
-        <div
-            v-if="error"
-            class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-        >
-            <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
-        </div>
+        <ErrorMessage v-if="error">
+            <p class="text-sm">{{ error }}</p>
+        </ErrorMessage>
 
         <!-- Table -->
         <div
             class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-border dark:bg-card"
         >
-            <div v-if="loading" class="p-12 text-center text-gray-500">
-                <div
-                    class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                ></div>
-                Cargando...
-            </div>
+            <LoadingState v-if="loading" label="Cargando..." />
             <div
                 v-else-if="filteredItems.length === 0"
                 class="p-12 text-center text-gray-400"
             >
                 <Filter :size="48" class="mx-auto mb-3 opacity-40" />
-                <p>No hay ítems que coincidan con el filtro seleccionado.</p>
+                <EmptyState compact
+                    >No hay ítems que coincidan con el filtro
+                    seleccionado.</EmptyState
+                >
                 <button
                     @click="selectedSupplierFilter = null"
                     class="mt-3 text-sm text-indigo-600 hover:underline dark:text-primary"

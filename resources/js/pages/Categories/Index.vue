@@ -13,6 +13,9 @@ import {
     Settings2,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useCategories } from '@/composables/useCategories';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Category } from '@/types/category';
@@ -267,28 +270,31 @@ watch(pathSeparator, (value) => {
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Categorías
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Gestiona las categorías de productos y sus jerarquías
                     </p>
                 </div>
-                <Link
-                    href="/categories/create"
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                >
-                    <Plus :size="20" />
-                    Nueva Categoría
-                </Link>
-                <Link
-                    href="/categories/import"
-                    class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
-                >
-                    <Upload :size="20" />
-                    Importar
-                </Link>
+                <!-- Acciones a la derecha: Nueva Categoría e Importar -->
+                <div class="flex items-center gap-2">
+                    <Link
+                        href="/categories/create"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+                    >
+                        <Plus :size="20" />
+                        Nueva Categoría
+                    </Link>
+                    <Link
+                        href="/categories/import"
+                        class="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+                    >
+                        <Upload :size="20" />
+                        Importar
+                    </Link>
+                </div>
             </div>
 
             <!-- Search -->
@@ -344,14 +350,11 @@ watch(pathSeparator, (value) => {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/10"
-            >
-                <p class="font-medium text-red-600 dark:text-red-400">
+            <ErrorMessage v-if="error">
+                <p class="font-medium">
                     {{ error }}
                 </p>
-            </div>
+            </ErrorMessage>
 
             <!-- Table -->
             <div
@@ -389,18 +392,10 @@ watch(pathSeparator, (value) => {
                             class="divide-y divide-gray-100 bg-white dark:divide-border/50 dark:bg-card"
                         >
                             <tr v-if="loading">
-                                <td
-                                    colspan="4"
-                                    class="px-6 py-12 text-center text-gray-500"
-                                >
-                                    <div
-                                        class="flex items-center justify-center gap-2"
-                                    >
-                                        <div
-                                            class="h-5 w-5 animate-spin rounded-full border-b-2 border-indigo-600 dark:border-primary"
-                                        ></div>
-                                        Cargando estructura...
-                                    </div>
+                                <td colspan="4">
+                                    <LoadingState
+                                        label="Cargando estructura..."
+                                    />
                                 </td>
                             </tr>
                             <tr v-else-if="filteredCategories.length === 0">
@@ -416,11 +411,10 @@ watch(pathSeparator, (value) => {
                                             :size="24"
                                         />
                                     </div>
-                                    <p
-                                        class="text-base font-medium text-gray-900 dark:text-gray-200"
+                                    <EmptyState compact
+                                        >No se encontraron
+                                        categorías</EmptyState
                                     >
-                                        No se encontraron categorías
-                                    </p>
                                     <p class="mt-1 text-sm">
                                         Intenta con otro término de búsqueda o
                                         crea una nueva.

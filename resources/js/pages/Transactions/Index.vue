@@ -10,7 +10,12 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { posService } from '@/services/api/pos';
 import { SalesQuotesApiService } from '@/services/sales-quotes';
@@ -266,7 +271,9 @@ onMounted(async () => {
     <div class="space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h1 class="text-2xl font-semibold text-foreground">
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-foreground"
+                >
                     Transacciones
                 </h1>
                 <p class="text-sm text-muted-foreground">
@@ -354,45 +361,43 @@ onMounted(async () => {
                         class="w-full rounded-md border border-border bg-background py-2 pr-3 pl-9 text-sm"
                     />
                 </label>
-                <select
-                    v-if="role === 'admin' && allowedWarehouses.length > 0"
-                    v-model.number="selectedWarehouseId"
+                <AppSelect
+                    v-if="
+                        multiWarehouse &&
+                        role === 'admin' &&
+                        allowedWarehouses.length > 0
+                    "
+                    v-model="selectedWarehouseId"
                     aria-label="Sucursal"
-                    class="rounded-md border border-border bg-background px-2 py-2 text-sm"
-                >
-                    <option :value="null">Seleccionar sucursal</option>
-                    <option
-                        v-for="warehouse in allowedWarehouses"
-                        :key="warehouse.id"
-                        :value="warehouse.id"
-                    >
-                        {{ warehouse.name }}
-                    </option>
-                </select>
-                <select
+                    :options="[
+                        { value: null, label: 'Seleccionar sucursal' },
+                        ...(allowedWarehouses ?? []).map((warehouse) => ({
+                            value: warehouse.id,
+                            label: String(warehouse.name),
+                        })),
+                    ]"
+                />
+                <AppSelect
                     v-model="filters.status_group"
                     aria-label="Grupo de estados"
-                    class="rounded-md border border-border bg-background px-2 py-2 text-sm"
-                >
-                    <option value="">Todos los grupos</option>
-                    <option value="pending">Pendientes</option>
-                    <option value="completed">Finalizadas</option>
-                    <option value="cancelled">Canceladas</option>
-                </select>
-                <select
+                    :options="[
+                        { value: '', label: 'Todos los grupos' },
+                        { value: 'pending', label: 'Pendientes' },
+                        { value: 'completed', label: 'Finalizadas' },
+                        { value: 'cancelled', label: 'Canceladas' },
+                    ]"
+                />
+                <AppSelect
                     v-model="filters.status"
                     aria-label="Estado específico"
-                    class="rounded-md border border-border bg-background px-2 py-2 text-sm"
-                >
-                    <option value="">Cualquier estado</option>
-                    <option
-                        v-for="option in statuses"
-                        :key="option.value"
-                        :value="option.value"
-                    >
-                        {{ option.label }}
-                    </option>
-                </select>
+                    :options="[
+                        { value: '', label: 'Cualquier estado' },
+                        ...(statuses ?? []).map((option) => ({
+                            value: option.value,
+                            label: String(option.label),
+                        })),
+                    ]"
+                />
                 <input
                     v-model="filters.date_from"
                     type="date"
@@ -416,13 +421,9 @@ onMounted(async () => {
             </form>
         </div>
 
-        <p
-            v-if="error"
-            role="alert"
-            class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-        >
+        <ErrorMessage v-if="error" role="alert">
             {{ error }}
-        </p>
+        </ErrorMessage>
 
         <div class="overflow-x-auto rounded-lg border border-border bg-card">
             <table class="w-full min-w-[920px] text-sm">
@@ -443,19 +444,16 @@ onMounted(async () => {
                 </thead>
                 <tbody class="divide-y divide-border">
                     <tr v-if="loading">
-                        <td
-                            colspan="7"
-                            class="px-3 py-8 text-center text-muted-foreground"
-                        >
-                            Cargando transacciones…
+                        <td colspan="7">
+                            <LoadingState label="Cargando transacciones..." />
                         </td>
                     </tr>
                     <tr v-else-if="rows.length === 0">
-                        <td
-                            colspan="7"
-                            class="px-3 py-8 text-center text-muted-foreground"
-                        >
-                            No hay transacciones para estos filtros.
+                        <td colspan="7">
+                            <EmptyState
+                                >No hay transacciones para estos
+                                filtros.</EmptyState
+                            >
                         </td>
                     </tr>
                     <tr

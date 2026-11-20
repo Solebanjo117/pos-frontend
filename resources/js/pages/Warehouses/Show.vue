@@ -2,6 +2,9 @@
 import { Head } from '@inertiajs/vue3';
 import { Pencil } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import { useWarehouses } from '@/composables/useWarehouses';
 import AppLayout from '@/layouts/AppLayout.vue';
 import WarehousesApiService from '@/services/warehouses';
@@ -123,24 +126,14 @@ const getStockStatusColor = (item: any) => {
     <Head title="Detalle del Almacén" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <div>
             <!-- Loading State -->
-            <div v-if="loading" class="py-12 text-center">
-                <div
-                    class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent dark:border-primary"
-                ></div>
-                <p class="mt-2 text-gray-800 dark:text-gray-200">
-                    Cargando almacén...
-                </p>
-            </div>
+            <LoadingState v-if="loading" label="Cargando almacén..." />
 
             <!-- Error State -->
-            <div
-                v-else-if="error"
-                class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-            >
+            <ErrorMessage v-else-if="error">
                 <p>{{ error }}</p>
-            </div>
+            </ErrorMessage>
 
             <!-- Warehouse Details -->
             <div v-else-if="currentWarehouse" class="space-y-6">
@@ -148,20 +141,18 @@ const getStockStatusColor = (item: any) => {
                 <div class="flex items-center justify-between">
                     <div>
                         <h1
-                            class="text-3xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             {{ currentWarehouse.name }}
                         </h1>
-                        <p
-                            class="mt-1 text-sm text-gray-700 dark:text-gray-300"
-                        >
+                        <p class="mt-1 text-sm text-muted-foreground">
                             Código: {{ currentWarehouse.code }}
                         </p>
                     </div>
                     <div class="flex gap-2">
                         <a
                             :href="`/warehouses/${warehouseId}/edit`"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                             <Pencil class="mr-2 h-4 w-4" /> Editar
                         </a>
@@ -364,7 +355,7 @@ const getStockStatusColor = (item: any) => {
                         <div class="flex justify-end gap-2">
                             <button
                                 @click="applyInventoryFilters"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                                class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             >
                                 Filtrar
                             </button>
@@ -385,12 +376,9 @@ const getStockStatusColor = (item: any) => {
                     </div>
 
                     <!-- Inventory Error -->
-                    <div
-                        v-else-if="inventoryError"
-                        class="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-                    >
+                    <ErrorMessage v-else-if="inventoryError">
                         <p>{{ inventoryError }}</p>
-                    </div>
+                    </ErrorMessage>
 
                     <!-- Inventory Table -->
                     <div
@@ -531,9 +519,9 @@ const getStockStatusColor = (item: any) => {
 
                     <!-- Empty Inventory -->
                     <div v-else class="py-8 text-center">
-                        <p class="text-gray-700 dark:text-gray-300">
-                            No hay productos en este almacén.
-                        </p>
+                        <EmptyState
+                            >No hay productos en este almacén.</EmptyState
+                        >
                     </div>
                 </div>
             </div>

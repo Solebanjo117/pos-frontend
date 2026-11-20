@@ -11,10 +11,12 @@ import {
     CheckCircle2,
 } from 'lucide-vue-next';
 import { ref, onMounted, computed } from 'vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useToast } from '@/composables/useToast';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import {
@@ -198,11 +200,11 @@ onMounted(async () => {
             <div class="flex items-center justify-between">
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Reabastecimiento Inteligente
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Genera órdenes de compra basadas en puntos de reorden
                     </p>
                 </div>
@@ -345,7 +347,7 @@ onMounted(async () => {
             <div
                 class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
             >
-                <div class="flex items-center gap-4">
+                <div v-if="multiWarehouse" class="flex items-center gap-4">
                     <label
                         class="text-sm font-medium text-gray-700 dark:text-gray-300"
                         >Almacén:</label
@@ -362,12 +364,9 @@ onMounted(async () => {
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Success Panel -->
             <div
@@ -491,6 +490,7 @@ onMounted(async () => {
                                     Mín
                                 </th>
                                 <th
+                                    v-if="multiWarehouse"
                                     class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase"
                                 >
                                     Almacén
@@ -564,6 +564,7 @@ onMounted(async () => {
                                     {{ item.reorder_point }}
                                 </td>
                                 <td
+                                    v-if="multiWarehouse"
                                     class="px-4 py-3 text-center text-xs text-gray-500"
                                 >
                                     {{ item.warehouse_name }}
@@ -634,7 +635,7 @@ onMounted(async () => {
                 <button
                     @click="handleGenerate"
                     :disabled="loading"
-                    class="inline-flex items-center gap-3 rounded-full bg-indigo-600 px-6 py-4 text-white shadow-lg transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="inline-flex items-center gap-3 rounded-full bg-primary px-6 py-4 text-primary-foreground shadow-lg transition hover:bg-primary/90 disabled:opacity-50"
                 >
                     <ShoppingCart :size="20" />
                     <span class="font-semibold"

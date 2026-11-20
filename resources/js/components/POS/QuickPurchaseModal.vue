@@ -8,6 +8,7 @@ import {
     List,
 } from 'lucide-vue-next';
 import { ref, watch, computed } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { usePurchaseOrders } from '@/composables/usePurchaseOrders';
@@ -395,22 +396,19 @@ const totalCost = computed(() => roundMoney(quantity.value * unitCost.value));
                                     />
                                     Variante a abastecer
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="selectedVariantId"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm transition-shadow focus:ring-2 focus:ring-orange-500 focus:outline-none dark:border-border dark:bg-muted dark:text-white"
-                                >
-                                    <option value="" disabled>
-                                        Seleccione una variante...
-                                    </option>
-                                    <option
-                                        v-for="variant in product.variants"
-                                        :key="variant.id"
-                                        :value="variant.id"
-                                    >
-                                        {{ variant.sku || variant.sku_base }} -
-                                        {{ variant.name || 'Variante' }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    placeholder="Seleccione una variante..."
+                                    :options="[
+                                        ...(product.variants ?? []).map(
+                                            (variant: any) => ({
+                                                value: variant.id,
+                                                label: `${variant.sku || variant.sku_base} - ${variant.name || 'Variante'}`,
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
 
                             <!-- Quantity (Cost optional for supply list) -->
@@ -502,7 +500,7 @@ const totalCost = computed(() => roundMoney(quantity.value * unitCost.value));
                                     (product?.variants?.length > 0 &&
                                         !selectedVariantId)
                                 "
-                                class="flex min-w-[160px] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-primary dark:hover:bg-primary/90"
+                                class="flex h-9 min-w-[160px] items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <svg
                                     v-if="isSubmitting"

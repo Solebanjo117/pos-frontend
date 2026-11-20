@@ -16,7 +16,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Pagination from '@/components/Pagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import { Input } from '@/components/ui/input';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import VehicleCatalogDialog from '@/components/Vehicles/VehicleCatalogDialog.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useToast } from '@/composables/useToast';
@@ -32,6 +34,7 @@ import {
     type VehicleMakeRow,
     type VehicleModelRow,
 } from '@/composables/useVehicleCatalog';
+import { engineSpecsLabel } from '@/composables/useVehicleCatalog';
 import { useVehicleChassis } from '@/composables/useVehicleChassis';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -405,10 +408,17 @@ const yearLabel = (row: VehicleModelRow | VehicleConfigurationRow['model']) =>
         : row.year_from + '-' + row.year_to;
 const engineSpecs = (
     engine: VehicleEngineRow | VehicleConfigurationRow['engine'],
+) => engineSpecsLabel(engine);
+const engineCode = (
+    engine: VehicleEngineRow | VehicleConfigurationRow['engine'],
 ) =>
-    [engine.displacement, engine.fuel_type, engine.aspiration]
+    engine.nickname
+        ? `${engine.engine_code} (${engine.nickname})`
+        : engine.engine_code;
+const vehicleTitle = (row: VehicleConfigurationRow) =>
+    [row.make.name, row.model.name, row.model.generation]
         .filter(Boolean)
-        .join(' • ') || 'Sin especificaciones';
+        .join(' ');
 const popState = () => {
     const state = stateFromUrl();
     activeTab.value = state.tab;
@@ -449,12 +459,14 @@ onBeforeUnmount(() => {
 <template>
     <Head title="Administración de Vehículos" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+        <div class="mx-auto w-full max-w-7xl space-y-5">
             <header
                 class="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-center lg:justify-between"
             >
                 <div>
-                    <h1 class="text-2xl font-semibold tracking-tight">
+                    <h1
+                        class="text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Administración de Vehículos
                     </h1>
                     <p class="mt-1 text-sm text-muted-foreground">
@@ -568,19 +580,17 @@ onBeforeUnmount(() => {
                         Reintentar
                     </Button>
                 </div>
-                <div
+                <LoadingState
                     v-else-if="loading"
-                    class="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground"
-                >
-                    <LoaderCircle class="h-5 w-5 animate-spin" />Cargando
-                    catálogo…
-                </div>
+                    class="min-h-64"
+                    label="Cargando catálogo..."
+                />
                 <div
                     v-else-if="rows.length === 0"
                     class="flex min-h-64 flex-col items-center justify-center p-6 text-center"
                 >
                     <Car class="mb-3 h-10 w-10 text-muted-foreground" />
-                    <p class="font-medium">No hay resultados</p>
+                    <EmptyState compact>No hay resultados</EmptyState>
                     <p class="mt-1 text-sm text-muted-foreground">
                         Ajusta la búsqueda o registra un nuevo elemento.
                     </p>
@@ -651,7 +661,7 @@ onBeforeUnmount(() => {
                                             <button
                                                 @click="changeSort('years')"
                                             >
-                                                Años / Generación
+                                                Años / Chasis
                                             </button>
                                         </th>
                                         <th class="px-4 py-3">Vehículos</th>
@@ -735,8 +745,9 @@ onBeforeUnmount(() => {
                                             class="px-4 py-3 font-mono font-medium"
                                         >
                                             {{
-                                                (row as VehicleEngineRow)
-                                                    .engine_code
+                                                engineCode(
+                                                    row as VehicleEngineRow,
+                                                )
                                             }}
                                         </td>
                                         <td
@@ -798,14 +809,9 @@ onBeforeUnmount(() => {
                                         <td class="px-4 py-3">
                                             <p class="font-medium">
                                                 {{
-                                                    (
-                                                        row as VehicleConfigurationRow
-                                                    ).make.name
-                                                }}
-                                                {{
-                                                    (
-                                                        row as VehicleConfigurationRow
-                                                    ).model.name
+                                                    vehicleTitle(
+                                                        row as VehicleConfigurationRow,
+                                                    )
                                                 }}
                                             </p>
                                             <p
@@ -818,28 +824,16 @@ onBeforeUnmount(() => {
                                                         ).model,
                                                     )
                                                 }}
-                                                <span
-                                                    v-if="
-                                                        (
-                                                            row as VehicleConfigurationRow
-                                                        ).model.generation
-                                                    "
-                                                >
-                                                    •
-                                                    {{
-                                                        (
-                                                            row as VehicleConfigurationRow
-                                                        ).model.generation
-                                                    }}
-                                                </span>
                                             </p>
                                         </td>
                                         <td class="px-4 py-3">
                                             <p class="font-mono font-medium">
                                                 {{
-                                                    (
-                                                        row as VehicleConfigurationRow
-                                                    ).engine.engine_code
+                                                    engineCode(
+                                                        (
+                                                            row as VehicleConfigurationRow
+                                                        ).engine,
+                                                    )
                                                 }}
                                             </p>
                                             <p
@@ -877,7 +871,7 @@ onBeforeUnmount(() => {
                                             <span
                                                 v-else
                                                 class="text-muted-foreground"
-                                                >Sin VIN</span
+                                                >No posee VIN registrado</span
                                             >
                                         </td>
                                     </template>
@@ -951,8 +945,9 @@ onBeforeUnmount(() => {
                                     >
                                         <p class="font-mono font-medium">
                                             {{
-                                                (row as VehicleEngineRow)
-                                                    .engine_code
+                                                engineCode(
+                                                    row as VehicleEngineRow,
+                                                )
                                             }}
                                         </p>
                                         <p
@@ -993,20 +988,20 @@ onBeforeUnmount(() => {
                                     <template v-else>
                                         <p class="font-medium">
                                             {{
-                                                (row as VehicleConfigurationRow)
-                                                    .make.name
-                                            }}
-                                            {{
-                                                (row as VehicleConfigurationRow)
-                                                    .model.name
+                                                vehicleTitle(
+                                                    row as VehicleConfigurationRow,
+                                                )
                                             }}
                                         </p>
                                         <p
                                             class="font-mono text-sm text-muted-foreground"
                                         >
                                             {{
-                                                (row as VehicleConfigurationRow)
-                                                    .engine.engine_code
+                                                engineCode(
+                                                    (
+                                                        row as VehicleConfigurationRow
+                                                    ).engine,
+                                                )
                                             }}
                                             •
                                             {{
@@ -1047,7 +1042,7 @@ onBeforeUnmount(() => {
                                             .length === 0
                                     "
                                     class="text-sm text-muted-foreground"
-                                    >Sin VIN</span
+                                    >No posee VIN registrado</span
                                 >
                             </div>
                             <div

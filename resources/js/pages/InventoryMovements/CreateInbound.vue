@@ -4,6 +4,8 @@ import { PackagePlus, Trash2, Plus, Copy } from 'lucide-vue-next';
 import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import ProductCombobox from '@/components/ProductCombobox.vue';
 import ProductVariantPickerModal from '@/components/Products/ProductVariantPickerModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -13,6 +15,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import apiClient from '@/services/api/client';
 import { type BreadcrumbItem } from '@/types';
@@ -32,10 +35,10 @@ interface InboundItem {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Inventario', href: '/inventory' },
-    { title: 'Movimientos', href: '/inventory-movements' },
+    { title: 'Movimientos', href: '/inventory/movements' },
     {
         title: 'Nueva Entrada Masiva',
-        href: '/inventory-movements/inbound/create',
+        href: '/inventory/movements/inbound/create',
     },
 ];
 
@@ -106,7 +109,7 @@ const successMessage = ref('');
 const globalError = ref<string | null>(null);
 
 // Computed
-const showWarehouseSelect = computed(() => true);
+const showWarehouseSelect = computed(() => multiWarehouse);
 
 const warehouseOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'Seleccionar...' },
@@ -413,14 +416,6 @@ const validateForm = () => {
             formErrors.value[`item_${item.id}_quantity`] = 'Cantidad inválida';
             isValid = false;
         }
-
-        const product = getProductDetails(item.product_id);
-        if (product && product.batch_tracking) {
-            if (!item.batch_number) {
-                formErrors.value[`item_${item.id}_batch`] = 'Lote requerido';
-                isValid = false;
-            }
-        }
     });
 
     return isValid;
@@ -453,7 +448,7 @@ const handleSubmit = async () => {
 
         successMessage.value = 'Entrada masiva registrada exitosamente';
         setTimeout(() => {
-            router.visit('/inventory-movements');
+            router.visit('/inventory/movements');
         }, 1500);
     } catch (err) {
         // Error handled in composable
@@ -462,7 +457,7 @@ const handleSubmit = async () => {
 };
 
 const cancel = () => {
-    router.visit('/inventory-movements');
+    router.visit('/inventory/movements');
 };
 </script>
 
@@ -470,22 +465,20 @@ const cancel = () => {
     <Head title="Nueva Entrada Masiva" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
-            <div class="mx-auto max-w-7xl">
+        <div>
+            <div class="mx-auto w-full max-w-7xl">
                 <!-- Header -->
                 <div
                     class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center"
                 >
                     <div>
                         <h1
-                            class="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white"
+                            class="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground"
                         >
                             <PackagePlus :size="32" />
                             Entrada de Inventario (Por Lotes)
                         </h1>
-                        <p
-                            class="mt-1 text-sm text-gray-700 dark:text-gray-300"
-                        >
+                        <p class="mt-1 text-sm text-muted-foreground">
                             Registra entradas de múltiples productos y lotes
                             simultáneamente (Multialmacén)
                         </p>
@@ -502,7 +495,7 @@ const cancel = () => {
                             type="button"
                             @click="handleSubmit"
                             :disabled="loading"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                         >
                             {{
                                 loading ? 'Procesando...' : 'Confirmar Entrada'
@@ -518,12 +511,9 @@ const cancel = () => {
                 >
                     {{ successMessage }}
                 </div>
-                <div
-                    v-if="error || globalError"
-                    class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900 dark:text-red-200"
-                >
+                <ErrorMessage v-if="error || globalError" class="mb-4">
                     {{ error || globalError }}
-                </div>
+                </ErrorMessage>
 
                 <!-- Main Grid -->
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
@@ -562,23 +552,28 @@ const cancel = () => {
                                         class="mb-1 block text-sm font-medium text-gray-900 dark:text-white"
                                         >Tipo Referencia</label
                                     >
-                                    <select
+                                    <AppSelect
                                         v-model="headerForm.reference_type"
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-border dark:bg-muted"
-                                    >
-                                        <option :value="undefined">
-                                            Ninguna
-                                        </option>
-                                        <option value="purchase">
-                                            Compra (PO)
-                                        </option>
-                                        <option value="adjustment">
-                                            Ajuste
-                                        </option>
-                                        <option value="return">
-                                            Devolución
-                                        </option>
-                                    </select>
+                                        class="w-full"
+                                        :options="[
+                                            {
+                                                value: undefined,
+                                                label: 'Ninguna',
+                                            },
+                                            {
+                                                value: 'purchase',
+                                                label: 'Compra (PO)',
+                                            },
+                                            {
+                                                value: 'adjustment',
+                                                label: 'Ajuste',
+                                            },
+                                            {
+                                                value: 'return',
+                                                label: 'Devolución',
+                                            },
+                                        ]"
+                                    />
                                 </div>
 
                                 <div v-if="headerForm.reference_type">
@@ -808,44 +803,35 @@ const cancel = () => {
                                                     <div
                                                         class="flex items-center gap-1"
                                                     >
-                                                        <select
+                                                        <AppSelect
                                                             v-model="
                                                                 item.variant_id
                                                             "
-                                                            @change="
+                                                            class="w-full"
+                                                            @update:model-value="
                                                                 handleProductSelect(
                                                                     index,
                                                                     item.product_id,
                                                                     item.variant_id,
                                                                 )
                                                             "
-                                                            class="w-full rounded-md border-gray-300 py-1.5 text-sm shadow-sm dark:border-border dark:bg-muted"
-                                                        >
-                                                            <option
-                                                                :value="null"
-                                                            >
-                                                                Genérico /
-                                                                Default
-                                                            </option>
-                                                            <option
-                                                                v-for="v in getProductDetails(
-                                                                    item.product_id,
-                                                                )?.variants ||
-                                                                []"
-                                                                :key="v.id"
-                                                                :value="v.id"
-                                                            >
-                                                                {{ v.sku }}
-                                                                {{
-                                                                    v.brand
-                                                                        ? '- ' +
-                                                                          v
-                                                                              .brand
-                                                                              .name
-                                                                        : ''
-                                                                }}
-                                                            </option>
-                                                        </select>
+                                                            :options="[
+                                                                {
+                                                                    value: null,
+                                                                    label: 'Genérico / Default',
+                                                                },
+                                                                ...(
+                                                                    getProductDetails(
+                                                                        item.product_id,
+                                                                    )
+                                                                        ?.variants ||
+                                                                    []
+                                                                ).map((v) => ({
+                                                                    value: v.id,
+                                                                    label: `${v.sku} ${v.brand ? '- ' + v.brand.name : ''}`,
+                                                                })),
+                                                            ]"
+                                                        />
                                                         <button
                                                             @click="
                                                                 refreshVariants(
@@ -877,7 +863,7 @@ const cancel = () => {
                                                         </button>
                                                     </div>
                                                     <a
-                                                        :href="`/products/${item.product_id}/edit`"
+                                                        :href="`/inventory/products/${item.product_id}/edit`"
                                                         target="_blank"
                                                         class="mt-1 flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400 dark:text-primary"
                                                     >

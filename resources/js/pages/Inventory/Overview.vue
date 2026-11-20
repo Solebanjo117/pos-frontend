@@ -5,7 +5,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Inventario', href: '/inventory/overview' },
+    { title: 'Inventario', href: '/inventory' },
 ];
 </script>
 

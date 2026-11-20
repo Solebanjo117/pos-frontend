@@ -329,7 +329,7 @@ onMounted(async () => {
 <template>
     <Head title="Nueva Cotización" />
 
-    <div class="mx-auto max-w-7xl">
+    <div class="mx-auto w-full max-w-7xl">
         <!-- R41: Enhanced Header with Quote Number -->
         <div
             class="mb-6 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 px-6 py-4 dark:border-indigo-900/50 dark:from-indigo-950/30 dark:to-blue-950/30"
@@ -345,11 +345,11 @@ onMounted(async () => {
                     </div>
                     <div>
                         <h1
-                            class="text-xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             Nueva Cotización
                         </h1>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                        <p class="text-sm text-muted-foreground">
                             Crea un presupuesto sin afectar el inventario
                         </p>
                     </div>
@@ -653,7 +653,7 @@ onMounted(async () => {
                 <button
                     @click="handleSave"
                     :disabled="saving || cart.length === 0"
-                    class="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-lg font-bold text-white shadow-lg transition hover:bg-indigo-700 disabled:bg-gray-400 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                    class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-lg font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90 disabled:bg-gray-400"
                 >
                     <Save :size="20" />
                     {{ saving ? 'Guardando...' : 'Guardar Cotización' }}
@@ -705,7 +705,7 @@ onMounted(async () => {
                     <button
                         @click="handleSaveAndExit"
                         :disabled="saving"
-                        class="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition hover:bg-indigo-700"
+                        class="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
                     >
                         <Save :size="18" />
                         {{ saving ? 'Guardando...' : 'Guardar y salir' }}

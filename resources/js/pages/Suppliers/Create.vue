@@ -2,6 +2,8 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useSuppliers } from '@/composables/useSuppliers';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { CreateSupplierData } from '@/types/supplier';
@@ -35,7 +37,7 @@ async function handleSubmit() {
 <template>
     <Head title="Nuevo Proveedor" />
     <AppLayout>
-        <div class="mx-auto max-w-3xl space-y-6">
+        <div class="mx-auto w-full max-w-3xl space-y-6">
             <!-- Header -->
             <div class="flex items-center gap-4">
                 <Link
@@ -46,23 +48,20 @@ async function handleSubmit() {
                 </Link>
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Nuevo Proveedor
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Registra un nuevo proveedor en el sistema
                     </p>
                 </div>
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Form -->
             <form
@@ -133,13 +132,14 @@ async function handleSubmit() {
                                 class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >Estado</label
                             >
-                            <select
+                            <AppSelect
                                 v-model="form.status"
-                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                            >
-                                <option value="active">Activo</option>
-                                <option value="inactive">Inactivo</option>
-                            </select>
+                                class="w-full"
+                                :options="[
+                                    { value: 'active', label: 'Activo' },
+                                    { value: 'inactive', label: 'Inactivo' },
+                                ]"
+                            />
                         </div>
                     </div>
                 </div>
@@ -247,7 +247,7 @@ async function handleSubmit() {
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                     >
                         <Save :size="18" />
                         {{ loading ? 'Guardando...' : 'Guardar Proveedor' }}

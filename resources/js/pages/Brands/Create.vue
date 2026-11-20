@@ -2,6 +2,9 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import BrandTierPicker from '@/components/Brands/BrandTierPicker.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useBrands } from '@/composables/useBrands';
 import { useSuppliers } from '@/composables/useSuppliers';
 import { useToast } from '@/composables/useToast';
@@ -17,8 +20,7 @@ const availableSuppliers = ref<Supplier[]>([]);
 const form = ref<CreateBrandData>({
     name: '',
     description: '',
-    logo_url: '',
-    website: '',
+    tier: 'standard',
     supplier_ids: [],
 });
 
@@ -44,7 +46,8 @@ function goBack() {
 <template>
     <Head title="Nueva Marca" />
     <AppLayout>
-        <div class="mx-auto max-w-2xl space-y-6">
+        <!-- w-full: dentro del layout flex, mx-auto solo encogería el formulario al ancho de su contenido. -->
+        <div class="mx-auto w-full max-w-3xl space-y-6">
             <!-- Header -->
             <div class="flex items-center gap-4">
                 <button
@@ -55,23 +58,20 @@ function goBack() {
                 </button>
                 <div>
                     <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
+                        class="text-2xl font-semibold tracking-tight text-foreground"
                     >
                         Nueva Marca
                     </h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         Agrega una nueva marca de productos
                     </p>
                 </div>
             </div>
 
             <!-- Error -->
-            <div
-                v-if="error"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30"
-            >
-                <p class="text-red-600 dark:text-red-400">{{ error }}</p>
-            </div>
+            <ErrorMessage v-if="error">
+                <p>{{ error }}</p>
+            </ErrorMessage>
 
             <!-- Form -->
             <form
@@ -114,37 +114,14 @@ function goBack() {
                     ></textarea>
                 </div>
 
-                <!-- Logo URL -->
+                <!-- Gama: cada marca es Standard o Premium -->
                 <div>
                     <label
                         class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                        URL del Logo
+                        Gama <span class="text-red-500">*</span>
                     </label>
-                    <input
-                        v-model="form.logo_url"
-                        type="url"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="https://ejemplo.com/logo.png"
-                    />
-                    <p class="mt-1 text-xs text-gray-500">
-                        Logo de la marca (opcional)
-                    </p>
-                </div>
-
-                <!-- Website -->
-                <div>
-                    <label
-                        class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                        Sitio Web
-                    </label>
-                    <input
-                        v-model="form.website"
-                        type="url"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-border dark:bg-muted dark:text-white"
-                        placeholder="https://www.ejemplo.com"
-                    />
+                    <BrandTierPicker v-model="form.tier" />
                 </div>
 
                 <div>
@@ -169,12 +146,9 @@ function goBack() {
                             />
                             <span>{{ supplier.name }}</span>
                         </label>
-                        <p
-                            v-if="availableSuppliers.length === 0"
-                            class="text-sm text-gray-500 dark:text-gray-400"
+                        <EmptyState v-if="availableSuppliers.length === 0"
+                            >No hay proveedores activos disponibles.</EmptyState
                         >
-                            No hay proveedores activos disponibles.
-                        </p>
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {{ form.supplier_ids?.length || 0 }} proveedor(es)
@@ -196,7 +170,7 @@ function goBack() {
                     <button
                         type="submit"
                         :disabled="loading"
-                        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                     >
                         <Save :size="18" />
                         Guardar

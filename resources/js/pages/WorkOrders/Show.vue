@@ -11,6 +11,8 @@ import {
     Wrench,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
     WorkOrdersApiService,
@@ -105,9 +107,9 @@ onMounted(loadOrder);
     <Head :title="title" />
 
     <div
-        class="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100"
+        class="app-page-full-bleed min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100"
     >
-        <div class="space-y-5 p-4 sm:p-6">
+        <div class="space-y-5 p-4 md:p-6">
             <Link
                 href="/work-orders"
                 class="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white"
@@ -123,12 +125,11 @@ onMounted(loadOrder);
                 {{ error }}
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="rounded-md border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-            >
-                Cargando orden...
-            </div>
+                class="rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                label="Cargando orden..."
+            />
 
             <template v-else-if="order">
                 <section
@@ -139,6 +140,7 @@ onMounted(loadOrder);
                     >
                         <div>
                             <div
+                                v-if="multiWarehouse"
                                 class="flex items-center gap-2 text-sm text-sky-700 dark:text-sky-300"
                             >
                                 <Wrench class="h-4 w-4" />
@@ -147,10 +149,12 @@ onMounted(loadOrder);
                                     `Sucursal #${order.warehouse_id}`
                                 }}
                             </div>
-                            <h1 class="mt-1 text-2xl font-semibold">
+                            <h1
+                                class="mt-1 text-2xl font-semibold tracking-tight text-foreground"
+                            >
                                 {{ order.folio }}
                             </h1>
-                            <p class="mt-1 text-sm text-slate-500">
+                            <p class="mt-1 text-sm text-muted-foreground">
                                 {{ order.notes || 'Sin notas internas.' }}
                             </p>
                         </div>
@@ -158,7 +162,7 @@ onMounted(loadOrder);
                             <button
                                 v-for="status in order.available_transitions"
                                 :key="status"
-                                class="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                                class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 dark:bg-white"
                                 :disabled="transitioning"
                                 @click="transition(status)"
                             >

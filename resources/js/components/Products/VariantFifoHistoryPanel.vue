@@ -8,8 +8,15 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import { productsApi } from '@/services/api/products';
+import { suppliersService } from '@/services/suppliers';
+import { variantSuppliersService } from '@/services/variantSuppliers';
 import type {
     InventoryFifoLot,
     ProductVariant,
@@ -707,7 +714,39 @@ watch(
     { deep: true },
 );
 
+// Proveedor de los lotes sin compra (existencia inicial, ajustes): se puede cargar a mano.
+const lotSupplierOptions = ref<{ value: number | null; label: string }[]>([]);
+const lotSupplierError = ref('');
+
+const loadLotSupplierOptions = async () => {
+    try {
+        const suppliers = (await suppliersService.getAllActive()) ?? [];
+        lotSupplierOptions.value = [
+            { value: null, label: 'Sin proveedor' },
+            ...suppliers.map((s: { id: number; name: string }) => ({
+                value: s.id,
+                label: s.name,
+            })),
+        ];
+    } catch {
+        lotSupplierOptions.value = [{ value: null, label: 'Sin proveedor' }];
+    }
+};
+
+const assignLotSupplier = async (lot: InventoryFifoLot, supplierId: unknown) => {
+    lotSupplierError.value = '';
+    const id = supplierId === null || supplierId === '' ? null : Number(supplierId);
+    try {
+        const result = await variantSuppliersService.assignLotSupplier(lot.id, id);
+        lot.supplier = result.supplier;
+    } catch (e: any) {
+        lotSupplierError.value =
+            e?.response?.data?.message || 'No se pudo cambiar el proveedor del lote.';
+    }
+};
+
 onMounted(() => {
+    loadLotSupplierOptions();
     if (!selectedWarehouseId.value) {
         selectedWarehouseId.value = resolveInitialWarehouse();
     } else {
@@ -744,18 +783,7 @@ defineExpose({
             </div>
 
             <div v-if="!embedded" class="flex items-center gap-2">
-                <select
-                    v-model.number="selectedWarehouseId"
-                    class="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-border dark:bg-muted dark:text-white"
-                >
-                    <option
-                        v-for="warehouse in variantWarehouseOptions"
-                        :key="warehouse.id"
-                        :value="warehouse.id"
-                    >
-                        {{ warehouse.name }}
-                    </option>
-                </select>
+                <AppSelect v-if="multiWarehouse" v-model="selectedWarehouseId" :options="[...((variantWarehouseOptions) ?? []).map((warehouse) => ({ value: warehouse.id, label: String(warehouse.name) }))]" />
                 <Button
                     type="button"
                     variant="outline"
@@ -894,12 +922,9 @@ defineExpose({
                 </button>
             </div>
 
-            <div
-                v-if="loading"
-                class="px-4 py-8 text-center text-sm text-gray-500"
-            >
-                Cargando historial de stock...
-            </div>
+            <ErrorMessage v-if="lotSupplierError">{{ lotSupplierError }}</ErrorMessage>
+
+            <LoadingState v-if="loading" label="Cargando historial de stock..." />
 
             <div v-else class="max-w-full overflow-x-auto">
                 <table
@@ -930,7 +955,7 @@ defineExpose({
                             <td class="px-4 py-2">{{ movement.user?.name || '-' }}</td>
                         </tr>
                         <tr v-if="!(history?.movement_timeline ?? []).length">
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">No hay movimientos para el rango seleccionado.</td>
+                            <td colspan="7" ><EmptyState>No hay movimientos para el rango seleccionado.</EmptyState></td>
                         </tr>
                     </tbody>
                 </table>
@@ -945,6 +970,7 @@ defineExpose({
                         <tr>
                             <th class="px-4 py-2">Fecha</th>
                             <th class="px-4 py-2">Origen</th>
+                            <th class="px-4 py-2">Proveedor</th>
                             <th class="px-4 py-2">Lote</th>
                             <th class="px-4 py-2 text-right">Inicial</th>
                             <th class="px-4 py-2 text-right">Disponible</th>
@@ -1009,6 +1035,16 @@ defineExpose({
                                         )
                                     }}
                                 </span>
+                            </td>
+                            <td class="px-4 py-2" data-test="lot-supplier">
+                                <AppSelect
+                                    v-if="lot.supplier_editable"
+                                    :model-value="lot.supplier?.id ?? null"
+                                    :options="lotSupplierOptions"
+                                    class="w-44"
+                                    @update:model-value="(v) => assignLotSupplier(lot, v)"
+                                />
+                                <span v-else>{{ lot.supplier?.name ?? 'Sin proveedor' }}</span>
                             </td>
                             <td class="px-4 py-2 font-mono">
                                 {{ lot.batch_number || `#${lot.id}` }}
@@ -1139,11 +1175,9 @@ defineExpose({
                         </tr>
                         <tr v-if="!history?.lots.length">
                             <td
-                                colspan="12"
-                                class="px-4 py-6 text-center text-gray-500"
-                            >
-                                No hay lotes disponibles para esta variante.
-                            </td>
+                                colspan="13"
+                                
+                            ><EmptyState>No hay lotes disponibles para esta variante.</EmptyState></td>
                         </tr>
                     </tbody>
                 </table>
@@ -1166,7 +1200,7 @@ defineExpose({
                             <th class="px-4 py-2 text-right">MISC total</th>
                             <th class="px-4 py-2 text-right">Costo final</th>
                             <th class="px-4 py-2 text-right">Precio venta</th>
-                            <th class="px-4 py-2">Almacén</th>
+                            <th v-if="multiWarehouse" class="px-4 py-2">Almacén</th>
                             <th
                                 class="sticky right-0 bg-gray-50 px-3 py-2 text-right shadow-[-10px_0_14px_-14px_rgba(15,23,42,0.7)] dark:bg-muted"
                             >
@@ -1355,7 +1389,7 @@ defineExpose({
                                     )
                                 }}</span>
                             </td>
-                            <td class="px-4 py-2">
+                            <td v-if="multiWarehouse" class="px-4 py-2">
                                 {{ movement.warehouse?.name || '-' }}
                             </td>
                             <td
@@ -1416,10 +1450,8 @@ defineExpose({
                         <tr v-if="!history?.purchase_movements.length">
                             <td
                                 colspan="12"
-                                class="px-4 py-6 text-center text-gray-500"
-                            >
-                                No hay compras registradas para esta variante.
-                            </td>
+                                
+                            ><EmptyState>No hay compras registradas para esta variante.</EmptyState></td>
                         </tr>
                     </tbody>
                 </table>
@@ -1571,10 +1603,8 @@ defineExpose({
                         <tr v-if="!history?.sale_movements.length">
                             <td
                                 colspan="6"
-                                class="px-4 py-6 text-center text-gray-500"
-                            >
-                                No hay ventas registradas para esta variante.
-                            </td>
+                                
+                            ><EmptyState>No hay ventas registradas para esta variante.</EmptyState></td>
                         </tr>
                     </tbody>
                 </table>

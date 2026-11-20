@@ -2,6 +2,7 @@
 import { Link } from '@inertiajs/vue3';
 import { Check, Plus, Star, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import apiClient from '@/services/api/client';
@@ -176,17 +177,17 @@ defineExpose({ hasConflicts: () => hasConflicts.value, validateAll });
                 placeholder="Ej: 45503-19155"
                 @keydown.enter.prevent="addCode"
             />
-            <select
+            <AppSelect
                 v-model="newType"
                 :disabled="disabled"
-                class="h-9 rounded-md border border-input bg-background px-3 text-sm"
                 aria-label="Tipo de código"
-            >
-                <option value="sku">SKU</option>
-                <option value="upc">UPC</option>
-                <option value="alternate">Alterno</option>
-                <option value="manual">Manual</option>
-            </select>
+                :options="[
+                    { value: 'sku', label: 'SKU' },
+                    { value: 'upc', label: 'UPC' },
+                    { value: 'alternate', label: 'Alterno' },
+                    { value: 'manual', label: 'Manual' },
+                ]"
+            />
             <Button
                 type="button"
                 variant="outline"
@@ -219,24 +220,18 @@ defineExpose({ hasConflicts: () => hasConflicts.value, validateAll });
                             updateCode(index, 'code', String($event))
                         "
                     />
-                    <select
-                        :value="item.type"
+                    <AppSelect
+                        :model-value="item.type"
                         :disabled="disabled"
-                        class="h-9 rounded-md border border-input bg-background px-3 text-sm"
                         aria-label="Tipo de código"
-                        @change="
-                            updateCode(
-                                index,
-                                'type',
-                                ($event.target as HTMLSelectElement).value,
-                            )
-                        "
-                    >
-                        <option value="sku">SKU</option>
-                        <option value="upc">UPC</option>
-                        <option value="alternate">Alterno</option>
-                        <option value="manual">Manual</option>
-                    </select>
+                        @update:model-value="updateCode(index, 'type', $event)"
+                        :options="[
+                            { value: 'sku', label: 'SKU' },
+                            { value: 'upc', label: 'UPC' },
+                            { value: 'alternate', label: 'Alterno' },
+                            { value: 'manual', label: 'Manual' },
+                        ]"
+                    />
                     <Button
                         type="button"
                         size="sm"

@@ -36,7 +36,7 @@ const emit = defineEmits(['request-open']);
             <div v-if="canManageCashRegister" class="flex items-center gap-3">
                 <button
                     @click="emit('request-open')"
-                    class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-blue-700 dark:bg-blue-700 dark:bg-primary dark:text-primary-foreground dark:hover:bg-blue-600 dark:hover:bg-primary/90"
+                    class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium whitespace-nowrap text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                     <Lock class="h-4 w-4" />
                     Abrir Caja

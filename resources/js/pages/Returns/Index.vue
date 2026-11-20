@@ -11,7 +11,12 @@ import {
 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import CreateReturnModal from '@/components/POS/CreateReturnModal.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { SalesReturnsApiService } from '@/services/sales-returns';
 import type {
@@ -276,7 +281,9 @@ const handleCreateReturn = async (
             <div>
                 <div class="flex items-center gap-2">
                     <RotateCcw class="h-6 w-6 text-cyan-700" />
-                    <h1 class="text-2xl font-semibold text-gray-950">
+                    <h1
+                        class="text-2xl font-semibold tracking-tight text-foreground"
+                    >
                         Devoluciones
                     </h1>
                 </div>
@@ -459,33 +466,33 @@ const handleCreateReturn = async (
                         class="w-full rounded-md border px-8 py-2 text-sm"
                     />
                 </div>
-                <select
+                <AppSelect
                     v-model="filters.status"
-                    class="rounded-md border px-3 py-2 text-sm"
-                >
-                    <option value="">Todos los estados</option>
-                    <option value="pending">Pendiente</option>
-                    <option value="approved">Aprobada</option>
-                    <option value="rejected">Rechazada</option>
-                </select>
-                <select
+                    :options="[
+                        { value: '', label: 'Todos los estados' },
+                        { value: 'pending', label: 'Pendiente' },
+                        { value: 'approved', label: 'Aprobada' },
+                        { value: 'rejected', label: 'Rechazada' },
+                    ]"
+                />
+                <AppSelect
                     v-model="filters.refund_method"
-                    class="rounded-md border px-3 py-2 text-sm"
-                >
-                    <option value="">Todos los métodos</option>
-                    <option value="cash">Efectivo</option>
-                    <option value="card">Tarjeta</option>
-                    <option value="transfer">Transferencia</option>
-                    <option value="yappy">Yappy</option>
-                    <option value="ach">ACH</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="visa">Visa</option>
-                    <option value="mastercard">Mastercard</option>
-                    <option value="amex">AMEX</option>
-                    <option value="other">Otro</option>
-                    <option value="receivable">Reducir CxC</option>
-                    <option value="balance">Saldo a favor</option>
-                </select>
+                    :options="[
+                        { value: '', label: 'Todos los métodos' },
+                        { value: 'cash', label: 'Efectivo' },
+                        { value: 'card', label: 'Tarjeta' },
+                        { value: 'transfer', label: 'Transferencia' },
+                        { value: 'yappy', label: 'Yappy' },
+                        { value: 'ach', label: 'ACH' },
+                        { value: 'cheque', label: 'Cheque' },
+                        { value: 'visa', label: 'Visa' },
+                        { value: 'mastercard', label: 'Mastercard' },
+                        { value: 'amex', label: 'AMEX' },
+                        { value: 'other', label: 'Otro' },
+                        { value: 'receivable', label: 'Reducir CxC' },
+                        { value: 'balance', label: 'Saldo a favor' },
+                    ]"
+                />
                 <input
                     v-model="filters.customer_id"
                     type="number"
@@ -517,23 +524,15 @@ const handleCreateReturn = async (
             </div>
         </section>
 
-        <div
-            v-if="error"
-            class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-        >
+        <ErrorMessage v-if="error">
             {{ error }}
-        </div>
+        </ErrorMessage>
 
         <section class="overflow-hidden rounded-lg border bg-white">
-            <div v-if="loading" class="p-8 text-center text-sm text-gray-500">
-                Cargando devoluciones...
-            </div>
-            <div
-                v-else-if="returns.length === 0"
-                class="p-8 text-center text-sm text-gray-500"
+            <LoadingState v-if="loading" label="Cargando devoluciones..." />
+            <EmptyState v-else-if="returns.length === 0"
+                >No hay devoluciones para el filtro seleccionado.</EmptyState
             >
-                No hay devoluciones para el filtro seleccionado.
-            </div>
             <div v-else class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
@@ -652,7 +651,7 @@ const handleCreateReturn = async (
                                         <button
                                             v-if="item.status === 'pending'"
                                             type="button"
-                                            class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                                            class="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                                             :disabled="processingId === item.id"
                                             @click="
                                                 processReturn(
@@ -685,7 +684,7 @@ const handleCreateReturn = async (
                                     <div
                                         class="grid gap-3 text-xs text-gray-600 md:grid-cols-4"
                                     >
-                                        <div>
+                                        <div v-if="multiWarehouse">
                                             <span class="font-semibold"
                                                 >Sucursal:</span
                                             >

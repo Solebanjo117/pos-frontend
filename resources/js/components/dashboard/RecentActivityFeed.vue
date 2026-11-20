@@ -2,6 +2,7 @@
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CheckCircle2Icon, PackageIcon } from 'lucide-vue-next';
+import EmptyState from '@/components/ui/EmptyState.vue';
 import type { RecentActivity } from '@/types/dashboard';
 
 interface Props {
@@ -88,11 +89,6 @@ const formatDate = (dateString: string) => {
                 </div>
             </li>
         </ul>
-        <div
-            v-else
-            class="py-4 text-center text-sm text-gray-500 dark:text-gray-400"
-        >
-            No hay actividad reciente.
-        </div>
+        <EmptyState v-else>No hay actividad reciente.</EmptyState>
     </div>
 </template>

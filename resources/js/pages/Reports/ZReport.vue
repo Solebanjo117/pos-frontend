@@ -22,6 +22,8 @@ import FinanceAccountingPanel from '@/components/Finance/FinanceAccountingPanel.
 import FinanceKpiCard from '@/components/Finance/FinanceKpiCard.vue';
 import FinanceMethodBars from '@/components/Finance/FinanceMethodBars.vue';
 import FinanceReportShell from '@/components/Finance/FinanceReportShell.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
@@ -29,6 +31,7 @@ import { usePosSettings } from '@/composables/usePosSettings';
 import { useReports } from '@/composables/useReports';
 import { useUsers } from '@/composables/useUsers';
 import { useWarehouses } from '@/composables/useWarehouses';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { formatCurrency, formatDateInputValue } from '@/utils/formatters';
@@ -331,7 +334,7 @@ onMounted(async () => {
     <Head title="Cierre de Caja (Z-Report)" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-5 p-4">
+        <div class="space-y-5">
             <FinanceReportShell
                 eyebrow="Cierre diario"
                 title="Cierre de Caja / Z-Report"
@@ -343,7 +346,7 @@ onMounted(async () => {
                         type="button"
                         @click="handleExport"
                         :disabled="exporting || loading || !report"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-white"
                     >
                         <Printer :size="16" />
                         {{ exporting ? 'Exportando...' : 'PDF / Imprimir' }}
@@ -367,7 +370,7 @@ onMounted(async () => {
                             @change="loadReport"
                         />
                     </div>
-                    <div>
+                    <div v-if="multiWarehouse">
                         <label
                             class="mb-1.5 block text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
                         >
@@ -417,13 +420,11 @@ onMounted(async () => {
                 {{ error }}
             </div>
 
-            <div
+            <LoadingState
                 v-if="loading && !report"
-                class="rounded-lg border border-slate-200 bg-white py-14 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
-            >
-                <RefreshCw :size="20" class="mx-auto mb-3 animate-spin" />
-                Cargando cierre de caja...
-            </div>
+                class="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                label="Cargando cierre de caja..."
+            />
 
             <template v-else-if="report">
                 <div class="grid gap-3 md:grid-cols-5">
@@ -712,12 +713,11 @@ onMounted(async () => {
                                     </td>
                                 </tr>
                                 <tr v-if="!report.by_user?.length">
-                                    <td
-                                        colspan="6"
-                                        class="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
-                                    >
-                                        No hay sesiones de caja para los filtros
-                                        seleccionados.
+                                    <td colspan="6">
+                                        <EmptyState
+                                            >No hay sesiones de caja para los
+                                            filtros seleccionados.</EmptyState
+                                        >
                                     </td>
                                 </tr>
                             </tbody>

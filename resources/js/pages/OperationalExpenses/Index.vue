@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import {
-    AlertCircle,
     Banknote,
     CheckCircle2,
     DollarSign,
@@ -16,11 +15,16 @@ import {
 import { computed, nextTick, onMounted, ref } from 'vue';
 import BusinessDatetimeEditor from '@/components/BusinessDatetimeEditor.vue';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
+import AppSelect from '@/components/ui/AppSelect.vue';
 import DateRangeInput from '@/components/ui/DateRangeInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import SearchableSelect, {
     type SelectOption,
 } from '@/components/ui/SearchableSelect.vue';
 import { useStoreSettings } from '@/composables/useStoreSettings';
+import { MULTI_WAREHOUSE_ENABLED as multiWarehouse } from '@/config/features';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { operationalExpensesService } from '@/services/operational-expenses';
 import { ReportsApiService } from '@/services/reports';
@@ -750,19 +754,19 @@ onMounted(async () => {
     <Head title="Gastos operativos" />
     <AppLayout>
         <div
-            class="min-h-[calc(100vh-4rem)] bg-gray-50/60 p-4 dark:bg-background"
+            class="app-page-full-bleed min-h-[calc(100vh-4rem)] bg-gray-50/60 p-4 md:p-6 dark:bg-background"
         >
-            <div class="mx-auto max-w-7xl space-y-4">
+            <div class="mx-auto w-full max-w-7xl space-y-4">
                 <div
                     class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
                 >
                     <div>
                         <h1
-                            class="text-2xl font-bold text-gray-900 dark:text-white"
+                            class="text-2xl font-semibold tracking-tight text-foreground"
                         >
                             Gastos operativos
                         </h1>
-                        <p class="text-sm text-gray-500">
+                        <p class="text-sm text-muted-foreground">
                             Luz, alquiler, contador, mantenimiento, software y
                             otros gastos de operación separados por impacto de
                             caja.
@@ -770,7 +774,7 @@ onMounted(async () => {
                     </div>
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
                         @click="openCreateForm"
                     >
                         <Plus :size="16" />
@@ -778,13 +782,9 @@ onMounted(async () => {
                     </button>
                 </div>
 
-                <div
-                    v-if="error"
-                    class="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
-                >
-                    <AlertCircle :size="16" />
+                <ErrorMessage v-if="error">
                     {{ error }}
-                </div>
+                </ErrorMessage>
 
                 <div class="grid gap-3 md:grid-cols-3">
                     <div
@@ -1064,19 +1064,16 @@ onMounted(async () => {
                             class="divide-y divide-gray-100 dark:divide-border"
                         >
                             <tr v-if="loading">
-                                <td
-                                    colspan="9"
-                                    class="px-3 py-8 text-center text-gray-500"
-                                >
-                                    Cargando gastos...
+                                <td colspan="9">
+                                    <LoadingState label="Cargando gastos..." />
                                 </td>
                             </tr>
                             <tr v-else-if="expenses.length === 0">
-                                <td
-                                    colspan="9"
-                                    class="px-3 py-8 text-center text-gray-500"
-                                >
-                                    No hay gastos para este filtro.
+                                <td colspan="9">
+                                    <EmptyState
+                                        >No hay gastos para este
+                                        filtro.</EmptyState
+                                    >
                                 </td>
                             </tr>
                             <template v-else>
@@ -1309,13 +1306,13 @@ onMounted(async () => {
                             placeholder="Nombre del beneficiario"
                             class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
                         />
-                        <select
+                        <AppSelect
                             v-model="beneficiaryForm.type"
-                            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-border dark:bg-muted"
-                        >
-                            <option value="individual">Persona</option>
-                            <option value="company">Empresa</option>
-                        </select>
+                            :options="[
+                                { value: 'individual', label: 'Persona' },
+                                { value: 'company', label: 'Empresa' },
+                            ]"
+                        />
                         <input
                             v-model="beneficiaryForm.phone"
                             type="text"
@@ -1328,7 +1325,7 @@ onMounted(async () => {
                                 creatingBeneficiary ||
                                 !beneficiaryForm.name.trim()
                             "
-                            class="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                            class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                             @click="createBeneficiaryFromForm"
                         >
                             {{
@@ -1449,25 +1446,26 @@ onMounted(async () => {
                                     :options="statusOptions"
                                 />
                             </div>
-                            <div>
+                            <div v-if="multiWarehouse">
                                 <label class="mb-1 block text-sm font-medium"
                                     >Sucursal</label
                                 >
-                                <select
-                                    v-model.number="form.warehouse_id"
-                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                                >
-                                    <option :value="null">
-                                        Sucursal actual
-                                    </option>
-                                    <option
-                                        v-for="warehouse in warehouses"
-                                        :key="warehouse.id"
-                                        :value="warehouse.id"
-                                    >
-                                        {{ warehouse.name }}
-                                    </option>
-                                </select>
+                                <AppSelect
+                                    v-model="form.warehouse_id"
+                                    class="w-full"
+                                    :options="[
+                                        {
+                                            value: null,
+                                            label: 'Sucursal actual',
+                                        },
+                                        ...(warehouses ?? []).map(
+                                            (warehouse) => ({
+                                                value: warehouse.id,
+                                                label: String(warehouse.name),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium">
@@ -1477,32 +1475,32 @@ onMounted(async () => {
                                             : 'Metodo previsto'
                                     }}
                                 </label>
-                                <select
+                                <AppSelect
                                     v-if="form.status === 'paid'"
                                     v-model="form.payment_method"
-                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                                >
-                                    <option
-                                        v-for="method in paymentMethods"
-                                        :key="method.value"
-                                        :value="method.value"
-                                    >
-                                        {{ method.label }}
-                                    </option>
-                                </select>
-                                <select
+                                    class="w-full"
+                                    :options="[
+                                        ...(paymentMethods ?? []).map(
+                                            (method) => ({
+                                                value: method.value,
+                                                label: String(method.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
+                                <AppSelect
                                     v-else
                                     v-model="form.planned_payment_method"
-                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-border dark:bg-muted"
-                                >
-                                    <option
-                                        v-for="method in paymentMethods"
-                                        :key="method.value"
-                                        :value="method.value"
-                                    >
-                                        {{ method.label }}
-                                    </option>
-                                </select>
+                                    class="w-full"
+                                    :options="[
+                                        ...(paymentMethods ?? []).map(
+                                            (method) => ({
+                                                value: method.value,
+                                                label: String(method.label),
+                                            }),
+                                        ),
+                                    ]"
+                                />
                             </div>
                             <div v-if="form.status !== 'paid'">
                                 <label class="mb-1 block text-sm font-medium"
@@ -1627,7 +1625,7 @@ onMounted(async () => {
                             saving ||
                             Number(form.estimated_amount || form.amount) <= 0
                         "
-                        class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                         <DollarSign :size="16" />
                         {{ saving ? 'Guardando...' : 'Guardar' }}

@@ -17,12 +17,10 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import TransactionTraceDrawer from '@/components/Traceability/TransactionTraceDrawer.vue';
-import {
-    formatCurrency,
-    formatDuration as fmtDuration,
-} from '@/utils/formatters';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
+import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import type {
     AccountPaymentRecord,
     CashMovementRecord,
@@ -33,6 +31,10 @@ import type {
     PurchasePaymentRecord,
     SessionSalesOrder,
 } from '@/services/posSessions';
+import {
+    formatCurrency,
+    formatDuration as fmtDuration,
+} from '@/utils/formatters';
 
 interface ReconciliationRow {
     code: string;
@@ -478,7 +480,7 @@ const handlePrint = () => {
                     <button
                         v-if="session"
                         type="button"
-                        class="inline-flex h-9 items-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                        class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 dark:bg-white"
                         @click="handlePrint"
                     >
                         <Printer :size="16" />
@@ -496,12 +498,11 @@ const handlePrint = () => {
                 </div>
             </header>
 
-            <div
+            <LoadingState
                 v-if="loading"
-                class="flex min-h-80 items-center justify-center text-sm font-medium text-slate-500 dark:text-slate-400"
-            >
-                Cargando detalle del cierre...
-            </div>
+                class="min-h-80"
+                label="Cargando detalle del cierre..."
+            />
 
             <div
                 v-else-if="error"
@@ -522,7 +523,7 @@ const handlePrint = () => {
                 </div>
                 <button
                     type="button"
-                    class="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                    class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 dark:bg-white"
                     @click="emit('retry')"
                 >
                     Reintentar
@@ -823,12 +824,11 @@ const handlePrint = () => {
                                                     countableRows.length === 0
                                                 "
                                             >
-                                                <td
-                                                    colspan="7"
-                                                    class="px-4 py-6 text-center text-slate-500"
-                                                >
-                                                    No hay datos de
-                                                    conciliación.
+                                                <td colspan="7">
+                                                    <EmptyState
+                                                        >No hay datos de
+                                                        conciliación.</EmptyState
+                                                    >
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -1695,12 +1695,10 @@ const handlePrint = () => {
                                 </div>
                             </div>
                         </div>
-                        <div
-                            v-else
-                            class="p-5 text-center text-sm text-slate-500 dark:text-slate-400"
+                        <EmptyState v-else
+                            >No hay eventos normalizados para esta
+                            sesion.</EmptyState
                         >
-                            No hay eventos normalizados para esta sesion.
-                        </div>
                     </div>
 
                     <div
@@ -1810,11 +1808,11 @@ const handlePrint = () => {
                                         </td>
                                     </tr>
                                     <tr v-if="documentRows.length === 0">
-                                        <td
-                                            colspan="5"
-                                            class="px-4 py-6 text-center text-slate-500"
-                                        >
-                                            No hay documentos normalizados.
+                                        <td colspan="5">
+                                            <EmptyState
+                                                >No hay documentos
+                                                normalizados.</EmptyState
+                                            >
                                         </td>
                                     </tr>
                                 </tbody>

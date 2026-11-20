@@ -108,7 +108,6 @@ export function useProducts() {
             'inventory',
             'suppliers',
             'compatibility',
-            'oem',
             'alternatives',
             'inherited_images',
         ],
@@ -281,28 +280,6 @@ export function useProducts() {
     }
 
     /**
-     * Get product batches
-     */
-    async function fetchBatches(productId: number, warehouseId?: number) {
-        loading.value = true;
-        error.value = null;
-
-        try {
-            const response = await productsApi.getBatches(
-                productId,
-                warehouseId,
-            );
-            return response.data;
-        } catch (err: any) {
-            error.value =
-                err.response?.data?.message || 'Error al cargar lotes';
-            throw err;
-        } finally {
-            loading.value = false;
-        }
-    }
-
-    /**
      * Fetch variants for a product
      */
     async function fetchVariants(productId: number) {
@@ -414,7 +391,6 @@ export function useProducts() {
         goToPage,
         clearCurrentProduct,
         clearError,
-        fetchBatches,
         fetchVariants,
         createVariant,
         updateVariant,

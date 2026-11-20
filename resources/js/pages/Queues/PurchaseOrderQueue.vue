@@ -2,6 +2,8 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowRight, ClipboardCheck, Factory } from 'lucide-vue-next';
 import { onMounted, onUnmounted } from 'vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import {
     usePurchaseOrderQueue,
     type PendingReceiptOrder,
@@ -41,7 +43,7 @@ const goToReceive = (id: number) => {
         <div class="flex items-center justify-between">
             <div>
                 <h1
-                    class="flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white"
+                    class="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground"
                 >
                     <ClipboardCheck
                         class="h-8 w-8 text-blue-600 dark:text-blue-400"
@@ -54,22 +56,17 @@ const goToReceive = (id: number) => {
                         {{ count }}
                     </span>
                 </h1>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <p class="mt-1 text-sm text-muted-foreground">
                     Ordenes de compra enviadas o parciales, pendientes de
                     recepcion
                 </p>
             </div>
         </div>
 
-        <div
+        <LoadingState
             v-if="loading && orders.length === 0"
-            class="py-16 text-center text-gray-500"
-        >
-            <div
-                class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"
-            ></div>
-            Cargando pedidos pendientes...
-        </div>
+            label="Cargando pedidos pendientes..."
+        />
 
         <div
             v-else-if="error"
@@ -96,9 +93,10 @@ const goToReceive = (id: number) => {
             >
                 Sin pedidos pendientes
             </h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                No hay ordenes de compra por recibir en este momento.
-            </p>
+            <EmptyState compact
+                >No hay ordenes de compra por recibir en este
+                momento.</EmptyState
+            >
         </div>
 
         <div v-else class="space-y-3">
@@ -136,7 +134,7 @@ const goToReceive = (id: number) => {
 
                 <button
                     type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                    class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
                     @click="goToReceive(order.id)"
                 >
                     Ir a Recepcion

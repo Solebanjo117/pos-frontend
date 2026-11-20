@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import LoadingState from '@/components/ui/LoadingState.vue';
 import apiClient from '@/services/api/client';
 
 const props = withDefaults(
@@ -263,12 +264,11 @@ onBeforeUnmount(() => {
                     style="min-height: 400px"
                     @load="previewReady = true"
                 />
-                <div
+                <LoadingState
                     v-if="previewLoading"
-                    class="flex min-h-[400px] items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-                >
-                    Cargando documento...
-                </div>
+                    class="min-h-[400px]"
+                    label="Cargando documento..."
+                />
                 <div
                     v-else-if="previewError"
                     class="flex min-h-[400px] flex-col items-center justify-center gap-3 px-6 text-center"
@@ -310,7 +310,7 @@ onBeforeUnmount(() => {
                     <button
                         @click="printTicket"
                         :disabled="!previewReady || previewLoading"
-                        class="flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         🖨️ Imprimir
                     </button>

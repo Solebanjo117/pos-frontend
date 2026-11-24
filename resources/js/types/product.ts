@@ -209,6 +209,8 @@ export interface Product {
     vehicles?: Array<{
         label: string;
         detail: string | null;
+        /** Carro principal (va primero). */
+        primary?: boolean;
     }>;
     pricing?: ProductPricing;
     // Variant information

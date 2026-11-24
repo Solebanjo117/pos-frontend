@@ -163,3 +163,17 @@ describe('Products: suppliers when creating a brand', () => {
         );
     });
 });
+
+/*
+ * Pedido de Luis (2026-11-24): al guardar un producto debe salir un solo aviso (el flotante de
+ * arriba), no además una barra dentro de la página.
+ */
+describe('Products: one success message when saving', () => {
+    it('Edit.vue uses only the toast', () => {
+        const page = source('Edit.vue');
+        expect(page).toContain(
+            "toast.success('Producto actualizado exitosamente')",
+        );
+        expect(page).not.toContain('successMessage');
+    });
+});

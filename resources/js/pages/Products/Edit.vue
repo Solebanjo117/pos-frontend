@@ -82,7 +82,6 @@ const productCodesModel = computed({
 });
 
 const validationErrors = ref<Record<string, string[]>>({});
-const successMessage = ref('');
 const initialEditVariantId = ref<number | null>(null);
 
 const categories = ref<Category[]>([]);
@@ -519,7 +518,6 @@ const saving = ref(false);
 
 const handleSubmit = async () => {
     validationErrors.value = {};
-    successMessage.value = '';
 
     await productCodesRef.value?.validateAll();
     if (productCodesRef.value?.hasConflicts()) {
@@ -533,7 +531,6 @@ const handleSubmit = async () => {
         await updateProduct(props.productId, metadataPayload());
         await fetchProduct(props.productId);
         await initializeProductDraft();
-        successMessage.value = 'Producto actualizado exitosamente';
         toast.success('Producto actualizado exitosamente');
     } catch (err: any) {
         if (err.response?.data?.errors) {
@@ -794,14 +791,6 @@ const validationErrorItems = computed(() =>
             />
 
             <div v-else class="space-y-4">
-                <!-- Success Message -->
-                <div
-                    v-if="successMessage"
-                    class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
-                >
-                    {{ successMessage }}
-                </div>
-
                 <!-- Error Message -->
                 <ErrorMessage v-if="error">
                     {{ error }}

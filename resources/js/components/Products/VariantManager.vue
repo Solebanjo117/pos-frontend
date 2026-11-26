@@ -328,8 +328,9 @@ const getVariantTotalStock = (variant: any): number => {
     );
 };
 
+// Con un solo almacén no se nombra (ni en Stock, ni en la ventana de la marca, ni al ajustar).
 const currentWarehouseName = computed(() => {
-    if (!currentWarehouseId.value) return '';
+    if (!multiWarehouse || !currentWarehouseId.value) return '';
     const wh = warehouses.value.find((w) => w.id === currentWarehouseId.value);
     return wh?.name || `#${currentWarehouseId.value}`;
 });
@@ -1460,7 +1461,10 @@ const formId = useId();
                                         Ajustar
                                     </button>
                                     <span
-                                        v-if="variant.inventory?.length > 1"
+                                        v-if="
+                                            multiWarehouse &&
+                                            variant.inventory?.length > 1
+                                        "
                                         class="text-[10px] text-gray-400"
                                     >
                                         (total:
@@ -1514,7 +1518,7 @@ const formId = useId();
                             Datos
                         </h4>
                         <span
-                            v-if="editingVariant"
+                            v-if="editingVariant && multiWarehouse"
                             class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-muted dark:text-gray-300"
                         >
                             {{ currentWarehouseName || 'Almacén actual' }}

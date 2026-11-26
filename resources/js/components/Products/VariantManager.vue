@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, nextTick, onMounted, watch, useId } from 'vue';
+import PriceMarginTable from '@/components/Products/PriceMarginTable.vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
 import VariantFifoHistoryPanel from '@/components/Products/VariantFifoHistoryPanel.vue';
@@ -10,6 +11,7 @@ import AppSelect from '@/components/ui/AppSelect.vue';
 import { Button } from '@/components/ui/button';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import SearchableSelect from '@/components/ui/SearchableSelect.vue';
+import { useMarginCostSource } from '@/composables/useMarginCostSource';
 import { usePosSettings } from '@/composables/usePosSettings';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -25,6 +27,15 @@ import {
 } from '@/utils/brandTier';
 import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
 import type { ItbmChoice } from '@/utils/itbm';
+import {
+    MARGIN_COST_SOURCES,
+    formatPercent,
+    marginCostInputFromVariant,
+    marginPercent,
+    markupPercent,
+    resolveMarginCost,
+} from '@/utils/priceMargins';
+import type { MarginCostInput, MarginSupplier } from '@/utils/priceMargins';
 
 type HeaderLotSyncState = {
     revision: number;
@@ -571,6 +582,63 @@ const formatVariantDisplay = (variant: any): string => {
     const amount = getVariantDisplayAmount(variant);
     return amount === null ? '—' : formatCurrency(amount);
 };
+
+// === Markup y margen (como el "Pricing" de Lightspeed): precio sin ITBM contra el costo elegido ===
+const { marginCostSource } = useMarginCostSource();
+
+const getVariantMargins = (variant: any) => {
+    const price = getVariantSaleAmount(variant, false);
+    if (price === null) return null;
+    const resolved = resolveMarginCost(
+        marginCostSource.value,
+        marginCostInputFromVariant(variant, currentWarehouseId.value),
+    );
+    return {
+        markup: formatPercent(markupPercent(price, resolved.cost)),
+        margin: formatPercent(marginPercent(price, resolved.cost)),
+        negative: price < resolved.cost,
+        detail: resolved.detail,
+        fallback: resolved.fallback,
+    };
+};
+
+// Una vez por marca y por cambio de costo elegido (cada fila lo lee en dos celdas).
+const variantMarginsByKey = computed(
+    () =>
+        new Map(
+            displayVariants.value.map((variant: any) => [
+                variant.id ?? variant._draftId,
+                getVariantMargins(variant),
+            ]),
+        ),
+);
+const marginsFor = (variant: any) =>
+    variantMarginsByKey.value.get(variant.id ?? variant._draftId) ?? null;
+const marginCellClass = (variant: any) =>
+    marginsFor(variant)?.negative
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-gray-900 dark:text-white';
+
+// En la ventana de la marca: valores del formulario en vivo y proveedores del panel.
+const modalSupplierRows = ref<MarginSupplier[] | null>(null);
+const modalMarginCostInput = computed<MarginCostInput>(() => {
+    const fromVariant = marginCostInputFromVariant(
+        editingVariant.value,
+        currentWarehouseId.value,
+    );
+    const savedVariant = Boolean(
+        editingVariant.value && !isDraftMode.value && props.productId,
+    );
+    return {
+        ...fromVariant,
+        brandCost: getFormCostTotal(),
+        costTaxRate: toSafeNumber(form.value.pricing.cost_tax_rate),
+        costMiscellaneous: toSafeNumber(form.value.pricing.cost_miscellaneous),
+        suppliers: savedVariant
+            ? (modalSupplierRows.value ?? fromVariant.suppliers)
+            : (form.value.suppliers ?? []),
+    };
+});
 
 // === Precio Final: PricingFormula es la única fuente de verdad ===
 // Al recibir un nuevo precio calculado (sea fórmula o numero directo),
@@ -1190,6 +1258,21 @@ const formId = useId();
                     </span>
                 </div>
 
+                <div
+                    class="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1 dark:border-border dark:bg-muted/40"
+                >
+                    <span
+                        class="text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                        >Costo para margen</span
+                    >
+                    <AppSelect
+                        v-model="marginCostSource"
+                        data-test="variants-margin-cost-source"
+                        class="w-44 min-w-0"
+                        :options="MARGIN_COST_SOURCES"
+                    />
+                </div>
+
                 <Button type="button" @click="openCreateModal">
                     Agregar Variante
                 </Button>
@@ -1228,6 +1311,18 @@ const formId = useId();
                         <th class="px-6 py-3">Nombre</th>
                         <th class="px-6 py-3">Marca</th>
                         <th class="px-6 py-3">{{ variantValueColumnTitle }}</th>
+                        <th
+                            class="px-4 py-3 text-right"
+                            title="Ganancia sobre el costo (precio sin ITBM)"
+                        >
+                            Markup
+                        </th>
+                        <th
+                            class="px-4 py-3 text-right"
+                            title="Ganancia sobre el precio (precio sin ITBM)"
+                        >
+                            Margen
+                        </th>
                         <th class="px-6 py-3">
                             <div class="flex items-center gap-1">
                                 Stock
@@ -1316,6 +1411,28 @@ const formId = useId();
                                         )
                                     }}
                                 </template>
+                            </div>
+                        </td>
+                        <td
+                            data-test="variant-markup"
+                            class="px-4 py-4 text-right font-medium tabular-nums"
+                            :class="marginCellClass(variant)"
+                            :title="marginsFor(variant)?.detail"
+                        >
+                            {{ marginsFor(variant)?.markup ?? '—' }}
+                        </td>
+                        <td
+                            data-test="variant-margin"
+                            class="px-4 py-4 text-right font-medium tabular-nums"
+                            :class="marginCellClass(variant)"
+                            :title="marginsFor(variant)?.detail"
+                        >
+                            {{ marginsFor(variant)?.margin ?? '—' }}
+                            <div
+                                v-if="marginsFor(variant)?.fallback"
+                                class="mt-0.5 text-[10px] font-normal text-amber-600 dark:text-amber-400"
+                            >
+                                con costo de la marca
                             </div>
                         </td>
                         <td class="px-6 py-4">
@@ -1512,6 +1629,7 @@ const formId = useId();
                     <VariantSuppliersPanel
                         :product-id="productId"
                         :variant-id="editingVariant.id"
+                        @rows-change="(rows) => (modalSupplierRows = rows)"
                     />
                 </section>
                 <!-- Marca nueva o en borrador: los proveedores se guardan junto con la marca. -->
@@ -1775,6 +1893,12 @@ const formId = useId();
                             </div>
                         </div>
                     </div>
+
+                    <PriceMarginTable
+                        class="mt-4"
+                        :price="Number(form.pricing.base_price) || 0"
+                        :cost-input="modalMarginCostInput"
+                    />
                 </section>
 
                 <!-- Error display -->

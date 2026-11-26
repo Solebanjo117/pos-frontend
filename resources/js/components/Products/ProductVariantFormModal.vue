@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CircleDollarSign } from 'lucide-vue-next';
 import { ref, computed, watch } from 'vue';
+import PriceMarginTable from '@/components/Products/PriceMarginTable.vue';
 import PricingFormula from '@/components/Products/PricingFormula.vue';
 import StockAdjustModal from '@/components/Products/StockAdjustModal.vue';
 import VariantSuppliersPanel from '@/components/Products/VariantSuppliersPanel.vue';
@@ -17,6 +18,8 @@ import apiClient from '@/services/api/client';
 import { brandOptionLabel } from '@/utils/brandTier';
 import { itbmChoiceFromRate, itbmRateFromChoice } from '@/utils/itbm';
 import type { ItbmChoice } from '@/utils/itbm';
+import { marginCostInputFromVariant } from '@/utils/priceMargins';
+import type { MarginCostInput, MarginSupplier } from '@/utils/priceMargins';
 
 const props = defineProps<{
     open: boolean;
@@ -326,6 +329,22 @@ const onStockAdjusted = async () => {
     emit('stock-adjusted');
 };
 
+// Markup y margen en vivo: costo, ITBM y misceláneos del formulario; proveedores del panel.
+const supplierRows = ref<MarginSupplier[] | null>(null);
+const marginCostInput = computed<MarginCostInput>(() => {
+    const fromVariant = marginCostInputFromVariant(
+        editingVariant.value,
+        currentWarehouseId.value,
+    );
+    return {
+        ...fromVariant,
+        brandCost: getFormCostTotal(),
+        costTaxRate: toSafeNumber(form.value.pricing.cost_tax_rate),
+        costMiscellaneous: toSafeNumber(form.value.pricing.cost_miscellaneous),
+        suppliers: supplierRows.value ?? fromVariant.suppliers,
+    };
+});
+
 const loadAndPopulate = async () => {
     if (!props.variantId) return;
     loadingVariant.value = true;
@@ -572,6 +591,7 @@ const handleSubmit = async () => {
                 <VariantSuppliersPanel
                     :product-id="productId"
                     :variant-id="editingVariant.id"
+                    @rows-change="(rows) => (supplierRows = rows)"
                 />
             </div>
 
@@ -747,6 +767,11 @@ const handleSubmit = async () => {
                             </button>
                         </div>
                     </div>
+
+                    <PriceMarginTable
+                        :price="Number(form.pricing.base_price) || 0"
+                        :cost-input="marginCostInput"
+                    />
                 </div>
             </div>
 

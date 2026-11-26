@@ -57,7 +57,7 @@ describe('ProductCodesEditor', () => {
     it('permite mantener un producto sin código', () => {
         const wrapper = mountEditor();
 
-        expect(wrapper.text()).toContain('Sin código');
+        expect(wrapper.text()).toContain('Sin número de parte');
         expect((wrapper.vm as { codes: ProductCode[] }).codes).toEqual([]);
     });
 
@@ -78,11 +78,33 @@ describe('ProductCodesEditor', () => {
         await input.setValue('45503 19155');
         await buttonWithText(wrapper, 'Agregar').trigger('click');
 
-        expect(wrapper.text()).toContain('ya está incluido');
+        expect(wrapper.text()).toContain('ya está en la lista');
         expect((wrapper.vm as { codes: ProductCode[] }).codes).toHaveLength(1);
     });
 
-    it('exige elegir otro principal antes de eliminar el actual', async () => {
+    it('cambia el principal con la estrella y lo muestra primero', async () => {
+        const wrapper = mountEditor([
+            { code: 'SKU-1', type: 'sku', is_primary: true },
+            { code: 'ALT-1', type: 'alternate', is_primary: false },
+        ]);
+
+        await wrapper
+            .get('button[aria-label="Hacer principal ALT-1"]')
+            .trigger('click');
+        await nextTick();
+
+        expect((wrapper.vm as { codes: ProductCode[] }).codes).toEqual([
+            expect.objectContaining({ code: 'SKU-1', is_primary: false }),
+            expect.objectContaining({ code: 'ALT-1', is_primary: true }),
+        ]);
+        const firstRow = wrapper.findAll('[data-test="code-row"]')[0];
+        expect((firstRow.get('input').element as HTMLInputElement).value).toBe(
+            'ALT-1',
+        );
+        expect(firstRow.text()).toContain('se imprime en tickets y pedidos');
+    });
+
+    it('al quitar el principal, el siguiente pasa a ser principal', async () => {
         const wrapper = mountEditor([
             { code: 'SKU-1', type: 'sku', is_primary: true },
             { code: 'ALT-1', type: 'alternate', is_primary: false },
@@ -91,16 +113,31 @@ describe('ProductCodesEditor', () => {
         await wrapper
             .get('button[aria-label="Eliminar código SKU-1"]')
             .trigger('click');
-        expect(wrapper.text()).toContain('Selecciona otro código principal');
-
-        await buttonWithText(wrapper, 'Hacer principal').trigger('click');
-        await nextTick();
-        await wrapper
-            .get('button[aria-label="Eliminar código SKU-1"]')
-            .trigger('click');
 
         expect((wrapper.vm as { codes: ProductCode[] }).codes).toEqual([
             expect.objectContaining({ code: 'ALT-1', is_primary: true }),
+        ]);
+    });
+
+    it('agrega con Enter y marca como código de barras un número de 12 a 14 dígitos', async () => {
+        const wrapper = mountEditor([
+            { code: 'SKU-1', type: 'sku', is_primary: true },
+        ]);
+        const input = wrapper.get('[data-test="code-new"]');
+
+        await input.setValue('7501234567890');
+        await input.trigger('keydown', { key: 'Enter' });
+        await input.setValue('OTRO-2');
+        await input.trigger('keydown', { key: 'Enter' });
+
+        expect((wrapper.vm as { codes: ProductCode[] }).codes).toEqual([
+            expect.objectContaining({ code: 'SKU-1', is_primary: true }),
+            expect.objectContaining({
+                code: '7501234567890',
+                type: 'upc',
+                is_primary: false,
+            }),
+            expect.objectContaining({ code: 'OTRO-2', type: 'alternate' }),
         ]);
     });
 

@@ -3,6 +3,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import { useMarginCostSource } from '@/composables/useMarginCostSource';
 import { chooseAppSelectOption } from '@/lib/testing/appSelect';
 import apiClient from '@/services/api/client';
 import ProductVariantFormModal from './ProductVariantFormModal.vue';
@@ -233,5 +234,85 @@ describe('ProductVariantFormModal ITBM', () => {
         expect(wrapper.find('[data-slot="loading-state"]').exists()).toBe(
             false,
         );
+    });
+});
+
+describe('ProductVariantFormModal markup and margin', () => {
+    const supplierRows = [
+        { supplier_name: 'BARATO', supplier_cost: 9 },
+        { supplier_name: 'CARO', supplier_cost: 11 },
+    ];
+    // El panel real carga sus filas del servidor; aquí las entrega de una vez.
+    const marginStubs = {
+        ...stubs,
+        VariantSuppliersPanel: {
+            emits: ['rows-change'],
+            mounted(this: any) {
+                this.$emit('rows-change', supplierRows);
+            },
+            template: '<div />',
+        },
+    };
+
+    beforeEach(() => {
+        updateVariant.mockReset().mockResolvedValue({ id: 20 });
+        fetchVariants.mockReset().mockResolvedValue([
+            {
+                ...variantWithRates(7, 7),
+                inventory: [
+                    {
+                        warehouse: { id: 3 },
+                        quantity_available: 4,
+                        active_lot_id: 77,
+                        current_cost: 10.2,
+                    },
+                ],
+            },
+        ]);
+        useMarginCostSource().marginCostSource.value = 'cheapest';
+    });
+
+    const mountWithMargins = async () => {
+        const wrapper = mount(ProductVariantFormModal, {
+            props: { open: true, productId: 10, variantId: 20 },
+            global: { stubs: marginStubs },
+        });
+        await flushPromises();
+        return wrapper;
+    };
+
+    const shown = (wrapper: any) => ({
+        markup: wrapper.get('[data-test="margin-markup"]').text(),
+        margin: wrapper.get('[data-test="margin-margin"]').text(),
+    });
+
+    it('shows markup and margin of the sale price with the cheapest supplier by default', async () => {
+        const wrapper = await mountWithMargins();
+
+        // Precio 15 sin ITBM; BARATO 9 × 1.07 = 9.63.
+        expect(
+            wrapper.get('[data-test="price-margin-table"]').text(),
+        ).toContain('Precio de venta');
+        expect(shown(wrapper)).toEqual({ markup: '55.8%', margin: '35.8%' });
+        expect(
+            wrapper.get('[data-test="margin-cost-detail"]').text(),
+        ).toContain('BARATO');
+    });
+
+    it('recalculates with the current lot or the most expensive supplier', async () => {
+        const wrapper = await mountWithMargins();
+
+        await chooseAppSelectOption(
+            wrapper.get('[data-test="margin-cost-source"] button'),
+            'Lote actual',
+        );
+        expect(shown(wrapper)).toEqual({ markup: '47.1%', margin: '32.0%' });
+
+        await chooseAppSelectOption(
+            wrapper.get('[data-test="margin-cost-source"] button'),
+            'Proveedor más caro',
+        );
+        // CARO 11 × 1.07 = 11.77.
+        expect(shown(wrapper)).toEqual({ markup: '27.4%', margin: '21.5%' });
     });
 });

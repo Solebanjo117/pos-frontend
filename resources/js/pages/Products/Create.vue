@@ -3,24 +3,16 @@ import { Head } from '@inertiajs/vue3';
 import { Plus, Wrench, X } from 'lucide-vue-next';
 import { ref, onMounted, watch, computed } from 'vue';
 import AsyncProductCombobox from '@/components/AsyncProductCombobox.vue';
+import ProductCategoryPicker from '@/components/Products/ProductCategoryPicker.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
 import type { PendingImage } from '@/components/Products/ProductImagesSection.vue';
+import ProductStatusToggle from '@/components/Products/ProductStatusToggle.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
 import AppSelect from '@/components/ui/AppSelect.vue';
-import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
 import { useToast } from '@/composables/useToast';
@@ -116,7 +108,6 @@ const brands = ref<Brand[]>([]);
 const loadingCategories = ref(false);
 const loadingBrands = ref(false);
 const extraCategoryIds = ref<number[]>([]);
-const selectedExtraCategoryId = ref<number | null>(null);
 const categoryDetailCache = ref<Record<number, Category>>({});
 
 type DraftProductAttribute = {
@@ -375,32 +366,6 @@ const refreshCategoryDerivedState = async () => {
     categoryMargin.value = primaryCategory?.default_margin_percent ?? null;
 };
 
-const addExtraCategory = () => {
-    const categoryId = selectedExtraCategoryId.value;
-    const primaryCategoryId = (form.value as any).category_id;
-
-    if (
-        !categoryId ||
-        categoryId === primaryCategoryId ||
-        extraCategoryIds.value.includes(categoryId)
-    ) {
-        selectedExtraCategoryId.value = null;
-        return;
-    }
-
-    extraCategoryIds.value = sortCategoryIdsByName([
-        ...extraCategoryIds.value,
-        categoryId,
-    ]);
-    selectedExtraCategoryId.value = null;
-};
-
-const removeExtraCategory = (categoryId: number) => {
-    extraCategoryIds.value = extraCategoryIds.value.filter(
-        (id) => id !== categoryId,
-    );
-};
-
 const categoryFormula = ref<string | null>(null);
 const categoryAppliesItbm = ref<boolean>(false);
 const categoryItbmPercent = ref<number | null>(null);
@@ -623,49 +588,6 @@ const getUpsaleRelationshipLabel = (type: UpsaleRelationship): string => {
 // === Images (draft via component) ===
 const pendingImages = ref<PendingImage[]>([]);
 
-// === Inline modals for Category & Brand (Create-only) ===
-const inlineModal = ref<'category' | 'brand' | null>(null);
-const inlineForm = ref<Record<string, any>>({});
-const inlineProcessing = ref(false);
-const inlineError = ref<string | null>(null);
-
-const openInline = (type: 'category' | 'brand') => {
-    inlineModal.value = type;
-    inlineError.value = null;
-    inlineProcessing.value = false;
-    if (type === 'category') inlineForm.value = { name: '', parent_id: null };
-    else if (type === 'brand') inlineForm.value = { name: '' };
-};
-
-const closeInline = () => {
-    inlineModal.value = null;
-};
-
-const submitInline = async () => {
-    inlineProcessing.value = true;
-    inlineError.value = null;
-    try {
-        if (inlineModal.value === 'category') {
-            const { data } = await apiClient.post(
-                '/categories',
-                inlineForm.value,
-            );
-            categories.value.push(data.data ?? data);
-            (form.value as any).category_id = (data.data ?? data).id;
-        } else if (inlineModal.value === 'brand') {
-            const { data } = await apiClient.post('/brands', inlineForm.value);
-            const newBrand = data.data ?? data;
-            brands.value.push(newBrand);
-            form.value.brand_id = newBrand.id;
-        }
-        closeInline();
-    } catch (e: any) {
-        inlineError.value = e.response?.data?.message || 'Error al crear';
-    } finally {
-        inlineProcessing.value = false;
-    }
-};
-
 const selectedCategoryIdsForImages = computed(() => {
     const primary = (form.value as any).category_id;
     const ids: number[] = [];
@@ -682,34 +604,6 @@ const categoryNameMapForImages = computed(() => {
         map[c.id] = c.name;
     }
     return map;
-});
-
-const categoryOptions = computed(() =>
-    categories.value.flatMap((c) => ({
-        value: c.id,
-        label: c.name,
-    })),
-);
-const extraCategoryOptions = computed(() => {
-    const primaryCategoryId = (form.value as any).category_id;
-
-    return categories.value
-        .filter(
-            (category) =>
-                category.id !== primaryCategoryId &&
-                !extraCategoryIds.value.includes(category.id),
-        )
-        .map((category) => ({
-            value: category.id,
-            label: category.name,
-        }));
-});
-const selectedExtraCategories = computed(() => {
-    return sortCategoryIdsByName(extraCategoryIds.value)
-        .map((categoryId) =>
-            categories.value.find((category) => category.id === categoryId),
-        )
-        .filter(Boolean) as Category[];
 });
 
 onMounted(async () => {
@@ -933,7 +827,7 @@ const validationErrorItems = computed(() =>
 
 const workbenchSections = [
     { id: 'identidad', label: 'Resumen' },
-    { id: 'codigos', label: 'Codigos' },
+    { id: 'codigos', label: 'Números de parte' },
     { id: 'compatibilidad', label: 'Compatibilidad' },
     { id: 'variantes', label: 'Variantes' },
     { id: 'atributos', label: 'Atributos' },
@@ -1115,87 +1009,22 @@ const readinessItems = computed(() => [
                                     </p>
                                 </div>
                             </div>
-                            <div>
-                                <div
-                                    class="mb-1 flex items-center justify-between"
-                                >
-                                    <label
-                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >Categoría</label
-                                    >
-                                    <button
-                                        type="button"
-                                        @click="openInline('category')"
-                                        class="flex items-center gap-0.5 text-xs text-blue-600 hover:underline dark:text-blue-400"
-                                    >
-                                        <Plus class="h-3 w-3" /> Crear
-                                    </button>
-                                </div>
-                                <SearchableSelect
-                                    :options="categoryOptions"
-                                    :model-value="
-                                        (form as any).category_id ?? null
-                                    "
-                                    @update:model-value="
-                                        (v) => ((form as any).category_id = v)
-                                    "
-                                    placeholder="-- Selecciona categoría --"
-                                    :loading="loadingCategories"
-                                />
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <label
-                                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >Categorías extra</label
-                            >
-                            <div
-                                class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]"
-                            >
-                                <SearchableSelect
-                                    :options="extraCategoryOptions"
-                                    :model-value="selectedExtraCategoryId"
-                                    @update:model-value="
-                                        (v) =>
-                                            (selectedExtraCategoryId = v as
-                                                | number
-                                                | null)
-                                    "
-                                    placeholder="-- Selecciona categoría extra --"
-                                    :loading="loadingCategories"
-                                    :clearable="true"
-                                />
-                                <button
-                                    type="button"
-                                    @click="addExtraCategory"
-                                    :disabled="!selectedExtraCategoryId"
-                                    class="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
-                                >
-                                    <Plus class="h-4 w-4" /> Agregar
-                                </button>
-                            </div>
-                            <div
-                                v-if="selectedExtraCategories.length > 0"
-                                class="flex flex-wrap gap-2"
-                            >
-                                <span
-                                    v-for="category in selectedExtraCategories"
-                                    :key="category.id"
-                                    class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
-                                >
-                                    {{ category.name }}
-                                    <button
-                                        type="button"
-                                        @click="
-                                            removeExtraCategory(category.id)
-                                        "
-                                        class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
-                                        :aria-label="`Quitar ${category.name}`"
-                                    >
-                                        <X class="h-3 w-3" />
-                                    </button>
-                                </span>
-                            </div>
+                            <ProductCategoryPicker
+                                :categories="categories"
+                                :primary-id="(form as any).category_id ?? null"
+                                :extra-ids="extraCategoryIds"
+                                :loading="loadingCategories"
+                                allow-create
+                                @update:primary-id="
+                                    (v) =>
+                                        ((form as any).category_id =
+                                            v ?? undefined)
+                                "
+                                @update:extra-ids="
+                                    (v) => (extraCategoryIds = v)
+                                "
+                                @created="(c) => categories.push(c as Category)"
+                            />
                         </div>
                     </div>
 
@@ -1204,51 +1033,27 @@ const readinessItems = computed(() => [
                         id="codigos"
                         class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
                     >
-                        <h2
-                            class="mb-4 text-sm font-semibold tracking-wider text-gray-500 uppercase"
+                        <div
+                            class="mb-3 flex flex-wrap items-start justify-between gap-3"
                         >
-                            Codigo y estado
-                        </h2>
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div class="md:col-span-2">
-                                <label
-                                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            <div>
+                                <h2
+                                    class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
                                 >
                                     Números de parte
-                                    <span
-                                        class="text-xs font-normal text-gray-400"
-                                        >(opcionales)</span
-                                    >
-                                </label>
-                                <p class="mb-2 text-xs text-muted-foreground">
-                                    El principal es el número de parte del
-                                    producto y aplica a todas sus marcas. Agrega
-                                    otros números con los que se conoce la misma
-                                    pieza.
+                                </h2>
+                                <p class="mt-0.5 text-xs text-muted-foreground">
+                                    Aplican a todas las marcas del producto.
+                                    Agrega los otros números con los que se
+                                    conoce la pieza.
                                 </p>
-                                <ProductCodesEditor
-                                    ref="productCodesRef"
-                                    v-model="productCodesModel"
-                                />
                             </div>
-                            <div>
-                                <label
-                                    class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                    >Estado</label
-                                >
-                                <AppSelect
-                                    v-model="form.status"
-                                    class="w-full"
-                                    :options="[
-                                        { value: 'active', label: 'Activo' },
-                                        {
-                                            value: 'discontinued',
-                                            label: 'Descontinuado',
-                                        },
-                                    ]"
-                                />
-                            </div>
+                            <ProductStatusToggle v-model="form.status" />
                         </div>
+                        <ProductCodesEditor
+                            ref="productCodesRef"
+                            v-model="productCodesModel"
+                        />
                     </div>
 
                     <!-- SECTION 4: Compatibilidad Vehicular -->
@@ -1713,88 +1518,5 @@ const readinessItems = computed(() => [
                 </aside>
             </div>
         </div>
-
-        <!-- Inline Creation Modal (Category & Brand) -->
-        <Dialog
-            :open="inlineModal !== null"
-            @update:open="
-                (v) => {
-                    if (!v) closeInline();
-                }
-            "
-        >
-            <DialogContent class="sm:max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>
-                        {{
-                            inlineModal === 'category'
-                                ? 'Nueva Categoría'
-                                : inlineModal === 'brand'
-                                  ? 'Nueva Marca de Artículo'
-                                  : ''
-                        }}
-                    </DialogTitle>
-                </DialogHeader>
-                <form @submit.prevent="submitInline" class="space-y-4 py-2">
-                    <template v-if="inlineModal === 'category'">
-                        <div class="space-y-4">
-                            <div class="space-y-2">
-                                <Label
-                                    >Nombre de la Categoría
-                                    <span class="text-red-500">*</span></Label
-                                >
-                                <Input
-                                    v-model="inlineForm.name"
-                                    required
-                                    placeholder="Ej: Filtros, Frenos"
-                                />
-                            </div>
-                            <div class="space-y-2">
-                                <Label>Categoría Padre (Opcional)</Label>
-                                <SearchableSelect
-                                    :options="categoryOptions"
-                                    :model-value="inlineForm.parent_id"
-                                    @update:model-value="
-                                        (v) =>
-                                            (inlineForm.parent_id = v as
-                                                | number
-                                                | null)
-                                    "
-                                    placeholder="-- Selecciona categoría padre --"
-                                />
-                            </div>
-                        </div>
-                    </template>
-                    <template v-if="inlineModal === 'brand'">
-                        <div class="space-y-2">
-                            <Label
-                                >Nombre de la Marca
-                                <span class="text-red-500">*</span></Label
-                            >
-                            <Input
-                                v-model="inlineForm.name"
-                                required
-                                placeholder="Ej: KYB, Bosch, Monroe"
-                            />
-                        </div>
-                    </template>
-
-                    <div v-if="inlineError" class="text-sm text-red-600">
-                        {{ inlineError }}
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="closeInline"
-                            >Cancelar</Button
-                        >
-                        <Button type="submit" :disabled="inlineProcessing">{{
-                            inlineProcessing ? 'Guardando...' : 'Guardar'
-                        }}</Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
     </AppLayout>
 </template>

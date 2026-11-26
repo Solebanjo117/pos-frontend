@@ -182,6 +182,9 @@ export interface AlternativeProduct extends Product {
 }
 
 // Main Product Interface (Base Product)
+/** `single` lleva existencia; `non_inventory` es un servicio o cargo sin existencia. */
+export type ProductInventoryType = 'single' | 'non_inventory';
+
 export interface Product {
     id: number;
     system_id?: string;
@@ -192,6 +195,7 @@ export interface Product {
     description?: string;
     image_url?: string | null;
     status: 'active' | 'discontinued';
+    inventory_type?: ProductInventoryType;
     is_universal?: boolean;
     category_id?: number;
     product_line?: ProductLine;
@@ -209,6 +213,8 @@ export interface Product {
     vehicles?: Array<{
         label: string;
         detail: string | null;
+        /** Carro principal (va primero). */
+        primary?: boolean;
     }>;
     pricing?: ProductPricing;
     // Variant information
@@ -490,6 +496,7 @@ export interface UpdateProductRequest {
     name?: string;
     description?: string;
     status?: 'active' | 'discontinued';
+    inventory_type?: ProductInventoryType;
     is_universal?: boolean;
     pricing?: {
         base_price?: number;

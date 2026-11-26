@@ -8,6 +8,8 @@ import ProductFiltersComponent from '@/components/Products/ProductFilters.vue';
 import type { ProductFilterValues } from '@/components/Products/ProductFilters.vue';
 import ProductSort from '@/components/Products/ProductSort.vue';
 import ProductVariantFormModal from '@/components/Products/ProductVariantFormModal.vue';
+import StackedCellList from '@/components/Products/StackedCellList.vue';
+import type { StackedCellItem } from '@/components/Products/StackedCellList.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
@@ -31,6 +33,31 @@ import {
 } from '@/utils/catalogPermissions';
 
 const page = usePage();
+
+// Celdas con varios valores (2 visibles + "ver más"): el principal primero y en negrita.
+const productCodeItems = (product: Product): StackedCellItem[] => {
+    const codes = (product.codes ?? []).map((code) => ({
+        label: code.code,
+        primary: Boolean(code.is_primary),
+    }));
+    if (codes.length) return codes;
+    const fallback = product.sku_base || product.default_variant?.sku;
+    return fallback ? [{ label: fallback, primary: true }] : [];
+};
+const productCategoryItems = (product: Product): StackedCellItem[] => [
+    ...(product.category
+        ? [{ label: product.category.name, primary: true }]
+        : []),
+    ...(product.extra_categories ?? []).map((category) => ({
+        label: category.name,
+    })),
+];
+const productVehicleItems = (product: Product): StackedCellItem[] =>
+    (product.vehicles ?? []).map((vehicle) => ({
+        label: vehicle.label,
+        detail: vehicle.detail,
+        primary: Boolean(vehicle.primary),
+    }));
 // Crear: admin, gerente o comprador. Importar: admin o gerente (igual que el backend).
 const canManageProducts = computed(() =>
     canManagePurchasingRecords((page.props.auth?.user as any)?.role),
@@ -1391,13 +1418,13 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 :style="getColumnStyle('sku')"
                                                 class="overflow-hidden px-6 py-4 text-sm font-medium text-gray-900 dark:text-white"
                                             >
-                                                <div class="truncate">
-                                                    {{
-                                                        product.sku_base ||
-                                                        product.default_variant
-                                                            ?.sku
-                                                    }}
-                                                </div>
+                                                <StackedCellList
+                                                    data-test="product-codes-cell"
+                                                    :items="
+                                                        productCodeItems(product)
+                                                    "
+                                                    mono
+                                                />
                                                 <div
                                                     v-if="
                                                         product.search_match_type &&
@@ -1422,14 +1449,14 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 "
                                                 class="px-6 py-4 text-sm break-words whitespace-normal text-gray-900 dark:text-white"
                                             >
-                                                <span v-if="product.category">{{
-                                                    product.category.name
-                                                }}</span>
-                                                <span
-                                                    v-else
-                                                    class="text-xs text-gray-400"
-                                                    >—</span
-                                                >
+                                                <StackedCellList
+                                                    data-test="product-categories-cell"
+                                                    :items="
+                                                        productCategoryItems(
+                                                            product,
+                                                        )
+                                                    "
+                                                />
                                             </td>
                                             <td
                                                 :style="
@@ -1444,64 +1471,15 @@ const getTechnicalSpecsTooltip = (product: any): string => {
                                                 >
                                                     🌐 Universal
                                                 </span>
-                                                <div
-                                                    v-else-if="
-                                                        product.vehicles?.length
-                                                    "
-                                                    class="flex flex-col gap-0.5"
-                                                    :title="
-                                                        product.vehicles
-                                                            .map((vehicle) =>
-                                                                vehicle.detail
-                                                                    ? `${vehicle.label} · ${vehicle.detail}`
-                                                                    : vehicle.label,
-                                                            )
-                                                            .join('\n')
-                                                    "
-                                                >
-                                                    <span
-                                                        v-for="vehicle in product.vehicles.slice(
-                                                            0,
-                                                            2,
-                                                        )"
-                                                        :key="
-                                                            vehicle.label +
-                                                            vehicle.detail
-                                                        "
-                                                        class="leading-snug break-words text-gray-900 dark:text-white"
-                                                    >
-                                                        {{ vehicle.label
-                                                        }}<span
-                                                            v-if="
-                                                                vehicle.detail
-                                                            "
-                                                            class="text-xs text-gray-500 dark:text-gray-400"
-                                                        >
-                                                            ·
-                                                            {{
-                                                                vehicle.detail
-                                                            }}</span
-                                                        >
-                                                    </span>
-                                                    <span
-                                                        v-if="
-                                                            product.vehicles
-                                                                .length > 2
-                                                        "
-                                                        class="text-xs text-gray-500 dark:text-gray-400"
-                                                    >
-                                                        +{{
-                                                            product.vehicles
-                                                                .length - 2
-                                                        }}
-                                                        más
-                                                    </span>
-                                                </div>
-                                                <span
+                                                <StackedCellList
                                                     v-else
-                                                    class="text-xs text-gray-400"
-                                                    >—</span
-                                                >
+                                                    data-test="product-vehicles-cell"
+                                                    :items="
+                                                        productVehicleItems(
+                                                            product,
+                                                        )
+                                                    "
+                                                />
                                             </td>
                                             <td
                                                 :style="

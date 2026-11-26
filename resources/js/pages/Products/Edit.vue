@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { Archive, Wrench, Copy, RefreshCw, Plus, X } from 'lucide-vue-next';
+import { Archive, Wrench, Copy, RefreshCw } from 'lucide-vue-next';
 import { ref, onMounted, watch, computed } from 'vue';
 import AlternativeManager from '@/components/Products/AlternativeManager.vue';
 import AttributeManager from '@/components/Products/AttributeManager.vue';
+import ProductCategoryPicker from '@/components/Products/ProductCategoryPicker.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
+import ProductInventoryTypeToggle from '@/components/Products/ProductInventoryTypeToggle.vue';
+import ProductStatusToggle from '@/components/Products/ProductStatusToggle.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
-import AppSelect from '@/components/ui/AppSelect.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import LoadingState from '@/components/ui/LoadingState.vue';
-import SearchableSelect from '@/components/ui/SearchableSelect.vue';
 import type { ProductAttribute as EditableProductAttribute } from '@/composables/useProductAttributes';
 import { useProducts } from '@/composables/useProducts';
 import { useStoreSettings } from '@/composables/useStoreSettings';
@@ -68,6 +69,7 @@ const form = ref<UpdateProductRequest>({
     name: '',
     description: '',
     status: 'active',
+    inventory_type: 'single',
     is_universal: false,
 });
 const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
@@ -82,7 +84,6 @@ const productCodesModel = computed({
 });
 
 const validationErrors = ref<Record<string, string[]>>({});
-const successMessage = ref('');
 const initialEditVariantId = ref<number | null>(null);
 
 const categories = ref<Category[]>([]);
@@ -94,7 +95,6 @@ const categoryMargin = ref<number | null>(null);
 const regenerating = ref(false);
 const selectedCategoryId = ref<number | null>(null);
 const extraCategoryIds = ref<number[]>([]);
-const selectedExtraCategoryId = ref<number | null>(null);
 const categoryDetailCache = ref<Record<number, Category>>({});
 const attributeManagerRef = ref<InstanceType<typeof AttributeManager> | null>(
     null,
@@ -104,13 +104,6 @@ const draftIdCounter = ref(-1000);
 const draftAttributes = ref<EditableProductAttribute[]>([]);
 const draftAlternatives = ref<DraftAlternative[]>([]);
 const draftCompatibility = ref<DraftCompatData>(emptyCompatDraft());
-
-const categoryOptions = computed(() =>
-    categories.value.map((c) => ({
-        value: c.id,
-        label: c.name,
-    })),
-);
 
 const categoryNameById = (categoryId: number | undefined | null): string => {
     if (!categoryId) return '';
@@ -229,27 +222,6 @@ const normalizeDraftAlternatives = (
                 alternative.relationship_type as DraftAlternative['relationship_type'],
         }));
 };
-
-const extraCategoryOptions = computed(() => {
-    return categories.value
-        .filter(
-            (category) =>
-                category.id !== selectedCategoryId.value &&
-                !extraCategoryIds.value.includes(category.id),
-        )
-        .map((category) => ({
-            value: category.id,
-            label: category.name,
-        }));
-});
-
-const selectedExtraCategories = computed(() => {
-    return sortCategoryIdsByName(extraCategoryIds.value)
-        .map((categoryId) =>
-            categories.value.find((category) => category.id === categoryId),
-        )
-        .filter(Boolean) as Category[];
-});
 
 const selectedCategoryIdsForImages = computed(() => {
     const ids: number[] = [];
@@ -407,31 +379,6 @@ const recalculateDraftAttributesFromCategories = async () => {
     draftAttributes.value = [...defaultAttributes, ...customAttributes];
 };
 
-const addExtraCategory = () => {
-    const categoryId = toCategoryId(selectedExtraCategoryId.value);
-
-    if (
-        !categoryId ||
-        categoryId === selectedCategoryId.value ||
-        extraCategoryIds.value.includes(categoryId)
-    ) {
-        selectedExtraCategoryId.value = null;
-        return;
-    }
-
-    extraCategoryIds.value = sortCategoryIdsByName([
-        ...extraCategoryIds.value,
-        categoryId,
-    ]);
-    selectedExtraCategoryId.value = null;
-};
-
-const removeExtraCategory = (categoryId: number) => {
-    extraCategoryIds.value = extraCategoryIds.value.filter(
-        (id) => id !== categoryId,
-    );
-};
-
 const initializeProductDraft = async () => {
     if (!currentProduct.value) return;
 
@@ -464,6 +411,7 @@ const initializeProductDraft = async () => {
         name: currentProduct.value.name,
         description: currentProduct.value.description || '',
         status: currentProduct.value.status,
+        inventory_type: currentProduct.value.inventory_type ?? 'single',
         is_universal: currentProduct.value.is_universal ?? false,
         extra_category_ids: extraCategoryIds.value,
     };
@@ -573,7 +521,6 @@ const saving = ref(false);
 
 const handleSubmit = async () => {
     validationErrors.value = {};
-    successMessage.value = '';
 
     await productCodesRef.value?.validateAll();
     if (productCodesRef.value?.hasConflicts()) {
@@ -587,7 +534,6 @@ const handleSubmit = async () => {
         await updateProduct(props.productId, metadataPayload());
         await fetchProduct(props.productId);
         await initializeProductDraft();
-        successMessage.value = 'Producto actualizado exitosamente';
         toast.success('Producto actualizado exitosamente');
     } catch (err: any) {
         if (err.response?.data?.errors) {
@@ -673,7 +619,7 @@ const handleRegenerateName = async () => {
 
 const workbenchSections = [
     { id: 'identidad', label: 'Resumen' },
-    { id: 'codigos', label: 'Codigos' },
+    { id: 'codigos', label: 'Números de parte' },
     { id: 'compatibilidad', label: 'Compatibilidad' },
     { id: 'variantes', label: 'Variantes' },
     { id: 'atributos', label: 'Atributos' },
@@ -848,14 +794,6 @@ const validationErrorItems = computed(() =>
             />
 
             <div v-else class="space-y-4">
-                <!-- Success Message -->
-                <div
-                    v-if="successMessage"
-                    class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
-                >
-                    {{ successMessage }}
-                </div>
-
                 <!-- Error Message -->
                 <ErrorMessage v-if="error">
                     {{ error }}
@@ -926,81 +864,23 @@ const validationErrorItems = computed(() =>
                                             {{ validationErrors.name[0] }}
                                         </p>
                                     </div>
-                                    <div>
-                                        <label
-                                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                            >Categoría</label
-                                        >
-                                        <SearchableSelect
-                                            :options="categoryOptions"
-                                            :model-value="selectedCategoryId"
-                                            @update:model-value="
-                                                (v) =>
-                                                    (selectedCategoryId =
-                                                        toCategoryId(v))
-                                            "
-                                            placeholder="-- Selecciona categoría --"
-                                            :loading="loadingCategories"
-                                        />
-                                    </div>
-                                </div>
-                                <div class="space-y-2">
-                                    <label
-                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                        >Categorías extra</label
-                                    >
-                                    <div
-                                        class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]"
-                                    >
-                                        <SearchableSelect
-                                            :options="extraCategoryOptions"
-                                            :model-value="
-                                                selectedExtraCategoryId
-                                            "
-                                            @update:model-value="
-                                                (v) =>
-                                                    (selectedExtraCategoryId =
-                                                        toCategoryId(v))
-                                            "
-                                            placeholder="-- Selecciona categoría extra --"
-                                            :loading="loadingCategories"
-                                            :clearable="true"
-                                        />
-                                        <button
-                                            type="button"
-                                            @click="addExtraCategory"
-                                            :disabled="!selectedExtraCategoryId"
-                                            class="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
-                                        >
-                                            <Plus class="h-4 w-4" /> Agregar
-                                        </button>
-                                    </div>
-                                    <div
-                                        v-if="
-                                            selectedExtraCategories.length > 0
+                                    <ProductCategoryPicker
+                                        :categories="categories"
+                                        :primary-id="selectedCategoryId"
+                                        :extra-ids="extraCategoryIds"
+                                        :loading="loadingCategories"
+                                        allow-create
+                                        @update:primary-id="
+                                            (v) => (selectedCategoryId = v)
                                         "
-                                        class="flex flex-wrap gap-2"
-                                    >
-                                        <span
-                                            v-for="category in selectedExtraCategories"
-                                            :key="category.id"
-                                            class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200"
-                                        >
-                                            {{ category.name }}
-                                            <button
-                                                type="button"
-                                                @click="
-                                                    removeExtraCategory(
-                                                        category.id,
-                                                    )
-                                                "
-                                                class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-indigo-800"
-                                                :aria-label="`Quitar ${category.name}`"
-                                            >
-                                                <X class="h-3 w-3" />
-                                            </button>
-                                        </span>
-                                    </div>
+                                        @update:extra-ids="
+                                            (v) => (extraCategoryIds = v)
+                                        "
+                                        @created="
+                                            (c) =>
+                                                categories.push(c as Category)
+                                        "
+                                    />
                                 </div>
                             </div>
 
@@ -1009,68 +889,38 @@ const validationErrorItems = computed(() =>
                                 id="codigos"
                                 class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-border dark:bg-card"
                             >
-                                <h2
-                                    class="mb-4 text-sm font-semibold tracking-wider text-gray-500 uppercase"
-                                >
-                                    Codigo y estado
-                                </h2>
                                 <div
-                                    class="grid grid-cols-1 gap-4 md:grid-cols-2"
+                                    class="mb-3 flex flex-wrap items-start justify-between gap-3"
                                 >
-                                    <div class="md:col-span-2">
-                                        <label
-                                            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    <div>
+                                        <h2
+                                            class="text-sm font-semibold tracking-wider text-gray-500 uppercase"
                                         >
                                             Números de parte
-                                            <span
-                                                class="text-xs font-normal text-gray-400"
-                                                >(opcionales)</span
-                                            >
-                                        </label>
+                                        </h2>
                                         <p
-                                            class="mb-2 text-xs text-muted-foreground"
+                                            class="mt-0.5 text-xs text-muted-foreground"
                                         >
-                                            El principal es el número de parte
-                                            del producto y aplica a todas sus
-                                            marcas. Agrega otros números con los
-                                            que se conoce la misma pieza.
-                                        </p>
-                                        <ProductCodesEditor
-                                            ref="productCodesRef"
-                                            v-model="productCodesModel"
-                                            :exclude-product-id="
-                                                props.productId
-                                            "
-                                        />
-                                        <p
-                                            v-if="validationErrors.codes"
-                                            class="mt-1 text-sm text-red-600"
-                                        >
-                                            {{ validationErrors.codes[0] }}
+                                            Aplican a todas las marcas del
+                                            producto. Agrega los otros números
+                                            con los que se conoce la pieza.
                                         </p>
                                     </div>
-
-                                    <div>
-                                        <label
-                                            class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                            >Estado</label
-                                        >
-                                        <AppSelect
-                                            v-model="form.status"
-                                            class="w-full"
-                                            :options="[
-                                                {
-                                                    value: 'active',
-                                                    label: 'Activo',
-                                                },
-                                                {
-                                                    value: 'discontinued',
-                                                    label: 'Discontinuado',
-                                                },
-                                            ]"
-                                        />
-                                    </div>
+                                    <ProductStatusToggle
+                                        v-model="form.status"
+                                    />
                                 </div>
+                                <ProductCodesEditor
+                                    ref="productCodesRef"
+                                    v-model="productCodesModel"
+                                    :exclude-product-id="props.productId"
+                                />
+                                <p
+                                    v-if="validationErrors.codes"
+                                    class="mt-1 text-sm text-red-600"
+                                >
+                                    {{ validationErrors.codes[0] }}
+                                </p>
                             </div>
                         </form>
 
@@ -1172,6 +1022,29 @@ const validationErrorItems = computed(() =>
                     </div>
 
                     <aside class="space-y-4 xl:sticky xl:top-16 xl:self-start">
+                        <div
+                            data-test="product-inventory-type-card"
+                            class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <h2
+                                class="text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white"
+                            >
+                                Tipo de inventario
+                            </h2>
+                            <div class="mt-3">
+                                <ProductInventoryTypeToggle
+                                    v-model="form.inventory_type"
+                                />
+                            </div>
+                            <p class="mt-2 text-xs text-muted-foreground">
+                                {{
+                                    form.inventory_type === 'non_inventory'
+                                        ? 'Servicio o cargo (mano de obra, instalación): no lleva existencia.'
+                                        : 'Se compra y se vende con existencia.'
+                                }}
+                            </p>
+                        </div>
+
                         <div
                             class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
                         >

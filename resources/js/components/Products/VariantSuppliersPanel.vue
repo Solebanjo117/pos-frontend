@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ErrorMessage from '@/components/ui/ErrorMessage.vue';
@@ -29,6 +29,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     'update:modelValue': [value: DraftVariantSupplier[]];
+    /** La lista que se ve (guardada o en borrador), para calcular markup y margen en vivo. */
+    'rows-change': [rows: VariantSupplierRow[]];
 }>();
 
 const liveRows = ref<VariantSupplierRow[]>([]);
@@ -69,6 +71,7 @@ const draftRows = computed<VariantSupplierRow[]>(() => {
 });
 
 const rows = computed(() => (props.draft ? draftRows.value : liveRows.value));
+watch(rows, (value) => emit('rows-change', value), { immediate: true });
 
 const supplierOptions = computed(() =>
     (allSuppliers.value ?? [])

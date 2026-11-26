@@ -7,6 +7,7 @@ import AttributeManager from '@/components/Products/AttributeManager.vue';
 import ProductCategoryPicker from '@/components/Products/ProductCategoryPicker.vue';
 import ProductCodesEditor from '@/components/Products/ProductCodesEditor.vue';
 import ProductImagesSection from '@/components/Products/ProductImagesSection.vue';
+import ProductInventoryTypeToggle from '@/components/Products/ProductInventoryTypeToggle.vue';
 import ProductStatusToggle from '@/components/Products/ProductStatusToggle.vue';
 import VariantManager from '@/components/Products/VariantManager.vue';
 import VehicleCompatSection from '@/components/Products/VehicleCompatSection.vue';
@@ -68,6 +69,7 @@ const form = ref<UpdateProductRequest>({
     name: '',
     description: '',
     status: 'active',
+    inventory_type: 'single',
     is_universal: false,
 });
 const productCodesRef = ref<InstanceType<typeof ProductCodesEditor> | null>(
@@ -409,6 +411,7 @@ const initializeProductDraft = async () => {
         name: currentProduct.value.name,
         description: currentProduct.value.description || '',
         status: currentProduct.value.status,
+        inventory_type: currentProduct.value.inventory_type ?? 'single',
         is_universal: currentProduct.value.is_universal ?? false,
         extra_category_ids: extraCategoryIds.value,
     };
@@ -1019,6 +1022,29 @@ const validationErrorItems = computed(() =>
                     </div>
 
                     <aside class="space-y-4 xl:sticky xl:top-16 xl:self-start">
+                        <div
+                            data-test="product-inventory-type-card"
+                            class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
+                        >
+                            <h2
+                                class="text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white"
+                            >
+                                Tipo de inventario
+                            </h2>
+                            <div class="mt-3">
+                                <ProductInventoryTypeToggle
+                                    v-model="form.inventory_type"
+                                />
+                            </div>
+                            <p class="mt-2 text-xs text-muted-foreground">
+                                {{
+                                    form.inventory_type === 'non_inventory'
+                                        ? 'Servicio o cargo (mano de obra, instalación): no lleva existencia.'
+                                        : 'Se compra y se vende con existencia.'
+                                }}
+                            </p>
+                        </div>
+
                         <div
                             class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-border dark:bg-card"
                         >
